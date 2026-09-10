@@ -78,7 +78,8 @@ class LIFParams:
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
 # synapses; without it the AL's PN <-> cholinergic-LN loop runs at 300 Hz). Elsewhere depression is off
 # because it blocks descending commands.
-DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0)]   # benchmarked: specific, ipsilateral leg drive, no storms
+DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0),          # benchmarked: specific, ipsilateral leg drive, no storms
+                     (r"^visual_projection$", r"^descending_neuron$", 2.0)]   # LC4/LPLC2 -> GF etc.: loom escape margin (x3 re-ignites the AVLP network)
 
 DEFAULT_STD_U_BY_TYPE = {r"^ORN_": 0.2, r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2, r"(_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN|PN\d)": 0.2}
 

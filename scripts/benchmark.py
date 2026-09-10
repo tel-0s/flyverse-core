@@ -46,6 +46,7 @@ def main():
     ap.add_argument("--w-syn", type=float, default=None)
     ap.add_argument("--conn-cap", type=float, default=None)
     ap.add_argument("--dn-vnc-gain", type=float, default=None, help="gain on descending -> VNC synapses")
+    ap.add_argument("--vp-dn-gain", type=float, default=None, help="gain on visual projection -> descending synapses")
     ap.add_argument("--gain-out", type=float, default=None)
     ap.add_argument("--t4-gain", type=float, default=None, help="T4/T5 output gain (default 2)")
     ap.add_argument("--json", type=str, default="")
@@ -55,8 +56,10 @@ def main():
                  ("input_norm_alpha", args.norm_alpha), ("input_norm_ref", args.norm_ref), ("w_syn", args.w_syn), ("conn_cap", args.conn_cap)]:
         if v is not None:
             setattr(lif, k, v)
-    if args.dn_vnc_gain is not None:
-        lif.path_gain = [(r"^descending_neuron$", r"^vnc_", args.dn_vnc_gain)]
+    if args.dn_vnc_gain is not None or args.vp_dn_gain is not None:
+        lif.path_gain = [(r"^descending_neuron$", r"^vnc_", args.dn_vnc_gain or 3.0)]
+        if args.vp_dn_gain is not None:
+            lif.path_gain.append((r"^visual_projection$", r"^descending_neuron$", args.vp_dn_gain))
     op = optic.OpticParams()
     if args.gain_out is not None:
         op.gain_out_mv = args.gain_out

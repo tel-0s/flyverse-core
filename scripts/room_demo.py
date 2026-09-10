@@ -8,7 +8,7 @@ Panels: fly's-eye camera (human colours) | overview of the table with the fly ma
         brain activity: superclass rates, motor readout, spike count trace
 Brain: graded optic lobe (optic.py, 89k rate units) -> spiking LIF central brain + VNC (brain.py, 72k).
 Keys: SPACE pause, R reset fly, T teleport next to fruit, L loom a black ball at the fly, F stimulate the
-giant fibre (escape jump), ESC quit.
+giant fibre (escape jump), W stimulate the flight DNs DNg02_a/DNa08 for 1 s (wingbeat), ESC quit.
 """
 from __future__ import annotations
 
@@ -128,6 +128,12 @@ class Sim:
         else:
             self.world.move_sphere(self.loom_idx, eye + np.array([0.0, d, 0.01]))
 
+    def stimulate_wing_dns(self, ms=1000.0):
+        """Drive the flight DNs the screen found (DNg02_a, DNa08: wingbeat) at 120 Hz for `ms`."""
+        idx = self.c.select(type=["DNg02_a", "DNa08"])
+        self.brain.set_poisson(idx, 120.0)
+        self.wing_pulse = int(ms / FRAME_MS); self.wing_idx = idx
+
     def stimulate_gf(self):
         """Like a giant-fibre optogenetic pulse: 200 Hz for 30 ms."""
         self.brain.set_poisson(self.wings.gf, 200.0)
@@ -147,6 +153,10 @@ class Sim:
         # taste: front legs touching fruit -> sweet GRNs fire (Poisson 120 Hz, Shiu-style)
         name, dist = self.nearest_fruit()
         self.tasting = 1.0 if (dist < 0.01 and not self.fly.airborne) else 0.0
+        if getattr(self, "wing_pulse", 0) > 0:
+            self.wing_pulse -= 1
+            if self.wing_pulse == 0:
+                self.brain.set_poisson(self.wing_idx, 0.0)
         if getattr(self, "gf_pulse", 0) > 0:
             self.gf_pulse -= 1
             if self.gf_pulse == 0:
@@ -233,7 +243,7 @@ def draw(sim: Sim, screen, font, cam_over: Camera, paused: bool):
     y += 105
     dt_wall = time.time() - sim.t_wall; sim.t_wall = time.time()
     blit_text(screen, font, f"{1 / max(dt_wall, 1e-3):.0f} fps  ({FRAME_MS / max(dt_wall, 1e-3) / 1000:.2f}x real time)" + ("   PAUSED" if paused else ""), ox, y)
-    blit_text(screen, font, "SPACE pause  R reset  T to apple  L loom  F giant fibre  ESC", ox, y + 18)
+    blit_text(screen, font, "SPACE pause  R reset  T apple  L loom  F giant fibre  W wing DNs  ESC", ox, y + 18)
 
 
 def blit_text(screen, font, text, x, y, color=(220, 220, 220)):
@@ -249,6 +259,7 @@ def main():
     ap.add_argument("--teleport", action="store_true", help="start next to the apple")
     ap.add_argument("--loom-at", type=float, default=-1, help="launch a loom at this brain time (s)")
     ap.add_argument("--decoder", type=str, default="", help="drive walking from a trained DN decoder (out/decoder.npz)")
+    ap.add_argument("--wing-at", type=float, default=-1, help="stimulate the flight DNs (DNg02_a, DNa08) at this brain time (s)")
     args = ap.parse_args()
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -284,9 +295,13 @@ def main():
                     sim.start_loom()
                 elif ev.key == pygame.K_f:
                     sim.stimulate_gf()
+                elif ev.key == pygame.K_w:
+                    sim.stimulate_wing_dns()
         if not paused:
             if args.loom_at >= 0 and sim.brain.t >= args.loom_at * 1000:
                 sim.start_loom(); args.loom_at = -1
+            if args.wing_at >= 0 and sim.brain.t >= args.wing_at * 1000:
+                sim.stimulate_wing_dns(); args.wing_at = -1
             sim.step()
             if sim.fly.airborne and not getattr(sim, "_was_air", False):
                 print(f"t={sim.brain.t / 1000:.2f}s TAKEOFF at ({sim.fly.x:+.2f},{sim.fly.y:+.2f}) GF {sim.wcmd['gf']:.0f} Hz TTMn {sim.wcmd['ttm']:.0f} power {sim.wcmd['power']:.0f} Hz")

@@ -244,6 +244,24 @@ and spike-frequency adaptation.
   raises the loom margin (37 Hz) but costs walking-GF margin (max 14); kept at x2.
 * body.py: baseline walking 0.8 cm/s; the MDN "back up" term only counts above 15 Hz (MDN fires a few
   Hz from self-motion optic flow).
+* **Takeoff triggers.** With the DN->VNC gain, walking-related VNC input drove TTMn (the jump-muscle
+  MN, 3,000 inputs, below the fan-in cap) to 20+ Hz and the fly hopped every second. In the animal TTMn
+  fires one spike per giant-fibre spike, so the GF alone is now the escape trigger; voluntary takeoff
+  needs a 50 Hz wingbeat command sustained for 0.3 s. Demo: 5.5 s of quiet walking, loom -> GF 21 Hz
+  with TTMn following at 21 Hz, a 1.2 s flight off the table. Smell adds ~10 Hz to wing-power MNs
+  during walking (benchmark walking test now has smell on, as the demo does).
+* Loom -> GF varies run to run (peak 9-124 Hz); the fan-in cap scales the GF's synapses by 0.125,
+  which under-weights LC4/LPLC2 -> GF, a known strong pathway. Fixed with a second pathway gain,
+  visual_projection -> descending_neuron x2 (default): loom GF 26 Hz, escape at 3.5 cm, walking GF 0,
+  taste unchanged. x3 re-ignites the AVLP network during walking and halves the taste response.
+  The model's per-pathway gain table is therefore: DN -> VNC x3, VP -> DN x2, everything else Shiu's
+  0.275 mV with the connection cap and fan-in cap.
+* **DN screen, second pass (current defaults; `out/dn_screen.csv`)** -- now a real motor map:
+  wing power: DNg02_a 146 Hz (10 cells, legs 0.5 Hz), DNa08 121, DNp31 100, DNpe036 47, DNp43 46,
+  DNg02_f 42, DNp27 41, DNg37, pMP2, DNg02_e -- DNg02 is the wingbeat-amplitude DN cluster of Namiki et
+  al. 2022, so the model recovers a known flight pathway. Giant fibre DNp01 -> TTMn 47 Hz (the jump).
+  Legs: DNp27, DNp43, DNge035, DNg100, DNge130 (5-9 Hz both sides); MDN 3.7/2.9; DNp09 only 0.6.
+  Proboscis: DNge080 28 Hz, DNge062 17, DNge059 10. 37 of 473 DN types drive wing power above 15 Hz.
 
 ## Batched brains and the RL environment
 
