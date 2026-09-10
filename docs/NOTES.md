@@ -216,6 +216,21 @@ and spike-frequency adaptation.
   spurious takeoffs; loom GF 39 Hz, escape at 3.5 cm. Without same-type damping, walking optic flow
   drove the DLMn/DVMn clique to 30-90 Hz and the fly took off every half second. Runs are chaotic:
   repeat a benchmark before trusting a 20% difference.
+* **Antennal lobe fixed by putting depression back where it is documented.** With global depression off
+  the AL's PN <-> cholinergic-LN recurrence ran at 300 Hz from 1 Hz of spontaneous ORN input (and
+  MBONs at 230 Hz). `LIFParams.std_u_by_type` now applies u = 0.2 (tau 300 ms) to ORNs, all AL local
+  neurons and all PN types, nothing else; spontaneous ORN rate 1 Hz. Result: spontaneous PNs 4-55 Hz,
+  odour-specific responses (apple: DM1 123 Hz, VA2 101, DM4 33; banana: DM2 66), LNs 20-200 Hz,
+  Kenyon cells sparse (0-1 Hz), MBONs 1-4 Hz. u = 0.5 on ORNs alone silences PNs (strong depression
+  equalises steady-state transmission across rates and leaves only onset transients).
+* **Final benchmark (commit after this note)**: rest silent; sugar -> MN9 3.7 Hz; odour -> PN 13 Hz
+  mean (max 108), 1,249 KCs weakly active, LNs 57 Hz; DNa02_L -> ipsilateral leg bias (0.6 / 0.0);
+  MDN -> GNG562 / IN06B020 / IN07B010 at 60 Hz, no storm; DNp09 -> nothing (its VNC effect was the
+  AVLP storm); walking: GF 0, wing power 2.5 Hz (max 11), 1.3% of CNS active; loom: GF peak 20 Hz,
+  escape at 3.5 cm (borderline -- the escape threshold is 20 Hz); rotation: DNp04 and DNp20 flip
+  with direction (DNp20 15/1 Hz during rightward rotation -- doomfly's arbitrary turning DN turns out to
+  carry a rotation signal here too). Demo: one loom-triggered hop, one spurious GF hop in 14 s; the
+  fly barely walks (baseline 0.4 cm/s minus an MDN term) -- the walking drive needs a real source.
 
 ## Batched brains and the RL environment
 

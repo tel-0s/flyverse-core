@@ -39,7 +39,7 @@ ODOURS = {
 class OlfactionParams:
     d0: float = 0.10          # m, distance at which concentration halves
     max_hz: float = 150.0     # ORN rate at saturating concentration (Hallem & Carlson: up to ~250 Hz)
-    base_hz: float = 3.0      # spontaneous ORN rate (real ~8-20 Hz, but Shiu-strength ORN->PN synapses saturate PNs)
+    base_hz: float = 1.0      # spontaneous ORN rate (real ~8-20 Hz; with Shiu-strength ORN->PN synapses PNs must rest below threshold)
     half_conc: float = 0.5    # concentration giving half-max response
 
 

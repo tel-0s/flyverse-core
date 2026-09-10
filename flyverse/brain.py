@@ -47,6 +47,10 @@ class LIFParams:
     # kills the self-exciting cliques (FR1, DLMn, ...) that otherwise lock up at 300 Hz. 0 disables.
     std_u: float = 0.0       # off by default: depression blocked descending commands (NOTES, session 3)
     std_tau: float = 300.0   # ms
+    # per-presynaptic-type depression: {type_regex: u}. ORN -> PN synapses are the classic strongly
+    # depressing synapse of the fly (Kazama & Wilson 2008); without it 3 Hz of spontaneous ORN input
+    # saturates the projection neurons and the antennal lobe runs hot.
+    std_u_by_type: dict = None
     # Large neurons have low input resistance: neurons whose total input synapse count exceeds
     # `input_norm_ref` get their unitary synapse scaled by (ref / total)^alpha (down only, floor 0.02).
     # E.g. the giant fibre (~40k inputs) would otherwise fire from a few hundred active synapses of
@@ -64,6 +68,12 @@ class LIFParams:
     # synapse number in real neurons; the linear rule turns the few giant connections (>100 synapses,
     # e.g. AVLP488->AVLP520 at ~435 per cell = 120 mV per presynaptic spike) into runaway drivers.
     conn_cap: float = 60.0
+
+
+# Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
+# synapses; without it the AL's PN <-> cholinergic-LN loop runs at 300 Hz). Elsewhere depression is off
+# because it blocks descending commands.
+DEFAULT_STD_U_BY_TYPE = {r"^ORN_": 0.2, r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2, r"(_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN|PN\d)": 0.2}
 
 
 class Brain:
@@ -119,7 +129,16 @@ class Brain:
         self._a_s = math.exp(-p.dt / p.tau_syn)
         self._a_r = math.exp(-p.dt / p.rate_tau)
         self._a_ad = math.exp(-p.dt / p.adapt_tau) if p.adapt_jump > 0 else 0.0
-        self._a_std = math.exp(-p.dt / p.std_tau) if p.std_u > 0 else 1.0
+        std_map = DEFAULT_STD_U_BY_TYPE if p.std_u_by_type is None else p.std_u_by_type
+        u = np.full(N, p.std_u, dtype=np.float32)
+        if std_map:
+            import re
+            types = c.neurons.type.fillna("").to_numpy()
+            for pat, uu in std_map.items():
+                u[np.array([bool(re.match(pat, t)) for t in types])] = uu
+        self.std_u_vec = torch.from_numpy(u).to(dev)
+        self._std_on = bool((u > 0).any())
+        self._a_std = math.exp(-p.dt / p.std_tau) if self._std_on else 1.0
 
     # ------------------------------------------------------------------ input helpers
     def _idx(self, idx) -> torch.Tensor:
@@ -174,10 +193,10 @@ class Brain:
             if p.adapt_jump > 0:
                 self.adapt.mul_(self._a_ad).add_(spikes, alpha=p.adapt_jump)
 
-            if p.std_u > 0:
+            if self._std_on:
                 # transmit with the currently available resource, then deplete and recover
                 self.spike_buf[self.buf_pos] = spikes * self.res
-                self.res = torch.where(fired, self.res * (1 - p.std_u), self.res)
+                self.res = torch.where(fired, self.res * (1 - self.std_u_vec), self.res)
                 self.res = 1.0 - (1.0 - self.res) * self._a_std
             else:
                 self.spike_buf[self.buf_pos] = spikes
