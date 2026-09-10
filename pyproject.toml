@@ -1,0 +1,9 @@
+[project]
+name = "flyverse"
+version = "0.1.0"
+description = "Simulations, games and other strange places to put the MaleCNS fly connectome"
+requires-python = ">=3.11"
+dependencies = ["numpy", "pandas", "pyarrow", "scipy", "torch", "pygame", "imageio", "pillow"]
+
+[tool.setuptools]
+packages = ["flyverse"]
