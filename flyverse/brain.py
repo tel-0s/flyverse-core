@@ -1,4 +1,4 @@
-"""Whole-CNS leaky integrate-and-fire simulation of the MaleCNS connectome on the GPU (torch).
+"""Whole-CNS leaky integrate-and-fire simulation of the MaleCNS connectome on the GPU (torch), batched.
 
 Model (Shiu et al. 2024, Nature 634:210; same constants as stonkfly/doomfly):
     dv/dt = (v_rest - v + g + I_ext) / tau_m          v_rest = v_reset = -52 mV, v_th = -45 mV
@@ -6,10 +6,12 @@ Model (Shiu et al. 2024, Nature 634:210; same constants as stonkfly/doomfly):
     presynaptic spike (after 1.8 ms delay): g_post += 0.275 mV * sign * synapse_count
     refractory period 2.2 ms.
 Integration is exponential-Euler with a configurable dt (default 0.5 ms; Shiu/stonkfly use 0.1 ms).
+Extras (all optional, see LIFParams): spike-frequency adaptation, short-term synaptic depression, a
+fan-in cap on unitary synaptic strength for very large neurons, current injection and Poisson forcing.
 
-I_ext is a per-neuron constant "drive" in mV (doomfly-style current injection: a drive of D mV above
-rest makes a neuron fire at 1/(t_ref + tau_m*ln(D/(D-7))) Hz once D > 7 mV). You can also force Poisson
-spikes on chosen neurons (Shiu-style optogenetic input) with `poisson_rate_hz`.
+Batching: `Brain(c, batch=B)` simulates B independent brains (same connectome) with state tensors of
+shape (B, N). One sparse matmul serves all B: the cost is nearly flat in B up to ~64 on an RTX 4090.
+Every method accepts per-brain values where it makes sense; with B = 1 the scalar API is unchanged.
 """
 from __future__ import annotations
 
@@ -56,11 +58,12 @@ class LIFParams:
 
 class Brain:
     def __init__(self, c: Connectome, params: LIFParams | None = None, device: str | None = None,
-                 seed: int = 0):
+                 seed: int = 0, batch: int = 1):
         self.c = c
         self.p = params or LIFParams()
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.n = c.n
+        self.B = int(batch)
         p = self.p
 
         W = c.W.tocsr()
@@ -76,21 +79,23 @@ class Brain:
         ).to(self.device)
 
         self.gen = torch.Generator(device=self.device).manual_seed(seed)
-        self.v = torch.full((self.n,), p.v_rest, device=self.device)
-        self.g = torch.zeros(self.n, device=self.device)
-        self.refrac = torch.zeros(self.n, device=self.device)          # ms left in refractory period
-        self.drive = torch.zeros(self.n, device=self.device)           # I_ext (mV), set by the environment
-        self.poisson_p = torch.zeros(self.n, device=self.device)       # per-step spike prob for forced neurons
-        self.rate = torch.zeros(self.n, device=self.device)            # running rate estimate (Hz)
-        self.spikes = torch.zeros(self.n, device=self.device)          # spikes this step (0/1)
-        self.adapt = torch.zeros(self.n, device=self.device)           # adaptation current (mV)
-        self.res = torch.ones(self.n, device=self.device)              # synaptic resource x (STD)
-        self.active = torch.ones(self.n, device=self.device)           # 0 = frozen (simulated elsewhere)
+        B, N, dev = self.B, self.n, self.device
+        self.v = torch.full((B, N), p.v_rest, device=dev)
+        self.g = torch.zeros(B, N, device=dev)
+        self.refrac = torch.zeros(B, N, device=dev)          # ms left in refractory period
+        self.drive = torch.zeros(B, N, device=dev)           # I_ext (mV), set by the environment
+        self.poisson_p = torch.zeros(B, N, device=dev)       # per-step spike prob for forced neurons
+        self.rate = torch.zeros(B, N, device=dev)            # running rate estimate (Hz)
+        self.spikes = torch.zeros(B, N, device=dev)          # spikes this step (0/1)
+        self.adapt = torch.zeros(B, N, device=dev)           # adaptation current (mV)
+        self.res = torch.ones(B, N, device=dev)              # synaptic resource x (STD)
+        self.active = torch.ones(N, device=dev)              # 0 = frozen (simulated elsewhere)
         self.n_delay = max(1, int(round(p.delay / p.dt)))
-        self.spike_buf = torch.zeros(self.n_delay, self.n, device=self.device)
+        self.spike_buf = torch.zeros(self.n_delay, B, N, device=dev)
         self.buf_pos = 0
-        self.t = 0.0                                                   # ms
+        self.t = 0.0                                          # ms
         self.step_count = 0
+        self._poisson_on = False
         self._a_m = math.exp(-p.dt / p.tau_m)
         self._a_s = math.exp(-p.dt / p.tau_syn)
         self._a_r = math.exp(-p.dt / p.rate_tau)
@@ -98,29 +103,40 @@ class Brain:
         self._a_std = math.exp(-p.dt / p.std_tau) if p.std_u > 0 else 1.0
 
     # ------------------------------------------------------------------ input helpers
+    def _idx(self, idx) -> torch.Tensor:
+        return torch.as_tensor(np.asarray(idx), device=self.device, dtype=torch.long)
+
     def set_drive(self, idx, mv) -> None:
-        """Set the injected current (mV) of neurons `idx` (numpy indices) to `mv` (scalar or array)."""
-        idx_t = torch.as_tensor(np.asarray(idx), device=self.device, dtype=torch.long)
-        self.drive[idx_t] = torch.as_tensor(np.asarray(mv, dtype=np.float32), device=self.device)
+        """Injected current (mV) of neurons `idx`: scalar, (len(idx),) or (B, len(idx))."""
+        self.drive[:, self._idx(idx)] = torch.as_tensor(np.asarray(mv, dtype=np.float32), device=self.device)
+
+    def set_poisson(self, idx, rate_hz) -> None:
+        """Force Poisson spikes at rate_hz on neurons `idx`: scalar, (len(idx),) or (B, len(idx))."""
+        r = torch.as_tensor(np.asarray(rate_hz, dtype=np.float32), device=self.device)
+        self.poisson_p[:, self._idx(idx)] = r * (self.p.dt / 1000.0)
+        self._poisson_on = bool(np.any(np.asarray(rate_hz) > 0)) or bool(self.poisson_p.count_nonzero() > 0)
 
     def freeze(self, idx) -> None:
         """Neurons `idx` never spike in the LIF (they are simulated as rate units in optic.py)."""
-        self.active[torch.as_tensor(np.asarray(idx), device=self.device, dtype=torch.long)] = 0.0
+        self.active[self._idx(idx)] = 0.0
 
-    def set_poisson(self, idx, rate_hz) -> None:
-        idx_t = torch.as_tensor(np.asarray(idx), device=self.device, dtype=torch.long)
-        r = torch.as_tensor(np.asarray(rate_hz, dtype=np.float32), device=self.device)
-        self.poisson_p[idx_t] = r * (self.p.dt / 1000.0)
-        self._poisson_on = bool(np.any(np.asarray(rate_hz) > 0)) or bool(self.poisson_p.count_nonzero() > 0)
+    def reset(self, rows=None) -> None:
+        """Reset the state of brains `rows` (all if None) to rest."""
+        sel = slice(None) if rows is None else torch.as_tensor(np.asarray(rows), device=self.device, dtype=torch.long)
+        self.v[sel] = self.p.v_rest
+        for t in (self.g, self.refrac, self.drive, self.poisson_p, self.rate, self.spikes, self.adapt):
+            t[sel] = 0.0
+        self.res[sel] = 1.0
+        self.spike_buf[:, sel] = 0.0
 
     # ------------------------------------------------------------------ dynamics
     @torch.no_grad()
     def step(self, n_steps: int = 1) -> None:
         p = self.p
         for _ in range(n_steps):
-            # synaptic input from spikes emitted `delay` ago
-            delayed = self.spike_buf[self.buf_pos]
-            self.g.mul_(self._a_s).add_(self.W @ delayed)
+            # synaptic input from spikes emitted `delay` ago: one sparse matmul for all B brains
+            delayed = self.spike_buf[self.buf_pos]                          # (B, N)
+            self.g.mul_(self._a_s).add_((self.W @ delayed.T.contiguous()).T)   # contiguous: 4x faster spmm
 
             # membrane (exponential Euler with g and drive held constant over the step)
             target = p.v_rest + self.g + self.drive - self.adapt
@@ -130,8 +146,8 @@ class Brain:
             self.refrac = torch.clamp(self.refrac - p.dt, min=0.0)
 
             spikes = (self.v >= p.v_th).float() * self.active
-            if getattr(self, "_poisson_on", False):   # python flag: avoids a GPU sync per step
-                forced = (torch.rand(self.n, generator=self.gen, device=self.device) < self.poisson_p).float()
+            if self._poisson_on:
+                forced = (torch.rand(self.v.shape, generator=self.gen, device=self.device) < self.poisson_p).float()
                 spikes = torch.maximum(spikes, forced)
             fired = spikes > 0
             self.v = torch.where(fired, torch.full_like(self.v, p.v_reset), self.v)
@@ -157,15 +173,20 @@ class Brain:
 
     # ------------------------------------------------------------------ readout helpers
     def rates(self, idx) -> np.ndarray:
-        return self.rate[torch.as_tensor(np.asarray(idx), device=self.device, dtype=torch.long)].cpu().numpy()
+        """(len(idx),) for B = 1, else (B, len(idx))."""
+        r = self.rate[:, self._idx(idx)].cpu().numpy()
+        return r[0] if self.B == 1 else r
 
-    def mean_rate(self, idx) -> float:
+    def mean_rate(self, idx):
+        """float for B = 1, else (B,) array."""
         if len(idx) == 0:
-            return 0.0
-        return float(self.rate[torch.as_tensor(np.asarray(idx), device=self.device, dtype=torch.long)].mean())
+            return 0.0 if self.B == 1 else np.zeros(self.B)
+        m = self.rate[:, self._idx(idx)].mean(dim=1)
+        return float(m[0]) if self.B == 1 else m.cpu().numpy()
 
-    def total_spikes(self) -> float:
-        return float(self.spikes.sum())
+    def total_spikes(self):
+        s = self.spikes.sum(dim=1)
+        return float(s[0]) if self.B == 1 else s.cpu().numpy()
 
 
 def drive_from_intensity(intensity, gain: float = 30.0, half: float = 0.02):

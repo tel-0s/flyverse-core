@@ -41,13 +41,13 @@ def main():
     b.set_poisson(sweet, args.rate)
     for k in range(int(args.ms / 100)):
         b.run_ms(100)
-        rt = b.rate.cpu().numpy()
+        rt = b.rate[0].cpu().numpy()
         if k % 3 == 2:
             print(f"  t={b.t:.0f}ms spikes/step {b.total_spikes():.0f} frac>1Hz {(rt > 1).mean():.3f} " +
                   " ".join(f"{t}={rt[c.select(type=t)].mean():.0f}" for t in PROBE))
     b.set_poisson(sweet, 0.0)
     b.run_ms(600)
-    rt = b.rate.cpu().numpy()
+    rt = b.rate[0].cpu().numpy()
     print(f"  600 ms after stimulus: spikes/step {b.total_spikes():.0f} frac>1Hz {(rt > 1).mean():.3f} " +
           " ".join(f"{t}={rt[c.select(type=t)].mean():.0f}" for t in PROBE))
     g = n.assign(rate=rt).groupby("type").rate.agg(["mean", "size"])

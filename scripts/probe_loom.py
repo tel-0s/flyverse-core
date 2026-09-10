@@ -50,7 +50,7 @@ def main():
         return (rad.reshape(dirs_b.shape[0], dirs_b.shape[1], 4) * wts_t[None, :, None]).sum(1)
 
     def rep(lab):
-        rts = b.rate.cpu().numpy(); dr = ol.last["dr"].cpu().numpy()
+        rts = b.rate[0].cpu().numpy(); dr = ol.last["dr"][0].cpu().numpy()
         print(f"[{lab}] spikes/step {b.total_spikes():.0f} | OL " + " ".join(f"{t}={np.abs(dr[rt == t]).mean():.2f}" for t in PROBE_OL)
               + " | " + " ".join(f"{t}={rts[c.select(type=t)].mean():.0f}" for t in PROBE))
 

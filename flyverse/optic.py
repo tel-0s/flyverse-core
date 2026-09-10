@@ -1,4 +1,4 @@
-"""Graded (rate-model) optic lobe coupled to the spiking rest of the CNS.
+"""Graded (rate-model) optic lobe coupled to the spiking rest of the CNS, batched over B flies.
 
 Physiology: photoreceptors, lamina cells, medulla columnar cells and T4/T5 are graded-potential
 neurons. Simulating them as leaky integrate-and-fire units fails (docs/NOTES.md): Shiu-style 0.275 mV
@@ -23,6 +23,9 @@ recurrent excitation bounded. The spiking neurons receive injected current
 
 so a visual projection neuron (LC4, LPLC2, LC10 ...) whose optic-lobe inputs rise by 0.3 on average gets
 ~0.3 * gain_out mV. Everything downstream (central brain, VNC) is the Shiu-style LIF in brain.py.
+
+Batching: all state is (B, n) and `step_frame` takes (B, n_col, 4) radiance; with B = 1 the demo
+passes (n_col, 4) and gets (1, N) drive back.
 """
 from __future__ import annotations
 
@@ -76,8 +79,9 @@ def _csr(D: sp.spmatrix, device) -> torch.Tensor:
 
 
 class OpticLobe:
-    def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None):
+    def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1):
         self.c, self.r, self.p = c, retina, params or OpticParams()
+        self.B = int(batch)
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         nrn = c.neurons
         types = nrn.type.fillna("").to_numpy()
@@ -108,38 +112,50 @@ class OpticLobe:
         n_col = retina.n_columns
         self.has = np.zeros((n_col, 5), bool)
         np.add.at(self.has, (retina.pr_column, self.pr_family), True)
-        self.I_lp = np.zeros((n_col, 5), np.float32)
-        self.I_mean = np.zeros((n_col, 5), np.float32)
-        self._fresh = True
+        # photoreceptor -> (column, family) averaging matrix, (n_col*5, n_pr)
+        cnt = np.zeros((n_col, 5), np.float32)
+        np.add.at(cnt, (retina.pr_column, self.pr_family), 1.0)
+        rows = retina.pr_column * 5 + self.pr_family
+        A = sp.csr_matrix((1.0 / cnt[retina.pr_column, self.pr_family], (rows, np.arange(self.n_pr))), shape=(n_col * 5, self.n_pr))
+        self.avg = _csr(A, self.device)
+        self.sens = torch.from_numpy(retina.pr_sens).to(self.device)                       # (n_pr, 4)
+        self.pr_column_t = torch.as_tensor(retina.pr_column, device=self.device)
+        self.pr_cell_t = torch.as_tensor(rows, device=self.device)                          # (n_pr,) -> col*5+fam
+        self.has_t = torch.from_numpy(self.has.reshape(-1)).to(self.device)
+        self.I_lp = torch.zeros(self.B, n_col * 5, device=self.device)
+        self.I_mean = torch.zeros(self.B, n_col * 5, device=self.device)
+        self._fresh = torch.ones(self.B, dtype=torch.bool, device=self.device)
 
-        self.v = torch.zeros(self.n_rate, device=self.device)
-        self.adapt = torch.zeros(self.n_rate, device=self.device)
+        self.v = torch.zeros(self.B, self.n_rate, device=self.device)
+        self.adapt = torch.zeros(self.B, self.n_rate, device=self.device)
         self.r0 = None
         self.last = {}
         tau_map = DEFAULT_TAU_BY_TYPE if self.p.tau_by_type is None else self.p.tau_by_type
         tau = np.array([tau_map.get(t, self.p.tau_ms) for t in types[self.rate_idx]], dtype=np.float32)
-        self._a = torch.from_numpy(np.exp(-self.p.dt_ms / tau)).to(self.device)
+        self._a = torch.from_numpy(np.exp(-self.p.dt_ms / tau)).to(self.device)             # (n_rate,)
         self._a_ad = float(np.exp(-self.p.dt_ms / self.p.adapt_tau_ms))
 
     # ------------------------------------------------------------------ photoreceptors
+    @torch.no_grad()
     def photoreceptor_activity(self, col_radiance: torch.Tensor, dt_ms: float) -> torch.Tensor:
+        """col_radiance (B, n_col, 4) -> photoreceptor contrast activity (B, n_pr)."""
         p = self.p
-        rad = col_radiance.detach().cpu().numpy().astype(np.float32)
-        I_pr = np.einsum("pc,pc->p", rad[self.r.pr_column], self.r.pr_sens)
-        I = np.zeros_like(self.I_lp); cnt = np.zeros_like(self.I_lp)
-        np.add.at(I, (self.r.pr_column, self.pr_family), I_pr)
-        np.add.at(cnt, (self.r.pr_column, self.pr_family), 1.0)
-        I[self.has] /= cnt[self.has]
-        if self._fresh:
-            self.I_lp[:] = I; self.I_mean[:] = I; self._fresh = False
-        a_lp = np.exp(-dt_ms / p.tau_lp_ms); a_ad = np.exp(-dt_ms / p.tau_adapt_ms)
+        rad = col_radiance.to(self.device, torch.float32)
+        if rad.dim() == 2:
+            rad = rad[None]
+        I_pr = (rad[:, self.pr_column_t, :] * self.sens[None]).sum(-1)                     # (B, n_pr)
+        I = (self.avg @ I_pr.T.contiguous()).T                                                            # (B, n_col*5)
+        fresh = self._fresh[:, None]
+        self.I_lp = torch.where(fresh, I, self.I_lp)
+        self.I_mean = torch.where(fresh, I, self.I_mean)
+        self._fresh[:] = False
+        a_lp = float(np.exp(-dt_ms / p.tau_lp_ms)); a_ad = float(np.exp(-dt_ms / p.tau_adapt_ms))
         self.I_lp = a_lp * self.I_lp + (1 - a_lp) * I
         self.I_mean = a_ad * self.I_mean + (1 - a_ad) * self.I_lp
-        contrast = np.clip((self.I_lp - self.I_mean) / (self.I_mean + p.eps), -1.0, p.contrast_clip)
-        contrast[~self.has] = 0.0
-        self.last["contrast"] = contrast
-        a = contrast[self.r.pr_column, self.pr_family]                      # per photoreceptor
-        return torch.from_numpy(np.ascontiguousarray(a, dtype=np.float32)).to(self.device)
+        contrast = ((self.I_lp - self.I_mean) / (self.I_mean + p.eps)).clamp(-1.0, p.contrast_clip)
+        contrast = torch.where(self.has_t[None], contrast, torch.zeros_like(contrast))
+        self.last["contrast"] = contrast.view(self.B, -1, 5).cpu().numpy()                  # (B, n_col, 5)
+        return contrast[:, self.pr_cell_t]                                                   # (B, n_pr)
 
     # ------------------------------------------------------------------ rate dynamics
     def rates(self) -> torch.Tensor:
@@ -148,44 +164,49 @@ class OpticLobe:
     @torch.no_grad()
     def _substep(self, a_pr: torch.Tensor, s_spk: torch.Tensor | None) -> None:
         p = self.p
-        dr = self.rates() - p.baseline
-        inp = p.gain_rr * (self.W_rr @ dr) + p.gain_in * (self.W_rp @ a_pr) - p.adapt_gain * self.adapt
+        dr = self.rates() - p.baseline                                                       # (B, n_rate)
+        inp = p.gain_rr * (self.W_rr @ dr.T.contiguous()).T + p.gain_in * (self.W_rp @ a_pr.T.contiguous()).T - p.adapt_gain * self.adapt
         if s_spk is not None:
-            inp = inp + p.gain_fb * (self.W_rs @ s_spk)
-        self.v = inp + (self.v - inp) * self._a
+            inp = inp + p.gain_fb * (self.W_rs @ s_spk.T.contiguous()).T
+        self.v = inp + (self.v - inp) * self._a[None]
         self.adapt = dr + (self.adapt - dr) * self._a_ad
 
     def relax(self, ms: float = 0.0) -> None:
         """Rest state: by construction every unit sits at the operating point (kept for API symmetry)."""
         self.v.zero_()
-        self.r0 = torch.full((self.n_rate,), self.p.baseline, device=self.device)
+        self.r0 = torch.full((1, self.n_rate), self.p.baseline, device=self.device)
 
     @torch.no_grad()
     def step_frame(self, col_radiance: torch.Tensor, spk_rate_hz: torch.Tensor, frame_ms: float) -> torch.Tensor:
-        """Advance the optic lobe by one frame and return the drive vector (N,) mV for the spiking brain."""
+        """Advance the optic lobe by one frame; returns the drive (B, N) in mV for the spiking brain.
+        spk_rate_hz: the brain's rate tensor, (B, N) (or (N,))."""
         if self.r0 is None:
             self.relax()
         a_pr = self.photoreceptor_activity(col_radiance, frame_ms)
-        s = (spk_rate_hz[self.spk_idx_t] / 100.0).clamp(0, 3)
+        if spk_rate_hz.dim() == 1:
+            spk_rate_hz = spk_rate_hz[None]
+        s = (spk_rate_hz[:, self.spk_idx_t] / 100.0).clamp(0, 3)
         for _ in range(max(1, int(round(frame_ms / self.p.dt_ms)))):
             self._substep(a_pr, s)
         dr = self.rates() - self.r0
-        drive = torch.zeros(self.c.n, device=self.device)
-        drive[self.spk_idx_t] = (self.p.gain_out_mv * (self.W_sr @ dr)).clamp(-self.p.drive_clip_mv, self.p.drive_clip_mv)
+        drive = torch.zeros(self.B, self.c.n, device=self.device)
+        drive[:, self.spk_idx_t] = (self.p.gain_out_mv * (self.W_sr @ dr.T.contiguous()).T).clamp(-self.p.drive_clip_mv, self.p.drive_clip_mv)
         self.last["dr"] = dr
         return drive
 
-    def reset(self) -> None:
-        self._fresh = True
-        self.v.zero_()
-        self.adapt.zero_()
+    def reset(self, rows=None) -> None:
+        if rows is None:
+            self._fresh[:] = True; self.v.zero_(); self.adapt.zero_()
+        else:
+            sel = torch.as_tensor(np.asarray(rows), device=self.device, dtype=torch.long)
+            self._fresh[sel] = True; self.v[sel] = 0.0; self.adapt[sel] = 0.0
 
     # ------------------------------------------------------------------ inspection
-    def delta_rate_by_type(self, top: int = 15):
+    def delta_rate_by_type(self, top: int = 15, row: int = 0):
         import pandas as pd
         if "dr" not in self.last:
             return None
-        dr = self.last["dr"].cpu().numpy()
+        dr = self.last["dr"][row].cpu().numpy()
         t = self.c.neurons.type.fillna("").to_numpy()[self.rate_idx]
         df = pd.DataFrame({"type": t, "dr": dr, "absdr": np.abs(dr)})
         return df.groupby("type").agg(mean_dr=("dr", "mean"), mean_abs=("absdr", "mean"), n=("dr", "size")).sort_values("mean_abs", ascending=False).head(top)

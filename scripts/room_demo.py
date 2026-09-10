@@ -183,7 +183,7 @@ def draw(sim: Sim, screen, font, cam_over: Camera, paused: bool):
     blit_text(screen, font, mode + "   smell: " + sim.olf.summary(), 502, 328)
     # 3. hex mosaics: fly false colour and drive
     fc = world.to_fly_false_color(sim.col_rad, exposure=2.5)
-    cf = sim.optic.last["contrast"][:, 0] if "contrast" in sim.optic.last else np.zeros(sim.r.n_columns)
+    cf = sim.optic.last["contrast"][0][:, 0] if "contrast" in sim.optic.last else np.zeros(sim.r.n_columns)
     for k, (title, ox) in enumerate([("what the fly's photoreceptors see (UV=magenta, G=green, B=blue)", 10),
                                      ("R1-R6 contrast: ON (white) / OFF (black)", 500)]):
         blit_text(screen, font, title, ox, 335)

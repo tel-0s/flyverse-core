@@ -37,7 +37,7 @@ def main():
     print(f"alpha={args.alpha} base={args.base} Hz, {len(olf.orn_idx)} ORNs")
 
     def rep(lab):
-        rt = b.rate.cpu().numpy()
+        rt = b.rate[0].cpu().numpy()
         g = n.assign(rate=rt).groupby("type").rate.agg(["mean", "size"])
         print(f"[{lab}] spikes/step {b.total_spikes():.0f} frac>1Hz {(rt > 1).mean():.3f} | "
               + " ".join(f"{t}={rt[c.select(type=t)].mean():.0f}" for t in PROBE))

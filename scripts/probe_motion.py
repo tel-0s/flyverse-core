@@ -67,10 +67,10 @@ def main():
             b.drive = ol.step_frame(rad, b.rate, 10.0)
             b.step(20)
             if k >= n_frames // 3:   # average after onset transient
-                dr = ol.last["dr"].cpu().numpy()
+                dr = ol.last["dr"][0].cpu().numpy()
                 for t in probe_ol:
                     acc.setdefault(t, []).append(np.maximum(dr[rt == t], 0).mean())   # rectified response
-        spk = b.rate.cpu().numpy()
+        spk = b.rate[0].cpu().numpy()
         results[name] = ({t: float(np.mean(v)) for t, v in acc.items()}, {t: float(spk[c.select(type=t)].mean()) for t in probe_spk})
         print(f"[{name:12s}] OL mean dr: " + " ".join(f"{t}={results[name][0][t]:+.3f}" for t in probe_ol[:8]))
         print(f"               spiking Hz: " + " ".join(f"{t}={results[name][1][t]:.1f}" for t in probe_spk))

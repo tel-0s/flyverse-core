@@ -65,17 +65,17 @@ def main():
     fly = body.FlyState(x=-0.45, y=0.0, z=info["table_top_z"], heading=0.0)
 
     def report(lab):
-        rts = b.rate.cpu().numpy()
+        rts = b.rate[0].cpu().numpy()
         n = nrn.assign(rate=rts)
         sc = n.groupby("superclass").rate.mean()
-        dr = ol.last["dr"].cpu().numpy()
-        ct = ol.last["contrast"][:, 0]
+        dr = ol.last["dr"][0].cpu().numpy()
+        ct = ol.last["contrast"][0][:, 0]
         print(f"[{lab}] spikes/step {b.total_spikes():.0f} frac>1Hz {(rts > 1).mean():.3f} contrast |c| mean {np.abs(ct).mean():.3f} | "
               + ", ".join(f"{k}={v:.1f}" for k, v in sc.sort_values(ascending=False).head(4).items()))
         print("    OL |dr|:", {t: round(float(np.abs(dr[rt == t]).mean()), 3) for t in OL_TYPES},
               " sat %.3f zero %.3f" % ((ol.rates() >= 1).float().mean().item(), (ol.rates() <= 0).float().mean().item()))
         print("    spiking:", {t: round(float(rts[c.select(type=t)].mean()), 1) for t in SPK_TYPES})
-        d = b.drive.cpu().numpy()
+        d = b.drive[0].cpu().numpy()
         print("    drive>7mV: %d, <-7: %d, max %.1f" % ((d > 7).sum(), (d < -7).sum(), d.max()))
         g2 = n.groupby("type").rate.agg(["mean", "size"])
         print("    top spiking:", g2[g2["size"] >= 4].sort_values("mean", ascending=False).head(8)["mean"].round(0).to_dict())

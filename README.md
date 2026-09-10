@@ -18,6 +18,12 @@ python scripts/probe_motion.py         #   drifting gratings: T4/T5 direction se
 Demo keys: SPACE pause, R reset, T teleport to the apple (taste), L loom a black ball at the fly
 (escape jump), F stimulate the giant fibre directly, ESC quit.
 
+RL / evolution on top of the brain (`flyverse/env.py`, `scripts/train_decoder.py`): `FlyRoomEnv(batch=32)`
+runs 32 flies through one batched brain (1.8 ms per fly-frame on a 4090) and exposes descending-neuron
+rates as observations and walking commands as actions; `train_decoder.py` evolves a linear decoder that
+must find the fruit from the brain's own activity. The env follows the PufferLib vectorised convention
+(PufferLib itself does not build on Windows/py3.13; see `docs/NOTES.md`).
+
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
 `FLYVERSE_DATA`). Only three files are used: `body-annotations`, `body-neurotransmitters`,
 `connectome-weights` (1.1 GB total). See `docs/NOTES.md` for everything learned about the data and the

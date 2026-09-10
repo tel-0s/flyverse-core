@@ -156,6 +156,25 @@ and spike-frequency adaptation.
   from leg-MN asymmetry. A per-cell-type gain (learned, as in flyvis) is the real answer; a uniform
   synapse cannot serve both a 40k-input giant fibre and a 250-input T4.
 
+## Batched brains and the RL environment
+
+* `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
+  B flies. Measured on the RTX 4090: spmm 0.58 ms for B=1, 1.3 ms for B=32, 1.7 ms for B=64. Gotcha
+  that cost a 4x slowdown: `W @ x.T` with a non-contiguous transpose (5.6 ms) -- use `.contiguous()`.
+* `flyverse/env.py` `FlyRoomEnv(batch=B)`: B flies on the picnic table, vision (1 ray per ommatidium
+  for speed), smell and taste as in the demo; obs = rates of the 1,314 descending neurons; action =
+  (forward, yaw); reward = cm of progress towards the nearest fruit + 1 per frame of tasting - 0.01.
+  Oracle (walk straight to the fruit) earns ~+13 per second, random ~-1. Throughput: 58 ms per step
+  for B=32 (1.8 ms per fly-frame, 5.5 fly-seconds of brain per wall second); the ray tracer dominates
+  at large B if 7 rays/ommatidium are used.
+* `scripts/train_decoder.py`: OpenAI-ES over a linear decoder (1,315 x 2) with antithetic perturbations,
+  rank fitness and common random numbers (all flies spawn at the same pose within a generation).
+  The question it asks: does descending-neuron activity carry enough information to find the fruit?
+  (The connectome is untouched; only the readout is learned.)
+* **PufferLib**: `pip install pufferlib` fails to build on this Windows / Python 3.13 box (needs its C
+  extensions). The env follows the vectorised reset/step convention, so on Linux wrap it with
+  `pufferlib.emulation` and train with PuffeRL/PPO; the batched brain is the throughput lever either way.
+
 ## Ideas / next steps
 
 * Direction selectivity: T4/T5 need temporally asymmetric inputs (Mi4/Mi9/CT1 slow vs Mi1/Tm3 fast);
