@@ -68,11 +68,18 @@ class LIFParams:
     # synapse number in real neurons; the linear rule turns the few giant connections (>100 synapses,
     # e.g. AVLP488->AVLP520 at ~435 per cell = 120 mV per presynaptic spike) into runaway drivers.
     conn_cap: float = 60.0
+    # Per-pathway gains on the LIF weights: list of (pre_superclass_regex, post_superclass_regex, factor).
+    # The first per-cell-type gain of the model: descending -> VNC synapses. With the anti-runaway
+    # settings, single DN pairs at 150 Hz no longer reach the leg motor neurons; the animal's DN->VNC
+    # synapses are strong (DNp09 / MDN optogenetics walks the fly).
+    path_gain: list = None
 
 
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
 # synapses; without it the AL's PN <-> cholinergic-LN loop runs at 300 Hz). Elsewhere depression is off
 # because it blocks descending commands.
+DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0)]   # benchmarked: specific, ipsilateral leg drive, no storms
+
 DEFAULT_STD_U_BY_TYPE = {r"^ORN_": 0.2, r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2, r"(_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN|PN\d)": 0.2}
 
 
@@ -90,6 +97,15 @@ class Brain:
         if p.conn_cap > 0:
             W = W.copy()
             W.data = np.sign(W.data) * np.minimum(np.abs(W.data), np.float32(p.conn_cap))
+        path_gain = DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain
+        if path_gain:
+            import re
+            sc = c.neurons.superclass.fillna("").to_numpy()
+            Wc = W.tocoo()
+            for pre_re, post_re, f in path_gain:
+                pre_m = np.array([bool(re.match(pre_re, t)) for t in sc]); post_m = np.array([bool(re.match(post_re, t)) for t in sc])
+                Wc.data[pre_m[Wc.col] & post_m[Wc.row]] *= np.float32(f)
+            W = Wc.tocsr()
         if p.same_type_gain != 1.0:
             types = c.neurons.type.fillna("").to_numpy()
             Wc = W.tocoo()

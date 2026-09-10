@@ -100,7 +100,8 @@ class Locomotion:
     max_speed: float = 0.03
     max_yaw: float = np.deg2rad(400)
     tau_ms: float = 80.0           # motor smoothing
-    baseline_speed: float = 0.004  # m/s intrinsic walking drive (flies walk spontaneously; keeps optic flow alive)
+    baseline_speed: float = 0.008  # m/s intrinsic walking drive (flies walk spontaneously; keeps optic flow alive)
+    mdn_threshold: float = 15.0    # Hz; MDN fires a few Hz from self-motion optic flow, only a real burst means "back up"
 
     def readout(self, brain, g: MotorGroups) -> dict:
         r = brain.mean_rate
@@ -109,7 +110,8 @@ class Locomotion:
         oL, oR = r(g.opto_L), r(g.opto_R)
         lL, lR = r(g.leg_L), r(g.leg_R)
         prob = r(g.proboscis)
-        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back
+        back_eff = max(back - self.mdn_threshold, 0.0) if np.isscalar(back) else np.maximum(back - self.mdn_threshold, 0.0)
+        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff
         # convention: DNa02 drives ipsilateral turning (Rayshubskiy et al. 2020): right DNa02 -> turn right
         yaw = -self.k_opto * (oL - oR) - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR)
         return {"speed": float(np.clip(speed, -self.max_speed, self.max_speed)),
@@ -169,7 +171,8 @@ class Flight:
     drag: float = 2.5                  # 1/s
     k_yaw: float = np.deg2rad(600) / 30.0
     max_yaw: float = np.deg2rad(900)
-    takeoff_power_hz: float = 30.0     # sustained power-MN rate that launches a voluntary takeoff
+    takeoff_power_hz: float = 50.0     # sustained power-MN rate that launches a voluntary takeoff
+    takeoff_hold_s: float = 0.3        # ... sustained for this long (a wingbeat command, not a flicker)
     gf_hz: float = 20.0                # smoothed GF rate that counts as an escape spike
     tau_ms: float = 40.0
 
@@ -179,11 +182,11 @@ class Flight:
                 "haltere": r(wg.haltere)}
 
     def maybe_takeoff(self, fly: FlyState, w: dict, dt_s: float = 0.01) -> bool:
-        if w["gf"] >= self.gf_hz or w["ttm"] >= self.gf_hz:
+        if w["gf"] >= self.gf_hz:          # the giant fibre spike is the escape trigger (TTMn follows it 1:1 in the animal)
             self.launch(fly, escape=True); return True
         # voluntary takeoff needs sustained wingbeat drive (0.1 s), not a transient
         self._power_hold = getattr(self, "_power_hold", 0.0) + dt_s if w["power"] >= self.takeoff_power_hz else 0.0
-        if self._power_hold >= 0.1:
+        if self._power_hold >= self.takeoff_hold_s:
             self._power_hold = 0.0
             self.launch(fly, escape=False); return True
         return False

@@ -289,7 +289,7 @@ def main():
                 sim.start_loom(); args.loom_at = -1
             sim.step()
             if sim.fly.airborne and not getattr(sim, "_was_air", False):
-                print(f"t={sim.brain.t / 1000:.2f}s TAKEOFF at ({sim.fly.x:+.2f},{sim.fly.y:+.2f}) GF {sim.wcmd['gf']:.0f} Hz power {sim.wcmd['power']:.0f} Hz")
+                print(f"t={sim.brain.t / 1000:.2f}s TAKEOFF at ({sim.fly.x:+.2f},{sim.fly.y:+.2f}) GF {sim.wcmd['gf']:.0f} Hz TTMn {sim.wcmd['ttm']:.0f} power {sim.wcmd['power']:.0f} Hz")
             if not sim.fly.airborne and getattr(sim, "_was_air", False):
                 print(f"t={sim.brain.t / 1000:.2f}s LANDED at ({sim.fly.x:+.2f},{sim.fly.y:+.2f},{sim.fly.z:.2f}) after {sim.fly.air_time:.2f}s")
             sim._was_air = sim.fly.airborne

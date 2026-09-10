@@ -232,6 +232,19 @@ and spike-frequency adaptation.
   carry a rotation signal here too). Demo: one loom-triggered hop, one spurious GF hop in 14 s; the
   fly barely walks (baseline 0.4 cm/s minus an MDN term) -- the walking drive needs a real source.
 
+## Session 4: per-pathway gains
+
+* **First per-cell-type gain: descending -> VNC synapses x3** (`LIFParams.path_gain`, default
+  `[("^descending_neuron$", "^vnc_", 3.0)]`). Benchmark: DNa02_L -> left leg MNs 3.1 Hz vs right 0.1
+  (ipsilateral, through IN14B003 / IN13B001 / IN14B004); DNp09 -> its own premotor set (IN06B030,
+  IN09A011, IN27X005 at 45 Hz); MDN -> the backward-walking interneurons (IN06B020 152 Hz, IN03B015,
+  IN07B013, LBL40) -- three different DNs, three different VNC patterns, no storm. Walking: GF 0,
+  wing power max 22 Hz (no spurious takeoffs); loom GF 30 Hz, escape at 3.5 cm; taste MN9 5.8 Hz.
+  x6 gives stronger drive but wing power max 50 during walking (takeoffs). T4/T5 output x3 alone
+  raises the loom margin (37 Hz) but costs walking-GF margin (max 14); kept at x2.
+* body.py: baseline walking 0.8 cm/s; the MDN "back up" term only counts above 15 Hz (MDN fires a few
+  Hz from self-motion optic flow).
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

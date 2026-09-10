@@ -11,7 +11,7 @@ Tests
   smell     : ORNs at 3 Hz base + apple odour       -> PN Hz (want < 100), KC Hz (want > 0), LN Hz, frac
   dn_drive  : DNa02_L / DNp09 / MDN at 150 Hz       -> leg MN L, R (want asymmetry for DNa02_L, activity
               for DNp09/MDN, and NOT the same pattern for all), wing power, frac active, top clique rate
-  walk      : fly walks 1.5 s in the room           -> GF Hz (want ~0), DNa02 L/R, frac active
+  walk      : fly walks 1.5 s in the room, smell on -> GF Hz (want ~0), wing power (want < 30), frac active
   loom      : black ball at 1 m/s from the left     -> GF Hz at 3.5 cm (want > 20), escape distance
   rotate    : 90 deg/s yaw for 0.8 s each way       -> DNa02 ipsi/contra Hz (want asymmetric)
 """
@@ -45,6 +45,7 @@ def main():
     ap.add_argument("--norm-ref", type=float, default=None)
     ap.add_argument("--w-syn", type=float, default=None)
     ap.add_argument("--conn-cap", type=float, default=None)
+    ap.add_argument("--dn-vnc-gain", type=float, default=None, help="gain on descending -> VNC synapses")
     ap.add_argument("--gain-out", type=float, default=None)
     ap.add_argument("--t4-gain", type=float, default=None, help="T4/T5 output gain (default 2)")
     ap.add_argument("--json", type=str, default="")
@@ -54,6 +55,8 @@ def main():
                  ("input_norm_alpha", args.norm_alpha), ("input_norm_ref", args.norm_ref), ("w_syn", args.w_syn), ("conn_cap", args.conn_cap)]:
         if v is not None:
             setattr(lif, k, v)
+    if args.dn_vnc_gain is not None:
+        lif.path_gain = [(r"^descending_neuron$", r"^vnc_", args.dn_vnc_gain)]
     op = optic.OpticParams()
     if args.gain_out is not None:
         op.gain_out_mv = args.gain_out
@@ -112,8 +115,9 @@ def main():
 
     gf = c.select(type="DNp01"); a02L = c.select(type="DNa02", somaSide="L"); a02R = c.select(type="DNa02", somaSide="R")
     gf_walk = []; pw_walk = []
+    olf_walk = olfaction.Olfaction(c, [(name, cen, 1.0) for name, cen, rad in info["fruit"]])   # smell on, as in the demo
     for k in range(150):
-        fly.x += 0.004 * 0.01; b.drive = ol.step_frame(col_rad(), b.rate, 10.0); b.step(20)
+        fly.x += 0.004 * 0.01; olf_walk.apply(b, fly.eye_pos); b.drive = ol.step_frame(col_rad(), b.rate, 10.0); b.step(20)
         if k >= 50:
             gf_walk.append(float(b.rate[0, b._idx(gf)].mean())); pw_walk.append(float(b.rate[0, b._idx(wg.power)].mean()))
     rt = b.rate[0].cpu().numpy()
