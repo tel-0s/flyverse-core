@@ -269,6 +269,22 @@ and spike-frequency adaptation.
   `EnvParams.obs = "pn"`: per-glomerulus projection-neuron means (71) plus their change over 0.5 s --
   the odour code plus the derivative a chemotaxing fly needs (klinotaxis). 142 dimensions instead of
   1,314. Results below when the run finishes.
+* **Is the odour code decodable at all?** A hand-written klinotaxis policy on the PN observation
+  (walk forward; turn at a rate proportional to the total drop in glomerular PN activity over the last
+  0.5 s; `FlyRoomEnv.klinotaxis_action`) scores 45 +- 110 with 83 tasted frames and a final distance of
+  4.0 cm, against random 34 / still 42 (47 tasted frames, 4.6 / 5.4 cm) and the oracle 271 (265 tasted
+  frames). So the projection-neuron code carries a usable gradient, but a weak one at 5-12 cm from a
+  fruit with our 10 cm odour half-distance -- and the reward's spawn variance (+-110-145) swamps it.
+  A linear ES decoder cannot express klinotaxis (needs the rectified derivative), hence obs="pn3" adds
+  relu(-delta). Better experiments: bilateral antennae (Gaudry et al. 2013 -- flies steer on
+  left/right ORN asymmetry), a steeper plume, and scoring by tasted frames rather than return.
+* **Result of the odour-code ES run** (64 flies x 40 generations x 5 s, 12 cm spawn curriculum,
+  obs="pn"): the trained decoder scores 34 +- 124 with 16 tasted frames -- *worse* than random (47) and
+  far below the hand-written klinotaxis (48 +- 116, 93 tasted frames). The two generations with high
+  mean return (28: +3, 38: +390) were common spawns that started on fruit. Verdict: ES with a
+  spawn-dominated return does not find chemotaxis in 40 generations even though a 3-line hand policy
+  on the same observation does. Next: fitness = tasted frames with several spawns per policy, the
+  "pn3" feature, and PPO on Linux via PufferLib.
 
 ## Batched brains and the RL environment
 

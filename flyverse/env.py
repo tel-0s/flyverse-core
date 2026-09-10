@@ -36,6 +36,7 @@ class EnvParams:
     taste_reward: float = 1.0
     step_penalty: float = 0.01
     obs: str = "descending"      # "descending" | "descending+motor" | "pn" (per-glomerulus PN rates + their change)
+                                 # | "pn3" (pn + rectified negative change: the klinotaxis feature)
     pn_lag_frames: int = 50      # for obs="pn": the derivative is taken over this many frames (0.5 s)
     seed: int = 0
     spawn_radius: float = 0.0    # > 0: curriculum -- spawn within this distance (m) of a random fruit
@@ -65,7 +66,7 @@ class FlyRoomEnv:
             self.obs_idx = self.c.select(superclass="descending_neuron")
         elif self.p.obs == "descending+motor":
             self.obs_idx = np.concatenate([self.c.select(superclass="descending_neuron"), self.c.select(superclass="vnc_motor"), self.c.select(superclass="cb_motor")])
-        elif self.p.obs == "pn":
+        elif self.p.obs in ("pn", "pn3"):
             # projection neurons grouped by glomerulus (type prefix before '_'): the odour code the mushroom
             # body and lateral horn read. obs = [glomerulus means now, means now - means `lag` frames ago]
             pn = self.c.select(type="~_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN")
@@ -81,7 +82,7 @@ class FlyRoomEnv:
         else:
             raise ValueError(self.p.obs)
         self.obs_idx_t = torch.as_tensor(self.obs_idx, device=self.brain.device)
-        self.n_obs = 2 * len(self.pn_gloms) if self.p.obs == "pn" else len(self.obs_idx)
+        self.n_obs = {"pn": 2, "pn3": 3}.get(self.p.obs, 0) * len(self.pn_gloms) if self.p.obs in ("pn", "pn3") else len(self.obs_idx)
         self.fruit_xy = np.array([[cen[0], cen[1]] for _, cen, _ in self.info["fruit"]])
         self.fruit_r = np.array([rad for _, _, rad in self.info["fruit"]])
         self.x0, self.x1, self.y0, self.y1 = self.info["table_extent"]
@@ -125,12 +126,13 @@ class FlyRoomEnv:
         return (rad * self.wts_t[None, None, :, None]).sum(2)
 
     def _obs(self) -> np.ndarray:
-        if self.p.obs == "pn":
+        if self.p.obs in ("pn", "pn3"):
             g = (self.brain.rate[:, self.obs_idx_t] @ self.pn_A.T / 50.0).clamp(0, 4)      # (B, n_glom), PN ~0-200 Hz
             self.pn_hist.append(g)
             self.pn_hist = self.pn_hist[-(self.p.pn_lag_frames + 1):]
             d = g - self.pn_hist[0]
-            return torch.cat([g, d], dim=1).cpu().numpy().astype(np.float32)
+            parts = [g, d] + ([(-d).clamp_min(0)] if self.p.obs == "pn3" else [])
+            return torch.cat(parts, dim=1).cpu().numpy().astype(np.float32)
         # descending neurons mostly fire 0-20 Hz here: /10 puts the typical active unit at O(1)
         return (self.brain.rate[:, self.obs_idx_t] / 10.0).clamp(0, 4).cpu().numpy().astype(np.float32)
 
@@ -143,7 +145,7 @@ class FlyRoomEnv:
         self.brain.reset()
         self.optic.reset()
         self.t_frames = 0
-        if self.p.obs == "pn":
+        if self.p.obs in ("pn", "pn3"):
             self.pn_hist = []
         self.prev_dist = self.fruit_dist()
         self._sense_and_think()
@@ -179,6 +181,13 @@ class FlyRoomEnv:
         return self._obs(), reward.astype(np.float32), done, info
 
     # convenience for evaluating hand-written policies
+    def klinotaxis_action(self, obs: np.ndarray, gain: float = 4.0) -> np.ndarray:
+        """Hand-written chemotaxis on the PN observation: walk forward; turn (left) at a rate proportional
+        to the total *drop* in odour over the last 0.5 s. Needs obs='pn' or 'pn3'."""
+        n = len(self.pn_gloms)
+        drop = np.clip(-obs[:, n:2 * n].sum(1), 0, None)
+        return np.stack([np.ones(self.B), np.clip(gain * drop, 0, 1)], axis=1)
+
     def oracle_action(self) -> np.ndarray:
         """Head straight for the nearest fruit (ground truth, for reward calibration)."""
         d = np.hypot(self.x[:, None] - self.fruit_xy[None, :, 0], self.y[:, None] - self.fruit_xy[None, :, 1]) - self.fruit_r[None]

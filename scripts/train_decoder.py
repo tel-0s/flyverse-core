@@ -53,7 +53,7 @@ def main():
     ap.add_argument("--init", type=str, default="", help="resume from a saved decoder (out/decoder.npz)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--spawn-radius", type=float, default=0.0, help="curriculum: spawn within this many m of a fruit")
-    ap.add_argument("--obs", default="descending", help="descending | descending+motor | pn")
+    ap.add_argument("--obs", default="descending", help="descending | descending+motor | pn | pn3")
     args = ap.parse_args()
     e = env.FlyRoomEnv(batch=args.batch, params=env.EnvParams(episode_s=args.episode_s, seed=args.seed, spawn_radius=args.spawn_radius, obs=args.obs))
     rng = np.random.default_rng(args.seed)
@@ -63,7 +63,7 @@ def main():
     if args.eval:
         d = np.load(args.eval)
         theta = np.concatenate([d["W"], d["b"][None]], axis=0)
-        for name in ["decoder", "random", "oracle", "still"]:
+        for name in ["decoder", "random", "oracle", "still"] + (["klinotaxis"] if e.p.obs in ("pn", "pn3") else []):
             rets = []
             for rep in range(3):
                 if name == "decoder":
@@ -72,6 +72,13 @@ def main():
                     ret, info = rollout(e, rng.normal(0, 0.05, (e.B, n_in, 2)))
                 elif name == "still":
                     ret, info = rollout(e, np.zeros((e.B, n_in, 2)))
+                elif name == "klinotaxis":
+                    obs = e.reset(); ret = np.zeros(e.B); tasted = np.zeros(e.B)
+                    while True:
+                        obs, r, done, info = e.step(e.klinotaxis_action(obs)); ret += r; tasted += info["tasting"]
+                        if done.all():
+                            break
+                    info = {"dist_cm": info["dist_cm"], "tasted_frames": tasted}
                 else:
                     obs = e.reset(); ret = np.zeros(e.B); tasted = np.zeros(e.B)
                     while True:
