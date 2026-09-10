@@ -171,6 +171,19 @@ and spike-frequency adaptation.
   rank fitness and common random numbers (all flies spawn at the same pose within a generation).
   The question it asks: does descending-neuron activity carry enough information to find the fruit?
   (The connectome is untouched; only the readout is learned.)
+* **Result of the first ES run** (64 flies x 40 generations x 5 s, sigma 0.3, lr 0.1, ~40 min): no
+  learning. Mean return stayed at the step-penalty floor (about -5) in every generation except one whose
+  common spawn point was already touching fruit (+417). Evaluation over 96 random spawns, 5 s episodes:
+  decoder 19 +- 101, random 23 +- 112, still 37 +- 138, oracle 123 +- 162 (final distance 11 / 13 / 13
+  / 2.7 cm) -- the decoder is indistinguishable from doing nothing, and the variance shows the reward is
+  dominated by spawns that happen to touch fruit. Reading: with a linear readout of 1,314 DN
+  rates and 64 rollouts per generation the signal is too weak -- DN activity here is dominated by
+  self-motion optic flow, the fruit are small in the visual field, odour gradients only reach the
+  (saturating) antennal lobe, and ES on 2,630 parameters with returns that depend mostly on the spawn
+  is a hard estimator. Things to try, in order: a curriculum (spawn 5-10 cm from fruit, then farther),
+  observations from LC/MeTu/AL projection neurons rather than DNs, PPO (PufferLib on Linux) with
+  frame-stacked observations, and actions that stimulate DN groups so the brain's own motor pathways
+  do the walking. The env, batching and trainer are in place; the science is open.
 * **PufferLib**: `pip install pufferlib` fails to build on this Windows / Python 3.13 box (needs its C
   extensions). The env follows the vectorised reset/step convention, so on Linux wrap it with
   `pufferlib.emulation` and train with PuffeRL/PPO; the batched brain is the throughput lever either way.

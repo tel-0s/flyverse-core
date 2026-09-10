@@ -22,7 +22,9 @@ RL / evolution on top of the brain (`flyverse/env.py`, `scripts/train_decoder.py
 runs 32 flies through one batched brain (1.8 ms per fly-frame on a 4090) and exposes descending-neuron
 rates as observations and walking commands as actions; `train_decoder.py` evolves a linear decoder that
 must find the fruit from the brain's own activity. The env follows the PufferLib vectorised convention
-(PufferLib itself does not build on Windows/py3.13; see `docs/NOTES.md`).
+(PufferLib itself does not build on Windows/py3.13; see `docs/NOTES.md`). First result: 40 generations
+of ES did **not** learn to approach fruit -- the notes say why and what to try next (curriculum via
+`--spawn-radius`, projection-neuron observations, PPO).
 
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
 `FLYVERSE_DATA`). Only three files are used: `body-annotations`, `body-neurotransmitters`,

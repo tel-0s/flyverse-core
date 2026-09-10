@@ -5,7 +5,7 @@ OpenAI-style ES (antithetic Gaussian perturbations, rank-shaped fitness) using t
 of the B flies runs one perturbed policy for an episode, so a generation costs one episode of wall time
 (~8 s of brain time ~ 30 s wall for B=32 on the RTX 4090).
 
-    python scripts/train_decoder.py --batch 32 --generations 60 --episode-s 6
+    python scripts/train_decoder.py --batch 64 --generations 40 --episode-s 5 [--spawn-radius 0.1]
     python scripts/train_decoder.py --eval out/decoder.npz          # evaluate + compare with oracle/random
 
 Writes out/decoder.npz (W, b) and out/train_log.csv. PufferLib does not build on this Windows box; the
@@ -52,8 +52,9 @@ def main():
     ap.add_argument("--eval", type=str, default="")
     ap.add_argument("--init", type=str, default="", help="resume from a saved decoder (out/decoder.npz)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--spawn-radius", type=float, default=0.0, help="curriculum: spawn within this many m of a fruit")
     args = ap.parse_args()
-    e = env.FlyRoomEnv(batch=args.batch, params=env.EnvParams(episode_s=args.episode_s, seed=args.seed))
+    e = env.FlyRoomEnv(batch=args.batch, params=env.EnvParams(episode_s=args.episode_s, seed=args.seed, spawn_radius=args.spawn_radius))
     rng = np.random.default_rng(args.seed)
     n_in = e.n_obs + 1
     os.makedirs("out", exist_ok=True)

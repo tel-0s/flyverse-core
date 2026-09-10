@@ -37,6 +37,7 @@ class EnvParams:
     step_penalty: float = 0.01
     obs: str = "descending"      # "descending" | "descending+motor" | "all_spiking_types"
     seed: int = 0
+    spawn_radius: float = 0.0    # > 0: curriculum -- spawn within this distance (m) of a random fruit
     rays_per_ommatidium: int = 1 # 1 for training speed (the demo uses 7); the ray tracer dominates at large B
     optic_dt_ms: float = 2.0     # optic-lobe substep (the demo uses 1 ms)
 
@@ -83,8 +84,15 @@ class FlyRoomEnv:
 
     def _place(self, rows):
         k = len(rows)
-        self.x[rows] = self.rng.uniform(self.x0 + 0.05, self.x1 - 0.05, k)
-        self.y[rows] = self.rng.uniform(self.y0 + 0.05, self.y1 - 0.05, k)
+        if self.p.spawn_radius > 0:
+            j = self.rng.integers(0, len(self.fruit_xy), k)
+            ang = self.rng.uniform(-np.pi, np.pi, k)
+            d = self.fruit_r[j] + self.rng.uniform(0.02, self.p.spawn_radius, k)
+            self.x[rows] = np.clip(self.fruit_xy[j, 0] + d * np.cos(ang), self.x0 + 0.03, self.x1 - 0.03)
+            self.y[rows] = np.clip(self.fruit_xy[j, 1] + d * np.sin(ang), self.y0 + 0.03, self.y1 - 0.03)
+        else:
+            self.x[rows] = self.rng.uniform(self.x0 + 0.05, self.x1 - 0.05, k)
+            self.y[rows] = self.rng.uniform(self.y0 + 0.05, self.y1 - 0.05, k)
         self.heading[rows] = self.rng.uniform(-np.pi, np.pi, k)
 
     def _radiance(self) -> torch.Tensor:
