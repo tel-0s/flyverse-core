@@ -39,13 +39,13 @@ class LIFParams:
     # spike-frequency adaptation (not in Shiu et al.): each spike adds `adapt_jump` mV of hyperpolarising
     # current that decays with `adapt_tau`. At rate R the steady adaptation is R*jump*tau, e.g. 100 Hz ->
     # 6 mV with the defaults, so runaway loops (KCs/PEN/PAM at 300 Hz) throttle themselves. 0 disables.
-    adapt_jump: float = 0.3  # mV
+    adapt_jump: float = 1.5  # mV (was 0.3; raised when depression was switched off, see NOTES)
     adapt_tau: float = 200.0 # ms
     # short-term synaptic depression (Tsodyks-Markram style, per presynaptic neuron; not in Shiu et al.):
     # each spike uses a fraction `std_u` of the available resource x, which recovers with `std_tau`. At
     # rate R the steady resource is 1/(1 + u R tau): 20 Hz -> 0.45, 100 Hz -> 0.14, 300 Hz -> 0.05, which
     # kills the self-exciting cliques (FR1, DLMn, ...) that otherwise lock up at 300 Hz. 0 disables.
-    std_u: float = 0.2
+    std_u: float = 0.0       # off by default: depression blocked descending commands (NOTES, session 3)
     std_tau: float = 300.0   # ms
     # Large neurons have low input resistance: neurons whose total input synapse count exceeds
     # `input_norm_ref` get their unitary synapse scaled by (ref / total)^alpha (down only, floor 0.02).
@@ -54,6 +54,16 @@ class LIFParams:
     # alpha 0 = Shiu's uniform 0.275 mV everywhere.
     input_norm_alpha: float = 1.0
     input_norm_ref: float = 5000.0
+    # Synapses between neurons of the SAME cell type are scaled by this factor. Dense within-type
+    # excitatory connections (FR1, lLN1_bc, DLMn, DNg33 ...) are the runaway cliques of the point model;
+    # in the animal such populations are typically gap-junction coupled and fire in synchrony rather
+    # than exciting each other chemically. 1.0 = untouched.
+    same_type_gain: float = 0.1
+    # Per-connection saturation: a connection of `count` synapses contributes min(count, conn_cap)
+    # synapse-equivalents (0 = linear, as in Shiu et al.). PSP amplitude does not grow linearly with
+    # synapse number in real neurons; the linear rule turns the few giant connections (>100 synapses,
+    # e.g. AVLP488->AVLP520 at ~435 per cell = 120 mV per presynaptic spike) into runaway drivers.
+    conn_cap: float = 60.0
 
 
 class Brain:
@@ -67,6 +77,15 @@ class Brain:
         p = self.p
 
         W = c.W.tocsr()
+        if p.conn_cap > 0:
+            W = W.copy()
+            W.data = np.sign(W.data) * np.minimum(np.abs(W.data), np.float32(p.conn_cap))
+        if p.same_type_gain != 1.0:
+            types = c.neurons.type.fillna("").to_numpy()
+            Wc = W.tocoo()
+            same = (types[Wc.row] == types[Wc.col]) & (types[Wc.row] != "")
+            Wc.data[same] *= np.float32(p.same_type_gain)
+            W = Wc.tocsr()
         if p.input_norm_alpha > 0:
             tot = np.asarray(abs(W).sum(axis=1)).ravel()
             scale = np.clip((p.input_norm_ref / np.maximum(tot, 1.0)) ** p.input_norm_alpha, 0.02, 1.0).astype(np.float32)

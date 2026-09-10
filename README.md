@@ -43,8 +43,10 @@ model, and for the PufferLib note if you want to put RL on top.
 | body | walking on the table, escape jumps, flight | named readout: DNa02 L/R -> turning, DNp09/DNa01/... -> forward, MDN -> backward, leg MNs, MN9 -> proboscis; giant fibre DNp01 -> escape takeoff, DLMn/DVMn -> wingbeat thrust/lift, steering MNs (b1-3, i1-2, hg1-4 ...) -> yaw | `body.py` |
 
 Whole thing runs at ~0.6x real time on an RTX 4090 (10 ms of brain per 16.6 ms frame; slower with the
-window open). Rotating the fly in the textured room modulates every optic-lobe layer and drives the
-DNa02 turning neuron on one side at ~28 Hz vs ~0 on the other, with under 2% of the CNS active.
+window open). T4/T5 are direction selective (correct preferred direction for all eight subtypes, from
+the wiring), a looming ball fires the giant fibre and the fly jumps, sugar on the labellum drives the
+proboscis motor neurons, and rotating the fly gives a direction-flipping signal in DNp04 / LPT cells
+that the body reads as an optomotor turn -- all with a few percent of the CNS active.
 
 The motor readout is a *hypothesis* (which descending neurons mean what), not a trained decoder; the
 connectome is not modified. Whether the fly walks towards the fruit is an experiment, not a promise.

@@ -43,11 +43,18 @@ def main():
     ap.add_argument("--contrast", type=float, default=0.5)
     ap.add_argument("--seconds", type=float, default=1.5)
     ap.add_argument("--slow-tau", type=float, default=0, help="override the slow-cell time constant (Mi4/Mi9/CT1/Tm9)")
+    ap.add_argument("--t4-baseline", type=float, default=-1, help="operating point of T4/T5 units (default 0.5)")
+    ap.add_argument("--inh-gain", type=float, default=1.0, help="gain on Mi4/Mi9/CT1/C3 -> T4 and Tm4/Tm9/CT1 -> T5 weights")
+    ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
     c = connectome.load(verbose=False)
     r = retina.build_retina(c)
     types = c.neurons.type.fillna("").to_numpy()
     params = optic.OpticParams()
+    if args.t4_baseline >= 0:
+        params.baseline_by_type = {t: args.t4_baseline for t in ["T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d"]}
+    if args.inh_gain != 1.0:
+        params.pair_gain = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", args.inh_gain), (r"^(Tm4|Tm9|CT1|TmY15)$", r"^T5[abcd]$", args.inh_gain)]
     if args.slow_tau > 0:
         params.tau_by_type = dict(optic.DEFAULT_TAU_BY_TYPE, Mi4=args.slow_tau, Mi9=args.slow_tau, CT1=args.slow_tau, Tm9=args.slow_tau)
     ol = optic.OpticLobe(c, r, params)
@@ -72,8 +79,9 @@ def main():
                     acc.setdefault(t, []).append(np.maximum(dr[rt == t], 0).mean())   # rectified response
         spk = b.rate[0].cpu().numpy()
         results[name] = ({t: float(np.mean(v)) for t, v in acc.items()}, {t: float(spk[c.select(type=t)].mean()) for t in probe_spk})
-        print(f"[{name:12s}] OL mean dr: " + " ".join(f"{t}={results[name][0][t]:+.3f}" for t in probe_ol[:8]))
-        print(f"               spiking Hz: " + " ".join(f"{t}={results[name][1][t]:.1f}" for t in probe_spk))
+        if not args.quiet:
+            print(f"[{name:12s}] OL mean dr: " + " ".join(f"{t}={results[name][0][t]:+.3f}" for t in probe_ol[:8]))
+            print(f"               spiking Hz: " + " ".join(f"{t}={results[name][1][t]:.1f}" for t in probe_spk))
     print("\nDirection selectivity (mean rectified dr per direction; each T4/T5 subtype should peak in a different direction):")
     for t in ["T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d", "Mi1", "Tm3", "Mi4", "Mi9", "Tm1", "Tm2", "Tm9", "LPi34", "LPi43"]:
         vals = [results[d][0][t] for d in DIRS]

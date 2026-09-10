@@ -4,12 +4,16 @@ The readout is deliberately simple and *named* (no hidden decoder): walking spee
 from the classic locomotor descending neurons and from the leg motor neurons in the VNC; proboscis
 extension from MN9. All rates are exponentially-smoothed firing rates from the brain (Hz).
 
-    forward  = k_fwd  * (DNp09 + DNa01 + DNa03 + DNb01 + leg MN total)/... - k_back * MDN
-    turn     = k_turn * (DNa02_R - DNa02_L) + k_leg * (legMN_L - legMN_R)   (positive = turn left)
-    proboscis = MN9 rate
+    forward  = baseline + k_fwd * (DNp09 + DNa01 + DNa03 + DNb01 + DNa04) + k_leg * leg MNs - k_back * MDN
+    turn     = -k_opto * (opto_L - opto_R) - k_turn * (DNa02_R - DNa02_L) + k_leg * (legMN_L - legMN_R)
+    proboscis = MN9 rate                                            (positive turn = left)
 
-These are hypotheses about what the connectome's outputs mean, not established mappings (doomfly used
-DNp20/DNpe017, which they themselves call arbitrary).
+`opto` = DNp04 + LPT27 + LPT30, the descending / lobula-plate-tangential types whose left-right
+asymmetry *flips with rotation direction* in this model (scripts/benchmark.py rotation test): during a
+leftward rotation of the fly the left cells fire, so the optomotor (course-stabilising) response turns
+the fly right -- hence the minus sign. DNa02 gets 80% of its input from the central-complex steering
+output (PFL3/LAL/PS), so it is read as a goal-steering command (ipsilateral turn, Rayshubskiy 2020).
+These are model-derived readouts, not established mappings (doomfly used DNp20/DNpe017, arbitrary).
 """
 from __future__ import annotations
 
@@ -26,6 +30,8 @@ class MotorGroups:
     back_dn: np.ndarray
     turn_L: np.ndarray
     turn_R: np.ndarray
+    opto_L: np.ndarray
+    opto_R: np.ndarray
     leg_L: np.ndarray
     leg_R: np.ndarray
     proboscis: np.ndarray
@@ -39,11 +45,13 @@ def motor_groups(c: Connectome) -> MotorGroups:
         back_dn=c.select(type="MDN"),
         turn_L=c.select(type="DNa02", somaSide="L"),
         turn_R=c.select(type="DNa02", somaSide="R"),
+        opto_L=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="L"),
+        opto_R=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="R"),
         leg_L=c.select(superclass="vnc_motor", subclass=["fl", "ml", "hl"], somaSide="L"),
         leg_R=c.select(superclass="vnc_motor", subclass=["fl", "ml", "hl"], somaSide="R"),
         proboscis=c.select(type="MN9"),
     )
-    g.names = {"fwd_dn": fwd_types, "back_dn": ["MDN"], "turn": ["DNa02 L/R"], "leg": ["leg MNs L/R"], "proboscis": ["MN9"]}
+    g.names = {"fwd_dn": fwd_types, "back_dn": ["MDN"], "turn": ["DNa02 L/R"], "opto": ["DNp04, LPT27, LPT30 L/R"], "leg": ["leg MNs L/R"], "proboscis": ["MN9"]}
     return g
 
 
@@ -87,6 +95,7 @@ class Locomotion:
     k_leg: float = 0.02 / 60.0     # m/s per Hz of mean leg-MN rate
     k_back: float = 0.02 / 40.0
     k_turn: float = np.deg2rad(200) / 40.0   # rad/s per Hz of DNa02 asymmetry
+    k_opto: float = np.deg2rad(150) / 15.0   # rad/s per Hz of DNp04/LPT asymmetry (optomotor, stabilising)
     k_leg_turn: float = np.deg2rad(100) / 30.0
     max_speed: float = 0.03
     max_yaw: float = np.deg2rad(400)
@@ -97,15 +106,16 @@ class Locomotion:
         r = brain.mean_rate
         fwd = r(g.fwd_dn); back = r(g.back_dn)
         tL, tR = r(g.turn_L), r(g.turn_R)
+        oL, oR = r(g.opto_L), r(g.opto_R)
         lL, lR = r(g.leg_L), r(g.leg_R)
         prob = r(g.proboscis)
         speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back
         # convention: DNa02 drives ipsilateral turning (Rayshubskiy et al. 2020): right DNa02 -> turn right
-        yaw = -self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR)
+        yaw = -self.k_opto * (oL - oR) - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR)
         return {"speed": float(np.clip(speed, -self.max_speed, self.max_speed)),
                 "yaw": float(np.clip(yaw, -self.max_yaw, self.max_yaw)),
                 "proboscis": float(np.clip(prob / 30.0, 0, 1)),
-                "rates": {"fwdDN": fwd, "MDN": back, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": prob}}
+                "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": prob}}
 
     def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds: tuple) -> None:
         a = np.exp(-dt_s * 1000 / self.tau_ms)

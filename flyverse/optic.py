@@ -57,6 +57,11 @@ class OpticParams:
     # per-type membrane time constants (ms): the T4/T5 motion detectors need temporally asymmetric
     # inputs (Mi4/Mi9/CT1 and Tm9 are slow, Mi1/Tm3 and Tm1/Tm2/Tm4 fast) -- flyvis learns the same.
     tau_by_type: dict = None
+    # per-type operating points (rest rate in [0,1]); a low value makes a unit rectify (ReLU-like),
+    # which the T4/T5 motion detectors need (null-direction suppression must be able to clip to zero)
+    baseline_by_type: dict = None
+    # extra multiplicative gains on specific connections: list of (pre_type_regex, post_type_regex, factor)
+    pair_gain: list = None
     gain_out_mv: float = 100.0    # optic lobe delta-rate -> injected current in spiking targets
     out_norm: str = "l1"          # normalisation of the optic-lobe -> spiking weights ("l1" fractions, "l2")
     drive_clip_mv: float = 35.0
@@ -67,9 +72,17 @@ class OpticParams:
     eps: float = 0.02
 
 
-DEFAULT_TAU_BY_TYPE = {"Mi4": 60.0, "Mi9": 60.0, "CT1": 80.0, "Tm9": 60.0, "L3": 40.0, "Mi1": 8.0, "Tm3": 8.0,
+DEFAULT_TAU_BY_TYPE = {"Mi4": 150.0, "Mi9": 150.0, "CT1": 150.0, "Tm9": 150.0, "L3": 40.0, "Mi1": 8.0, "Tm3": 8.0,
                        "Tm1": 8.0, "Tm2": 8.0, "Tm4": 8.0, "L1": 6.0, "L2": 6.0, "T4a": 10.0, "T4b": 10.0, "T4c": 10.0, "T4d": 10.0,
                        "T5a": 10.0, "T5b": 10.0, "T5c": 10.0, "T5d": 10.0}
+# T4/T5 as rectifying (ReLU) units with strong delayed inhibition: this is what makes them direction
+# selective (DSI 0.16-0.26 with the correct preferred direction for all 8 subtypes; see NOTES).
+T4T5 = ["T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d"]
+DEFAULT_BASELINE_BY_TYPE = {t: 0.0 for t in T4T5}
+DEFAULT_PAIR_GAIN = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0), (r"^(Tm4|Tm9|CT1|TmY15)$", r"^T5[abcd]$", 5.0),
+                     # T4/T5 outputs x4: rectified, strongly inhibited DS units respond weakly to natural
+                     # scenes; this restores drive to LPi / HS / VS / LPLC and the descending neurons
+                     (r"^T[45][abcd]$", r".*", 2.0)]
 
 
 def _csr(D: sp.spmatrix, device) -> torch.Tensor:
@@ -100,10 +113,24 @@ class OpticLobe:
             Wn_ol = (sp.diags(1.0 / np.maximum(l2, 1.0)) @ W).tocsr()
         else:
             Wn_ol = Wn
-        self.W_rr = _csr(Wn_ol[self.rate_idx][:, self.rate_idx], self.device)
+        pair_gain = DEFAULT_PAIR_GAIN if self.p.pair_gain is None else self.p.pair_gain
+
+        def apply_pair_gain(M, pre_types, post_types):
+            if not pair_gain:
+                return M
+            import re
+            M = M.tocoo()
+            for pre_re, post_re, f in pair_gain:
+                pre_m = np.array([bool(re.match(pre_re, t)) for t in pre_types]); post_m = np.array([bool(re.match(post_re, t)) for t in post_types])
+                sel = pre_m[M.col] & post_m[M.row]
+                M.data[sel] *= f
+            return M.tocsr()
+
+        rt = types[self.rate_idx]
+        self.W_rr = _csr(apply_pair_gain(Wn_ol[self.rate_idx][:, self.rate_idx], rt, rt), self.device)
         self.W_rp = _csr(Wn_ol[self.rate_idx][:, self.pr_idx], self.device)
         self.W_rs = _csr(Wn_ol[self.rate_idx][:, self.spk_idx], self.device)
-        self.W_sr = _csr((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], self.device)
+        self.W_sr = _csr(apply_pair_gain((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], rt, types[self.spk_idx]), self.device)
         self.rate_idx_t = torch.as_tensor(self.rate_idx, device=self.device)
         self.spk_idx_t = torch.as_tensor(self.spk_idx, device=self.device)
 
@@ -133,6 +160,8 @@ class OpticLobe:
         tau_map = DEFAULT_TAU_BY_TYPE if self.p.tau_by_type is None else self.p.tau_by_type
         tau = np.array([tau_map.get(t, self.p.tau_ms) for t in types[self.rate_idx]], dtype=np.float32)
         self._a = torch.from_numpy(np.exp(-self.p.dt_ms / tau)).to(self.device)             # (n_rate,)
+        bl_map = DEFAULT_BASELINE_BY_TYPE if self.p.baseline_by_type is None else self.p.baseline_by_type
+        self.b_vec = torch.from_numpy(np.array([bl_map.get(t, self.p.baseline) for t in types[self.rate_idx]], dtype=np.float32)).to(self.device)
         self._a_ad = float(np.exp(-self.p.dt_ms / self.p.adapt_tau_ms))
 
     # ------------------------------------------------------------------ photoreceptors
@@ -159,12 +188,12 @@ class OpticLobe:
 
     # ------------------------------------------------------------------ rate dynamics
     def rates(self) -> torch.Tensor:
-        return (self.v + self.p.baseline).clamp(0.0, 1.0)
+        return (self.v + self.b_vec[None]).clamp(0.0, 1.0)
 
     @torch.no_grad()
     def _substep(self, a_pr: torch.Tensor, s_spk: torch.Tensor | None) -> None:
         p = self.p
-        dr = self.rates() - p.baseline                                                       # (B, n_rate)
+        dr = self.rates() - self.b_vec[None]                                                 # (B, n_rate)
         inp = p.gain_rr * (self.W_rr @ dr.T.contiguous()).T + p.gain_in * (self.W_rp @ a_pr.T.contiguous()).T - p.adapt_gain * self.adapt
         if s_spk is not None:
             inp = inp + p.gain_fb * (self.W_rs @ s_spk.T.contiguous()).T
@@ -174,7 +203,7 @@ class OpticLobe:
     def relax(self, ms: float = 0.0) -> None:
         """Rest state: by construction every unit sits at the operating point (kept for API symmetry)."""
         self.v.zero_()
-        self.r0 = torch.full((1, self.n_rate), self.p.baseline, device=self.device)
+        self.r0 = self.b_vec[None].clone()
 
     @torch.no_grad()
     def step_frame(self, col_radiance: torch.Tensor, spk_rate_hz: torch.Tensor, frame_ms: float) -> torch.Tensor:

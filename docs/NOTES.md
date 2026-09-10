@@ -156,6 +156,67 @@ and spike-frequency adaptation.
   from leg-MN asymmetry. A per-cell-type gain (learned, as in flyvis) is the real answer; a uniform
   synapse cannot serve both a 40k-input giant fibre and a 250-input T4.
 
+## Session 3: tackling the negatives
+
+* **Direction selectivity achieved.** First the anatomy check: in our hex embedding, each T4 subtype's
+  Mi9 (leading) and Mi4 (trailing) inputs are offset from its Mi1 centre by one column in the expected
+  directions -- T4c: Mi4 +2.9 deg up / Mi9 -3.1 deg down, T4d mirrored; T4a/T4b: +-3.6-4 deg along
+  azimuth, mirrored between eyes. The rate model just wasn't using it: units sat at a mid-range
+  operating point (linear) and the delayed inhibitory arms were weak. Fix (now default in optic.py):
+  T4/T5 operating point 0 (pure ReLU), x5 gain on Mi4/Mi9/CT1/C3 -> T4 and Tm4/Tm9/CT1/TmY15 -> T5, slow
+  cells (Mi4/Mi9/CT1/Tm9) at 150 ms. Result with a 60 deg/s, 30 deg grating: DSI 0.16-0.26 with the
+  correct preferred direction for all eight subtypes (T4a/T5a front-to-back, b back-to-front, c up,
+  d down); at 30 deg/s DSI halves (temporal-frequency tuning, as in the real cells). The loom still
+  triggers the escape at 3.5 cm and walking leaves the GF at 0-2 Hz.
+* **DN activation screen** (`scripts/screen_dns.py`, batched: 64 brains, one DN type each, 150 Hz
+  for 400 ms, ~2 min for all 600 types): essentially *nothing* moves in the VNC. DNp09, MDN, DNa02,
+  whose optogenetic activation walks real flies, change leg-MN rates by < 1 Hz; strongest wing-power
+  driver DNg15 at 4.5 Hz; DNge062 -> MN9 14 Hz is the one clean hit. Not the fan-in cap (alpha 0 is the
+  same). See below for the cause.
+* **Cause: short-term depression.** With `std_u = 0` DNp09/MDN/DNa02 at 150 Hz drive 1,000-1,500 VNC
+  interneurons and the leg MNs -- but *non-specifically* (all three give the same pattern, both sides
+  equally, wing power at 250 Hz) and the cliques come back (DNg33, DLMn, AN27X013 at 300 Hz). So the
+  point model has two regimes, silent or epileptic, and depression had been choosing "silent" for the
+  VNC. Depression is presynaptic-rate dependent: a 150 Hz descending command is exactly what it
+  suppresses (10% efficacy), which is why single-DN optogenetics-style tests fail here.
+* Within-type synapses are 2.8% of the connectome but hold most of the cliques (lLN1_bc 2,900/cell,
+  KC->KC 415k = 57% of KC input, FR1, PFN, PEN, DNg33 ...). `LIFParams.same_type_gain` scales them
+  (populations like these are typically gap-junction coupled and fire in synchrony in the animal). It is
+  not sufficient: with depression off a *cross-type* recurrent network in the AVLP (AVLP154/157/488 ->
+  AVLP520/AVLP428/CL212/CL002) runs at 280 Hz. Spike-frequency adaptation (per neuron, so it does not
+  block feed-forward commands) is the remaining physiological brake -- see the benchmark results.
+* `scripts/benchmark.py` scores a parameter set on all known behaviours at once (rest, taste, smell,
+  DN drive x3, walking GF, loom, rotation). Use it before changing defaults.
+* **Per-connection saturation** (`LIFParams.conn_cap = 60`, new default, with depression off and
+  adaptation 1.0 mV/spike): a connection contributes at most 60 synapse-equivalents (16.5 mV per
+  presynaptic spike). Connections above 60 synapses are 0.6% of all connections (5.8% of synapses);
+  the AVLP giants are ~435 per cell. Benchmark: rest silent; sugar -> MN9 8 Hz; loom -> GF 76 Hz,
+  escape at 3.5 cm; walking GF 0; odour -> 3,261 KCs active (the MB is alive, not yet sparse);
+  MDN drives a specific VNC set (IN06B020, GNG562, LBL40 at 70-80 Hz, no storm); DNa02_L gives an
+  *ipsilateral* leg-MN bias (0.8 vs 0.1 Hz) for the first time. DNp09 still ignites the AVLP network.
+  Cap 40 kills DNp09's effect and most of taste; same-type damping on top kills DNp09's effect too --
+  so in this model DNp09's motor effect *is* that AVLP recurrence.
+* **DNa02 is not an optomotor relay.** Of its 23,756 input synapses only 595 (2.5%) come from visual
+  projection neurons; the top inputs are AN03A008, PS049/PS059, AN04B003, **PFL3** (the central-complex
+  steering output), LAL126/083/179, VES052, AOTU019. During a 90 deg/s rotation its net synaptic drive
+  is -0.6 mV (inhibited). The 28 Hz "turning response" seen before the fan-in cap was central-brain
+  crosstalk. So the rotation benchmark now reports *which* DNs respond asymmetrically to rotation, and
+  the body readout should use those; DNa02 should be read as a goal-steering command (PFL3 -> DNa02).
+* **Measured optomotor readout.** Most lateralised DNs under rotation (DNg34, DNge119, DNp68) are
+  lateralised the same way for both directions -- constant biases from the asymmetric eye (left-eye
+  hole) and room, not turning signals. Ranking types by how their L-R asymmetry *flips* with rotation
+  direction gives DNp04 (left rotation: L 17 / R 2.6 Hz; right rotation: L 1.5 / R 5.9), the
+  lobula-plate tangential types LPT27, LPT30, and MeVP50/Nod4; HS/VS are weak (< 5 Hz) here. body.py now
+  uses DNp04 + LPT27 + LPT30 (L - R) as a course-stabilising optomotor term, DNa02 as goal steering.
+* Final defaults of this session: depression off, adaptation 1.5 mV/spike (tau 200 ms), conn_cap 60,
+  same_type_gain 0.1, fan-in cap 5000, T4/T5 ReLU + x5 inhibition + x2 output, slow cells 150 ms.
+  Benchmark: rest silent; sugar -> MN9 3.7 Hz (6.7 without same-type damping); odour -> 2,409 KCs
+  active; DNa02_L -> ipsilateral leg bias; MDN -> specific VNC set (GNG562, IN06B020, IN07B010); DNp09
+  -> no storm (and no VNC effect either); walking: GF 0, wing-power MNs 2.5 Hz (max 11) so no
+  spurious takeoffs; loom GF 39 Hz, escape at 3.5 cm. Without same-type damping, walking optic flow
+  drove the DLMn/DVMn clique to 30-90 Hz and the fly took off every half second. Runs are chaotic:
+  repeat a benchmark before trusting a 20% difference.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
