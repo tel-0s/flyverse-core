@@ -32,9 +32,8 @@ def main():
         m = n.type.fillna("").str.match(r"^(lLN|v2LN|v3LN|il3LN|l2LN)") & (n.nt == "acetylcholine")
         print("zeroing outputs of", int(m.sum()), "cholinergic AL LNs")
         W = (c.W @ sp.diags((~m.to_numpy()).astype(np.float32))).tocsr()
-        from flyverse.device import sparse_matrix
         W.data = W.data * np.float32(b.p.w_syn)
-        b.W = sparse_matrix(W, b.device)
+        b.set_weights(W)
     print(f"alpha={args.alpha} base={args.base} Hz, {len(olf.orn_idx)} ORNs")
 
     def rep(lab):

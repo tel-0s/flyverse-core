@@ -15,6 +15,8 @@ python scripts/probe_smell.py          #   fruit odour -> ORNs -> antennal lobe 
 python scripts/probe_motion.py         #   drifting gratings: T4/T5 direction selectivity (not yet)
 ```
 
+`--fast` is the speed preset for Macs / slower GPUs (`--brain-dt`, `--optic-dt`, `--cam-scale` set the parts individually).
+
 Demo keys: SPACE pause, R reset, T teleport to the apple (taste), L loom a black ball at the fly
 (escape jump), F stimulate the giant fibre directly, W stimulate the flight DNs (DNg02_a/DNa08 -> a
 2-3 s powered flight), ESC quit.
@@ -33,8 +35,12 @@ of ES did **not** learn to approach fruit -- the notes say why and what to try n
 `--spawn-radius`, projection-neuron observations, PPO).
 
 Torch backend: CUDA if available, else Apple MPS, else CPU (`flyverse/device.py`; override with
-`FLYVERSE_DEVICE=cpu|cuda:1|mps`). On MPS the sparse weights are COO (torch has no CSR kernels there);
-the brain steps at ~8 ms per 0.5 ms step on an M-series Mac vs ~0.3 ms on a 4090 and ~230 ms on CPU.
+`FLYVERSE_DEVICE=cpu|cuda:1|mps`). On CUDA the synaptic input is one sparse matmul over all 24.6 M
+synapses; on MPS/CPU it is an event-driven gather over the outputs of the neurons that fired
+(`LIFParams.event_driven`, ~1 ms per step on an M-series Mac instead of 8 ms, identical results). The
+demo runs at ~0.06x real time on an M-series Mac, ~0.14x with `--fast` (brain dt 1 ms, optic-lobe dt
+2 ms as in the RL env, half-resolution fly's-eye camera); the optic lobe's 8.8 M-synapse rate model is
+the remaining cost there.
 
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
 `FLYVERSE_DATA`). Only three files are used: `body-annotations`, `body-neurotransmitters`,

@@ -361,3 +361,29 @@ env API if the room sim needs to be ported for speed. Not installed yet (`pip in
 Design constraint to remember: the brain step is the bottleneck (~0.6 ms/step for the whole CNS on
 GPU), so batch many environment copies through one batched brain (spike vectors as a (B, N) matrix;
 the sparse matmul cost is nearly flat in B) rather than running many brains in parallel processes.
+
+
+## Backends: Apple MPS / CPU (session 5)
+
+- `flyverse/device.py` picks cuda > mps > cpu (`FLYVERSE_DEVICE` overrides). Torch has no compressed
+  sparse (CSR) kernels on MPS, so `sparse_matrix()` builds COO there; COO spmm on MPS is ~5-8 ms for the
+  24.6 M-synapse brain matrix and 3.6 ms for the 8.8 M-synapse optic-lobe recurrence (about 5x off memory
+  bandwidth; gather + `index_add_`, int32 indices, fp16 values and a cumsum-over-CSR-segments trick were
+  all tried and are no faster or lose precision).
+- The brain's synaptic input is now optionally event-driven (`LIFParams.event_driven`, default on for
+  non-CUDA devices): the pre-major (CSC) weight layout is gathered for the neurons that fired this step
+  and `index_add_`ed into g. Cost is spikes x fan-out (~150 synapses per neuron) instead of 24.6 M: 0.8 ms
+  at the demo's 40-60 spikes/step, 1.6 ms in a 2%-of-neurons storm, vs 5-8 ms for the spmm. It works for
+  any batch B (the gather carries a brain index). Results are bit-identical to the spmm on CPU and under
+  deterministic drive on MPS; with Poisson input on MPS the two paths drift apart by fp32 rounding order
+  (0.14 Hz max after 150 ms, 16 Hz on a handful of neurons after 500 ms) -- the network amplifies
+  near-threshold differences, as it does between any two summation orders.
+- Readouts: `Brain.rate_np()` caches one device->host copy of the rates per step for all B = 1 readouts
+  (`rates`, `mean_rate`); the demo made ~30 such copies per frame, each a GPU sync (7 ms on MPS).
+- Demo frame on an M-series Mac (FRAME_MS = 10): default 158 ms (optic 67, draw 57, brain 26, trace 5) =
+  0.06x real time; `--fast` (brain dt 1 ms, optic dt 2 ms, camera at 240x150 upscaled) 70 ms = 0.14x.
+  Before this work the frame was ~450 ms. The optic-lobe rate model is the floor now: every unit is active
+  so there is no event-driven shortcut, and its cost is (frame_ms / dt_ms) x 4.5 ms. Further options, all
+  model or engineering trade-offs: prune the smallest normalised optic-lobe weights, overlap the pygame
+  drawing with the next frame's GPU work (MPS is asynchronous until a `.cpu()`), or a fused Metal kernel
+  for the LIF update (the 10 elementwise ops per step cost ~0.3 ms in launches).

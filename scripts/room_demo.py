@@ -48,13 +48,14 @@ class Camera:
 
 
 class Sim:
-    def __init__(self, seed=0):
+    def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1):
         t0 = time.time()
+        self.cam_scale = int(cam_scale)          # fly's-eye camera rendered at 1/cam_scale resolution, upscaled
         self.c = connectome.load(verbose=False)
         self.r = retina.build_retina(self.c)
-        self.optic = optic.OpticLobe(self.c, self.r)
+        self.optic = optic.OpticLobe(self.c, self.r, optic.OpticParams(dt_ms=optic_dt))
         self.optic.relax()
-        self.brain = brain.Brain(self.c, seed=seed)
+        self.brain = brain.Brain(self.c, brain.LIFParams(dt=brain_dt), seed=seed)
         self.brain.freeze(self.optic.rate_idx)     # optic-lobe neurons are rate units, not LIF
         self.groups = body.motor_groups(self.c)
         self.loco = body.Locomotion()
@@ -184,8 +185,11 @@ def draw(sim: Sim, screen, font, cam_over: Camera, paused: bool):
     screen.fill((18, 18, 22))
     fly = sim.fly
     # 1. fly's-eye pinhole camera (human colours)
-    img = sim.world.render_camera(fly.eye_pos, fly.forward, [0, 0, 1], 480, 300, 110)
+    s = sim.cam_scale
+    img = sim.world.render_camera(fly.eye_pos, fly.forward, [0, 0, 1], 480 // s, 300 // s, 110)
     surf = pygame.surfarray.make_surface(np.transpose(world.to_rgb8(img, exposure=2.5), (1, 0, 2)))
+    if s > 1:
+        surf = pygame.transform.scale(surf, (480, 300))
     screen.blit(surf, (10, 10))
     blit_text(screen, font, "fly's-eye camera (human colours, 110 deg)", 12, 312)
     # 2. overview
@@ -204,19 +208,18 @@ def draw(sim: Sim, screen, font, cam_over: Camera, paused: bool):
     mode = f"AIRBORNE z={fly.z:.2f} m v=({fly.vx:+.2f},{fly.vy:+.2f},{fly.vz:+.2f})" if fly.airborne else ("walking on table" if abs(fly.z - sim.info["table_top_z"]) < 1e-3 else "walking on floor")
     blit_text(screen, font, mode + "   smell: " + sim.olf.summary(), 502, 328)
     # 3. hex mosaics: fly false colour and drive
-    fc = world.to_fly_false_color(sim.col_rad, exposure=2.5)
+    fc = world.to_fly_false_color(sim.col_rad, exposure=2.5).astype(int)
     cf = sim.optic.last["contrast"][0][:, 0] if "contrast" in sim.optic.last else np.zeros(sim.r.n_columns)
+    v = np.clip(128 + 127 * cf / 0.5, 0, 255).astype(int)
+    if not hasattr(sim, "_hex_xy"):
+        az, el = sim.r.col_az_el[:, 0], sim.r.col_az_el[:, 1]
+        sim._hex_xy = list(zip((240 - az * 1.85).astype(int).tolist(), (355 + 130 - el * 1.6).astype(int).tolist()))
     for k, (title, ox) in enumerate([("what the fly's photoreceptors see (UV=magenta, G=green, B=blue)", 10),
                                      ("R1-R6 contrast: ON (white) / OFF (black)", 500)]):
         blit_text(screen, font, title, ox, 335)
-        for i in range(sim.r.n_columns):
-            az, el = sim.r.col_az_el[i]
-            x = ox + 240 - az * 1.85; y = 355 + 130 - el * 1.6
-            if k == 0:
-                col = tuple(int(v) for v in fc[i])
-            else:
-                v = int(np.clip(128 + 127 * cf[i] / 0.5, 0, 255)); col = (v, v, v)
-            pygame.draw.circle(screen, col, (int(x), int(y)), 3)
+        cols = fc.tolist() if k == 0 else [(c, c, c) for c in v.tolist()]
+        for (x, y), col in zip(sim._hex_xy, cols):
+            pygame.draw.circle(screen, col, (ox + x, y), 3)
     # 4. brain panel
     ox, oy = 990, 10
     blit_text(screen, font, f"brain t = {sim.brain.t / 1000:.2f} s   spikes/step {sim.spike_hist[-1] if sim.spike_hist else 0:.0f}", ox, oy)
@@ -260,6 +263,10 @@ def main():
     ap.add_argument("--loom-at", type=float, default=-1, help="launch a loom at this brain time (s)")
     ap.add_argument("--decoder", type=str, default="", help="drive walking from a trained DN decoder (out/decoder.npz)")
     ap.add_argument("--wing-at", type=float, default=-1, help="stimulate the flight DNs (DNg02_a, DNa08) at this brain time (s)")
+    ap.add_argument("--fast", action="store_true", help="speed preset for slower GPUs (Apple MPS): brain dt 1 ms, optic dt 2 ms, half-res camera")
+    ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
+    ap.add_argument("--optic-dt", type=float, default=None, help="optic-lobe substep (ms), default 1 (the RL env uses 2)")
+    ap.add_argument("--cam-scale", type=int, default=None, help="fly's-eye camera downscale factor, default 1")
     args = ap.parse_args()
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -268,7 +275,11 @@ def main():
     screen = pygame.display.set_mode((W, H))
     pygame.display.set_caption("flyverse: MaleCNS fly brain in a room")
     font = pygame.font.SysFont("consolas", 14)
-    sim = Sim(args.seed)
+    fast = {"brain_dt": 1.0, "optic_dt": 2.0, "cam_scale": 2} if args.fast else {"brain_dt": 0.5, "optic_dt": 1.0, "cam_scale": 1}
+    for k, v in (("brain_dt", args.brain_dt), ("optic_dt", args.optic_dt), ("cam_scale", args.cam_scale)):
+        if v is not None:
+            fast[k] = v
+    sim = Sim(args.seed, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)
     if args.teleport:

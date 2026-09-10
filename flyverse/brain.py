@@ -74,6 +74,11 @@ class LIFParams:
     # settings, single DN pairs at 150 Hz no longer reach the leg motor neurons; the animal's DN->VNC
     # synapses are strong (DNp09 / MDN optogenetics walks the fly).
     path_gain: list = None
+    # Synaptic input as an event-driven gather over the outputs of the neurons that fired (cost ~ spikes x
+    # fan-out, ~100x less than the full 24.6M-synapse spmm at a few % activity) or as one sparse matmul.
+    # None = matmul on CUDA (cuSPARSE spmm is fast and the batched RL flies are dense in spikes), events
+    # elsewhere (MPS/CPU sparse matmul is 5-30x slower than the gather).
+    event_driven: bool | None = None
 
 
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
@@ -121,7 +126,8 @@ class Brain:
             W = (sp.diags(scale) @ W).tocsr()
             self.input_scale = scale
         W = W.copy(); W.data = W.data * np.float32(p.w_syn)
-        self.W = sparse_matrix(W, self.device)
+        self.event_driven = (self.device.type != "cuda") if p.event_driven is None else bool(p.event_driven)
+        self.set_weights(W)
 
         self.gen = torch.Generator(device=self.device).manual_seed(seed)
         B, N, dev = self.B, self.n, self.device
@@ -138,6 +144,8 @@ class Brain:
         self.n_delay = max(1, int(round(p.delay / p.dt)))
         self.spike_buf = torch.zeros(self.n_delay, B, N, device=dev)
         self.buf_pos = 0
+        self._rate_np = None                                  # CPU snapshot of rate[0] (B = 1 readouts), see rate_np()
+        self._rate_np_key = None
         self.t = 0.0                                          # ms
         self.step_count = 0
         self._poisson_on = False
@@ -155,6 +163,38 @@ class Brain:
         self.std_u_vec = torch.from_numpy(u).to(dev)
         self._std_on = bool((u > 0).any())
         self._a_std = math.exp(-p.dt / p.std_tau) if self._std_on else 1.0
+
+    def set_weights(self, W) -> None:
+        """Install a (post, pre) scipy sparse matrix of synaptic weights in mV (already scaled by w_syn)."""
+        import scipy.sparse as sp
+        if self.event_driven:
+            Wc = sp.csc_matrix(W)                                      # pre-major: outputs of each neuron
+            self.W = None
+            self._out_ptr = torch.from_numpy(Wc.indptr.astype(np.int64)).to(self.device)
+            self._out_post = torch.from_numpy(Wc.indices.astype(np.int64)).to(self.device)
+            self._out_w = torch.from_numpy(Wc.data.astype(np.float32)).to(self.device)
+        else:
+            self.W = sparse_matrix(W, self.device)
+
+    def _add_synaptic_input(self, x: torch.Tensor) -> None:
+        """g += W @ x for transmitted spikes x (B, N); event-driven or one sparse matmul for all B brains."""
+        if not self.event_driven:
+            self.g.add_((self.W @ x.T.contiguous()).T)                  # contiguous: 4x faster spmm
+            return
+        nz = torch.nonzero(x)                                           # (K, 2) [brain, pre]; syncs with host
+        if nz.shape[0] == 0:
+            return
+        bidx, pre = nz[:, 0], nz[:, 1]
+        start = self._out_ptr[pre]
+        cnt = self._out_ptr[pre + 1] - start
+        total = int(cnt.sum())
+        if total == 0:
+            return
+        seg = torch.repeat_interleave(torch.arange(nz.shape[0], device=self.device), cnt, output_size=total)
+        first = torch.repeat_interleave(torch.cumsum(cnt, 0) - cnt, cnt, output_size=total)
+        e = start[seg] + torch.arange(total, device=self.device) - first          # synapse ids, pre-major
+        tgt = self._out_post[e] + bidx[seg] * self.n
+        self.g.view(-1).index_add_(0, tgt, self._out_w[e] * x[bidx[seg], pre[seg]])
 
     # ------------------------------------------------------------------ input helpers
     def _idx(self, idx) -> torch.Tensor:
@@ -182,6 +222,7 @@ class Brain:
             t[sel] = 0.0
         self.res[sel] = 1.0
         self.spike_buf[:, sel] = 0.0
+        self._rate_np_key = None
 
     # ------------------------------------------------------------------ dynamics
     @torch.no_grad()
@@ -189,8 +230,8 @@ class Brain:
         p = self.p
         for _ in range(n_steps):
             # synaptic input from spikes emitted `delay` ago: one sparse matmul for all B brains
-            delayed = self.spike_buf[self.buf_pos]                          # (B, N)
-            self.g.mul_(self._a_s).add_((self.W @ delayed.T.contiguous()).T)   # contiguous: 4x faster spmm
+            self.g.mul_(self._a_s)
+            self._add_synaptic_input(self.spike_buf[self.buf_pos])          # spikes emitted `delay` ago, (B, N)
 
             # membrane (exponential Euler with g and drive held constant over the step)
             target = p.v_rest + self.g + self.drive - self.adapt
@@ -226,17 +267,28 @@ class Brain:
         self.step(int(round(ms / self.p.dt)))
 
     # ------------------------------------------------------------------ readout helpers
+    def rate_np(self) -> np.ndarray:
+        """(N,) CPU copy of the B = 1 rates, fetched once per step however many readouts ask (every
+        device->host copy is a sync; the demo makes ~30 readouts per frame)."""
+        key = (self.step_count, self.t)
+        if self._rate_np_key != key:
+            self._rate_np = self.rate[0].cpu().numpy()
+            self._rate_np_key = key
+        return self._rate_np
+
     def rates(self, idx) -> np.ndarray:
         """(len(idx),) for B = 1, else (B, len(idx))."""
-        r = self.rate[:, self._idx(idx)].cpu().numpy()
-        return r[0] if self.B == 1 else r
+        if self.B == 1:
+            return self.rate_np()[np.asarray(idx)]
+        return self.rate[:, self._idx(idx)].cpu().numpy()
 
     def mean_rate(self, idx):
         """float for B = 1, else (B,) array."""
         if len(idx) == 0:
             return 0.0 if self.B == 1 else np.zeros(self.B)
-        m = self.rate[:, self._idx(idx)].mean(dim=1)
-        return float(m[0]) if self.B == 1 else m.cpu().numpy()
+        if self.B == 1:
+            return float(self.rate_np()[np.asarray(idx)].mean())
+        return self.rate[:, self._idx(idx)].mean(dim=1).cpu().numpy()
 
     def total_spikes(self):
         s = self.spikes.sum(dim=1)
