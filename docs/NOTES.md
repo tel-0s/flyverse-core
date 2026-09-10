@@ -263,6 +263,13 @@ and spike-frequency adaptation.
   Legs: DNp27, DNp43, DNge035, DNg100, DNge130 (5-9 Hz both sides); MDN 3.7/2.9; DNp09 only 0.6.
   Proboscis: DNge080 28 Hz, DNge062 17, DNge059 10. 37 of 473 DN types drive wing power above 15 Hz.
 
+* **RL, second attempt.** Retraining the DN-rate decoder under the new model with a 12 cm spawn
+  curriculum gave the same nothing after 12 generations (mean return -5), so it was stopped. The
+  observation was the problem, not the optimiser: DN rates are dominated by self-motion. New
+  `EnvParams.obs = "pn"`: per-glomerulus projection-neuron means (71) plus their change over 0.5 s --
+  the odour code plus the derivative a chemotaxing fly needs (klinotaxis). 142 dimensions instead of
+  1,314. Results below when the run finishes.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

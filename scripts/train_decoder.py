@@ -53,8 +53,9 @@ def main():
     ap.add_argument("--init", type=str, default="", help="resume from a saved decoder (out/decoder.npz)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--spawn-radius", type=float, default=0.0, help="curriculum: spawn within this many m of a fruit")
+    ap.add_argument("--obs", default="descending", help="descending | descending+motor | pn")
     args = ap.parse_args()
-    e = env.FlyRoomEnv(batch=args.batch, params=env.EnvParams(episode_s=args.episode_s, seed=args.seed, spawn_radius=args.spawn_radius))
+    e = env.FlyRoomEnv(batch=args.batch, params=env.EnvParams(episode_s=args.episode_s, seed=args.seed, spawn_radius=args.spawn_radius, obs=args.obs))
     rng = np.random.default_rng(args.seed)
     n_in = e.n_obs + 1
     os.makedirs("out", exist_ok=True)

@@ -16,7 +16,13 @@ python scripts/probe_motion.py         #   drifting gratings: T4/T5 direction se
 ```
 
 Demo keys: SPACE pause, R reset, T teleport to the apple (taste), L loom a black ball at the fly
-(escape jump), F stimulate the giant fibre directly, ESC quit.
+(escape jump), F stimulate the giant fibre directly, W stimulate the flight DNs (DNg02_a/DNa08 -> a
+2-3 s powered flight), ESC quit.
+
+`scripts/screen_dns.py` stimulates every descending-neuron type in its own copy of the brain (batched)
+and records what the VNC does -- the model's measured motor map. It recovers known pathways: DNg02 ->
+wingbeat power muscles, giant fibre -> jump muscle, DNa02 -> ipsilateral leg motor neurons, MDN -> the
+backward-walking premotor set. `scripts/benchmark.py` scores any parameter set on all the behaviours.
 
 RL / evolution on top of the brain (`flyverse/env.py`, `scripts/train_decoder.py`): `FlyRoomEnv(batch=32)`
 runs 32 flies through one batched brain (1.8 ms per fly-frame on a 4090) and exposes descending-neuron
