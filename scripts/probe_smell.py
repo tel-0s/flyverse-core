@@ -32,8 +32,9 @@ def main():
         m = n.type.fillna("").str.match(r"^(lLN|v2LN|v3LN|il3LN|l2LN)") & (n.nt == "acetylcholine")
         print("zeroing outputs of", int(m.sum()), "cholinergic AL LNs")
         W = (c.W @ sp.diags((~m.to_numpy()).astype(np.float32))).tocsr()
-        b.W = torch.sparse_csr_tensor(torch.from_numpy(W.indptr.astype(np.int64)), torch.from_numpy(W.indices.astype(np.int64)),
-                                      torch.from_numpy(W.data * np.float32(b.p.w_syn)), size=W.shape).to(b.device)
+        from flyverse.device import sparse_matrix
+        W.data = W.data * np.float32(b.p.w_syn)
+        b.W = sparse_matrix(W, b.device)
     print(f"alpha={args.alpha} base={args.base} Hz, {len(olf.orn_idx)} ORNs")
 
     def rep(lab):

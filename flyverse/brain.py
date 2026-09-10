@@ -22,6 +22,7 @@ import numpy as np
 import torch
 
 from .connectome import Connectome
+from .device import resolve, sparse_matrix
 
 
 @dataclass
@@ -89,7 +90,7 @@ class Brain:
                  seed: int = 0, batch: int = 1):
         self.c = c
         self.p = params or LIFParams()
-        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = resolve(device)
         self.n = c.n
         self.B = int(batch)
         p = self.p
@@ -119,10 +120,8 @@ class Brain:
             import scipy.sparse as sp
             W = (sp.diags(scale) @ W).tocsr()
             self.input_scale = scale
-        self.W = torch.sparse_csr_tensor(
-            torch.from_numpy(W.indptr.astype(np.int64)), torch.from_numpy(W.indices.astype(np.int64)),
-            torch.from_numpy(W.data * np.float32(p.w_syn)), size=(self.n, self.n), dtype=torch.float32,
-        ).to(self.device)
+        W = W.copy(); W.data = W.data * np.float32(p.w_syn)
+        self.W = sparse_matrix(W, self.device)
 
         self.gen = torch.Generator(device=self.device).manual_seed(seed)
         B, N, dev = self.B, self.n, self.device

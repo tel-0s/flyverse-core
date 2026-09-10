@@ -32,6 +32,10 @@ must find the fruit from the brain's own activity. The env follows the PufferLib
 of ES did **not** learn to approach fruit -- the notes say why and what to try next (curriculum via
 `--spawn-radius`, projection-neuron observations, PPO).
 
+Torch backend: CUDA if available, else Apple MPS, else CPU (`flyverse/device.py`; override with
+`FLYVERSE_DEVICE=cpu|cuda:1|mps`). On MPS the sparse weights are COO (torch has no CSR kernels there);
+the brain steps at ~8 ms per 0.5 ms step on an M-series Mac vs ~0.3 ms on a 4090 and ~230 ms on CPU.
+
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
 `FLYVERSE_DATA`). Only three files are used: `body-annotations`, `body-neurotransmitters`,
 `connectome-weights` (1.1 GB total). See `docs/NOTES.md` for everything learned about the data and the

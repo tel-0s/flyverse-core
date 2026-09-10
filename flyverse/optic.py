@@ -37,6 +37,7 @@ import torch
 
 from .connectome import Connectome, PHOTORECEPTOR_TYPES
 from .retina import Retina
+from .device import resolve, sparse_matrix
 
 FAMILY_OF_TYPE = {"R1-R6": 0, "R7p": 1, "R7y": 2, "R7d": 1, "R7_unclear": 2, "R8p": 3, "R8y": 4,
                   "R8d": 1, "R8_unclear": 4, "R7R8_unclear": 2}
@@ -86,16 +87,14 @@ DEFAULT_PAIR_GAIN = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0), (r"^(Tm4|Tm9|C
 
 
 def _csr(D: sp.spmatrix, device) -> torch.Tensor:
-    D = D.tocsr().astype(np.float32)
-    return torch.sparse_csr_tensor(torch.from_numpy(D.indptr.astype(np.int64)), torch.from_numpy(D.indices.astype(np.int64)),
-                                   torch.from_numpy(D.data), size=D.shape).to(device)
+    return sparse_matrix(D.astype(np.float32), device)
 
 
 class OpticLobe:
     def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1):
         self.c, self.r, self.p = c, retina, params or OpticParams()
         self.B = int(batch)
-        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = resolve(device)
         nrn = c.neurons
         types = nrn.type.fillna("").to_numpy()
         is_pr = nrn.type.isin(PHOTORECEPTOR_TYPES).to_numpy()

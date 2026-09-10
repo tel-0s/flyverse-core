@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import torch
 
+from .device import default_device
+
 INF = 1e9
 
 
@@ -73,7 +75,7 @@ class World:
     light_pos: tuple = (0.0, 0.0, 2.3)
     light_color: tuple = (0.9, 1.8, 1.8, 1.8)    # UV, B, G, R power (a bright lamp with some UV)
     ambient: tuple = (0.12, 0.15, 0.15, 0.15)
-    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    device: torch.device = field(default_factory=default_device)
 
     # ---------------------------------------------------------------- dynamic objects
     def move_sphere(self, idx: int, center, radii=None) -> None:
