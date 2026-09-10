@@ -175,21 +175,39 @@ and spike-frequency adaptation.
   extensions). The env follows the vectorised reset/step convention, so on Linux wrap it with
   `pufferlib.emulation` and train with PuffeRL/PPO; the batched brain is the throughput lever either way.
 
+* **Colour** (`scripts/probe_colour.py`): sweeping a 2 cm sphere of each fruit material past the fly
+  gives responses that differ by material only in the third decimal, but the pattern is the right one:
+  Tm5a tracks UV/blue reflectance (r = +0.8), Dm8 / Tm20 / Mi15 anti-track green, LC15 tracks UV/blue,
+  MDN anti-tracks UV/blue. So colour opponency exists in the wiring and reaches projection neurons,
+  weakly. A local (receptive-field) analysis with a larger stimulus would quantify it properly.
+* **Mushroom body**: Kenyon cells stay silent under odour (96 PN synapses per KC, PN population mean
+  15 Hz -> ~1.3 mV of synaptic drive vs the 7 mV needed). Real KCs need ~half their claws active at
+  high rates; with our saturating antennal lobe only the 3-4 odour glomeruli are active. In-brain
+  learning (KC->MBON plasticity gated by PAM/PPL1 dopamine) therefore needs a working PN->KC stage
+  first -- e.g. sparser, stronger ORN->PN transmission or a KC-specific gain.
+
 ## Ideas / next steps
 
-* Direction selectivity: T4/T5 need temporally asymmetric inputs (Mi4/Mi9/CT1 slow vs Mi1/Tm3 fast);
-  give rate units per-type time constants (flyvis has them) and check T4a-d for preferred directions.
-* Sweet GRN identification via the G2N-1/Rattle/Usnea connectivity above; then proboscis extension.
-* Colour: fruit already differ in UV/B/G reflectance; measure Dm8/Tm5/Tm20 opponency by moving a coloured
-  sphere through the receptive field; check whether MeTu/LC responses discriminate apple vs lime.
-* Olfaction is trivial to add: ORN types are annotated by glomerulus (ORN_DA1 ...); a fruit odour = a
-  set of ORN classes at Poisson rates falling off with distance (fly-escape does this).
-* RL with PufferLib: the room is already a step()-able Sim; wrap it as a PufferLib env with the readout
-  (or a small linear decoder over DN rates) as the trained policy, batching B fly copies through one
-  brain (spikes as a (B, N) matrix). See the PufferLib section below.
-* Learning inside the brain: KC->MBON anti-Hebbian rule with PAM/PPL1 reward pulses (stonkfly/doomfly
-  do this with Huang & Luo 2024 equations); DA/OA/5-HT are currently sign-0 (modulatory), which is
-  exactly where plasticity gating should hook in.
+Done in session 2: sweet GRNs, olfaction, colour probe, flight/loom, batched brains, RL env + ES
+trainer. Still open:
+
+* **Direction selectivity** (the biggest missing computation): per-type time constants alone give
+  DSI ~0.05. Options: (a) fit per-cell-type gains/time constants to flyvis's published optimum;
+  (b) a multiplicative (Reichardt-style) nonlinearity at T4/T5 dendrites; (c) use flyvis directly as
+  the optic lobe (it is a torch model on the FlyWire optic lobe; map its cell types onto MaleCNS).
+  With DS, LPLC2 becomes a real loom detector and the escape/self-motion trade-off disappears.
+* **Antennal lobe realism**: presynaptic (GABA-B) inhibition of ORN terminals and depressing ORN->PN
+  synapses would bring PN rates to physiological levels; then KCs can be made sparse and the
+  KC->MBON plasticity (Huang & Luo 2024 rule, PAM/PPL1 gated) becomes meaningful. DA/OA/5-HT are
+  already sign-0, i.e. reserved for modulation.
+* **Per-cell-type synaptic gains** instead of one 0.275 mV synapse plus a fan-in cap: a small table
+  (visual projection, DN, MN, KC ...) would let the GF, DNa02 and T4 all sit at sensible thresholds.
+  Could be fit against the known behaviours (sugar -> MN9, loom -> GF, optic flow -> DNa02).
+* **Sustained flight**: which descending neurons initiate wingbeat (DNa? DNp? "flight DNs" in the
+  fly-escape pathways.json) -- stimulate candidates and see whether DLMn/DVMn stay on.
+* **Leg sugar GRNs** need their own second-order reference set (the labellar set is done).
+* **RL**: on Linux, wrap `FlyRoomEnv` with PufferLib and run PPO; try actions = stimulation of DN
+  groups instead of direct body control, so the brain's own motor pathways do the walking.
 * Try Shiu's dt = 0.1 ms and no STD/adaptation to see how far the vanilla model gets now that the
   NT-sign fixes are in; and the `-significant-only` weights file as a faster-loading alternative.
 

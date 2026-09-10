@@ -97,6 +97,18 @@ class Sim:
         rad = rad.reshape(self.dirs_b.shape[0], self.dirs_b.shape[1], 4)
         return (rad * self.wts_t[None, :, None]).sum(1)
 
+    def load_decoder(self, path):
+        """Walking commands from a trained linear decoder over descending-neuron rates (train_decoder.py)."""
+        d = np.load(path)
+        self.dec_W, self.dec_b = d["W"], d["b"]
+        self.dec_idx = torch.as_tensor(self.c.select(superclass="descending_neuron"), device=self.brain.device)
+        self.decoder = True
+
+    def decoder_cmd(self):
+        obs = (self.brain.rate[0, self.dec_idx] / 10.0).clamp(0, 4).cpu().numpy()
+        a = np.tanh(obs @ self.dec_W + self.dec_b)
+        return {"speed": float(a[0] * 0.02), "yaw": float(a[1] * np.deg2rad(200)), "proboscis": self.cmd["proboscis"], "rates": self.cmd["rates"]}
+
     def surface_z(self, x, y):
         x0, x1, y0, y1 = self.info["table_extent"]
         return self.info["table_top_z"] if (x0 <= x <= x1 and y0 <= y <= y1) else 0.0
@@ -150,7 +162,7 @@ class Sim:
         elif not self.flight.maybe_takeoff(self.fly, self.wcmd):
             on_table = abs(self.fly.z - self.info["table_top_z"]) < 1e-3
             bounds = (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02) if on_table else (-1.95, 1.95, -1.95, 1.95)
-            self.loco.step(self.fly, self.cmd, FRAME_MS / 1000, bounds)
+            self.loco.step(self.fly, self.decoder_cmd() if getattr(self, "decoder", False) else self.cmd, FRAME_MS / 1000, bounds)
         self.update_loom()
         self.spike_hist.append(self.brain.total_spikes())
         self.spike_hist = self.spike_hist[-400:]
@@ -236,6 +248,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--teleport", action="store_true", help="start next to the apple")
     ap.add_argument("--loom-at", type=float, default=-1, help="launch a loom at this brain time (s)")
+    ap.add_argument("--decoder", type=str, default="", help="drive walking from a trained DN decoder (out/decoder.npz)")
     args = ap.parse_args()
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -245,6 +258,8 @@ def main():
     pygame.display.set_caption("flyverse: MaleCNS fly brain in a room")
     font = pygame.font.SysFont("consolas", 14)
     sim = Sim(args.seed)
+    if args.decoder:
+        sim.load_decoder(args.decoder)
     if args.teleport:
         sim.teleport_to_fruit()
     cam_over = Camera((-1.5, -1.3, 1.8), (0.0, 0.0, sim.info["table_top_z"]), 480, 300, 60)

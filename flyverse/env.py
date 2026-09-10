@@ -6,7 +6,7 @@ fruit?* The agent (a decoder) reads a slice of brain activity -- by default the 
 walking commands. Vision, smell and taste are produced by the world and delivered to the brain by the
 same machinery as the demo. The connectome itself is not trained.
 
-    obs     (B, n_obs)   descending-neuron rates (Hz) / 50, clipped to [0, 4]
+    obs     (B, n_obs)   descending-neuron rates (Hz) / 10, clipped to [0, 4]
     action  (B, 2)       [forward in -1..1 -> cm/s * max_speed, yaw in -1..1 -> deg/s * max_yaw]
     reward  (B,)         progress towards the nearest fruit (cm) + 1.0 per frame of tasting - 0.01
     done    (B,)         episode length reached (or fell off the table -> teleported back, no done)
@@ -103,7 +103,8 @@ class FlyRoomEnv:
         return (rad * self.wts_t[None, None, :, None]).sum(2)
 
     def _obs(self) -> np.ndarray:
-        return (self.brain.rate[:, self.obs_idx_t] / 50.0).clamp(0, 4).cpu().numpy().astype(np.float32)
+        # descending neurons mostly fire 0-20 Hz here: /10 puts the typical active unit at O(1)
+        return (self.brain.rate[:, self.obs_idx_t] / 10.0).clamp(0, 4).cpu().numpy().astype(np.float32)
 
     # ------------------------------------------------------------------ API
     def reset(self, same_start: bool = False) -> np.ndarray:
