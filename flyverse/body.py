@@ -57,6 +57,11 @@ class FlyState:
     yaw_rate: float = 0.0     # rad/s
     proboscis: float = 0.0    # 0..1
     eye_height: float = 0.0012
+    airborne: bool = False
+    vx: float = 0.0           # m/s, world frame (used when airborne)
+    vy: float = 0.0
+    vz: float = 0.0
+    air_time: float = 0.0
 
     @property
     def forward(self) -> np.ndarray:
@@ -115,3 +120,97 @@ class Locomotion:
             fly.x, fly.y = nx, ny
         else:
             fly.heading += np.pi / 2 * dt_s * 8   # nudge away from the edge
+
+
+# ---------------------------------------------------------------------------- flight
+@dataclass
+class WingGroups:
+    gf: np.ndarray          # giant fibre DNp01 (escape takeoff)
+    ttm: np.ndarray         # TTMn: tergotrochanteral "jump" muscle motor neurons
+    power: np.ndarray       # DLMn + DVMn: indirect flight power muscles (wingbeat)
+    steer_L: np.ndarray     # direct steering muscle MNs (b1-3, i1-2, iii1/3, hg1-4, ps1-2, tp1-2, tpn) left
+    steer_R: np.ndarray
+    haltere: np.ndarray
+
+
+def wing_groups(c: Connectome) -> WingGroups:
+    steer = c.select(superclass="vnc_motor", subclass="wm", type="~^(b[123]|i[12]|iii[13]|hg[1-4]|ps[12]|tp[12]|tpn) MN$")
+    side = c.neurons.somaSide.to_numpy()
+    return WingGroups(
+        gf=c.select(type="DNp01"),
+        ttm=c.select(type="TTMn"),
+        power=c.select(type="~^(DLMn|DVMn)"),
+        steer_L=steer[side[steer] == "L"], steer_R=steer[side[steer] == "R"],
+        haltere=c.select(superclass="vnc_motor", subclass="hm"),
+    )
+
+
+@dataclass
+class Flight:
+    """Airborne dynamics. Takeoff = a giant-fibre spike (escape jump: ballistic hop, wings may or may not
+    engage) or sustained wing-power motor neuron activity (voluntary takeoff). In the air, thrust and lift
+    come from the power MNs, yaw from steering-MN asymmetry; without wingbeat the fly falls and lands."""
+    jump_speed: float = 0.6            # m/s initial escape-jump velocity (Drosophila jumps ~0.5-1 m/s)
+    jump_pitch_deg: float = 45.0
+    k_thrust: float = 0.8 / 60.0       # m/s of airspeed per Hz of mean power-MN rate (60 Hz -> 0.8 m/s)
+    hover_hz: float = 20.0             # power-MN rate needed to hold altitude
+    k_lift: float = 1.5 / 40.0         # m/s^2 of vertical acceleration per Hz above hover
+    gravity: float = 3.0               # m/s^2, reduced: a fly's terminal velocity is low (drag)
+    drag: float = 2.5                  # 1/s
+    k_yaw: float = np.deg2rad(600) / 30.0
+    max_yaw: float = np.deg2rad(900)
+    takeoff_power_hz: float = 30.0     # sustained power-MN rate that launches a voluntary takeoff
+    gf_hz: float = 20.0                # smoothed GF rate that counts as an escape spike
+    tau_ms: float = 40.0
+
+    def readout(self, brain, wg: WingGroups) -> dict:
+        r = brain.mean_rate
+        return {"gf": r(wg.gf), "ttm": r(wg.ttm), "power": r(wg.power), "steer_L": r(wg.steer_L), "steer_R": r(wg.steer_R),
+                "haltere": r(wg.haltere)}
+
+    def maybe_takeoff(self, fly: FlyState, w: dict, dt_s: float = 0.01) -> bool:
+        if w["gf"] >= self.gf_hz or w["ttm"] >= self.gf_hz:
+            self.launch(fly, escape=True); return True
+        # voluntary takeoff needs sustained wingbeat drive (0.1 s), not a transient
+        self._power_hold = getattr(self, "_power_hold", 0.0) + dt_s if w["power"] >= self.takeoff_power_hz else 0.0
+        if self._power_hold >= 0.1:
+            self._power_hold = 0.0
+            self.launch(fly, escape=False); return True
+        return False
+
+    def launch(self, fly: FlyState, escape: bool) -> None:
+        fly.airborne = True
+        v = self.jump_speed if escape else 0.2
+        pitch = np.deg2rad(self.jump_pitch_deg if escape else 30)
+        fly.vx = v * np.cos(pitch) * np.cos(fly.heading)
+        fly.vy = v * np.cos(pitch) * np.sin(fly.heading)
+        fly.vz = v * np.sin(pitch)
+        fly.air_time = 0.0
+
+    def step(self, fly: FlyState, w: dict, dt_s: float, surface_z, room: tuple) -> None:
+        """Integrate one airborne step. surface_z(x, y) -> z of what is below; room = (x0,x1,y0,y1,z1)."""
+        a = np.exp(-dt_s * 1000 / self.tau_ms)
+        yaw = np.clip(-self.k_yaw * (w["steer_R"] - w["steer_L"]), -self.max_yaw, self.max_yaw)
+        fly.yaw_rate = a * fly.yaw_rate + (1 - a) * yaw
+        fly.heading += fly.yaw_rate * dt_s
+        thrust = self.k_thrust * w["power"]
+        f = fly.forward
+        ax = (thrust * f[0] - self.drag * fly.vx)
+        ay = (thrust * f[1] - self.drag * fly.vy)
+        az = self.k_lift * (w["power"] - self.hover_hz) - self.gravity if w["power"] > 1 else -self.gravity
+        az -= self.drag * fly.vz
+        fly.vx += ax * dt_s; fly.vy += ay * dt_s; fly.vz += az * dt_s
+        fly.x += fly.vx * dt_s; fly.y += fly.vy * dt_s; fly.z += fly.vz * dt_s
+        fly.air_time += dt_s
+        x0, x1, y0, y1, z1 = room
+        if not (x0 < fly.x < x1):   # walls: land on the wall = stop, drop to the floor below
+            fly.x = np.clip(fly.x, x0 + 0.01, x1 - 0.01); fly.vx = 0.0
+        if not (y0 < fly.y < y1):
+            fly.y = np.clip(fly.y, y0 + 0.01, y1 - 0.01); fly.vy = 0.0
+        if fly.z > z1 - 0.01:
+            fly.z = z1 - 0.01; fly.vz = min(fly.vz, 0.0)
+        ground = surface_z(fly.x, fly.y)
+        if fly.z <= ground and fly.vz <= 0 and fly.air_time > 0.05:
+            fly.z = ground; fly.airborne = False
+            fly.speed = float(np.hypot(fly.vx, fly.vy)) * 0.2   # landing: most momentum lost
+            fly.vx = fly.vy = fly.vz = 0.0

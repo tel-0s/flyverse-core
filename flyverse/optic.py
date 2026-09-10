@@ -51,13 +51,22 @@ class OpticParams:
     gain_fb: float = 0.5          # spiking neurons -> optic lobe (rate/100 Hz)
     adapt_tau_ms: float = 400.0   # slow adaptation of every rate unit towards its operating point
     adapt_gain: float = 1.0       # (removes after-images / persistent states from recurrent gain > 1)
-    gain_out_mv: float = 80.0     # optic lobe delta-rate -> injected current in spiking targets
+    # per-type membrane time constants (ms): the T4/T5 motion detectors need temporally asymmetric
+    # inputs (Mi4/Mi9/CT1 and Tm9 are slow, Mi1/Tm3 and Tm1/Tm2/Tm4 fast) -- flyvis learns the same.
+    tau_by_type: dict = None
+    gain_out_mv: float = 100.0    # optic lobe delta-rate -> injected current in spiking targets
+    out_norm: str = "l1"          # normalisation of the optic-lobe -> spiking weights ("l1" fractions, "l2")
     drive_clip_mv: float = 35.0
     # photoreceptor stage
     tau_lp_ms: float = 10.0
     tau_adapt_ms: float = 300.0
     contrast_clip: float = 2.0
     eps: float = 0.02
+
+
+DEFAULT_TAU_BY_TYPE = {"Mi4": 60.0, "Mi9": 60.0, "CT1": 80.0, "Tm9": 60.0, "L3": 40.0, "Mi1": 8.0, "Tm3": 8.0,
+                       "Tm1": 8.0, "Tm2": 8.0, "Tm4": 8.0, "L1": 6.0, "L2": 6.0, "T4a": 10.0, "T4b": 10.0, "T4c": 10.0, "T4d": 10.0,
+                       "T5a": 10.0, "T5b": 10.0, "T5c": 10.0, "T5d": 10.0}
 
 
 def _csr(D: sp.spmatrix, device) -> torch.Tensor:
@@ -90,7 +99,7 @@ class OpticLobe:
         self.W_rr = _csr(Wn_ol[self.rate_idx][:, self.rate_idx], self.device)
         self.W_rp = _csr(Wn_ol[self.rate_idx][:, self.pr_idx], self.device)
         self.W_rs = _csr(Wn_ol[self.rate_idx][:, self.spk_idx], self.device)
-        self.W_sr = _csr(Wn[self.spk_idx][:, self.rate_idx], self.device)   # spiking targets: fractions
+        self.W_sr = _csr((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], self.device)
         self.rate_idx_t = torch.as_tensor(self.rate_idx, device=self.device)
         self.spk_idx_t = torch.as_tensor(self.spk_idx, device=self.device)
 
@@ -107,7 +116,9 @@ class OpticLobe:
         self.adapt = torch.zeros(self.n_rate, device=self.device)
         self.r0 = None
         self.last = {}
-        self._a = float(np.exp(-self.p.dt_ms / self.p.tau_ms))
+        tau_map = DEFAULT_TAU_BY_TYPE if self.p.tau_by_type is None else self.p.tau_by_type
+        tau = np.array([tau_map.get(t, self.p.tau_ms) for t in types[self.rate_idx]], dtype=np.float32)
+        self._a = torch.from_numpy(np.exp(-self.p.dt_ms / tau)).to(self.device)
         self._a_ad = float(np.exp(-self.p.dt_ms / self.p.adapt_tau_ms))
 
     # ------------------------------------------------------------------ photoreceptors

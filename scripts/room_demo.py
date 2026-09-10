@@ -7,7 +7,8 @@ Panels: fly's-eye camera (human colours) | overview of the table with the fly ma
         fly's-eye hex mosaic (fly false colour: UV=magenta, G=green, B=blue) + R1-R6 contrast
         brain activity: superclass rates, motor readout, spike count trace
 Brain: graded optic lobe (optic.py, 89k rate units) -> spiking LIF central brain + VNC (brain.py, 72k).
-Keys: SPACE pause, R reset fly, T teleport next to fruit, ESC quit.
+Keys: SPACE pause, R reset fly, T teleport next to fruit, L loom a black ball at the fly, F stimulate the
+giant fibre (escape jump), ESC quit.
 """
 from __future__ import annotations
 
@@ -17,10 +18,11 @@ import sys
 import time
 
 import numpy as np
+import pandas as pd
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from flyverse import body, brain, connectome, optic, retina, world  # noqa: E402
+from flyverse import body, brain, connectome, olfaction, optic, retina, world  # noqa: E402
 
 FRAME_MS = 10.0          # brain time per frame (20 LIF steps at 0.5 ms)
 W, H = 1280, 760
@@ -56,14 +58,20 @@ class Sim:
         self.brain.freeze(self.optic.rate_idx)     # optic-lobe neurons are rate units, not LIF
         self.groups = body.motor_groups(self.c)
         self.loco = body.Locomotion()
+        self.wings = body.wing_groups(self.c)
+        self.flight = body.Flight()
         self.world, self.info = world.make_room(seed)
+        self.world.spheres.append(world.Sphere((9, 9, 9), (0.03, 0.03, 0.03), "black"))   # looming ball (L key)
+        self.loom_idx = len(self.world.spheres) - 1
+        self.loom_t = -1.0
         self.dirs_b, self.wts = self.r.ray_directions()
         self.wts_t = torch.from_numpy(self.wts).float().to(self.world.device)
-        # putative sweet taste: a fixed subset of front-leg bristle GRNs (which leg GRNs are sugar cells
-        # is not annotated; this is a stand-in so that touching fruit does *something* gustatory)
-        rng = np.random.default_rng(seed)
-        leg_grn = self.c.select(subclass="leg bristle", entryNerve="ProLN")
-        self.sweet = rng.choice(leg_grn, size=len(leg_grn) // 4, replace=False)
+        # sweet taste: labellar sugar GRNs identified by connectivity to the known sweet second-order
+        # neurons (scripts/find_sweet_grns.py -> flyverse/data/taste_grns.csv)
+        taste = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "flyverse", "data", "taste_grns.csv"))
+        self.sweet = self.c.index_of(taste.bodyId[taste.taste == "sweet"].to_numpy())
+        # smell: every fruit is an odour source for the ORNs of its glomeruli (flyverse/olfaction.py)
+        self.olf = olfaction.Olfaction(self.c, [(name, cen, 1.0) for name, cen, rad in self.info["fruit"]])
         self.reset_fly()
         self.superclasses = ["ol_intrinsic", "visual_projection", "cb_intrinsic", "descending_neuron",
                              "vnc_intrinsic", "vnc_motor", "cb_motor", "vnc_sensory"]
@@ -89,6 +97,30 @@ class Sim:
         rad = rad.reshape(self.dirs_b.shape[0], self.dirs_b.shape[1], 4)
         return (rad * self.wts_t[None, :, None]).sum(1)
 
+    def surface_z(self, x, y):
+        x0, x1, y0, y1 = self.info["table_extent"]
+        return self.info["table_top_z"] if (x0 <= x <= x1 and y0 <= y <= y1) else 0.0
+
+    def start_loom(self):
+        self.loom_t = 0.0
+        self.loom_from = self.fly.eye_pos + np.array([0.0, 0.5, 0.01])
+
+    def update_loom(self):
+        if self.loom_t < 0:
+            return
+        self.loom_t += FRAME_MS / 1000
+        d = max(0.5 - 1.0 * self.loom_t, 0.035)
+        eye = self.fly.eye_pos
+        if self.loom_t > 0.8:
+            self.loom_t = -1.0; self.world.move_sphere(self.loom_idx, (9, 9, 9))
+        else:
+            self.world.move_sphere(self.loom_idx, eye + np.array([0.0, d, 0.01]))
+
+    def stimulate_gf(self):
+        """Like a giant-fibre optogenetic pulse: 200 Hz for 30 ms."""
+        self.brain.set_poisson(self.wings.gf, 200.0)
+        self.gf_pulse = 3
+
     def nearest_fruit(self):
         best = (None, 1e9)
         for name, cen, rad in self.info["fruit"]:
@@ -102,12 +134,24 @@ class Sim:
         self.brain.drive = self.optic.step_frame(self.col_rad, self.brain.rate, FRAME_MS)
         # taste: front legs touching fruit -> sweet GRNs fire (Poisson 120 Hz, Shiu-style)
         name, dist = self.nearest_fruit()
-        self.tasting = 1.0 if dist < 0.01 else 0.0
+        self.tasting = 1.0 if (dist < 0.01 and not self.fly.airborne) else 0.0
+        if getattr(self, "gf_pulse", 0) > 0:
+            self.gf_pulse -= 1
+            if self.gf_pulse == 0:
+                self.brain.set_poisson(self.wings.gf, 0.0)
+        self.olf.apply(self.brain, self.fly.eye_pos)
         self.brain.set_poisson(self.sweet, 120.0 * self.tasting)
         self.brain.step(int(FRAME_MS / self.brain.p.dt))
         self.cmd = self.loco.readout(self.brain, self.groups)
+        self.wcmd = self.flight.readout(self.brain, self.wings)
         x0, x1, y0, y1 = self.info["table_extent"]
-        self.loco.step(self.fly, self.cmd, FRAME_MS / 1000, (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02))
+        if self.fly.airborne:
+            self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, self.surface_z, (-2, 2, -2, 2, 2.6))
+        elif not self.flight.maybe_takeoff(self.fly, self.wcmd):
+            on_table = abs(self.fly.z - self.info["table_top_z"]) < 1e-3
+            bounds = (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02) if on_table else (-1.95, 1.95, -1.95, 1.95)
+            self.loco.step(self.fly, self.cmd, FRAME_MS / 1000, bounds)
+        self.update_loom()
         self.spike_hist.append(self.brain.total_spikes())
         self.spike_hist = self.spike_hist[-400:]
 
@@ -135,6 +179,8 @@ def draw(sim: Sim, screen, font, cam_over: Camera, paused: bool):
     nf = sim.nearest_fruit()
     blit_text(screen, font, f"overview  fly ({fly.x:+.2f},{fly.y:+.2f}) m  hdg {np.rad2deg(fly.heading) % 360:.0f} deg  "
               f"{fly.speed * 100:.1f} cm/s  {nf[0]} {nf[1] * 100:.0f} cm" + ("  TASTING" if sim.tasting else ""), 502, 312)
+    mode = f"AIRBORNE z={fly.z:.2f} m v=({fly.vx:+.2f},{fly.vy:+.2f},{fly.vz:+.2f})" if fly.airborne else ("walking on table" if abs(fly.z - sim.info["table_top_z"]) < 1e-3 else "walking on floor")
+    blit_text(screen, font, mode + "   smell: " + sim.olf.summary(), 502, 328)
     # 3. hex mosaics: fly false colour and drive
     fc = world.to_fly_false_color(sim.col_rad, exposure=2.5)
     cf = sim.optic.last["contrast"][:, 0] if "contrast" in sim.optic.last else np.zeros(sim.r.n_columns)
@@ -162,6 +208,9 @@ def draw(sim: Sim, screen, font, cam_over: Camera, paused: bool):
     for k, v in sim.cmd["rates"].items():
         pygame.draw.rect(screen, (220, 120, 60), (ox + 90, y, int(min(v, 80) * 2), 12))
         blit_text(screen, font, f"{k:9s} {v:5.1f}", ox, y - 2); y += 16
+    for k, v in sim.wcmd.items():
+        pygame.draw.rect(screen, (120, 160, 240), (ox + 90, y, int(min(v, 80) * 2), 12))
+        blit_text(screen, font, f"{k:9s} {v:5.1f}", ox, y - 2); y += 16
     y += 8
     blit_text(screen, font, f"speed cmd {sim.cmd['speed'] * 100:+.2f} cm/s  yaw {np.rad2deg(sim.cmd['yaw']):+.0f} deg/s  proboscis {sim.cmd['proboscis']:.2f}", ox, y); y += 22
     if len(sim.spike_hist) > 2:
@@ -172,7 +221,7 @@ def draw(sim: Sim, screen, font, cam_over: Camera, paused: bool):
     y += 105
     dt_wall = time.time() - sim.t_wall; sim.t_wall = time.time()
     blit_text(screen, font, f"{1 / max(dt_wall, 1e-3):.0f} fps  ({FRAME_MS / max(dt_wall, 1e-3) / 1000:.2f}x real time)" + ("   PAUSED" if paused else ""), ox, y)
-    blit_text(screen, font, "SPACE pause  R reset  T teleport to apple  ESC quit", ox, y + 18)
+    blit_text(screen, font, "SPACE pause  R reset  T to apple  L loom  F giant fibre  ESC", ox, y + 18)
 
 
 def blit_text(screen, font, text, x, y, color=(220, 220, 220)):
@@ -186,6 +235,7 @@ def main():
     ap.add_argument("--headless", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--teleport", action="store_true", help="start next to the apple")
+    ap.add_argument("--loom-at", type=float, default=-1, help="launch a loom at this brain time (s)")
     args = ap.parse_args()
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -215,8 +265,19 @@ def main():
                     sim.reset_fly()
                 elif ev.key == pygame.K_t:
                     sim.teleport_to_fruit()
+                elif ev.key == pygame.K_l:
+                    sim.start_loom()
+                elif ev.key == pygame.K_f:
+                    sim.stimulate_gf()
         if not paused:
+            if args.loom_at >= 0 and sim.brain.t >= args.loom_at * 1000:
+                sim.start_loom(); args.loom_at = -1
             sim.step()
+            if sim.fly.airborne and not getattr(sim, "_was_air", False):
+                print(f"t={sim.brain.t / 1000:.2f}s TAKEOFF at ({sim.fly.x:+.2f},{sim.fly.y:+.2f}) GF {sim.wcmd['gf']:.0f} Hz power {sim.wcmd['power']:.0f} Hz")
+            if not sim.fly.airborne and getattr(sim, "_was_air", False):
+                print(f"t={sim.brain.t / 1000:.2f}s LANDED at ({sim.fly.x:+.2f},{sim.fly.y:+.2f},{sim.fly.z:.2f}) after {sim.fly.air_time:.2f}s")
+            sim._was_air = sim.fly.airborne
         frame_no = sim.brain.step_count // int(FRAME_MS / sim.brain.p.dt)
         if frame_no % 4 == 0 or paused:
             draw(sim, screen, font, cam_over, paused)

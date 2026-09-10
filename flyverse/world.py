@@ -40,6 +40,7 @@ MATERIALS = {
     "blueberry": Material("blueberry", (0.55, 0.70, 0.20, 0.20)),  # bluish with UV bloom
     "plate":    Material("plate",  (0.60, 0.95, 0.95, 0.95)),
     "lamp":     Material("lamp",   (0, 0, 0, 0), emit=(0.6, 1.0, 1.0, 1.0)),
+    "black":    Material("black",  (0.01, 0.02, 0.02, 0.02)),      # looming object / predator
 }
 
 
@@ -73,6 +74,15 @@ class World:
     light_color: tuple = (0.9, 1.8, 1.8, 1.8)    # UV, B, G, R power (a bright lamp with some UV)
     ambient: tuple = (0.12, 0.15, 0.15, 0.15)
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # ---------------------------------------------------------------- dynamic objects
+    def move_sphere(self, idx: int, center, radii=None) -> None:
+        """Move (and optionally resize) a sphere; the packed GPU tensors are refreshed on the next trace."""
+        s = self.spheres[idx]
+        s.center = tuple(float(v) for v in center)
+        if radii is not None:
+            s.radii = tuple(float(v) for v in radii)
+        self._packed = False
 
     # ---------------------------------------------------------------- packing
     def _pack(self):

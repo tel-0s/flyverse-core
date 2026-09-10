@@ -112,6 +112,50 @@ and spike-frequency adaptation.
 * The motor mapping is a hypothesis. Runs are sensitive to details (which eye has holes, room asymmetry),
   so left/right responses are not symmetric. The fly does turn and back up in response to optic flow.
 
+## Session 2 (autonomous): taste, smell, flight, loom
+
+* **Sweet GRNs found by connectivity** (`scripts/find_sweet_grns.py` -> `flyverse/data/taste_grns.csv`):
+  scoring every gustatory neuron by synapses onto the known sweet second-order neurons (G2N-1/GNG232,
+  Rattle/GNG132, Usnea/GNG175, Phantom/GNG229, Zorro/GNG215, Roundup/GNG108, Fudog/DNg67,
+  Bract/DNge173-174, Clavicle/ANXXX462a) vs bitter ones (Bitter/DNg28, Scapula/GNG087) cleanly
+  separates 165 sweet cells (labellar bristles LB3a/c/d, taste pegs, some pharyngeal) from 47 bitter
+  (LB1a/c). Only 3 *leg* GRNs qualify -- the reference neurons are the labellar pathway; leg sugar GRNs
+  need their own second-order reference set. Stimulating the labellar sweet set at 100 Hz drives the
+  sweet interneurons (Usnea 67 Hz, Rattle 49, Phantom 47, G2N-1 28) and the proboscis motor neurons
+  MN9 (4-14 Hz) and MN11D -- the Shiu et al. sugar -> proboscis result reproduces on MaleCNS.
+* **Olfaction** (`flyverse/olfaction.py`): fruit = odour sources -> ORN classes by glomerulus (rough
+  DoOR-style tuning table), Poisson rates by distance. PNs encode odour identity (DM2 PNs for banana,
+  DM1 for apple) but the antennal lobe runs *hot*: PNs at ~200 Hz, GABAergic LNs at 100-250 Hz, from
+  any tonic ORN input. Cause: Shiu-strength ORN->PN synapses (3,000+ per PN) saturate PNs at 8 Hz
+  spontaneous ORN rate, and the cholinergic LN population (lLN1_bc: 30 cells with 86,864 synapses onto
+  each other; lLN2T/lLN2X) excites itself. Neither input normalisation (alpha 0.75/1.0 -- which also
+  kills the taste pathway) nor zeroing cholinergic LN outputs fixes it: the point model lacks the
+  presynaptic (GABA-B on ORN terminals) inhibition and the gap-junction coupling that shape the real AL.
+  Setting: ORN base 3 Hz. It does not destabilise the rest of the brain (MB silent, DNs quiet).
+* **Fan-in cap** (`LIFParams.input_norm_ref = 5000, alpha = 1`): neurons with more than 5,000 input
+  synapses get their unitary synapse scaled by 5000/total. Motivation: the giant fibre (~40k inputs)
+  fired every ~0.5 s from walking-related central-brain input (DNp70, SAD073, PVLP010 -- not from
+  LC4/LPLC2), making the fly hop continuously; with the cap it is silent during walking and the taste
+  pathway is unchanged (MN9 3-5 Hz). Big neurons have low input resistance, so this is defensible.
+* **Direction selectivity: not achieved.** Per-type time constants (Mi4/Mi9/CT1/Tm9 slow) and slower
+  gratings give DSI 0.03-0.06 for all T4/T5 subtypes (`scripts/probe_motion.py`). The rate model is
+  linear around its operating point; flyvis gets DS only after training. Consequence: LC4/LPLC2 respond
+  to self-motion optic flow as much as to looms, so loom-vs-walking discrimination for the escape
+  circuit is a gain trade-off, not a computation, until DS exists.
+* **Flight** (`body.Flight`, `body.wing_groups`): takeoff on a giant-fibre spike (escape: ballistic
+  hop at 0.6 m/s, 45 deg) or 0.1 s of sustained wing-power MN (DLMn/DVMn) activity; airborne thrust and
+  lift from power-MN rate, yaw from steering-MN (b1-3, i1-2, iii1/3, hg1-4, ps, tp) asymmetry; without
+  wingbeat the fly falls and lands (table or floor). GF -> TTMn is weak in the chemical-synapse table
+  (90 synapses; the real GF-TTMn synapse is electrical), so the GF spike itself is the trigger.
+* **Loom** (`scripts/probe_loom.py`, L key in the demo): a black 3 cm ball approaching at 1 m/s from the
+  side drives DNp01/DNp11/DNp02/DNp04 and triggers the escape at ~3.5 cm range.
+* **Settings that came out of this** (defaults now): optic->spiking gain 100 mV (80 left LC4/LPLC2
+  below threshold for the loom; 120+ or L2-normalised output weights make them fire from walking flow),
+  fan-in cap 5000/alpha 1 (alpha 0.5 already lets the GF fire spontaneously). Cost: DNa02's visual
+  turning response (28 Hz vs 0.4 Hz before the cap) is now ~1-3 Hz; turning in the demo comes mostly
+  from leg-MN asymmetry. A per-cell-type gain (learned, as in flyvis) is the real answer; a uniform
+  synapse cannot serve both a 40k-input giant fibre and a 250-input T4.
+
 ## Ideas / next steps
 
 * Direction selectivity: T4/T5 need temporally asymmetric inputs (Mi4/Mi9/CT1 slow vs Mi1/Tm3 fast);

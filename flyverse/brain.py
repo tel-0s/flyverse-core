@@ -45,10 +45,13 @@ class LIFParams:
     # kills the self-exciting cliques (FR1, DLMn, ...) that otherwise lock up at 300 Hz. 0 disables.
     std_u: float = 0.2
     std_tau: float = 300.0   # ms
-    # per-postsynaptic-neuron synaptic gain (median total input synapses / own total)^alpha, clipped to
-    # [0.5, 5]: small neurons (T4 has ~250 input synapses vs a median of ~1000) get larger unitary PSPs.
-    # 0 = Shiu's uniform 0.275 mV.
-    input_norm_alpha: float = 0.0
+    # Large neurons have low input resistance: neurons whose total input synapse count exceeds
+    # `input_norm_ref` get their unitary synapse scaled by (ref / total)^alpha (down only, floor 0.02).
+    # E.g. the giant fibre (~40k inputs) would otherwise fire from a few hundred active synapses of
+    # walking-related central-brain input; with ref 5000 it needs the coherent LC4+LPLC2 loom volley.
+    # alpha 0 = Shiu's uniform 0.275 mV everywhere.
+    input_norm_alpha: float = 1.0
+    input_norm_ref: float = 5000.0
 
 
 class Brain:
@@ -63,10 +66,10 @@ class Brain:
         W = c.W.tocsr()
         if p.input_norm_alpha > 0:
             tot = np.asarray(abs(W).sum(axis=1)).ravel()
-            med = np.median(tot[tot > 0])
-            scale = np.clip((med / np.maximum(tot, 1.0)) ** p.input_norm_alpha, 0.5, 5.0).astype(np.float32)
+            scale = np.clip((p.input_norm_ref / np.maximum(tot, 1.0)) ** p.input_norm_alpha, 0.02, 1.0).astype(np.float32)
             import scipy.sparse as sp
             W = (sp.diags(scale) @ W).tocsr()
+            self.input_scale = scale
         self.W = torch.sparse_csr_tensor(
             torch.from_numpy(W.indptr.astype(np.int64)), torch.from_numpy(W.indices.astype(np.int64)),
             torch.from_numpy(W.data * np.float32(p.w_syn)), size=(self.n, self.n), dtype=torch.float32,

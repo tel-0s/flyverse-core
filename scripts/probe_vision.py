@@ -29,6 +29,9 @@ def main():
     ap.add_argument("--gain-in", type=float, default=3.0)
     ap.add_argument("--gain-out", type=float, default=80.0)
     ap.add_argument("--gain-rr", type=float, default=1.0)
+    ap.add_argument("--norm-ref", type=float, default=5000.0)
+    ap.add_argument("--norm-alpha", type=float, default=1.0)
+    ap.add_argument("--out-norm", default="l1")
     args = ap.parse_args()
 
     c = connectome.load(verbose=False)
@@ -54,10 +57,10 @@ def main():
 
     g = body.motor_groups(c)
     loco = body.Locomotion()
-    ol = optic.OpticLobe(c, r, optic.OpticParams(norm=args.norm, gain_in=args.gain_in, gain_out_mv=args.gain_out, gain_rr=args.gain_rr))
+    ol = optic.OpticLobe(c, r, optic.OpticParams(norm=args.norm, gain_in=args.gain_in, gain_out_mv=args.gain_out, gain_rr=args.gain_rr, out_norm=args.out_norm))
     ol.relax()
     rt = types[ol.rate_idx]
-    b = brain.Brain(c)
+    b = brain.Brain(c, brain.LIFParams(input_norm_alpha=args.norm_alpha, input_norm_ref=args.norm_ref))
     b.freeze(ol.rate_idx)
     fly = body.FlyState(x=-0.45, y=0.0, z=info["table_top_z"], heading=0.0)
 
