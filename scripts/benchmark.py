@@ -2,7 +2,7 @@
 optic.py, the readouts in motor.py) on every measured behaviour at once, each section against a reference
 value from docs/NOTES.md, and write the numbers as JSON for regression comparisons.
 
-    python scripts/benchmark.py                                  # everything (~8 min on the 4090, native backend)
+    python scripts/benchmark.py                                  # everything (~4 min on the 4090, ~5 on a shared B200; native backend)
     python scripts/benchmark.py --sections a,b,f --json out/bench.json
     python scripts/benchmark.py --fast                           # shorter recordings, one seed (~half the time)
     python scripts/benchmark.py --eager                          # demo sections on the torch path instead of the CUDA kernels
@@ -18,7 +18,7 @@ Sections (letters or names in --sections; "legacy" = the five original ones, "al
                                                             -> GF walking / loom peak / escape range / DN flips (onset)
   a motion       T4/T5 direction selectivity: DSI and preferred direction per subtype (scripts/probe_motion.py)
   b loom_escape  the demo Sim (scripts/room_demo.py): 5 s walking, then the L-key loom; GF burst peak and whether
-                 body.Flight (gf_hz 38) escapes -- two seeds
+                 body.Flight (gf_hz 33) escapes -- two seeds
   c walk_gf      15 s of walking in the demo Sim, escapes disabled: per-second maxima of the GF, 99th percentile
   d rotation     sustained +-90 deg/s imposed yaw, pinned, no wind (scripts/screen_rotation.py protocol):
                  L - R flip of the optomotor group DNp20 + HSN + HSE
@@ -84,10 +84,10 @@ REFERENCES = {
     "loom.escape_cm": Ref(3.5, "notnone", 0, "2-4", note="range at which the GF crosses 20 Hz (3.5 cm)"),
     "rotate.DNp20_flip_hz": Ref(-14, "<", -2, "3", note="0.8 s yaw onset: DNp20 (L-R)_left - (L-R)_right (rightward: 15/1 Hz)"),
     # --- a: session 3 (DS achieved: DSI 0.16-0.26, correct directions), session 8 (T5a 0.38, T4c/d 0.23/0.24)
-    "motion.min_dsi": Ref(0.23, ">=", 0.1, "3, 8", note="minimum DSI over T4a-d / T5a-d, 60 deg/s 30 deg grating"),
+    "motion.min_dsi": Ref(0.16, ">=", 0.1, "3, 8", note="minimum DSI over T4a-d / T5a-d, 60 deg/s 30 deg grating"),
     "motion.correct_directions": Ref(8, "==", 8, "3", note="a front-to-back, b back-to-front, c up, d down, both T4 and T5"),
-    # --- b: session 8 (the escape threshold from data: loom bursts 41-67 Hz, gf_hz 38, 4/6 looms escape)
-    "loom_escape.GF_peak_hz": Ref(46, ">=", 38, "8", note="best seed's GF peak in the 1.5 s after the demo loom"),
+    # --- b: session 9 (LPi x4, edge_len 20 mm, gf_hz 33: loom peaks 34-56 Hz, 5/6 looms escape; the check is bistable at the threshold, use --seeds 0..5)
+    "loom_escape.GF_peak_hz": Ref(41, ">=", 33, "9", note="best seed's GF peak in the 1.5 s after the demo loom"),
     "loom_escape.escapes": Ref(1, ">=", 1, "8", note="seeds in which body.Flight escapes within 1.5 s of the loom"),
     # --- c: session 8 (per-second walking GF maxima: median 20, 90th pct 28, 99th 32; one outlier 41.5)
     "walk_gf.p99_hz": Ref(32, "<", 38, "8", note="99th percentile of per-second GF maxima over 15 s of walking"),

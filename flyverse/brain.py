@@ -113,14 +113,15 @@ DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0),          # benchma
 
 DEFAULT_ADAPT_BY_TYPE: dict = {}      # filled in when the compass benchmark settles; {} = uniform adapt_jump
 
-DEFAULT_STD_U_BY_TYPE = {r"^ORN_": 0.2, r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2, r"(_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN|PN\d)": 0.2}
+# depressing terminals: ORNs (ORN -> PN, Kazama & Wilson 2008) and antennal-lobe LNs. (A PN entry that used to be here
+# never matched a cell -- the patterns are applied with re.match -- so the model has always been ORN + LN only.)
+DEFAULT_STD_U_BY_TYPE = {r"^ORN_": 0.2, r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2}
 
 
 def _shaped_weights(c: Connectome, p: LIFParams):
     """Apply the calibrated connection rules before fan-in normalization."""
-    W = c.W.tocsr()
+    W = c.W.tocsr().copy()                                          # always a copy: the gain loops below write into W.data
     if p.conn_cap > 0:
-        W = W.copy()
         W.data = np.sign(W.data) * np.minimum(np.abs(W.data), np.float32(p.conn_cap))
     path_gain = DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain
     if path_gain:

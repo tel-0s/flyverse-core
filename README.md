@@ -99,7 +99,8 @@ These are measured behaviours of the wiring under the model, each with a probe s
 * **Odour code** (`probe_smell.py`): glomerulus-specific PN responses (apple: DM1 / VA2 / DM4; banana:
   DM2 / VM2), sparse Kenyon cells, MBONs at 1-4 Hz.
 
-`scripts/benchmark.py` scores any parameter set on all of these at once (~3 min); every default in
+`scripts/benchmark.py` scores any parameter set on all of these at once (14 sections, ~4 min on a 4090; table and
+references in `docs/audits/benchmark_suite.md`, `--sections` / `--json` / `--fast`); every default in
 `brain.py` / `optic.py` was chosen with it. Runs are chaotic -- repeat before trusting a 20% change.
 
 ## What we had to add to the point model, and why
@@ -207,7 +208,9 @@ flyverse/brainmap.py     soma projections for the --brain-map panel
 flyverse/room_ui.py      dense room console, controls and neural telemetry
 flyverse/env.py          vectorised RL environment
 scripts/room_demo.py     the interactive demo
-scripts/benchmark.py     one-shot calibration harness;  scripts/probe_*.py  one behaviour each
+scripts/benchmark.py     the benchmark suite (14 sections, JSON for regression diffs);  scripts/probe_*.py  one behaviour each
+scripts/audit_nt.py, scripts/cx_wedge.py, scripts/retire_measures.py   the session-9 audits (reports in docs/audits/)
+scripts/cluster_run.py   run a batch of commands on a GPU cluster job manager (config in a git-ignored .cluster.json)
 scripts/screen_dns.py    the DN activation screen;  scripts/find_sweet_grns.py  sugar GRNs
 scripts/screen_odour.py  the lateral-horn odour screen;  scripts/screen_steering.py  odour x wind steering
 scripts/profile_room.py  per-frame profile of the demo loop;  scripts/profile_brain.py  the brain alone

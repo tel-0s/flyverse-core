@@ -1,26 +1,35 @@
 """Does the connectome's central-complex wiring support a ring attractor under this model's synaptic rules?
 
-Structural audit (no simulation needed):
+Structural audit (no simulation needed; `python scripts/cx_wedge.py`, results in docs/audits/cx_wedge.json + PNGs):
   * wedge identity of every EPG / PEN / PEG / Delta7 cell from the instance names (PB glomerulus L1-L9 / R1-R9;
     the Delta7 instance carries its OUTPUT glomeruli, e.g. Delta7(PB15)_L1L9R8_R);
   * the 16-wedge ring order of the glomeruli, read off the direct EPG -> EPG matrix (L_i neighbours R_(9-i) and
-    R_(8-i)): L1 R8 L2 R7 L3 R6 L4 R5 L5 R4 L6 R3 L7 R2 L8 R1;
+    R_(8-i)): L1 R8 L2 R7 L3 R6 L4 R5 L5 R4 L6 R3 L7 R2 L8 R1; L9 wraps onto L1, R9 onto R1;
   * effective weights A[post, pre] in mV per presynaptic spike = w_syn * fan-in scale[post] * _shaped_weights
     (connection cap 60, path gains, same-type damping 0.1) -- exactly what Brain installs;
-  * EPG x EPG two-step matrices through PEN, PEG and Delta7 (A[EPG, X] @ A[X, EPG], mV^2 per spike, one step each
-    way), cell-level ordered by wedge and aggregated to 16 wedges / 8 tiles ("input to a typical cell of wedge i
-    if every cell of wedge k fires once, relayed through X");
-  * the ring-attractor window: for a bump of k wedges at uniform rate, the net two-step input to wedges inside
-    versus outside the bump as a function of rho = gD / gE^2 (gD = Delta7 -> EPG gain, gE = EPG <-> PEN gain, both
-    links), in the linear-rate estimate; the window is (max_out E/|I|, min_in E/|I|).
+  * EPG x EPG two-step matrices through PEN, PEG, Delta7 and the ring / extrinsic-ring neurons (ER*, ExR*: the
+    untuned EPG -> ER/ExR -> EPG, PEN feedback that turns out to dominate), A[EPG, X] @ A[X, EPG] in mV^2 per spike,
+    cell-level ordered by wedge and aggregated to 16 wedges / 8 tiles ("input to a typical cell of wedge i if
+    every cell of wedge k fires once, relayed through X");
+  * the ring-attractor window in the linear estimate: for a bump of k wedges, net two-step input inside versus
+    outside as a function of rho = gD / gE^2 (gD = Delta7 -> EPG gain, gE = EPG <-> PEN gain on both links), and
+    the same with the flat ER/ExR term G added (feasible gD per gE).
 
-Simulation cross-check (--sim gE:gD [gE:gD ...]): FlyBrain on the full connectome, no world, compass adaptation
-off, 10 Hz Poisson background on every EPG, one tile (two wedges) driven at +40 Hz for 2 s, then 5 s free;
-reports cells above threshold inside / outside the driven wedge at 0.5 / 1 / 2 / 3 / 5 s after the pulse.
+Threshold-linear rate model (`--rate-grid gE,... gD,...`): mean-field fixed point r = f(tau_syn A r) of the compass
+cells (+ ER/ExR unless --no-ring) with the LIF f-I curve, under the same background / pulse protocol as the LIF.
 
-Usage:
-    python scripts/cx_wedge.py                      # structure only; PNGs + JSON under docs/audits/
-    python scripts/cx_wedge.py --sim 1:1 1.5:2 2:8  # + simulation at those (EPG<->PEN gain : Delta7 gain)
+Simulation cross-check (`--sim gE:gD ...`): FlyBrain on the full connectome, no world, compass adaptation off
+(adapt_by_type {'^(EPG|PEN|PEG|Delta7)': 0}), 10 Hz Poisson background on every EPG (--background), `--width`
+contiguous wedges (default 4 = one 90 deg tile pair) driven at +40 Hz for 2 s, then 5 s free; reports EPG cells
+above 22 Hz inside / outside the driven wedges, PEN / Delta7 / ER-ExR rates and the wedge profile at 0.5 / 1 / 2 /
+3 / 5 s after the pulse. `--no-delta7-pen` applies gD to Delta7 -> EPG only (Delta7 -> PEN stays x1; with the gain
+on Delta7 -> PEN as well, the NOTES-session-8 convention, Delta7 clamps PEN and no bump survives). `--ring-gain`
+scales ER/ExR -> EPG / PEN / PEG. Rows append to --sim-out (JSON); `--plot-sim` draws the wedge profiles from it.
+
+Findings (docs/audits/cx_wedge.md): the tuned structure is there (PEN excitation local, Delta7 inhibition
+cosine-shaped with own-wedge / opposite = 0.10); the loop is shut at gain x1 by the untuned EPG -> ExR6 / ExR4 /
+ER6 / ER4m -> EPG, PEN feedback, not by Delta7; a persistent, confined bump exists in the LIF for gE 1.75-2 with
+gD 15-40 on Delta7 -> EPG only (rho = gD / gE^2 of 4-10), or for gE 1-1.25 with the ER/ExR feedback damped x0.3.
 """
 from __future__ import annotations
 
@@ -44,6 +53,7 @@ POS16 = {g: i for i, g in enumerate(RING16)}
 POS16["L9"] = 0     # L9 wraps onto L1 (Delta7_L1L9R8), R9 onto R1 (Delta7_L8R1R9)
 POS16["R9"] = 15
 COMPASS_RE = r"^(EPG|PEN|PEG|Delta7)"
+RING_RE = r"^(ER|ExR)"      # ring neurons and extrinsic ring neurons: the EPG -> ExR / ER -> EPG, PEN global feedback
 
 
 def effective_weights(c, p: brain.LIFParams):
@@ -72,9 +82,11 @@ def compass_cells(c):
     inst = n.instance.fillna("").to_numpy()
     cells = {}
     for name, pat in [("EPG", r"^EPG$"), ("EPGt", r"^EPGt$"), ("PEN", r"^PEN_"), ("PEN_a", r"^PEN_a"), ("PEN_b", r"^PEN_b"),
-                      ("PEG", r"^PEG$"), ("Delta7", r"^Delta7$")]:
+                      ("PEG", r"^PEG$"), ("Delta7", r"^Delta7$"), ("Ring", RING_RE)]:
         idx = np.flatnonzero([bool(re.match(pat, t)) for t in ty])
-        if name == "Delta7":
+        if name == "Ring":
+            pos = np.full(len(idx), np.nan); lab = list(ty[idx])
+        elif name == "Delta7":
             outs = [delta7_outputs(inst[i]) for i in idx]
             pos = np.array([np.mean([POS16[g] for g in o if g in POS16]) for o in outs])   # mean output position
             # adjacent output wedges (e.g. L1=0, R8=1); L8R1R9 -> (14, 15); mean is the tile centre
@@ -157,7 +169,7 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
     p = brain.LIFParams()
     A, scale, tot = effective_weights(c, p)
     cells = compass_cells(c)
-    epg, pen, peg, d7, epgt = (cells[k] for k in ("EPG", "PEN", "PEG", "Delta7", "EPGt"))
+    epg, pen, peg, d7, epgt, ring = (cells[k] for k in ("EPG", "PEN", "PEG", "Delta7", "EPGt", "Ring"))
     res = {"n_cells": {k: int(len(v["idx"])) for k, v in cells.items()},
            "ring16": RING16, "cells_per_wedge": {g: int((np.array(epg["label"]) == g).sum()) for g in RING16},
            "fan_in_scale": {k: [float(scale[v["idx"]].min()), float(scale[v["idx"]].max())] for k, v in cells.items()},
@@ -173,7 +185,8 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
     for name, (pre, post) in {"EPG->PEN": (epg, pen), "PEN->EPG": (pen, epg), "EPG->PEG": (epg, peg), "PEG->EPG": (peg, epg),
                               "EPG->Delta7": (epg, d7), "Delta7->EPG": (d7, epg), "Delta7->PEN": (d7, pen), "Delta7->PEG": (d7, peg),
                               "Delta7->Delta7": (d7, d7), "EPG->EPG": (epg, epg), "PEN->PEN": (pen, pen), "PEG->PEN": (peg, pen),
-                              "EPGt->Delta7": (epgt, d7), "Delta7->EPGt": (d7, epgt)}.items():
+                              "EPGt->Delta7": (epgt, d7), "Delta7->EPGt": (d7, epgt),
+                              "EPG->Ring": (epg, ring), "Ring->EPG": (ring, epg), "Ring->PEN": (ring, pen), "Ring->Ring": (ring, ring)}.items():
         B = block(post, pre); nz = B != 0
         one[name] = dict(pairs=int(nz.sum()), mean_per_pair=float(B[nz].mean()) if nz.any() else 0.0,
                          total_per_post=float(B.sum(axis=1).mean()))
@@ -202,6 +215,24 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
          "Delta7": block(epg, d7) @ block(d7, epg), "PEN_a": block(epg, cells["PEN_a"]) @ block(cells["PEN_a"], epg),
          "PEN_b": block(epg, cells["PEN_b"]) @ block(cells["PEN_b"], epg)}
     K["direct"] = block(epg, epg)   # mV per spike, no intermediate
+    K["Ring"] = block(epg, ring) @ block(ring, epg)      # the ER / ExR global feedback, two steps
+    # which ring / ExR types carry it (EPG -> type -> EPG, summed over the type's cells, mean per EPG pair)
+    rt = np.array(ring["label"]); ring_types = {}
+    for t in sorted(set(rt)):
+        sel = rt == t
+        Kt = block(epg, ring)[:, sel] @ block(ring, epg)[sel]
+        if np.abs(Kt).sum() > 0:
+            Kp = block(pen, ring)[:, sel] @ block(ring, epg)[sel]
+            ring_types[t] = dict(cells=int(sel.sum()), nt=str(c.neurons.nt.to_numpy()[ring["idx"][sel]][0]),
+                                 epg_to_type_mV_per_pair=float(block(ring, epg)[sel][block(ring, epg)[sel] != 0].mean()) if (block(ring, epg)[sel] != 0).any() else 0.0,
+                                 type_to_epg_mV_per_pair=float(block(epg, ring)[:, sel][block(epg, ring)[:, sel] != 0].mean()) if (block(epg, ring)[:, sel] != 0).any() else 0.0,
+                                 type_to_pen_mV_per_pair=float(block(pen, ring)[:, sel][block(pen, ring)[:, sel] != 0].mean()) if (block(pen, ring)[:, sel] != 0).any() else 0.0,
+                                 two_step_epg_total_mV2=float(Kt.sum(axis=1).mean()), two_step_pen_total_mV2=float(Kp.sum(axis=1).mean()))
+    res["ring_types"] = ring_types
+    log("ring / ExR feedback types (EPG -> type -> EPG two-step total per EPG cell, mV^2; and onto PEN):")
+    for t, v in sorted(ring_types.items(), key=lambda kv: kv[1]["two_step_epg_total_mV2"]):
+        log(f"   {t:>8} ({v['cells']:2d} cells, {v['nt']:>9}): EPG->{t} {v['epg_to_type_mV_per_pair']:+.2f}/pair, {t}->EPG {v['type_to_epg_mV_per_pair']:+.2f}/pair, "
+            f"{t}->PEN {v['type_to_pen_mV_per_pair']:+.2f}/pair; two-step onto EPG {v['two_step_epg_total_mV2']:+8.0f}, onto PEN {v['two_step_pen_total_mV2']:+8.0f}")
     # three-step: EPG -> Delta7 -> PEN -> EPG (the Delta7 clamp on PEN), mV^3
     K["Delta7_PEN"] = block(epg, pen) @ block(pen, d7) @ block(d7, epg)
     bin16 = lambda x: np.asarray(np.round(x), int) % 16
@@ -214,14 +245,14 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
     res["tiles"] = tiles
     labels46 = [f"{g}" for g in epg["label"]]
     out_dir.mkdir(parents=True, exist_ok=True)
-    for k in ("PEN", "PEG", "Delta7", "direct", "Delta7_PEN"):
+    for k in ("PEN", "PEG", "Delta7", "direct", "Delta7_PEN", "Ring"):
         unit = {"direct": "mV/spike", "Delta7_PEN": "mV^3 (3 steps)"}.get(k, "mV^2 (2 steps)")
         heatmap(K[k], labels46, f"EPG x EPG through {k}, per cell pair [{unit}]", out_dir / f"cx_wedge_{k}_cells.png")
         heatmap(M16[k], RING16, f"EPG x EPG through {k}, 16 wedges (sum over pre wedge, mean over post) [{unit}]",
                 out_dir / f"cx_wedge_{k}_16.png", fmt="%.0f")
         heatmap(M8[k], tiles, f"EPG x EPG through {k}, 8 tiles [{unit}]", out_dir / f"cx_wedge_{k}_8.png", fmt="%.0f")
     pd.set_option("display.width", 250)
-    for k in ("PEN", "PEG", "Delta7", "direct"):
+    for k in ("PEN", "PEG", "Delta7", "direct", "Ring"):
         log(f"\n{k}: 16-wedge matrix (rows post, cols pre; ring order)")
         log(pd.DataFrame(np.round(M16[k], 1), index=RING16, columns=RING16).to_string())
         log(f"{k}: 8-tile matrix")
@@ -229,7 +260,7 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
 
     # ---- profile of each path against ring distance (16-wedge level, averaged over the diagonal bands)
     prof = {}
-    for k in ("PEN", "PEG", "Delta7", "direct", "Delta7_PEN"):
+    for k in ("PEN", "PEG", "Delta7", "direct", "Delta7_PEN", "Ring"):
         M = M16[k]
         d = ring_dist(np.arange(16), np.arange(16))
         prof[k] = [float(M[d == j].mean()) for j in range(9)]
@@ -266,6 +297,28 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
                      offsets_with_window=int((df.rho_high > df.rho_low).sum()), n_offsets=int(len(df)))
             windows[f"{level}:{k}"] = w
     res["windows"] = windows
+    # with the untuned ring / ExR feedback G (gain 1): u = gE^2 E + gD I + G; feasible gD per gE, bump of k bins
+    windows_g = {}
+    for level, M, n in (("16", M16, 16), ("8", M8, 8)):
+        E = M["PEN"] + M["PEG"]; I = M["Delta7"]; G = M["Ring"]
+        for k in ([2, 3, 4, 5, 6] if n == 16 else [1, 2, 3]):
+            for gE in (0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0):
+                lows, highs, ok = [], [], 0
+                for s0 in range(n):
+                    inb = np.zeros(n, bool); inb[[(s0 + j) % n for j in range(k)]] = True
+                    e = E[:, inb].sum(axis=1); i = I[:, inb].sum(axis=1); g = G[:, inb].sum(axis=1)
+                    num = gE * gE * e + g
+                    # outside: gD |i| > num  -> gD > num/|i| (auto if num <= 0); inside: gD < num/|i| (impossible if num <= 0)
+                    lo = max([num[j] / abs(i[j]) for j in range(n) if not inb[j]] + [0.0])
+                    hi = min([num[j] / abs(i[j]) for j in range(n) if inb[j]])
+                    lows.append(lo); highs.append(hi); ok += int(hi > lo and hi > 0)
+                windows_g[f"{level}:{k}:{gE}"] = dict(level=level, k=k, gE=gE, gD_low_worst=float(max(lows)), gD_high_worst=float(min(highs)),
+                                                     gD_low_mean=float(np.mean(lows)), gD_high_mean=float(np.mean(highs)), offsets_ok=ok, n_offsets=n)
+    res["windows_with_global"] = windows_g
+    log("\nwith the ring / ExR global feedback G at gain 1 (u = gE^2 E + gD I + G): feasible Delta7 gain gD per EPG<->PEN gain gE")
+    log("  level k  gE    gD_low (worst / mean)   gD_high (worst / mean)   offsets with a window")
+    for key, w in windows_g.items():
+        log(f"  {w['level']:>4} {w['k']:>2} {w['gE']:<5} {w['gD_low_worst']:8.2f} / {w['gD_low_mean']:6.2f}     {w['gD_high_worst']:8.2f} / {w['gD_high_mean']:6.2f}        {w['offsets_ok']}/{w['n_offsets']}")
     log("\nring-attractor window (two-step, linear): rho = gD / gE^2; bump of k bins; E = PEN+PEG, I = Delta7 (mean per post cell, sum over bump)")
     log("  level k   E_in    E_out    I_in    I_out  E_in/E_out  |I_in|/|I_out|  rho_low(max out E/|I|)  rho_high(min in E/|I|)  offsets with window")
     for key, w in windows.items():
@@ -293,14 +346,18 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
     Apen_e = block(pen, epg); Apen_d = block(pen, d7); Ad_e = block(d7, epg)
     direct_pen = aggregate(Apen_e, pen["pos"], epg["pos"], 16, bin16)          # mV per spike, [pen wedge, epg wedge]
     via_d7 = aggregate(Apen_d @ Ad_e, pen["pos"], epg["pos"], 16, bin16)        # mV^2
+    via_ring = aggregate(block(pen, ring) @ block(ring, epg), pen["pos"], epg["pos"], 16, bin16)
     dd = ring_dist(np.arange(16), np.arange(16))
     res["PEN_drive_profile"] = dict(distance_wedges=list(range(9)),
                                     direct_EPG_to_PEN_mV=[float(direct_pen[dd == j].mean()) for j in range(9)],
                                     via_Delta7_mV2=[float(via_d7[dd == j].mean()) for j in range(9)],
-                                    via_Delta7_at_gamma_mV=[float(via_d7[dd == j].mean() * gamma_nominal * tau) for j in range(9)])
+                                    via_Delta7_at_gamma_mV=[float(via_d7[dd == j].mean() * gamma_nominal * tau) for j in range(9)],
+                                    via_Ring_mV2=[float(via_ring[dd == j].mean()) for j in range(9)],
+                                    via_Ring_at_gamma_mV=[float(via_ring[dd == j].mean() * gamma_nominal * tau) for j in range(9)])
     log("PEN drive from an EPG wedge vs distance (PEN wedge = its glomerulus): direct (mV/spike) and via Delta7 (mV, at gamma):")
     log("   direct     :", np.round(res["PEN_drive_profile"]["direct_EPG_to_PEN_mV"], 1).tolist())
     log("   via Delta7 :", np.round(res["PEN_drive_profile"]["via_Delta7_at_gamma_mV"], 1).tolist())
+    log("   via ER/ExR :", np.round(res["PEN_drive_profile"]["via_Ring_at_gamma_mV"], 1).tolist())
     with open(out_dir / "cx_wedge.json", "w") as f:
         json.dump(res, f, indent=1)
     np.savez(out_dir / "cx_wedge_matrices.npz", **{f"K_{k}": v for k, v in K.items()}, **{f"M16_{k}": v for k, v in M16.items()},
@@ -308,15 +365,16 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
     return res, cells, c
 
 
-def gained_blocks(c, cells, gE, gD, delta7_pen=True):
+def gained_blocks(c, cells, gE, gD, delta7_pen=True, gR=1.0, with_ring=True):
     """Effective matrix among the compass cells (mV per spike) with the gains applied as Brain would apply
     type_path_gain (before the fan-in scale, which stays 1.00 for these cells up to gains of ~x1.7 on EPG)."""
     tpg = list(brain.DEFAULT_TYPE_PATH_GAIN) + [(r"^EPG$", r"^PEN_", gE), (r"^PEN_", r"^EPG$", gE),
                                                 (r"^EPG$", r"^PEG$", gE), (r"^PEG$", r"^EPG$", gE),
-                                                (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD)]
+                                                (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD),
+                                                (RING_RE, r"^(EPG$|PEN_|PEG$)", gR)]
     p = brain.LIFParams(type_path_gain=tpg)
     A, scale, tot = effective_weights(c, p)
-    idx = np.concatenate([cells[k]["idx"] for k in ("EPG", "PEN", "PEG", "Delta7")])
+    idx = np.concatenate([cells[k]["idx"] for k in (("EPG", "PEN", "PEG", "Delta7", "Ring") if with_ring else ("EPG", "PEN", "PEG", "Delta7"))])
     return A[idx][:, idx].toarray().astype(np.float64), idx, p, scale[idx]
 
 
@@ -338,12 +396,12 @@ def lif_fi(u, p=None, sigma=2.0):
 
 
 def rate_model(c, cells, gE, gD, delta7_pen=True, background_hz=10.0, pulse_hz=40.0, start_wedge=0, width=4,
-               sigma=2.0, iters=4000, alpha=0.05):
+               sigma=2.0, iters=4000, alpha=0.05, gR=1.0, with_ring=True):
     """Threshold-linear mean-field fixed point of the compass circuit: r = f(tau_syn * A r) with the EPG's forced
     Poisson background / pulse added to the intrinsic rate. Returns the state after the pulse and after release."""
-    A, idx, p, scale = gained_blocks(c, cells, gE, gD, delta7_pen)
+    A, idx, p, scale = gained_blocks(c, cells, gE, gD, delta7_pen, gR, with_ring)
     nE = len(cells["EPG"]["idx"]); n = len(idx)
-    nP, nG = len(cells["PEN"]["idx"]), len(cells["PEG"]["idx"])
+    nP, nG, nD = len(cells["PEN"]["idx"]), len(cells["PEG"]["idx"]), len(cells["Delta7"]["idx"])
     tau = p.tau_syn / 1000.0
     wedge_of = np.asarray(np.round(cells["EPG"]["pos"]), int) % 16
     inside = np.isin(wedge_of, [(start_wedge + j) % 16 for j in range(width)])
@@ -367,15 +425,17 @@ def rate_model(c, cells, gE, gD, delta7_pen=True, background_hz=10.0, pulse_hz=4
         return dict(epg_in=float(e[inside].mean()), epg_out=float(e[~inside].mean()),
                     epg_in_min=float(e[inside].min()), epg_out_max=float(e[~inside].max()),
                     pen=float(r[nE:nE + nP].mean()), peg=float(r[nE + nP:nE + nP + nG].mean()),
-                    delta7=float(r[nE + nP + nG:].mean()),
+                    delta7=float(r[nE + nP + nG:nE + nP + nG + nD].mean()),
+                    ring=float(r[nE + nP + nG + nD:].mean()) if with_ring else 0.0,
                     profile=[float(e[wedge_of == w].mean()) for w in range(16)])
-    return dict(gE=gE, gD=gD, delta7_pen=delta7_pen, background=summ(r_bg), pulse=summ(r_pulse), after=summ(r_after))
+    return dict(gE=gE, gD=gD, gR=gR, delta7_pen=delta7_pen, with_ring=with_ring,
+                background=summ(r_bg), pulse=summ(r_pulse), after=summ(r_after))
 
 
 def rate_grid(c, cells, gEs, gDs, delta7_pen, log=print, **kw):
     rows = []
     bg = kw.get("background_hz", 10.0)
-    log(f"threshold-linear rate model (Delta7 -> PEN {'x gD' if delta7_pen else 'x1'}): EPG in / out after release "
+    log(f"threshold-linear rate model (Delta7 -> PEN {'x gD' if delta7_pen else 'x1'}; ER/ExR {'included, gain ' + str(kw.get('gR', 1.0)) if kw.get('with_ring', True) else 'excluded'}): EPG in / out after release "
         f"(background-state ring / PEN / Delta7 in brackets; BUMP = in > 2 x out and in > bg + 5 Hz)")
     for gE in gEs:
         for gD in gDs:
@@ -385,12 +445,12 @@ def rate_grid(c, cells, gEs, gDs, delta7_pen, log=print, **kw):
             rm["bump"] = bool(bump)
             rows.append(rm)
             log(f"  gE {gE:<4} gD {gD:<4}: after in {a['epg_in']:6.1f} out {a['epg_out']:6.1f} (max {a['epg_out_max']:6.1f}) "
-                f"PEN {a['pen']:5.1f} D7 {a['delta7']:5.1f}  [bg ring {b['epg_in']:5.1f} PEN {b['pen']:5.1f} D7 {b['delta7']:5.1f}]  {'BUMP' if bump else ''}")
+                f"PEN {a['pen']:5.1f} D7 {a['delta7']:5.1f} ER/ExR {a['ring']:5.1f}  [bg ring {b['epg_in']:5.1f} PEN {b['pen']:5.1f} D7 {b['delta7']:5.1f}]  {'BUMP' if bump else ''}")
     return rows
 
 
 def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, pulse_hz=40.0, start_wedge=0, width=4, seed=0,
-             thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, verbose=True):
+             thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, gR=1.0, verbose=True):
     """FlyBrain on the full connectome; drive `width` contiguous wedges (of 16) of the EPG ring from `start_wedge`;
     report persistence and confinement after the pulse."""
     from flyverse.fly import FlyBrain
@@ -399,13 +459,14 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
     wedge_of = np.asarray(np.round(epg["pos"]), int) % 16
     inside = np.isin(wedge_of, [(start_wedge + j) % 16 for j in range(width)])
     idx_epg = epg["idx"]
-    pen_idx, d7_idx, peg_idx = cells["PEN"]["idx"], cells["Delta7"]["idx"], cells["PEG"]["idx"]
+    pen_idx, d7_idx, peg_idx, ring_idx = cells["PEN"]["idx"], cells["Delta7"]["idx"], cells["PEG"]["idx"], cells["Ring"]["idx"]
     others = np.setdiff1d(np.arange(c.n), np.concatenate([idx_epg, pen_idx, d7_idx, peg_idx, cells["EPGt"]["idx"]]))
     out = []
     for gE, gD in gains:
         tpg = list(brain.DEFAULT_TYPE_PATH_GAIN) + [(r"^EPG$", r"^PEN_", gE), (r"^PEN_", r"^EPG$", gE),
                                                     (r"^EPG$", r"^PEG$", gE), (r"^PEG$", r"^EPG$", gE),
-                                                    (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD)]
+                                                    (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD),
+                                                    (RING_RE, r"^(EPG$|PEN_|PEG$)", gR)]
         params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=tpg)
         t0 = time.time()
         fb = FlyBrain(c, lif_params=params, seed=seed, cuda_graphs=cuda_graphs)
@@ -419,13 +480,14 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                  f"{tag}_in_above": int((r[inside] > thresh_hz).sum()), f"{tag}_out_above": int((r[~inside] > thresh_hz).sum()),
                  f"{tag}_pen": float(fb.brain.mean_rate(pen_idx)), f"{tag}_delta7": float(fb.brain.mean_rate(d7_idx)),
                  f"{tag}_peg": float(fb.brain.mean_rate(peg_idx)), f"{tag}_rest": float(fb.brain.mean_rate(others)),
+                 f"{tag}_ring": float(fb.brain.mean_rate(ring_idx)),
                  f"{tag}_wedge_profile": [float(r[wedge_of == w].mean()) for w in range(16)]}
             ang = 2 * np.pi * wedge_of / 16
             z = np.sum(r * np.exp(1j * ang)) / max(r.sum(), 1e-9)
             d[f"{tag}_vector_strength"] = float(np.abs(z)); d[f"{tag}_centre_wedge"] = float((np.angle(z) % (2 * np.pi)) / (2 * np.pi) * 16)
             return d
 
-        row = dict(gE=gE, gD=gD, delta7_pen=delta7_pen, background_hz=background_hz, pulse_hz=pulse_hz, start_wedge=start_wedge,
+        row = dict(gE=gE, gD=gD, gR=gR, delta7_pen=delta7_pen, background_hz=background_hz, pulse_hz=pulse_hz, start_wedge=start_wedge,
                    width=width, seed=seed, n_in=int(inside.sum()), n_out=int((~inside).sum()))
         fb.step(1000.0)                                             # 1 s settle on background
         row.update(sample("pre"))
@@ -441,14 +503,38 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
 
         def fmt(tag):
             return (f"in {row[f'{tag}_in_mean']:.1f} ({row[f'{tag}_in_above']}/{row['n_in']}) out {row[f'{tag}_out_mean']:.1f} "
-                    f"({row[f'{tag}_out_above']}/{row['n_out']}) PEN {row[f'{tag}_pen']:.1f} D7 {row[f'{tag}_delta7']:.1f} vs {row[f'{tag}_vector_strength']:.2f}")
-        log(f"gE {gE} gD {gD} (D7->PEN {'x gD' if delta7_pen else 'x1'}, bg {background_hz} Hz, width {width}): pre {fmt('pre')}; "
+                    f"({row[f'{tag}_out_above']}/{row['n_out']}) PEN {row[f'{tag}_pen']:.1f} D7 {row[f'{tag}_delta7']:.1f} R {row[f'{tag}_ring']:.1f} vs {row[f'{tag}_vector_strength']:.2f}")
+        log(f"gE {gE} gD {gD} gR {gR} (D7->PEN {'x gD' if delta7_pen else 'x1'}, bg {background_hz} Hz, width {width}): pre {fmt('pre')}; "
             f"during {fmt('during')}; " + "; ".join(f"{m}s {fmt(f't{m}')}" for m in marks)
             + f"; PEG {row['t5.0_peg']:.1f} rest {row['t5.0_rest']:.2f} Hz; {row['wall_s']} s")
         out.append(row)
         del fb
         import torch; torch.cuda.empty_cache()
     return out
+
+
+def plot_sim(sim_json: Path, out_png: Path, keys=None):
+    """Wedge profiles (EPG Hz per wedge, ring order) before, during and after the pulse for every row in the JSON."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    rows = json.load(open(sim_json))
+    tags = ["pre", "during", "t0.5", "t1.0", "t2.0", "t3.0", "t5.0"]
+    rows = [r for r in rows if all(f"{t}_wedge_profile" in r for t in tags) and (keys is None or keys(r))]
+    n = len(rows)
+    fig, axes = plt.subplots(n, 1, figsize=(9, 1.6 * n + 1), sharex=True, squeeze=False)
+    for ax, r in zip(axes[:, 0], rows):
+        M = np.array([r[f"{t}_wedge_profile"] for t in tags])
+        im = ax.imshow(M, aspect="auto", cmap="magma", vmin=0, vmax=max(60, M.max()))
+        ax.set_yticks(range(len(tags))); ax.set_yticklabels(tags, fontsize=6)
+        w0, wd = r.get("start_wedge", 0), r.get("width", 4)
+        ax.axvline(w0 - 0.5, color="cyan", lw=0.8); ax.axvline(w0 + wd - 0.5, color="cyan", lw=0.8)
+        ax.set_title(f"gE {r['gE']} gD {r['gD']} gR {r.get('gR', 1.0)} D7->PEN {'x gD' if r.get('delta7_pen', True) else 'x1'} "
+                     f"bg {r.get('background_hz', 10)} Hz width {wd} seed {r.get('seed', 0)}: 5 s after -> in {r['t5.0_in_mean']:.0f} Hz "
+                     f"({r['t5.0_in_above']}/{r['n_in']} > 22 Hz), out {r['t5.0_out_mean']:.0f} Hz ({r['t5.0_out_above']}/{r['n_out']})", fontsize=7)
+        ax.set_xticks(range(16)); ax.set_xticklabels(RING16, fontsize=6)
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.4, label="EPG Hz")
+    fig.savefig(out_png, dpi=120, bbox_inches="tight"); plt.close(fig)
 
 
 def main():
@@ -468,8 +554,14 @@ def main():
     ap.add_argument("--rate-grid", nargs=2, default=None, metavar=("GE", "GD"),
                     help="threshold-linear rate-model grid, comma-separated gains, e.g. --rate-grid 0.8,1,1.5 1,4,15")
     ap.add_argument("--rate-out", default=None)
+    ap.add_argument("--ring-gain", type=float, default=1.0, help="gain on ER/ExR -> EPG/PEN/PEG (rate model and simulation)")
+    ap.add_argument("--no-ring", action="store_true", help="rate model without the ER/ExR cells")
+    ap.add_argument("--plot-sim", default=None, help="draw wedge profiles from this simulation JSON (no structure / sim run)")
     a = ap.parse_args()
     out_dir = Path(a.out)
+    if a.plot_sim:
+        plot_sim(Path(a.plot_sim), out_dir / "cx_wedge_sim_profiles.png")
+        return
     if a.no_structure:
         c = connectome.load(verbose=False); cells = compass_cells(c)
     else:
@@ -477,14 +569,14 @@ def main():
     if a.rate_grid is not None:
         gEs = [float(x) for x in a.rate_grid[0].split(",")]; gDs = [float(x) for x in a.rate_grid[1].split(",")]
         rows = rate_grid(c, cells, gEs, gDs, not a.no_delta7_pen, background_hz=a.background, pulse_hz=a.pulse_hz,
-                         start_wedge=a.start_wedge, width=a.width)
+                         start_wedge=a.start_wedge, width=a.width, gR=a.ring_gain, with_ring=not a.no_ring)
         if a.rate_out:
             with open(a.rate_out, "w") as f:
                 json.dump(rows, f, indent=1)
     if a.sim is not None:
         gains = [tuple(float(x) for x in g.split(":")) for g in a.sim] or [(1.0, 1.0)]
         rows = simulate(c, cells, gains, seconds=a.seconds, background_hz=a.background, pulse_hz=a.pulse_hz, start_wedge=a.start_wedge, width=a.width,
-                        seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen)
+                        seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen, gR=a.ring_gain)
         if a.sim_out:
             path = Path(a.sim_out)
             old = json.load(open(path)) if path.exists() else []

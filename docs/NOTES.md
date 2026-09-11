@@ -85,7 +85,8 @@ and spike-frequency adaptation.
   prediction were treated as excitatory (Shiu's default), and they include the largest antennal-lobe
   local neurons (v2LN30, lLN2F_a, lLN2T_d: 25-50k output synapses each, GABAergic as a class). Fix:
   unknown NT -> sign 0, AL LN types -> GABA. With that the brain is quiet without input again.
-  Making DA/OA/5-HT purely modulatory (sign 0) was *not* sufficient on its own and is left at +1.
+  Making DA/OA/5-HT purely modulatory (sign 0) was *not* sufficient on its own; they were later set to sign 0
+  anyway (NT_SIGN, session 3), which is the current state -- see the session-9 NT audit.
 * Synaptic budget: a target needs ~5,000 synapse-spikes/s (7 mV / (0.275 mV x 5 ms)) to reach
   threshold, so columnar medulla cells must fire ~100 Hz to drive T4/T5 (166 synapses from
   Mi1/Tm3/Mi4/Mi9/C3/CT1 per T4a). Shiu drove sensory inputs at 150 Hz Poisson for the same reason.
@@ -1056,6 +1057,85 @@ sweep today is B processes packed onto a GPU (each at ~20 % of a B200's memory).
 over B would let one process run a whole sweep through a single batched brain step, which is roughly
 B times cheaper than B processes; the warp-CSR path is batch-1 only, so the batched configuration would
 use cuSPARSE (`--cuda-sparse torch`) with kernels + graphs.
+
+### Session 9 addendum 2: the audit workflow (NT signs, compass structure, benchmark suite, anti-runaway retirement)
+
+Nine agents (three audits, one retirement study, four skeptics, one critic; the second half on the cluster) --
+reports in `docs/audits/`, every number below survived its skeptic unless marked.
+
+**The compass circuit does support a ring attractor** (`docs/audits/cx_wedge.md`, `scripts/cx_wedge.py`, verified
+bit-for-bit on the B200 by `scripts/cx_wedge_verify.py`). Session 8's "no confined bump in any gain grid" was a
+consequence of where the Delta7 gain was applied. Structure, from the wedge identities (46 EPG in PB glomeruli
+L1-L8 / R1-R8, 42 PEN, 18 PEG, 42 Delta7 whose instance names are their output glomeruli; ring order L1 R8 L2 R7 L3
+R6 L4 R5 L5 R4 L6 R3 L7 R2 L8 R1): two-step EPG x EPG excitation through PEN is wedge-local (84 % within +-2 wedges),
+Delta7 inhibition is cosine-shaped (own-wedge / opposite 0.10), and PEG is 20x weaker. What the grid missed is an
+**untuned global feedback loop EPG -> ExR6 / ExR4 / ER6 / ER4m -> EPG, PEN** (two-step -2,800 to -3,200 mV^2 per
+wedge at every distance, 7x the peak Delta7 inhibition): with Delta7 cut, a PEN next to a driven bump still nets
+-7.7 mV from it. So at x1 this loop, not Delta7, shuts the recurrence, and gaining Delta7 -> PEN (the session-8
+convention) clamps the bump's own PEN. Working settings (full connectome, compass adaptation 0, 10 Hz EPG
+background, 4 wedges driven at +40 Hz for 2 s, 5 s free): EPG <-> PEN and EPG <-> PEG x2 with **Delta7 -> EPG x15-25
+(Delta7 -> PEN x1)** gives a confined bump that persists for the full 5 s (driven wedges ~200 Hz, 11/11 cells above
+22 Hz, 1/35 outside, vector strength 0.76; PEN 49, Delta7 101 Hz; rest of brain 0.03 Hz), captured by the pulse from
+wherever the spontaneous bump had formed, in seeds 0-2; gE 1.75 also works, gE 1.5 is metastable, gE 1 dies, gD 60
+drifts, gD 8 or gE 2.5 give a bump too stiff to relocate. Alternative: ER / ExR -> EPG / PEN / PEG damped x0.3 with
+Delta7 -> EPG x4-15 at recurrence x1. Caveats the skeptic added: the bump fires 200-260 Hz per cell (refractory-
+limited, 10x the animal); capture is not always exact (one seed lands one wedge off); nothing beyond 5 s was
+sampled; several "capture" rows were really persistence because the seed's spontaneous bump had nucleated at the
+driven wedges; and the whole loop hinges on four ExR4 / ExR6 cells (predicted glutamate) whose fast-vs-modulatory
+role in the animal is unknown. The bump has not yet been run with sensory input, shown to move with a PEN L / R
+asymmetry, or shown to reach PFN -> hDelta -> PFL3 (structurally PFN gets EPG +2.8 vs Delta7 -13.5 mV per cell with
+every nodulus input but IbSpsP inhibitory) -- these are the next experiments.
+
+**NT signs** (`docs/audits/nt_audit.md`, `scripts/audit_nt.py`, byte-reproducible on CPU): sign 0 silences 2.2 % of
+synapses (unknown 0.7 %, DA / OA / 5-HT 0.5 % each), landing on the mushroom body (9.8 % of input, 12.5 % of output)
+and the octopaminergic visual centrifugal cells (17.6 % of their output), while every optic, loom, optomotor,
+antennal-lobe and DN population loses under 1.5 % of input and none of its output. So the sign-0 convention is not what
+silences the compass or the object pathway. One link to test: GLNO (4 cells, all NT columns unclear, T-bars glutamate
+51 % / ACh 37 %) is 19.4 % of PEN's raw input and is itself 41 % driven by PEN -- a silent PEN <-> GLNO loop. Two
+sign disagreements rather than gaps: Tm5Y is ACh at confidence 0.96 (the "glutamate" was the audit's own unsourced
+table entry), MN9 ACh vs glutamatergic motor neurons (726 output synapses; irrelevant). A type-majority rule would
+give an NT to 496 of the 1,838 unknown presynaptic cells (25 % of the silenced synapses) at much higher confidence
+than T-bar votes. The receptor-expression integration (`docs/NT_INTEGRATION.md`) remains the principled route.
+
+**Benchmark suite** (`scripts/benchmark.py`, `docs/audits/benchmark_suite.md`): 14 sections, one entry point,
+`REFERENCES` dict with the session that set each value, JSON for regression diffs; 3.8 min on the 4090, 5.3 min on a
+shared B200; 24 pass / 3 fail / 2 known gaps at the defaults. Skeptic's corrections applied: `loom_escape` had run
+against a stale body.py (gf_hz 38) -- at HEAD (33) the reruns give 2/2, 1/2 and 4/6 escapes with peaks 29-42 Hz, so
+the check passes but is bistable at the threshold (`--seeds 0..5`); the motion DSI line now quotes measured values
+(T4a 0.17 ... T5a 0.40, identical across 4090 and B200); min-DSI reference 0.16. Checks that do not discriminate and
+should be repaired next: `loom.escape_cm`, `dn.DNp09_top_hz` / `MDN_top_hz` (report the driven type), `walk.power_max_hz`
+(bistable per-frame transient), the legacy `rotate.DNp20_flip_hz` (2x scatter), and the object / compass sections
+(population means at defaults, 0 in all 45 runs by construction).
+
+**Anti-runaway retirement** (`docs/audits/anti_runaway.md`, `scripts/retire_measures.py`; 26 configurations, three
+replicates, "broken" only when it fails in every replicate): adaptation is needed (6 breaks without it) but
+`adapt_by_type` -- 0 mV in the CX columnar cells, ring neurons, motor neurons and GF, 1.5 mV elsewhere -- **breaks
+nothing** (26/1; this is also the adaptation half of the compass fix); the cap is needed (DNa02 asymmetry, MDN storm,
+odour gate), a soft cap 120(1-exp(-n/120)) breaks nothing; same-type damping x0.1 produces no replicated break when
+removed but KC rates rise 2.9 -> 12 Hz and loom GF doubles, and the per-type list passes only without margin; fan-in
+scaling is needed (walking GF p99 58 Hz without it), (5000/total)^0.5 passes; AL depression is needed (odour gate 92 Hz
+without it); DN -> VNC x3 breaks nothing when removed but the DN motor maps collapse 4x; **the GF x0.3 input damping
+breaks nothing when removed** and four of its five targets are inhibitory, so it goes. Adoptions are one at a time
+with a suite run each (`all_replacements` together breaks walking GF p99).
+
+**Three bugs found by the study, fixed here**: (1) `brain._shaped_weights` with `conn_cap 0` aliased the shared
+connectome and multiplied the path gains into `c.W` on every build (121.4M -> 125.6M -> 137.9M abs sum) -- it now
+always copies; the local `no_cap` and the earlier Shiu-rules numbers in the retire study were contaminated (the cluster
+replicate, built with a guard, was clean: Shiu 123.5 / 2.1 unchanged). (2) The PN entry in `DEFAULT_STD_U_BY_TYPE`
+never matched a cell (patterns are applied with `re.match`), so the model has always depressed ORN and LN terminals
+only; the entry is removed and the docs corrected -- no behavioural change. (3) `room_demo.update_loom` placed the
+ball along world +y, which is the fly's left only at heading 0; in free-walking loom sections the stimulus azimuth
+therefore depended on the seed's heading (session 9's two "ball not seen" seeds). It now approaches along
+`fly.left`; the free-walking loom numbers above predate the fix and should be re-measured.
+
+**Critic's follow-ups, in order**: run the two compass settings through the full suite with senses (does a 200 Hz
+bump spin the walking fly through PFL3 -> DNa02?); PEN L / R shift and the PFN / hDelta / PFL3 readout; the GLNO sign;
+T2 / T3 as ON-OFF units (their inputs sum Mi1 / Tm3 (figure z -8) and Tm1 / Tm2 / Tm4 (+3 to +5) linearly and cancel
+the object exactly where NOTES 9 loses it; T3 is 21 % of LC11's input) via a rectified baseline in `optic.py`, scored
+with `probe_figure_ground.py` and the sweeping-ball assay; the self-motion GF assays that decided LPi x4 and
+edge_len 20 mm added to the suite, and the optic layer's own hand-crafted measures (five pair gains, gain_out, L1
+normalisation, drive clip) audited the way the LIF's were; the odour gate at the 40 cm foraging start (channel 12.5 Hz
+against a 13 Hz gate) and cross-channel specificity; an NT-rescue counterfactual through the LIF sections.
 
 ## Batched brains and the RL environment
 

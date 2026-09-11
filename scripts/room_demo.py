@@ -187,7 +187,7 @@ class Sim:
         if self.loom_t > (start - final) / speed + 0.3:
             self.loom_t = -1.0; self.world.move_sphere(self.loom_idx, (9, 9, 9))
         else:
-            self.world.move_sphere(self.loom_idx, eye + np.array([0.0, d, 0.01]))
+            self.world.move_sphere(self.loom_idx, eye + d * np.asarray(self.fly.left) + np.array([0.0, 0.0, 0.01]))   # from the fly's left, whatever its heading
 
     def stimulate_wing_dns(self, ms=1000.0):
         """Drive the flight DNs the screen found (DNg02_a, DNa08: wingbeat) at 120 Hz for `ms`."""
