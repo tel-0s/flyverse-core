@@ -12,6 +12,7 @@ Keys: SPACE pause, R reset fly, T teleport next to fruit, L loom a black ball at
 giant fibre (escape jump), W stimulate the flight DNs DNg02_a/DNa08 for 1 s (wingbeat), ESC quit.
 Scene camera: arrow keys orbit, +/- (or mouse wheel over the view) zoom, mouse drag in the view orbits,
 C follows the fly, HOME resets. The window is resizable; the UI keeps its layout and scales to fit.
+State: F5 / F9 quick-save / quick-load (out/quicksave.pt), S timestamped save, --load file to resume.
 """
 from __future__ import annotations
 
@@ -181,6 +182,51 @@ class Sim:
         self.brain.set_poisson(self.wings.gf, 200.0)
         self.gf_pulse = 3
 
+    # ------------------------------------------------------------------ save / load
+    BRAIN_TENSORS = ("v", "g", "refrac", "drive", "poisson_p", "rate", "spikes", "adapt", "res", "spike_buf")
+    OPTIC_TENSORS = ("v", "adapt", "I_lp", "I_mean", "_fresh")
+
+    def save_state(self, path):
+        """Everything needed to resume exactly: LIF + optic-lobe state, RNG, fly pose, loom, trail."""
+        import dataclasses
+        b, o = self.brain, self.optic
+        state = {
+            "brain": {k: getattr(b, k).detach().cpu() for k in self.BRAIN_TENSORS},
+            "brain_scalars": {"buf_pos": b.buf_pos, "t": b.t, "step_count": b.step_count, "_poisson_on": b._poisson_on},
+            "rng": b.gen.get_state(),
+            "optic": {k: getattr(o, k).detach().cpu() for k in self.OPTIC_TENSORS},
+            "fly": dataclasses.asdict(self.fly),
+            "loom_t": self.loom_t, "loom_center": self.world.spheres[self.loom_idx].center,
+            "trail": self.trail, "spike_hist": self.spike_hist, "tasting": self.tasting,
+            "pulses": {"wing_pulse": getattr(self, "wing_pulse", 0), "gf_pulse": getattr(self, "gf_pulse", 0)},
+            "flight_hold": getattr(self.flight, "_power_hold", 0.0),
+        }
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        torch.save(state, path)
+        print(f"saved state at t={b.t / 1000:.2f}s -> {path}")
+
+    def load_state(self, path):
+        state = torch.load(path, map_location="cpu", weights_only=False)
+        b, o = self.brain, self.optic
+        for k in self.BRAIN_TENSORS:
+            getattr(b, k).copy_(state["brain"][k].to(b.device))
+        for k, v in state["brain_scalars"].items():
+            setattr(b, k, v)
+        b._rate_np_key = None
+        b.gen.set_state(state["rng"])
+        for k in self.OPTIC_TENSORS:
+            getattr(o, k).copy_(state["optic"][k].to(o.device))
+        self.fly = body.FlyState(**state["fly"])
+        self.loom_t = state["loom_t"]; self.world.move_sphere(self.loom_idx, state["loom_center"])
+        self.trail = state["trail"]; self.spike_hist = state["spike_hist"]; self.tasting = state["tasting"]
+        self.wing_pulse = state["pulses"]["wing_pulse"]; self.gf_pulse = state["pulses"]["gf_pulse"]
+        if self.wing_pulse:
+            self.wing_idx = self.c.select(type=["DNg02_a", "DNa08"])
+        self.flight._power_hold = state["flight_hold"]
+        self.col_rad = self.column_radiance()
+        self.cmd = self.loco.readout(b, self.groups); self.wcmd = self.flight.readout(b, self.wings)
+        print(f"loaded state at t={b.t / 1000:.2f}s <- {path}")
+
     def nearest_fruit(self):
         best = (None, 1e9)
         for name, cen, rad in self.info["fruit"]:
@@ -312,11 +358,21 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
     dt_wall = time.time() - sim.t_wall; sim.t_wall = time.time()
     blit_text(screen, font, f"{1 / max(dt_wall, 1e-3):.0f} fps  ({FRAME_MS / max(dt_wall, 1e-3) / 1000:.2f}x real time)" + ("   PAUSED" if paused else ""), ox, y)
     blit_text(screen, font, "SPACE pause  R reset  T apple  L loom  F giant fibre  W wing DNs  ESC", ox, y + 18)
-    blit_text(screen, font, "arrows/drag orbit  +/- wheel zoom  C follow  HOME reset", ox, y + 34)
-    # 5. brain map (optional column)
+    blit_text(screen, font, "arrows/drag orbit  +/- wheel zoom  C follow  HOME reset  F5/F9 save/load  S save", ox, y + 34)
+    # 5. brain map (optional column): sampled every `map_every` drawn frames; between samples the shown
+    #    activity decays (time constant ~2 x map_every frames) so spikes light up and fade out
     if bmap is not None:
         mx0 = W + 12
-        act = bmap.activity(sim.brain, sim.optic)
+        n_every = max(1, int(getattr(sim, "map_every", 1)))
+        k = getattr(sim, "_map_counter", 0)
+        shown = getattr(sim, "_map_shown", None)
+        if shown is None or k % n_every == 0:
+            act = bmap.activity(sim.brain, sim.optic)
+            shown = act if (shown is None or n_every == 1 or getattr(sim, "map_no_blur", False)) else np.maximum(shown, act)
+        elif not getattr(sim, "map_no_blur", False):
+            shown = shown * float(np.exp(-1.0 / (2.0 * n_every)))
+        sim._map_shown = shown; sim._map_counter = k + 1
+        act = shown
         dors, lat = bmap.render(act)
         blit_text(screen, font, "brain map: dorsal (brain left, VNC right)", mx0, 10)
         screen.blit(pygame.surfarray.make_surface(np.transpose(dors, (1, 0, 2))), (mx0, 28))
@@ -351,6 +407,9 @@ def main():
     ap.add_argument("--window", type=str, default="", help="initial window size WxH (default: the design size)")
     ap.add_argument("--start", type=str, default="", help="start pose: 'x,y' (on the table), 'x,y,z', or 'floor'")
     ap.add_argument("--trail-seconds", type=float, default=20.0, help="how long the fly's trail persists in the scene view (0 = off)")
+    ap.add_argument("--map-every", type=int, default=4, help="brain map: sample the brain every N drawn frames (activity fades in between)")
+    ap.add_argument("--map-no-blur", action="store_true", help="brain map: no fading between samples")
+    ap.add_argument("--load", type=str, default="", help="resume from a saved state (.pt); F5/F9 quick-save/load, S timestamped save")
     args = ap.parse_args()
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -378,6 +437,9 @@ def main():
     if args.teleport:
         sim.teleport_to_fruit()
     bmap = brainmap.BrainMap(sim.c, sim.optic) if args.brain_map else None
+    sim.map_every, sim.map_no_blur = args.map_every, args.map_no_blur
+    if args.load:
+        sim.load_state(args.load)
     orbit = OrbitCam((0.0, 0.0, sim.info["table_top_z"]))
     frames = []
     paused = False
@@ -438,6 +500,12 @@ def main():
                         orbit.dist = min(orbit.dist, 0.4)
                 elif ev.key == pygame.K_HOME:
                     orbit.reset()
+                elif ev.key == pygame.K_F5:
+                    sim.save_state("out/quicksave.pt")
+                elif ev.key == pygame.K_F9 and os.path.exists("out/quicksave.pt"):
+                    sim.load_state("out/quicksave.pt"); sim._over_key = None
+                elif ev.key == pygame.K_s:
+                    sim.save_state(time.strftime("out/state_%Y%m%d_%H%M%S.pt"))
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1 and in_scene(ev.pos):
                 dragging = True
             elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
