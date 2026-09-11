@@ -798,6 +798,15 @@ body assumption, not the connectome:
   fixate and approach dark objects. Whether the model carries an object-position signal is a screen
   question (`scripts/screen_object.py`: apple 5 cm ahead-left vs ahead-right, every DN / LC / VP type
   by side) before it is a program question.
+* **No object-position signal in the model.** `screen_object.py` (apple 5 cm ahead-left vs
+  ahead-right, pinned, no wind; every DN / LC / LPLC / LT / MeTu / AOTU / LAL / PVLP / AVLP type by
+  side): the strongest L - R flip is LAL207 at d' 0.64 (2 cells, 1.2 Hz) -- nothing. LC10a, the
+  object-tracking population of the animal (275 cells), sits at 0.02 Hz; LC16 0.12; DNa02 0.01. Like
+  the compass's visual input, the object pathway is silent in the rate optic lobe + LIF model. So the
+  last five centimetres cannot be read out of the brain as it stands: it is either a program
+  (near-field klinotaxis on the bilateral antennae, which the animal also does) or an optic-lobe
+  question (why LC10 is silent when LC4 / LPLC2 are not). Left as the second open model question
+  beside the compass; the single-apple table stays at 0 / 6 with the approach to 3.5-9 cm recorded.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
