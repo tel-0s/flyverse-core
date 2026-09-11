@@ -10,3 +10,4 @@ build/
 
 # infrastructure notes (public repo)
 docs/CLUSTER.md
+.cluster.json
