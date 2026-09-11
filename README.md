@@ -133,7 +133,7 @@ rates, the body classes (or your own) turn rates into motion.
 from flyverse import FlyBrain
 from flyverse.body import FlyState, Locomotion
 
-fb = FlyBrain(modules=["antennal_lobe", "mushroom_body", "mechanosensory", "central", "descending", "vnc"])   # modules=None: everything
+fb = FlyBrain(modules=["antennal_lobe", "mushroom_body", "gustatory", "mechanosensory", "central", "descending", "vnc"])   # modules=None: everything
 fb.smell({"DM1": 0.4, "VA2": 0.2}, {"DM1": 0.2, "VA2": 0.1})   # concentration per glomerulus, left / right antenna
 fb.wind(0.3, 0.3); fb.taste(0.0)                              # antennal deflection; sugar contact
 fb.step(10.0)                                                 # 10 ms of brain
