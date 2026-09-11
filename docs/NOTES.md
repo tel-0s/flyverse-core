@@ -1005,6 +1005,13 @@ body assumption, not the connectome:
   encodes final size (the LC4 side), not expansion rate (the LPLC2 side) -- consistent with LPLC2
   sitting at 1-4 Hz throughout this session's measurements. The discriminating condition for
   landing is an approach that stops short.
+* **Stop-short approaches** (the landing condition: the ball halts at 8 / 10 / 15 cm, final size 23-41
+  deg, l/v 60-250 ms, two seeds): GF +7.5 to +15 Hz over baseline and no takeoff in any run -- the
+  short-mode escape is gated by final size in the right direction; wing power +35 to +58 Hz without a
+  jump -- a wing-raise-like preparation to a gentle approach, which is the long mode's first half;
+  leg MNs +2.7 to +5.1 Hz -- no leg extension. Battery: 2a pass, 2b partial (wing preparation scales
+  and precedes, but no GF-independent takeoff and the GF still fires for slow looms that reach the
+  fly), 3 fail (no landing leg response).
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
