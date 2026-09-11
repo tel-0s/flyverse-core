@@ -77,8 +77,11 @@ These are measured behaviours of the wiring under the model, each with a probe s
 * **Looming escape** (`probe_loom.py`): a black ball approaching at 1 m/s drives LC4 / LPLC2 -> the
   giant fibre, which spikes at ~3.5 cm range; TTMn (the jump muscle) follows it 1:1. Walking through a
   textured room leaves the giant fibre silent.
-* **Sugar -> proboscis** (`probe_taste.py`): the labellar sweet GRNs drive the known second-order
-  neurons (Usnea 67 Hz, Rattle 49, Phantom 47, G2N-1 28) and MN9 -- Shiu et al.'s result on MaleCNS.
+* **Sugar -> proboscis, bitter shuts it off** (`probe_taste.py`, `probe_bitter.py`): the labellar
+  sweet GRNs drive the known second-order neurons (Usnea 67 Hz, Rattle 49, Phantom 47, G2N-1 28) and
+  MN9; adding the bitter GRNs suppresses it. Under Shiu et al.'s uniform-synapse rules on MaleCNS:
+  MN9 124 Hz on sugar, 2 Hz with bitter (they report 78 -> 3 on FlyWire); under this project's
+  calibration 4.6 -> 0.
 * **Wind direction** (`probe_wind.py`): the JO -> AMMC / WED -> DN pathway is the strongest lateralised
   signal in the model: DNp18 fires on the side the wind comes from (+60 Hz over its partner), DNp33 on
   the opposite side (+64), then DNge016, DNg99, DNge175, DNg05_a, DNp19 and DNpe017.

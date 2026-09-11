@@ -888,6 +888,19 @@ body assumption, not the connectome:
   kernels alone are not faster than Torch graphs, and `--fast` buys nothing on top of events. Spike
   trains diverge from eager after ~35 frames (atomic accumulation order; documented as non-bitwise).
   The sustain runs below use the event configuration. `probe_sustain.py` takes the backend flags.
+* **Shiu et al. 2024's sugar / bitter result, on MaleCNS** (`scripts/probe_bitter.py`: the 165 labellar
+  sweet GRNs and the 47 bitter GRNs from `taste_grns.csv` driven at 100 Hz, LIF alone, 1.5 s):
+
+  | | sugar | sugar + bitter | bitter alone |
+  |---|---|---|---|
+  | Shiu's rules (uniform 0.275 mV synapses, no adaptation / cap / damping / fan-in scaling) | MN9 123.5 Hz | 2.1 Hz | 0.0 Hz |
+  | this project's calibration | 4.6 Hz | 0.0 Hz | 0.0 Hz |
+
+  Shiu reported 78 -> 3 Hz on FlyWire (female). On MaleCNS their rules give 124 -> 2: the proboscis
+  motor neuron fires hard on sugar and bitter shuts it off. The calibrated model keeps the sign and
+  the suppression at a tenth of the amplitude -- the price of the anti-runaway measures the whole
+  brain with sensory input needs (session 3); the two-parameter-set comparison is the honest way to
+  quote it.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
