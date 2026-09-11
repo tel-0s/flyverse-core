@@ -91,6 +91,18 @@ class Retina:
 
 def build_retina(c: Connectome, geometry: EyeGeometry | None = None) -> Retina:
     g = geometry or EyeGeometry()
+    if c.reference is not c:
+        # Pruning columns must not recenter the remaining eye's viewing directions.
+        full = build_retina(c.reference, g)
+        body_ids = c.reference.neurons.bodyId.to_numpy()[full.pr_index]
+        keep = np.isin(body_ids, c.neurons.bodyId.to_numpy())
+        columns = np.unique(full.pr_column[keep])
+        col_map = np.full(full.n_columns, -1, dtype=np.int64)
+        col_map[columns] = np.arange(len(columns))
+        return Retina(pr_index=c.index_of(body_ids[keep]), pr_column=col_map[full.pr_column[keep]],
+                      pr_sens=full.pr_sens[keep], col_side=full.col_side[columns],
+                      col_hex=full.col_hex[columns], col_dir=full.col_dir[columns],
+                      col_az_el=full.col_az_el[columns], geometry=g)
     nrn = c.neurons
     m = nrn.type.isin(PHOTORECEPTOR_TYPES) & nrn.hex1.notna()
     pr = nrn[m]
@@ -101,7 +113,7 @@ def build_retina(c: Connectome, geometry: EyeGeometry | None = None) -> Retina:
     col_of = {k: i for i, k in enumerate(uniq)}
     pr_column = np.array([col_of[k] for k in keys])
     col_side = np.array([k[0] for k in uniq])
-    col_hex = np.array([[k[1], k[2]] for k in uniq], dtype=float)
+    col_hex = np.array([[k[1], k[2]] for k in uniq], dtype=float).reshape(-1, 2)
     pr_sens = np.array([SENSITIVITY[t] for t in pr.type], dtype=np.float32)
 
     # hex -> Cartesian (column spacing = 1). The two hex axes are 120 deg apart ((1,1) is a nearest

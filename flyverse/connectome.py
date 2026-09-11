@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -61,6 +61,48 @@ class Connectome:
     neurons: pd.DataFrame      # index 0..N-1; KEEP_COLS + nt, sign, hex1, hex2, hex_side, hex_source
     W: sp.csr_matrix           # (N, N), W[post, pre] = signed synapse count (float32)
     body_to_index: pd.Series   # bodyId -> row index
+    _reference: Connectome | None = field(default=None, repr=False)
+    _norm_cache: dict = field(default_factory=dict, repr=False)
+
+    def __post_init__(self):
+        # Fast synapse magnitudes; sign-zero neuromodulatory contacts contribute zero.
+        # Old caches acquire these columns in memory without rewriting the cache.
+        if "in_syn" not in self.neurons:
+            self.neurons["in_syn"] = np.asarray(abs(self.W).sum(axis=1)).ravel()
+        if "in_syn_l2" not in self.neurons:
+            self.neurons["in_syn_l2"] = np.sqrt(np.asarray(self.W.multiply(self.W).sum(axis=1)).ravel())
+
+    @property
+    def reference(self) -> Connectome:
+        """Original graph, retained on CPU for parameter-dependent normalization and laterality."""
+        return self if self._reference is None else self._reference
+
+    def indices(self, selection) -> np.ndarray:
+        """Validate a row-index selection, boolean mask, or select() criteria dictionary."""
+        if isinstance(selection, dict):
+            return self.select(**selection)
+        idx = np.asarray(selection)
+        if idx.dtype == bool:
+            if idx.shape != (self.n,):
+                raise ValueError(f"mask must have shape ({self.n},)")
+            return np.flatnonzero(idx)
+        if idx.ndim != 1 or (idx.size and not np.issubdtype(idx.dtype, np.integer)):
+            raise ValueError("selection must be a one-dimensional integer index array")
+        idx = idx.astype(np.int64)
+        if np.any((idx < 0) | (idx >= self.n)) or len(np.unique(idx)) != len(idx):
+            raise ValueError("indices must be unique and within the connectome")
+        return idx
+
+    def subset(self, selection) -> Connectome:
+        """Induced subgraph in selection order, with fresh indices and original normalization.
+
+        Selectors refer to this graph's row indices; body IDs stay stable across subsets.
+        The original CPU graph is shared, never copied, including for nested subsets.
+        """
+        idx = self.indices(selection)
+        neurons = self.neurons.iloc[idx].copy().reset_index(drop=True)
+        return Connectome(neurons, self.W[idx][:, idx].tocsr(),
+                          pd.Series(np.arange(len(idx)), index=neurons.bodyId.to_numpy()), self.reference)
 
     @property
     def n(self) -> int:
@@ -175,20 +217,35 @@ def _assign_photoreceptor_columns(neurons: pd.DataFrame, W: sp.csr_matrix, log) 
 
 
 def save(c: Connectome, cache_dir: Path = CACHE_DIR) -> None:
+    cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
     c.neurons.to_parquet(cache_dir / "neurons.parquet")
     sp.save_npz(cache_dir / "W_post_pre.npz", c.W, compressed=False)
+    # A saved subset must retain normalization under custom LIF parameters as well.
+    if c.reference is not c:
+        c.reference.neurons.to_parquet(cache_dir / "reference_neurons.parquet")
+        sp.save_npz(cache_dir / "reference_W.npz", c.reference.W, compressed=False)
+    else:
+        for name in ("reference_neurons.parquet", "reference_W.npz"):
+            (cache_dir / name).unlink(missing_ok=True)
 
 
 def load(cache_dir: Path = CACHE_DIR, rebuild: bool = False, verbose: bool = True) -> Connectome:
+    cache_dir = Path(cache_dir)
     if rebuild or not (cache_dir / "W_post_pre.npz").exists():
         c = compile_connectome(verbose=verbose)
         save(c, cache_dir)
         return c
     neurons = pd.read_parquet(cache_dir / "neurons.parquet")
     W = sp.load_npz(cache_dir / "W_post_pre.npz").tocsr()
+    reference = None
+    if (cache_dir / "reference_W.npz").exists():
+        rn = pd.read_parquet(cache_dir / "reference_neurons.parquet")
+        reference = Connectome(rn, sp.load_npz(cache_dir / "reference_W.npz").tocsr(),
+                              pd.Series(np.arange(len(rn)), index=rn.bodyId.to_numpy()))
     return Connectome(neurons=neurons, W=W,
-                      body_to_index=pd.Series(np.arange(len(neurons)), index=neurons.bodyId.to_numpy()))
+                      body_to_index=pd.Series(np.arange(len(neurons)), index=neurons.bodyId.to_numpy()),
+                      _reference=reference)
 
 
 if __name__ == "__main__":

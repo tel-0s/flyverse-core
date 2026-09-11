@@ -21,62 +21,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .connectome import Connectome
-
-
-@dataclass
-class MotorGroups:
-    fwd_dn: np.ndarray
-    back_dn: np.ndarray
-    turn_L: np.ndarray
-    turn_R: np.ndarray
-    opto_L: np.ndarray
-    opto_R: np.ndarray
-    wind_ipsi_L: np.ndarray     # DNp18 (+ DNge016, DNge175, DNg05_a, DNp19): fire on the side the wind comes from
-    wind_ipsi_R: np.ndarray
-    wind_contra_L: np.ndarray   # DNp33, DNg99: fire on the side away from the wind
-    wind_contra_R: np.ndarray
-    pn: np.ndarray              # antennal-lobe projection neurons: the odour signal that gates upwind turning
-    leg_L: np.ndarray
-    leg_R: np.ndarray
-    proboscis: np.ndarray
-    names: dict = field(default_factory=dict)
-    pn_glom: np.ndarray = None  # glomerulus id of each PN (the gate reads the most active glomerulus)
-    lh_odour: np.ndarray = None # lateral-horn types whose rate is the food-odour signal (see LH_ODOUR_TYPES)
-
-
-# Lateral-horn cell types that report fruit odour in the model, found by recording every LH / MB-output / DN
-# type at fruit and plume-free sites with heading-matched controls (NOTES, session 8): ~23 Hz next to fruit
-# (blueberry or apple, facing into or away from the wind) vs ~5-10 Hz on a plume-free table spot and ~2-5 on
-# the floor. The LH is the innate-valence output of the olfactory system; these 14 cells are the gate.
-LH_ODOUR_TYPES = ["LHPD4d2_b", "LHPD4a2", "LHAV3k1", "LHAV3h1", "LHPD5c1", "LHAD1f2"]
-
-
-def motor_groups(c: Connectome) -> MotorGroups:
-    fwd_types = ["DNp09", "DNa01", "DNa03", "DNb01", "DNa04"]
-    g = MotorGroups(
-        fwd_dn=c.select(type=fwd_types),
-        back_dn=c.select(type="MDN"),
-        turn_L=c.select(type="DNa02", somaSide="L"),
-        turn_R=c.select(type="DNa02", somaSide="R"),
-        opto_L=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="L"),
-        opto_R=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="R"),
-        wind_ipsi_L=c.select(type=["DNp18", "DNge016", "DNge175", "DNg05_a", "DNp19"], somaSide="L"),
-        wind_ipsi_R=c.select(type=["DNp18", "DNge016", "DNge175", "DNg05_a", "DNp19"], somaSide="R"),
-        wind_contra_L=c.select(type=["DNp33", "DNg99"], somaSide="L"),
-        wind_contra_R=c.select(type=["DNp33", "DNg99"], somaSide="R"),
-        # uniglomerular PNs only: the multiglomerular M_ types (275 cells, many GABAergic) are not a glomerulus
-        # and burst to 150 Hz from antennal-lobe activity alone
-        pn=c.select(type="~^(?!M_)[^_]+_(l2PN|adPN|lPN|lvPN|ilPN|ivPN|vPN)"),
-        leg_L=c.select(superclass="vnc_motor", subclass=["fl", "ml", "hl"], somaSide="L"),
-        leg_R=c.select(superclass="vnc_motor", subclass=["fl", "ml", "hl"], somaSide="R"),
-        proboscis=c.select(type="MN9"),
-    )
-    gl = np.array([t.split("_")[0] for t in c.neurons.type.to_numpy()[g.pn]])
-    g.pn_glom = np.unique(gl, return_inverse=True)[1]
-    g.lh_odour = c.select(type=LH_ODOUR_TYPES)
-    g.names = {"fwd_dn": fwd_types, "back_dn": ["MDN"], "turn": ["DNa02 L/R"], "opto": ["DNp04, LPT27, LPT30 L/R"], "leg": ["leg MNs L/R"], "proboscis": ["MN9"]}
-    return g
+from .motor import MotorGroups, WingGroups, MotorRates, motor_groups, wing_groups, read_motor, LH_ODOUR_TYPES
 
 
 @dataclass
@@ -222,36 +167,38 @@ class Locomotion:
     baseline_speed: float = 0.008  # m/s intrinsic walking drive (flies walk spontaneously; keeps optic flow alive)
     mdn_threshold: float = 15.0    # Hz; MDN fires a few Hz from self-motion optic flow, only a real burst means "back up"
 
-    def readout(self, brain, g: MotorGroups) -> dict:
-        r = brain.mean_rate
-        fwd = r(g.fwd_dn); back = r(g.back_dn)
-        tL, tR = r(g.turn_L), r(g.turn_R)
-        oL, oR = r(g.opto_L), r(g.opto_R)
-        lL, lR = r(g.leg_L), r(g.leg_R)
-        prob = r(g.proboscis)
-        wiL, wiR, wcL, wcR = r(g.wind_ipsi_L), r(g.wind_ipsi_R), r(g.wind_contra_L), r(g.wind_contra_R)
+    def readout(self, motor, g: MotorGroups | None = None, dt_s: float = 0.01) -> dict:
+        # Legacy (Brain, MotorGroups) probes use the same raw-rate adapter.
+        motor = read_motor(motor, groups=g) if g is not None else motor
+        fwd, back = motor.fwd_dn, motor.back_dn
+        tL, tR = motor.turn_L, motor.turn_R
+        oL, oR = motor.opto_L, motor.opto_R
+        lL, lR = motor.leg_L, motor.leg_R
+        prob = motor.proboscis
+        wiL, wiR = motor.wind_ipsi_L, motor.wind_ipsi_R
+        wcL, wcR = motor.wind_contra_L, motor.wind_contra_R
         upwind = 0.5 * ((wiL - wiR) - (wcL - wcR))          # + = wind from the left = turn left to face it
         asym = oL - oR
-        a_hp = np.exp(-0.01 / self.opto_hp_tau_s)
+        a_hp = np.exp(-dt_s / self.opto_hp_tau_s)
         self._opto_bias = a_hp * getattr(self, "_opto_bias", asym) + (1 - a_hp) * asym
         opto = asym - self._opto_bias
-        a_sm = np.exp(-0.01 / self.pn_smooth_s)
-        if self.odour_source == "lh" and g.lh_odour is not None and len(g.lh_odour):
-            lh = r(g.lh_odour)
+        a_sm = np.exp(-dt_s / self.pn_smooth_s)
+        if self.odour_source == "lh":
+            lh = float(motor.lh_odour)
             self._lh_smooth = a_sm * getattr(self, "_lh_smooth", lh) + (1 - a_sm) * lh
             odour = float(np.clip((self._lh_smooth - self.lh_base_hz) / self.lh_gate_hz, 0.0, 1.0))
             self._odour_hz = self._lh_smooth
         else:
-            pn_rates = brain.rates(g.pn)
-            n_pn = np.bincount(g.pn_glom)
-            glom_mean = np.bincount(g.pn_glom, weights=pn_rates) / np.maximum(n_pn, 1)
+            names = list(motor.pn_glomeruli)
+            glom_mean = np.array([float(motor.pn_glomeruli[n]) for n in names], float)
+            n_pn = np.array([motor.pn_glom_cells.get(n, 1) for n in names])
             self._glom_smooth = a_sm * getattr(self, "_glom_smooth", glom_mean) + (1 - a_sm) * glom_mean
-            x = self._glom_smooth[n_pn >= self.pn_min_cells]
-            odour = float(np.clip((x.max() - np.median(x) - self.pn_base_hz) / self.pn_gate_hz, 0.0, 1.0))
-            self._odour_hz = float(x.max() - np.median(x))
-        self._gate = max(odour, getattr(self, "_gate", 0.0) * np.exp(-0.01 / self.gate_tau_s))
+            x = self._glom_smooth[n_pn >= self.pn_min_cells] if (n_pn >= self.pn_min_cells).any() else self._glom_smooth
+            odour = float(np.clip((x.max() - np.median(x) - self.pn_base_hz) / self.pn_gate_hz, 0.0, 1.0)) if len(x) else 0.0
+            self._odour_hz = float(x.max() - np.median(x)) if len(x) else 0.0
+        self._gate = max(odour, getattr(self, "_gate", 0.0) * np.exp(-dt_s / self.gate_tau_s))
         # plume-loss detection and casting
-        t = getattr(self, "_t", 0.0) + 0.01; self._t = t
+        t = getattr(self, "_t", 0.0) + dt_s; self._t = t
         if self._gate > 0.6:
             self._last_hit = t; self._cast_from = None
         elif self._gate < self.lost_gate and getattr(self, "_last_hit", -1e9) > t - 30.0 and getattr(self, "_cast_from", None) is None:
@@ -271,7 +218,7 @@ class Locomotion:
         # upwind surge goes nowhere, and the way into the plume proper is downwind of the source)
         searching = (self.metabolism.hunger > self.search_hunger and self._gate < 0.6 and cast == 0.0
                      and since_hit > self.offset_delay_s)
-        a_ou = np.exp(-0.01 / self.search_yaw_tau_s)
+        a_ou = np.exp(-dt_s / self.search_yaw_tau_s)
         self._ou = a_ou * getattr(self, "_ou", 0.0) + np.sqrt(1 - a_ou ** 2) * self.search_yaw_sd * self.rng.standard_normal()
         downwind = self.k_downwind * self.metabolism.hunger * max(1.0 - self._gate / 0.6, 0.0)   # fades as the odour grows
         search_yaw = (self._ou - downwind * upwind) if searching else 0.0
@@ -287,6 +234,8 @@ class Locomotion:
                 "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "wind_L": wiL, "wind_R": wiR, "odour Hz": self._odour_hz, "gate x10": self._gate * 10, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": prob}}
 
     def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds: tuple) -> None:
+        if isinstance(cmd, MotorRates):
+            cmd = self.readout(cmd, dt_s=dt_s)
         a = np.exp(-dt_s * 1000 / self.tau_ms)
         fly.speed = a * fly.speed + (1 - a) * cmd["speed"]
         fly.yaw_rate = a * fly.yaw_rate + (1 - a) * cmd["yaw"]
@@ -313,28 +262,6 @@ class Locomotion:
 
 
 # ---------------------------------------------------------------------------- flight
-@dataclass
-class WingGroups:
-    gf: np.ndarray          # giant fibre DNp01 (escape takeoff)
-    ttm: np.ndarray         # TTMn: tergotrochanteral "jump" muscle motor neurons
-    power: np.ndarray       # DLMn + DVMn: indirect flight power muscles (wingbeat)
-    steer_L: np.ndarray     # direct steering muscle MNs (b1-3, i1-2, iii1/3, hg1-4, ps1-2, tp1-2, tpn) left
-    steer_R: np.ndarray
-    haltere: np.ndarray
-
-
-def wing_groups(c: Connectome) -> WingGroups:
-    steer = c.select(superclass="vnc_motor", subclass="wm", type="~^(b[123]|i[12]|iii[13]|hg[1-4]|ps[12]|tp[12]|tpn) MN$")
-    side = c.neurons.somaSide.to_numpy()
-    return WingGroups(
-        gf=c.select(type="DNp01"),
-        ttm=c.select(type="TTMn"),
-        power=c.select(type="~^(DLMn|DVMn)"),
-        steer_L=steer[side[steer] == "L"], steer_R=steer[side[steer] == "R"],
-        haltere=c.select(superclass="vnc_motor", subclass="hm"),
-    )
-
-
 @dataclass
 class Flight:
     """Airborne dynamics. Takeoff = a giant-fibre spike (escape jump: ballistic hop, wings may or may not
@@ -368,18 +295,20 @@ class Flight:
     gf_hab_tau_s: float = 10.0
     tau_ms: float = 40.0
 
-    def readout(self, brain, wg: WingGroups) -> dict:
-        r = brain.mean_rate
-        gf = r(wg.gf)
-        a = np.exp(-0.01 / self.gf_hab_tau_s)
+    def readout(self, motor, wg: WingGroups | None = None, dt_s: float = 0.01) -> dict:
+        motor = read_motor(motor, wings=wg) if wg is not None else motor
+        gf = float(motor.gf)
+        a = np.exp(-dt_s / self.gf_hab_tau_s)
         self._gf_mean = a * getattr(self, "_gf_mean", 0.0) + (1 - a) * gf
-        return {"gf": gf, "gf_threshold": self.gf_hz + self.gf_habituation * self._gf_mean,
-                "ttm": r(wg.ttm), "power": r(wg.power), "steer_L": r(wg.steer_L), "steer_R": r(wg.steer_R),
-                "haltere": r(wg.haltere)}
+        out = {name: getattr(motor, name) for name in ("gf", "ttm", "power", "steer_L", "steer_R", "haltere")}
+        out["gf_threshold"] = self.gf_hz + self.gf_habituation * self._gf_mean
+        return out
 
     landing_refractory_s: float = 1.0  # no new escape within this time of landing (a jump-land-jump chain is not fly behaviour)
 
     def maybe_takeoff(self, fly: FlyState, w: dict, dt_s: float = 0.01) -> bool:
+        if isinstance(w, MotorRates):
+            w = self.readout(w)
         fly.ground_time += dt_s
         if w["gf"] >= w.get("gf_threshold", self.gf_hz) and fly.ground_time >= self.landing_refractory_s:
             # the giant fibre spike is the escape trigger (TTMn follows it 1:1 in the animal)
@@ -402,6 +331,8 @@ class Flight:
 
     def step(self, fly: FlyState, w: dict, dt_s: float, surface_z, room: tuple) -> None:
         """Integrate one airborne step. surface_z(x, y) -> z of what is below; room = (x0,x1,y0,y1,z1)."""
+        if isinstance(w, MotorRates):
+            w = self.readout(w)
         a = np.exp(-dt_s * 1000 / self.tau_ms)
         yaw = np.clip(-self.k_yaw * (w["steer_R"] - w["steer_L"]), -self.max_yaw, self.max_yaw)
         fly.yaw_rate = a * fly.yaw_rate + (1 - a) * yaw
