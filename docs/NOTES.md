@@ -1041,8 +1041,11 @@ budget), waits, prints the logs and fetches results back. The workflow agents of
 reloaded with the instruction to use it instead of the local GPU.
 
 First cluster run of the fenced single-apple sustain probe (seed 0, `--program cx`, fast configuration,
-`probe_sustain.py`): 5 min, meals 0, final energy 0, hops 0, path 3.78 m; exploring 52 %, surging 19 %,
-casting 17 %, searching 12 % -- 9.6 min wall-clock, i.e. 1.9x slower than real time, against 1.24x real time on the local RTX 4090. That number includes the first-time compilation of the native kernels for sm_100 and two other jobs sharing the GPU for part of the run, so it is not yet a clean B200 timing; the sim is latency-bound (small kernels per 0.5 ms step), which is exactly the regime where a datacentre GPU does not beat a desktop one and where batching flies per process would pay. Same
+`probe_sustain.py`), which by a scheduling accident ran twice concurrently on two GPUs: 5 min, meals 0, final
+energy 0, hops 0 in both; path 3.78 m (exploring 52 %, surging 19 %, casting 17 %, searching 12 %) and
+3.84 m (exploring 69 %, surging 18 %) -- the same seed giving two different trajectories is the run-to-run
+nondeterminism of the native fast configuration (float atomics in the event-driven kernels), worth
+remembering when comparing single runs. 9.6 min wall-clock, i.e. 1.9x slower than real time, against 1.24x real time on the local RTX 4090. That number includes the first-time compilation of the native kernels for sm_100 and two other jobs sharing the GPU for part of the run, so it is not yet a clean B200 timing; the sim is latency-bound (small kernels per 0.5 ms step), which is exactly the regime where a datacentre GPU does not beat a desktop one and where batching flies per process would pay. Same
 outcome class as the local runs (session 9: CX fed in 2 of 6). The smoke job (control / cuda / world
 tests) passed on the B200: 25 passed, 10 skipped.
 
