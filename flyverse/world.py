@@ -349,7 +349,10 @@ def make_room(seed: int = 0) -> tuple[World, dict]:
         fruit.append(Sphere((-0.05 + 0.03 * rng.normal(), 0.28 + 0.03 * rng.normal(), top_z + 0.006), (0.006, 0.006, 0.006), "blueberry"))
     w.spheres += fruit
     w.spheres.append(Sphere(w.light_pos, (0.08, 0.08, 0.08), "lamp"))
-    info = {"table_top_z": top_z, "table_extent": (-0.6, 0.6, -0.4, 0.4),
+    solids = [(-0.6, 0.6, -0.4, 0.4, top_z - 0.03, top_z)] + [(sx - 0.025, sx + 0.025, sy - 0.025, sy + 0.025, 0.0, top_z - 0.03)
+                                                            for sx in (-0.55, 0.55) for sy in (-0.35, 0.35)]
+    info = {"table_top_z": top_z, "table_extent": (-0.6, 0.6, -0.4, 0.4), "room": (-2.0, 2.0, -2.0, 2.0, 0.0, 2.6),
+            "solids": solids, "solid_labels": ["table"] + ["leg"] * 4,
             "fruit": [(s.material, s.center, max(s.radii)) for s in fruit]}
     return w, info
 

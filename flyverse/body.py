@@ -26,11 +26,14 @@ from .motor import MotorGroups, WingGroups, MotorRates, motor_groups, wing_group
 
 @dataclass
 class FlyState:
+    """Pose. On a surface the source of truth is (fwd, normal): forward vector in the face's plane and the
+    face's outward normal (`surfaces.py`); heading / pitch / roll are derived for display and for the
+    flight integrator, which owns them while airborne. `heading = h` on a surface rotates fwd about the
+    normal to azimuth h where that is defined (horizontal faces), and is a no-op on vertical faces."""
     x: float = 0.0            # m, world frame
     y: float = 0.0
     z: float = 0.75           # height of the walking surface
-    heading: float = 0.0      # rad, 0 = +x, positive = counter-clockwise (left)
-    pitch: float = 0.0        # rad, positive = nose up (free in flight, 0 on flat surfaces)
+    pitch: float = 0.0        # rad, positive = nose up (free in flight)
     roll: float = 0.0         # rad, positive = right wing down (banking)
     speed: float = 0.0        # m/s
     yaw_rate: float = 0.0     # rad/s
@@ -42,21 +45,60 @@ class FlyState:
     vz: float = 0.0
     air_time: float = 0.0
     ground_time: float = 1e9  # seconds since the last landing (escape refractory)
+    fwd: np.ndarray = field(default_factory=lambda: np.array([1.0, 0.0, 0.0]))
+    normal: np.ndarray = field(default_factory=lambda: np.array([0.0, 0.0, 1.0]))
+    face: object = None       # surfaces.Face the fly stands on (None = legacy flat plane)
+    _heading: float = 0.0     # flight azimuth (rad); on a surface, the azimuth of fwd
+
+    @property
+    def pos(self) -> np.ndarray:
+        return np.array([self.x, self.y, self.z])
+
+    def set_pos(self, p) -> None:
+        self.x, self.y, self.z = (float(v) for v in p)
+
+    @property
+    def heading(self) -> float:
+        if self.airborne or abs(self.fwd[2]) > 0.999:
+            return self._heading
+        return float(np.arctan2(self.fwd[1], self.fwd[0]))
+
+    @heading.setter
+    def heading(self, h: float) -> None:
+        self._heading = float(h)
+        if not self.airborne and abs(self.normal[2]) > 0.5:          # horizontal face: rotate fwd to azimuth h
+            self.fwd = np.array([np.cos(h), np.sin(h), 0.0])
+
+    def place(self, x: float, y: float, z: float, heading: float = 0.0, normal=(0.0, 0.0, 1.0), face=None) -> None:
+        self.x, self.y, self.z = float(x), float(y), float(z)
+        self.normal = np.array(normal, float); self.face = face; self.airborne = False
+        self.pitch = self.roll = 0.0; self.vx = self.vy = self.vz = 0.0
+        self._heading = float(heading)
+        if abs(self.normal[2]) > 0.5:
+            self.fwd = np.array([np.cos(heading), np.sin(heading), 0.0])
+        else:                                                        # a wall: forward = up the wall
+            self.fwd = np.array([0.0, 0.0, 1.0])
 
     @property
     def forward(self) -> np.ndarray:
+        if not self.airborne:
+            return self.fwd
         cp = np.cos(self.pitch)
-        return np.array([cp * np.cos(self.heading), cp * np.sin(self.heading), np.sin(self.pitch)])
+        return np.array([cp * np.cos(self._heading), cp * np.sin(self._heading), np.sin(self.pitch)])
 
     @property
     def left(self) -> np.ndarray:
+        if not self.airborne:
+            return np.cross(self.normal, self.fwd)
         f = self.forward
-        l0 = np.array([-np.sin(self.heading), np.cos(self.heading), 0.0])
+        l0 = np.array([-np.sin(self._heading), np.cos(self._heading), 0.0])
         u0 = np.cross(f, l0)
         return np.cos(self.roll) * l0 + np.sin(self.roll) * u0
 
     @property
     def up(self) -> np.ndarray:
+        if not self.airborne:
+            return self.normal
         return np.cross(self.forward, self.left)
 
     def body_to_world(self, dirs_body: np.ndarray) -> np.ndarray:
@@ -66,7 +108,37 @@ class FlyState:
 
     @property
     def eye_pos(self) -> np.ndarray:
-        return np.array([self.x, self.y, self.z + self.eye_height])
+        return self.pos + self.eye_height * self.up
+
+    def flight_frame_from_surface(self) -> None:
+        """Entering the air: express the surface pose as heading / pitch / roll for the flight integrator."""
+        f, n = self.fwd, self.normal
+        self._heading = float(np.arctan2(f[1], f[0])) if abs(f[2]) < 0.999 else self._heading
+        self.pitch = float(np.arcsin(np.clip(f[2], -1, 1)))
+        l0 = np.array([-np.sin(self._heading), np.cos(self._heading), 0.0]); u0 = np.cross(self.forward_air(), l0)
+        left = np.cross(n, f)
+        self.roll = float(np.arctan2(np.dot(left, u0), np.dot(left, l0)))
+
+    def forward_air(self) -> np.ndarray:
+        cp = np.cos(self.pitch)
+        return np.array([cp * np.cos(self._heading), cp * np.sin(self._heading), np.sin(self.pitch)])
+
+    def __post_init__(self):
+        if isinstance(self.face, dict):                              # loaded from a saved state: re-resolved on the next step
+            self.face = None
+        self.fwd = np.asarray(self.fwd, float); self.normal = np.asarray(self.normal, float)
+
+
+_flystate_init = FlyState.__init__
+
+
+def _flystate_init_with_heading(self, *args, heading=None, **kw):   # FlyState(heading=...) keeps working
+    _flystate_init(self, *args, **kw)
+    if heading is not None:
+        self.heading = heading
+
+
+FlyState.__init__ = _flystate_init_with_heading
 
 
 @dataclass
@@ -151,14 +223,22 @@ class Locomotion:
                 "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "wind_L": motor.wind_ipsi_L, "wind_R": motor.wind_ipsi_R,
                           "LH odour": motor.lh_odour, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": motor.proboscis}}
 
-    def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds: tuple) -> None:
+    def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds) -> None:
+        """Walk. `bounds` is a surfaces.Surfaces (the fly sticks to faces, walks over edges and up walls) or,
+        for legacy callers, an (x0, x1, y0, y1) plane with contact-mediated edges."""
         if isinstance(cmd, MotorRates):
             cmd = self.readout(cmd, dt_s=dt_s)
         a = np.exp(-dt_s * 1000 / self.tau_ms)
         fly.speed = a * fly.speed + (1 - a) * cmd["speed"]
         fly.yaw_rate = a * fly.yaw_rate + (1 - a) * cmd["yaw"]
         fly.proboscis = cmd["proboscis"]
-        fly.heading += fly.yaw_rate * dt_s
+        if hasattr(bounds, "walk"):
+            p, f, n, face = bounds.walk(fly.pos, fly.fwd, fly.normal, fly.face, fly.speed * dt_s, fly.yaw_rate * dt_s)
+            fly.set_pos(p); fly.fwd, fly.normal, fly.face = f, n, face
+            if abs(f[2]) < 0.999:
+                fly._heading = float(np.arctan2(f[1], f[0]))
+            return
+        fly.heading = fly.heading + fly.yaw_rate * dt_s
         nx = fly.x + fly.speed * dt_s * np.cos(fly.heading)
         ny = fly.y + fly.speed * dt_s * np.sin(fly.heading)
         x0, x1, y0, y1 = bounds
@@ -166,16 +246,12 @@ class Locomotion:
         if in_x and in_y:
             fly.x, fly.y = nx, ny
         else:
-            # against an edge (table edge: the front legs find no substrate; wall: body contact). Flies
-            # rarely walk off edges: slide along it and turn towards the interior at a walking-turn rate.
-            # (An earlier version spun the fly at 720 deg/s here, which drove the loom detectors from the
-            # rotating scene and made it hop itself off the table -- NOTES, session 8.)
             if in_x: fly.x = nx
             if in_y: fly.y = ny
             fly.x = float(np.clip(fly.x, x0, x1)); fly.y = float(np.clip(fly.y, y0, y1))
             to_centre = np.arctan2(0.5 * (y0 + y1) - fly.y, 0.5 * (x0 + x1) - fly.x)
             err = (to_centre - fly.heading + np.pi) % (2 * np.pi) - np.pi
-            fly.heading += np.sign(err) * min(abs(err), self.edge_turn * dt_s)
+            fly.heading = fly.heading + np.sign(err) * min(abs(err), self.edge_turn * dt_s)
         fly.heading = (fly.heading + np.pi) % (2 * np.pi) - np.pi
 
 
@@ -231,22 +307,24 @@ class Flight:
         return False
 
     def launch(self, fly: FlyState, escape: bool) -> None:
-        fly.airborne = True
         v = self.jump_speed if escape else 0.2
         pitch = np.deg2rad(self.jump_pitch_deg if escape else 30)
-        fly.vx = v * np.cos(pitch) * np.cos(fly.heading)
-        fly.vy = v * np.cos(pitch) * np.sin(fly.heading)
-        fly.vz = v * np.sin(pitch)
+        d = np.cos(pitch) * fly.forward + np.sin(pitch) * fly.up      # in the surface frame: "up" is the face normal
+        fly.set_pos(fly.pos + 0.003 * fly.up)
+        fly.flight_frame_from_surface()
+        fly.airborne = True
+        fly.vx, fly.vy, fly.vz = (float(c) for c in v * d)
         fly.air_time = 0.0
 
     def step(self, fly: FlyState, w: dict, dt_s: float, surface_z, room: tuple) -> None:
-        """Integrate one airborne step. surface_z(x, y) -> z of what is below; room = (x0,x1,y0,y1,z1)."""
+        """Integrate one airborne step. `surface_z` is a surfaces.Surfaces (land on the first face the path
+        crosses) or, for legacy callers, a callable (x, y) -> z of what is below; room = (x0,x1,y0,y1,z1)."""
         if isinstance(w, MotorRates):
             w = self.readout(w)
         a = np.exp(-dt_s * 1000 / self.tau_ms)
         yaw = np.clip(-self.k_yaw * (w["steer_R"] - w["steer_L"]), -self.max_yaw, self.max_yaw)
         fly.yaw_rate = a * fly.yaw_rate + (1 - a) * yaw
-        fly.heading += fly.yaw_rate * dt_s
+        fly._heading += fly.yaw_rate * dt_s
         thrust = self.k_thrust * w["power"]
         f = fly.forward
         ax = (thrust * f[0] - self.drag * fly.vx)
@@ -254,8 +332,34 @@ class Flight:
         az = self.k_lift * (w["power"] - self.hover_hz) - self.gravity if w["power"] > 1 else -self.gravity
         az -= self.drag * fly.vz
         fly.vx += ax * dt_s; fly.vy += ay * dt_s; fly.vz += az * dt_s
+        p_prev = fly.pos
         fly.x += fly.vx * dt_s; fly.y += fly.vy * dt_s; fly.z += fly.vz * dt_s
         fly.air_time += dt_s
+        if hasattr(surface_z, "land"):
+            hit = surface_z.land(p_prev, fly.pos)
+            if hit is None and surface_z.in_solid(fly.pos):          # safety: never inside a solid or outside the room
+                hit = surface_z.snap(fly.pos)
+            if hit is not None:
+                point, face = hit
+                v = np.array([fly.vx, fly.vy, fly.vz]); n = face.normal
+                fwd = v - n * np.dot(v, n)
+                if np.linalg.norm(fwd) < 1e-3:
+                    fwd = fly.forward - n * np.dot(fly.forward, n)
+                if np.linalg.norm(fwd) < 1e-3:
+                    fwd = np.cross(n, np.array([0.0, 1.0, 0.0]) if abs(n[1]) < 0.9 else np.array([1.0, 0.0, 0.0]))
+                fly.set_pos(point); fly.fwd = fwd / np.linalg.norm(fwd); fly.normal = n; fly.face = face
+                fly.airborne = False; fly.pitch = fly.roll = 0.0; fly.vx = fly.vy = fly.vz = 0.0
+                fly.ground_time = 0.0
+                if abs(fly.fwd[2]) < 0.999:
+                    fly._heading = float(np.arctan2(fly.fwd[1], fly.fwd[0]))
+            else:
+                ao = np.exp(-dt_s * 1000 / self.orient_tau_ms)
+                horiz = float(np.hypot(fly.vx, fly.vy))
+                pitch_t = float(np.clip(self.pitch_follow * np.arctan2(fly.vz, max(horiz, 0.05)), -self.max_pitch, self.max_pitch))
+                roll_t = float(np.clip(-self.bank_per_yaw * fly.yaw_rate + self.k_roll * (w["steer_L"] - w["steer_R"]), -np.deg2rad(60), np.deg2rad(60)))
+                fly.pitch = ao * fly.pitch + (1 - ao) * pitch_t
+                fly.roll = ao * fly.roll + (1 - ao) * roll_t
+            return
         # orientation in the air. Roll: commanded by the wing steering-muscle asymmetry (a banked turn is
         # what an asymmetric stroke produces) plus the bank that goes with the yaw rate; pitch: the nose
         # follows part of the flight-path angle. Both relax towards level -- the haltere-mediated
@@ -275,7 +379,8 @@ class Flight:
             fly.z = z1 - 0.01; fly.vz = min(fly.vz, 0.0)
         ground = surface_z(fly.x, fly.y)
         if fly.z <= ground and fly.vz <= 0 and fly.air_time > 0.05:
-            fly.z = ground; fly.airborne = False
+            fly.z = ground; fly.airborne = False; fly.ground_time = 0.0
+            fly.normal = np.array([0.0, 0.0, 1.0]); fly.fwd = np.array([np.cos(fly._heading), np.sin(fly._heading), 0.0])
             fly.pitch = 0.0; fly.roll = 0.0                            # landed on a flat surface
             fly.ground_time = 0.0
             fly.speed = float(np.hypot(fly.vx, fly.vy)) * 0.2   # landing: most momentum lost

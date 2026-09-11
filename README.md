@@ -62,7 +62,7 @@ plain torch). Spike trains match the torch path exactly; continuous state and ra
 | taste | 165 labellar sugar GRNs, found by connectivity to the known sweet interneurons | Poisson while touching fruit -> Usnea / Rattle / Phantom / G2N-1 -> proboscis MN9 | `scripts/find_sweet_grns.py`, `flyverse/data/taste_grns.csv` |
 | smell | 2,639 ORNs in 53 glomeruli, sided to the left / right antenna by their PN targets | every fruit is a **wind-blown plume** (Gaussian, puffing) sampled by two antennae 1 mm apart | `air.py` |
 | wind | Johnston's organ C / E neurons, sided by their AMMC/WED targets | antennal deflection per side from the wind vector in the body frame | `air.py` |
-| body | walking, escape jumps, flight with pitch and roll | named readout from measured groups: DNp04 + LPT27/30 (optomotor), DNp18 / DNp33 (wind direction, gated by the odour signal), DNa02 (goal steering), MDN (back up), MN9 (proboscis); giant fibre -> escape jump; DLMn / DVMn -> wingbeat; wing steering MNs -> yaw and roll | `body.py` |
+| body | walking on any surface (table top, sides, underside, legs, walls, ceiling: the fly sticks to what it stands on, walks over edges and climbs corners), escape jumps, flight with pitch and roll that lands on the first surface it meets | named readout from measured groups: DNp04 + LPT27/30 (optomotor), DNp18 / DNp33 (wind direction, gated by the odour signal), DNa02 (goal steering), MDN (back up), MN9 (proboscis); giant fibre -> escape jump; DLMn / DVMn -> wingbeat; wing steering MNs -> yaw and roll | `body.py` |
 
 Batched brains (`Brain(c, batch=64)`) run 64 flies at 1.8 ms per fly-frame -- one sparse matmul
 serves them all; single-fly speed is in "Run it".
@@ -186,6 +186,7 @@ flyverse/senses.py       vision / smell / wind / taste encoders onto the connect
 flyverse/motor.py        named readout groups and MotorRates (incl. the lateral-horn odour signal)
 flyverse/async_brain.py  the brain on its own thread / CUDA stream for fixed-tick hosts
 flyverse/body.py         fly pose (3-D), walking / flight / metabolism: MotorRates -> motion, nothing decided
+flyverse/surfaces.py     walkable faces: edges, corners, landings
 flyverse/programs.py     hand-designed behaviour programs (anemotaxis, escape gating), opt-in stand-ins for circuits
 flyverse/cx.py           CompassSteering: a simulated central-complex stage that drives PFL3 inside the brain
 flyverse/screen.py       condition screens, ranking, ablation: which cells carry what

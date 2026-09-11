@@ -25,7 +25,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from flyverse import air, body, brain, brainmap, optic, programs, world  # noqa: E402
+from flyverse import air, body, brain, brainmap, optic, programs, surfaces, world  # noqa: E402
 from flyverse.fly import FlyBrain  # noqa: E402
 
 FRAME_MS = 10.0          # brain time per frame (20 LIF steps at 0.5 ms)
@@ -106,6 +106,7 @@ class Sim:
         self.program = programs.make_program(program)
         self.gating = programs.EscapeGating() if escape_gating else None
         self.world, self.info = world.make_room(seed)
+        self.surfaces = surfaces.Surfaces(self.info["room"], self.info["solids"], self.info["solid_labels"])
         self.world.spheres.append(world.Sphere((9, 9, 9), (0.03, 0.03, 0.03), "black"))   # looming ball (L key)
         self.loom_idx = len(self.world.spheres) - 1
         self.loom_t = -1.0
@@ -158,8 +159,7 @@ class Sim:
         return {"speed": float(a[0] * 0.02), "yaw": float(a[1] * np.deg2rad(200)), "proboscis": self.cmd["proboscis"], "rates": self.cmd["rates"]}
 
     def surface_z(self, x, y):
-        x0, x1, y0, y1 = self.info["table_extent"]
-        return self.info["table_top_z"] if (x0 <= x <= x1 and y0 <= y <= y1) else 0.0
+        return self.surfaces.support(x, y)
 
     def start_loom(self):
         self.loom_t = 0.0
@@ -264,7 +264,7 @@ class Sim:
     def nearest_fruit(self):
         best = (None, 1e9)
         for name, cen, rad in self.info["fruit"]:
-            dxy = np.hypot(self.fly.x - cen[0], self.fly.y - cen[1]) - rad
+            dxy = float(np.linalg.norm(self.fly.pos - np.asarray(cen))) - rad     # 3-D: a fly on the floor under a berry is 75 cm from it
             if dxy < best[1]:
                 best = (name, dxy)
         return best
@@ -292,19 +292,16 @@ class Sim:
                 self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000)
         if self.gating is not None:
             self.wcmd = self.gating.apply(motor, self.wcmd, self.fly, FRAME_MS / 1000)
-        x0, x1, y0, y1 = self.info["table_extent"]
         if self.fly.airborne:
             self.feeding = False
             self.metabolism.update(False, 0.0, FRAME_MS / 1000)
-            self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, self.surface_z, (-2, 2, -2, 2, 2.6))
+            self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, self.surfaces, (-2, 2, -2, 2, 2.6))
         elif not self.flight.maybe_takeoff(self.fly, self.wcmd):
-            on_table = abs(self.fly.z - self.info["table_top_z"]) < 1e-3
-            bounds = (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02) if on_table else (-1.95, 1.95, -1.95, 1.95)
             cmd = self.decoder_cmd() if getattr(self, "decoder", False) else self.cmd
             self.feeding = self.metabolism.update(bool(self.tasting), self.fly.speed, FRAME_MS / 1000)
             if self.feeding:                                   # a fly that is feeding stops walking
                 cmd = dict(cmd, speed=0.0, yaw=0.0)
-            self.loco.step(self.fly, cmd, FRAME_MS / 1000, bounds)
+            self.loco.step(self.fly, cmd, FRAME_MS / 1000, self.surfaces)
         self.update_loom()
         if self.trail_seconds > 0 and int(self.brain.t / FRAME_MS) % 5 == 0:      # 20 samples per second
             t_now = self.brain.t / 1000
@@ -360,7 +357,7 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
     nf = sim.nearest_fruit()
     blit_text(screen, font, f"scene [{'follow' if orbit.follow else 'orbit'} az {orbit.az:.0f} el {orbit.el:.0f} d {orbit.dist:.2f}]  hdg {np.rad2deg(fly.heading) % 360:.0f}  "
               f"{fly.speed * 100:.1f} cm/s  {nf[0]} {nf[1] * 100:.0f} cm" + ("  TASTING" if sim.tasting else ""), sx + 2, 312)
-    mode = f"AIRBORNE z={fly.z:.2f} v=({fly.vx:+.2f},{fly.vy:+.2f},{fly.vz:+.2f})" if fly.airborne else ("on table" if abs(fly.z - sim.info["table_top_z"]) < 1e-3 else "on floor")
+    mode = f"AIRBORNE z={fly.z:.2f} v=({fly.vx:+.2f},{fly.vy:+.2f},{fly.vz:+.2f})" if fly.airborne else ("on " + (fly.face.label if fly.face is not None else "floor"))
     cL, cR = sim.smell_values
     gloms = sorted(cL, key=lambda g: -float(cL[g][0] + cR[g][0]))[:2]
     smell = "  ".join(f"{g}={cL[g][0]:.2f}/{cR[g][0]:.2f}" for g in gloms)

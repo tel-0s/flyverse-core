@@ -610,6 +610,44 @@ body assumption, not the connectome:
   and the clock is worth ~1 ms, fp16 another ~1 ms. The forecast of "~14 ms eager" was wrong for
   that reason. Real time for the full brain at B = 1 is now `--cuda-graphs --dt-by-module vnc=1.0
   --weight-dtype float16` (0.96x) or `--fast --cuda-graphs` (1.31x).
+* **Surfaces: flies stick to what they stand on** (`flyverse/surfaces.py`). Every sustain
+  configuration was losing runs the same way: an escape hop from the table edge lands on the floor,
+  and a fly on the floor can neither smell the fruit nor get back up. That is a body-model artefact --
+  the old walker was a rectangle with a clipped boundary and a turn-away rule, and the flight model
+  landed only on the floor or the table top. Now the walkable world is a set of axis-aligned faces
+  (the inside of the room, the outside of the table slab and its four legs, 36 faces) and the fly's
+  pose on a surface is a forward vector in the face plane plus the face's outward normal; heading /
+  pitch / roll are derived (and owned by the flight integrator while airborne). Walking over a convex
+  edge rotates the fly onto the side face (new normal = the direction it was walking, new forward =
+  minus the old normal), walking into a concave corner climbs it (new normal = the face it ran into,
+  new forward = the old normal), and a flight lands on the first face its path crosses. No decision
+  by the fly is involved; the contact-mediated edge turn is gone. Checks without a brain: table top
+  -> side -> underside at 2 cm/s; floor -> wall -> ceiling (including the case where a step lands
+  exactly on the wall plane, which stuck the first version); floor -> leg side -> slab underside ->
+  other leg -> floor; a hop from the +x edge lands 14 cm out on the floor, a hop mid-table lands back
+  on the top, a powered takeoff lands on the top. The eye sits `eye_height` along the surface normal,
+  so a fly on a wall or the underside sees the room from there; the wind and odour senses use the
+  same body frame. Save states carry the pose (the face is re-resolved on load).
+* **Two bugs the surfaces exposed.** (i) Landing was only checked after 50 ms of flight; a
+  voluntary takeoff (0.2 m/s) is a ~60 ms flight that could pass through the floor plane inside the
+  unchecked window, after which no face is ever "entered" again -- one plain fly fell to z = -182 m.
+  The gate is gone (the 3 mm launch offset already prevents re-landing at takeoff) and a fly found
+  inside a solid snaps to the nearest face. (ii) `nearest_fruit` was 2-D: a fly on the floor 75 cm
+  below a blueberry "tasted" it. Now 3-D. **Earlier sustain rows with meals at z = 0 were this bug**
+  (the CX seeds' floor-side meals; the pre-surfaces plain seed 0's three meals were all on the table
+  and stand).
+* **Sustain with the surfaces, honestly** (5 min, seeds 0-2, meals / final energy / hops): plain
+  0 / 0.00 / 26, 1 / 0.00 / 31, 0 / 0.00 / 20; CX module + gating 0 / 0.00 / 2, 1 / 0.00 / 5,
+  1 / 0.00 / 5. Every fly leaves the table by an escape hop within the first minute (a hop from the
+  edge lands 14 cm out on the floor; a hop from the side or underside lands further) and never
+  returns: from a 16 m^2 floor a random walk does not find a 5 cm table leg, and the model's flight is
+  a ballistic hop without a goal. The physics is now right; what remains is (a) the hop rate on the
+  table -- the rate optic lobe's LPLC2 / LC4 respond to self-motion expansion, so a fly turning near
+  a fruit or an edge escapes (20-30 hops / 5 min plain, 2-5 with habituation), and (b) the return,
+  which in the animal is a flight towards light / odour, i.e. behaviour the model does not have.
+  Both are model questions (the loom pathway's wide-field suppression; goal-directed flight), not
+  body physics; the single-fruit table will be measured with the fly held on the table (a
+  glass-walled table, `--fence`) so foraging can be scored independently of the escape problem.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
