@@ -535,6 +535,16 @@ body assumption, not the connectome:
   the goal comparison, drive PFL3 L / R by stimulation, and the connectome does the rest. That, not a
   body program, is the principled replacement for `AnemotaxisProgram`; alternatively, the two
   synaptic questions above (TuBu / AOTU silence, EPG <-> PEN gain) are tractable with the benchmark.
+* **Can gains alone wake the compass? No.** Per-type gains on the two broken links, same
+  calibration style as DN -> VNC: EPG <-> PEN / PEG x4 makes the network bistable between silent and
+  a 300 Hz all-cell state (baseline 109 Hz on one seed, 0 on another; a driven bump recruits all 50
+  EPG to 300+ Hz with Delta7 at 250 Hz sculpting nothing and the ring neurons dragged to 41 Hz);
+  x8 the same; adding MeTu -> TuBu -> ER x4 lifts TuBu to 2.7 Hz and nothing else. In every case
+  PFL3 stays at 0.00 Hz even with EPG at 300 -- the EPG -> PFN -> hDelta -> PFL chain is blocked as
+  well. The point model's silent-or-epileptic regime again, now in the one circuit whose function is
+  an attractor. This is a research thread (Delta7 inhibition vs EPG <-> PEN excitation under the
+  connection and fan-in caps, and the FB columnar pathway), not a knob; the practical route to
+  navigation in the meantime is the module contract above (compass + goal -> PFL3 stimulation).
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
