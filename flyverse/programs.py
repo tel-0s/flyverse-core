@@ -46,14 +46,17 @@ class AnemotaxisProgram:
     wind_speed_bonus: float = 0.006          # m/s extra forward drive at full gate (the surge)
     hunger_gain_min: float = 0.1             # gain at zero hunger, relative to full hunger
     # casting: crosswind zigzag on plume loss
+    # casting is the flight literature (van Breugel & Dickinson 2014); a walking fly that loses odour makes a
+    # brief crosswind turn and then the offset response below dominates (Alvarez-Salvado et al. 2018)
     cast_yaw: float = np.deg2rad(90)
     cast_half_period_s: float = 1.5
-    cast_duration_s: float = 8.0
+    cast_duration_s: float = 3.0
     lost_gate: float = 0.25                  # gate below this (after > 0.6 within 30 s) = plume lost
     # search: hungry and no surge-level odour for offset_delay_s -> downwind drift (offset response,
     # fading with odour) + Ornstein-Uhlenbeck turning, with klinokinesis (less turning while the odour rises)
     search_hunger: float = 0.3
-    offset_delay_s: float = 10.0
+    offset_delay_s: float = 1.5              # walking flies turn downwind 1-2 s after odour offset (Alvarez-Salvado 2018);
+                                             # 10 s never triggered next to a flickering source and the fly sat upwind of it
     offset_duration_s: float = 20.0          # the downwind drift is an episode after plume loss, then pure local search
     k_downwind: float = np.deg2rad(60) / 40.0
     search_yaw_sd: float = np.deg2rad(60)

@@ -780,6 +780,24 @@ body assumption, not the connectome:
   activity; + Delta7 x4 -> a localised bump that fades in 1 s) and no combination tried so far gives
   a stable localised bump. Left here, with `adapt_by_type` kept as a feature (empty default) and the
   CX module as the working stand-in.
+* **Single apple, corrected readouts: still 0 / 9, but now for a nameable reason.** With the
+  boundary-layer plume, the apple LH channel and the optomotor term off, every programmed fly (body
+  program and CX module, three seeds each, fenced) reaches 12-20 cm of the apple inside the first
+  minute -- and then sits upwind and beside it (x 0.36-0.58 vs the apple's 0.25) for four minutes:
+  the surge overshoots the source and upwind of a source there is no plume. The plain fly does not
+  move towards it at all (0 / 3). The walking-fly answer to overshoot is the offset response --
+  turn and walk downwind 1-2 s after odour loss, back into the plume, surge again -- and the program
+  had it 10 s after the last hit, behind an 8 s flight-style cast, which next to a flickering source
+  never fires. Offset delay 1.5 s, cast 3 s, from the walking literature rather than the flight one.
+* **Retimed: still 0 / 6, and the failure is now the last five centimetres.** With the walking-fly
+  offset timing, every programmed fly reaches 3.5-9 cm of the apple within 30 s (CX seed 0 again
+  at 300 s) and runs past it: "surging" is upwind, and within a few centimetres of a source the
+  direction to the source is no longer upwind (the fly ends level with or beside the apple, then
+  explores upwind of it against the fence). The animal closes this gap with local search on the
+  near-field and, plausibly, vision -- a 4 cm apple at 3 cm fills a large part of the eye, and flies
+  fixate and approach dark objects. Whether the model carries an object-position signal is a screen
+  question (`scripts/screen_object.py`: apple 5 cm ahead-left vs ahead-right, every DN / LC / VP type
+  by side) before it is a program question.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
