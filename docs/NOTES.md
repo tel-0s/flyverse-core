@@ -648,6 +648,31 @@ body assumption, not the connectome:
   Both are model questions (the loom pathway's wide-field suppression; goal-directed flight), not
   body physics; the single-fruit table will be measured with the fly held on the table (a
   glass-walled table, `--fence`) so foraging can be scored independently of the escape problem.
+* **A single fruit source, and a fence.** `make_room(seed, fruit_set="apple")` leaves only the apple
+  (4 cm, at (0.25, 0.15)); the standard start 40 cm directly downwind of it is inside its plume.
+  `--fence` replaces the walkable world by a 10 cm glass box around the table top (faces the fly can
+  walk on, nothing visual), so a hop from the edge lands on the fence and the run scores foraging
+  without the escape problem. Both are demo / probe options (`--fruit apple --fence`).
+* **Where the hops that lose the table come from.** A hop log (takeoff face, GF vs threshold, landing
+  face) over 90 s: the plain fly hops twice on the table top and lands on it (GF 30-31 vs 30 -- the
+  plain model walks at the escape threshold), then hops **from the table side face within a frame of
+  walking over the edge** (GF 35) and lands on the floor; the CX fly's only hop is the same event (GF
+  43 vs 38, from the side face, 0% of its time spent there). The first surface model flipped the pose
+  by 90 deg in one 10 ms frame at every edge, so the whole scene swung in a frame -- an expansion
+  transient the loom detectors are built to report. A real fly bends over an edge across a couple of
+  body lengths. Now the face changes at once but the *sensed* orientation rotates about the edge axis
+  over `FlyState.edge_len` = 4 mm of travel (0.2 s at 2 cm/s; Rodrigues interpolation of the body
+  frame, used by vision, wind and olfaction). Same on concave corners.
+* **The escape threshold, from data.** With the gradual edge the plain fly still hopped every ~10 s at
+  GF 30-34 against `gf_hz` 30: the threshold was set in session 6 when the walking GF peaked at 26 Hz
+  and the model has moved since. Measured over six seeds (20 s of walking each, hops disabled, then a
+  loom, then a walk over the +x edge): per-second maxima of the walking GF -- median 20 Hz, 90th
+  percentile 28, 99th 32, one outlier at 41.5; loom bursts 67, 57, 53, 41 Hz in the four seeds that
+  see the ball and 21-23 in the two that do not (the ball comes from behind the fly: a stimulus fact,
+  not a threshold one); edge crossings 21-24 Hz in four seeds (the gradual edge does its job) and
+  60-63 in the two loom-miss seeds, where the passed ball was still next to the edge. Threshold sweep:
+  30 -> 4/6 looms, 1.2 spontaneous hops per minute; 36-40 -> 4/6 looms, 0.6 / min; 42 -> 3/6 looms,
+  0 / min. `Flight.gf_hz` is now 38: above the 99th percentile of walking, below the weakest loom.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

@@ -317,7 +317,7 @@ class World:
         return self.trace(o, d).reshape(height, width, 4)
 
 
-def make_room(seed: int = 0) -> tuple[World, dict]:
+def make_room(seed: int = 0, fruit_set: str = "all") -> tuple[World, dict]:
     """A 4 x 4 x 2.6 m room with a table in the middle, fruit on the table. Returns (world, info)."""
     w = World()
     # room: floor z=0, ceiling z=2.6, walls at x=+-2, y=+-2
@@ -347,6 +347,10 @@ def make_room(seed: int = 0) -> tuple[World, dict]:
                             (0.008, 0.008, 0.008), "grape"))
     for k in range(6):
         fruit.append(Sphere((-0.05 + 0.03 * rng.normal(), 0.28 + 0.03 * rng.normal(), top_z + 0.006), (0.006, 0.006, 0.006), "blueberry"))
+    if fruit_set == "apple":                       # a single source: the foraging test that separates strategies
+        fruit = fruit[:1]
+    elif fruit_set != "all":
+        raise ValueError(f"unknown fruit set {fruit_set!r}")
     w.spheres += fruit
     w.spheres.append(Sphere(w.light_pos, (0.08, 0.08, 0.08), "lamp"))
     solids = [(-0.6, 0.6, -0.4, 0.4, top_z - 0.03, top_z)] + [(sx - 0.025, sx + 0.025, sy - 0.025, sy + 0.025, 0.0, top_z - 0.03)

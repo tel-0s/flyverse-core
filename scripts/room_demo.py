@@ -88,7 +88,8 @@ class OrbitCam:
 class Sim:
     def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0,
                  wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32",
-                 sensory_cuda_graphs=None, program="none", escape_gating=False, dt_by_module=None, prune_frozen=True):
+                 sensory_cuda_graphs=None, program="none", escape_gating=False, dt_by_module=None, prune_frozen=True,
+                 fruit_set="all", fence=False):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
@@ -105,8 +106,15 @@ class Sim:
         # behaviour programs (hand-designed stand-ins, off by default): flyverse/programs.py
         self.program = programs.make_program(program)
         self.gating = programs.EscapeGating() if escape_gating else None
-        self.world, self.info = world.make_room(seed)
+        self.world, self.info = world.make_room(seed, fruit_set)
         self.surfaces = surfaces.Surfaces(self.info["room"], self.info["solids"], self.info["solid_labels"])
+        # --fence: an invisible glass box around the table top (walls the fly can walk on, no visual change):
+        # holds the fly on the table so foraging can be scored independently of the escape-hop problem
+        self.fence = fence
+        if fence:
+            x0, x1, y0, y1 = self.info["table_extent"]; z = self.info["table_top_z"]
+            self.surfaces = surfaces.Surfaces((x0, x1, y0, y1, z, z + 0.1), [], [])
+            self.surfaces.faces = [f for f in self.surfaces.faces if f.label != "ceiling"]
         self.world.spheres.append(world.Sphere((9, 9, 9), (0.03, 0.03, 0.03), "black"))   # looming ball (L key)
         self.loom_idx = len(self.world.spheres) - 1
         self.loom_t = -1.0
@@ -465,6 +473,8 @@ def main():
     ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
     ap.add_argument("--dt-by-module", default=None, help="per-module LIF clocks, e.g. vnc=1.0 or vnc=1.0,descending=1.0 (ms; multiples of --brain-dt)")
     ap.add_argument("--no-prune", action="store_true", help="keep the optic-lobe synapses in the LIF matrix (they are zeros; for timing comparisons)")
+    ap.add_argument("--fruit", default="all", choices=["all", "apple"], help="fruit on the table: all 19 items, or the apple alone (a single source)")
+    ap.add_argument("--fence", action="store_true", help="invisible walls around the table top: the fly cannot leave it (scores foraging without the escape problem)")
     ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"],
                     help="hand-designed behaviour program between the brain and the body (flyverse/programs.py); default: none, the plain model")
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
@@ -506,7 +516,7 @@ def main():
         start = (v[0], v[1], v[2] if len(v) > 2 else 0.75)
     sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir,
               cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype, program=args.program, escape_gating=args.escape_gating,
-              dt_by_module=parse_dt_by_module(args.dt_by_module), prune_frozen=not args.no_prune,
+              dt_by_module=parse_dt_by_module(args.dt_by_module), prune_frozen=not args.no_prune, fruit_set=args.fruit, fence=args.fence,
               sensory_cuda_graphs=args.sensory_cuda_graphs, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)

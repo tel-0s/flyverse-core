@@ -28,10 +28,13 @@ def main():
     ap.add_argument("--energy", type=float, default=0.4)
     ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"])
     ap.add_argument("--escape-gating", action="store_true")
+    ap.add_argument("--fruit", default="all", choices=["all", "apple"])
+    ap.add_argument("--fence", action="store_true")
     args = ap.parse_args()
     x, y = [float(v) for v in args.start.split(",")]
-    sim = rd.Sim(args.seed, start=(x, y, 0.75), trail_seconds=0.0, program=args.program, escape_gating=args.escape_gating)
-    print(f"program {args.program}, escape gating {args.escape_gating}")
+    sim = rd.Sim(args.seed, start=(x, y, 0.75), trail_seconds=0.0, program=args.program, escape_gating=args.escape_gating,
+                 fruit_set=args.fruit, fence=args.fence)
+    print(f"program {args.program}, escape gating {args.escape_gating}, fruit {args.fruit}, fence {args.fence}")
     sim.fly.heading = np.random.default_rng(args.seed).uniform(-np.pi, np.pi)
     sim.metabolism.energy = args.energy
     n = int(args.minutes * 60 * 100)

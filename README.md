@@ -18,6 +18,7 @@ python -m flyverse.connectome              # one-off: compile the graph cache (1
 python scripts/room_demo.py                # live window: fly on the table
 python scripts/room_demo.py --brain-map --trail-seconds 30 --window 1920x1080
 python scripts/room_demo.py --start floor  # begin on the floor (it has to fly to get back up)
+python scripts/room_demo.py --fruit apple --fence                  # one apple, an invisible fence around the table top
 python scripts/room_demo.py --program cx --escape-gating           # simulated central-complex steering plugged into the brain
 python scripts/room_demo.py --program anemotaxis --escape-gating   # the same logic as a body-level program
 python scripts/room_demo.py --headless --seconds 20 --loom-at 4 --gif out/room.gif

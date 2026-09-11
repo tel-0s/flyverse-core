@@ -49,6 +49,13 @@ class FlyState:
     normal: np.ndarray = field(default_factory=lambda: np.array([0.0, 0.0, 1.0]))
     face: object = None       # surfaces.Face the fly stands on (None = legacy flat plane)
     _heading: float = 0.0     # flight azimuth (rad); on a surface, the azimuth of fwd
+    # walking over an edge: the face changes at once, the body rotates over `edge_len` of travel (a real
+    # fly takes a couple of body lengths to bend over an edge; an instantaneous 90 deg swing of the scene
+    # was firing the giant fibre at every edge -- NOTES, session 8)
+    _edge_axis: np.ndarray = field(default_factory=lambda: np.zeros(3))
+    _edge_theta: float = 0.0  # signed rotation from the old frame to the new (rad), 0 = no blend
+    _edge_left: float = 0.0   # metres of travel left in the blend
+    edge_len: float = 0.004
 
     @property
     def pos(self) -> np.ndarray:
@@ -73,23 +80,39 @@ class FlyState:
         self.x, self.y, self.z = float(x), float(y), float(z)
         self.normal = np.array(normal, float); self.face = face; self.airborne = False
         self.pitch = self.roll = 0.0; self.vx = self.vy = self.vz = 0.0
-        self._heading = float(heading)
+        self._heading = float(heading); self._edge_left = 0.0; self._edge_theta = 0.0
         if abs(self.normal[2]) > 0.5:
             self.fwd = np.array([np.cos(heading), np.sin(heading), 0.0])
         else:                                                        # a wall: forward = up the wall
             self.fwd = np.array([0.0, 0.0, 1.0])
 
+    def _sensed(self, v: np.ndarray) -> np.ndarray:
+        """A body-frame vector as the fly currently holds it: mid-rotation over an edge if a blend is active."""
+        if self._edge_left <= 0.0 or self._edge_theta == 0.0:
+            return v
+        ang = -self._edge_theta * (self._edge_left / self.edge_len)     # remaining rotation, applied backwards
+        k = self._edge_axis; c, s_ = np.cos(ang), np.sin(ang)
+        return v * c + np.cross(k, v) * s_ + k * np.dot(k, v) * (1 - c)   # Rodrigues
+
+    def begin_edge(self, n_from: np.ndarray, n_to: np.ndarray) -> None:
+        axis = np.cross(n_from, n_to); norm = np.linalg.norm(axis)
+        if norm < 1e-9:
+            self._edge_theta = 0.0; self._edge_left = 0.0; return
+        self._edge_axis = axis / norm
+        self._edge_theta = float(np.arctan2(norm, np.dot(n_from, n_to)))
+        self._edge_left = self.edge_len
+
     @property
     def forward(self) -> np.ndarray:
         if not self.airborne:
-            return self.fwd
+            return self._sensed(self.fwd)
         cp = np.cos(self.pitch)
         return np.array([cp * np.cos(self._heading), cp * np.sin(self._heading), np.sin(self.pitch)])
 
     @property
     def left(self) -> np.ndarray:
         if not self.airborne:
-            return np.cross(self.normal, self.fwd)
+            return np.cross(self.up, self.forward)
         f = self.forward
         l0 = np.array([-np.sin(self._heading), np.cos(self._heading), 0.0])
         u0 = np.cross(f, l0)
@@ -98,7 +121,7 @@ class FlyState:
     @property
     def up(self) -> np.ndarray:
         if not self.airborne:
-            return self.normal
+            return self._sensed(self.normal)
         return np.cross(self.forward, self.left)
 
     def body_to_world(self, dirs_body: np.ndarray) -> np.ndarray:
@@ -233,8 +256,13 @@ class Locomotion:
         fly.yaw_rate = a * fly.yaw_rate + (1 - a) * cmd["yaw"]
         fly.proboscis = cmd["proboscis"]
         if hasattr(bounds, "walk"):
+            n_before = fly.normal.copy()
             p, f, n, face = bounds.walk(fly.pos, fly.fwd, fly.normal, fly.face, fly.speed * dt_s, fly.yaw_rate * dt_s)
             fly.set_pos(p); fly.fwd, fly.normal, fly.face = f, n, face
+            if np.dot(n, n_before) < 0.99:
+                fly.begin_edge(n_before, n)
+            elif fly._edge_left > 0.0:
+                fly._edge_left = max(0.0, fly._edge_left - abs(fly.speed) * dt_s)
             if abs(f[2]) < 0.999:
                 fly._heading = float(np.arctan2(f[1], f[0]))
             return
@@ -280,8 +308,11 @@ class Flight:
     orient_tau_ms: float = 120.0       # pitch/roll settle with this time constant (haltere-mediated stabilisation)
     takeoff_power_hz: float = 50.0     # sustained power-MN rate that launches a voluntary takeoff
     takeoff_hold_s: float = 0.3        # ... sustained for this long (a wingbeat command, not a flicker)
-    gf_hz: float = 30.0                # smoothed GF rate that counts as an escape (a burst, not one crosstalk spike);
-                                       # habituation / efference-copy gating live in programs.EscapeGating
+    # smoothed GF rate that counts as an escape. Calibrated from data (NOTES, session 8): per-second maxima of the
+    # walking GF have median 20 Hz, 90th percentile 28, 99th 32; real loom bursts are 41-67 Hz. 38 sits above the
+    # 99th percentile and below the weakest loom (was 30, set when the walking GF peaked at 26). Habituation
+    # lives in programs.EscapeGating.
+    gf_hz: float = 38.0
     tau_ms: float = 40.0
 
     def readout(self, motor, wg: WingGroups | None = None, dt_s: float = 0.01) -> dict:
@@ -349,7 +380,7 @@ class Flight:
                     fwd = np.cross(n, np.array([0.0, 1.0, 0.0]) if abs(n[1]) < 0.9 else np.array([1.0, 0.0, 0.0]))
                 fly.set_pos(point); fly.fwd = fwd / np.linalg.norm(fwd); fly.normal = n; fly.face = face
                 fly.airborne = False; fly.pitch = fly.roll = 0.0; fly.vx = fly.vy = fly.vz = 0.0
-                fly.ground_time = 0.0
+                fly.ground_time = 0.0; fly._edge_left = 0.0; fly._edge_theta = 0.0
                 if abs(fly.fwd[2]) < 0.999:
                     fly._heading = float(np.arctan2(fly.fwd[1], fly.fwd[0]))
             else:
