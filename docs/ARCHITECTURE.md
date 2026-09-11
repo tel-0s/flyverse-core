@@ -27,10 +27,13 @@ the implementation; `docs/NOTES.md` has the measurements that motivated it. See
 * **Brain side** (`FlyBrain`) turns those into spikes and rates on the connectome and exposes named
   readouts (`MotorRates`: forward DNs, DNa02 L/R, optomotor L/R, wind-direction L/R, MDN, MN9, giant
   fibre, wing power/steering MNs, PN rates by glomerulus). Nothing here knows what a table is.
-* **Body side** turns `MotorRates` into a pose: speed, yaw, pitch/roll, jumps, flight, feeding. This
-  is where the behavioural assumptions live (the odour gate, casting, hunger scaling, edge
-  behaviour) and they are all named parameters of `Locomotion` / `Flight` / `Metabolism`. A game can
-  use these classes or write its own from the same `MotorRates`.
+* **Body side** turns `MotorRates` into a pose: speed, yaw, pitch/roll, jumps, flight, feeding --
+  a physical readout with no decisions in it. A game can use these classes or write its own from the
+  same `MotorRates`.
+* **Programs** (`programs.py`, optional) sit between `MotorRates` and the body: hand-designed,
+  swappable stand-ins for circuits the full model does not produce on its own (odour-gated
+  anemotaxis, escape habituation). Off by default; the same slot is where a simulated module can
+  replace a brain region, and `screen.py` is how to find out which region that is.
 
 The **room demo** is then `World + Air + FlyBrain(all modules) + body.*` -- the full-fidelity
 configuration -- and `env.FlyRoomEnv` is the batched version of the same wiring. Neither wires

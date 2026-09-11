@@ -114,7 +114,7 @@ class ControlTests(unittest.TestCase):
         loco=Locomotion(); pose=FlyState()
         loco.step(pose,MotorRates(fwd_dn=20),.01,(-1,1,-1,1))
         self.assertGreater(pose.x,0)
-        self.assertIn(loco.readout(MotorRates())['mode'],('searching','exploring'))   # a hungry fly without odour explores
+        self.assertIn('speed', loco.readout(MotorRates()))
 
     def test_optic_substeps_carry_fractional_time(self):
         c=graph()

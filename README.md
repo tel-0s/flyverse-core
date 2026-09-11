@@ -18,6 +18,7 @@ python -m flyverse.connectome              # one-off: compile the graph cache (1
 python scripts/room_demo.py                # live window: fly on the table
 python scripts/room_demo.py --brain-map --trail-seconds 30 --window 1920x1080
 python scripts/room_demo.py --start floor  # begin on the floor (it has to fly to get back up)
+python scripts/room_demo.py --program anemotaxis --escape-gating   # with the hand-designed foraging program
 python scripts/room_demo.py --headless --seconds 20 --loom-at 4 --gif out/room.gif
 ```
 
@@ -96,23 +97,27 @@ not propagate at all. Two pathway gains (descending -> VNC x3, visual projection
 stand in for per-cell-type synaptic strengths; they were the difference between motor commands that
 reach the legs and ones that do not.
 
-## Food-finding
+## Food-finding, and what is the brain's and what is not
 
-Flies find fruit by odour-gated anemotaxis: surge upwind on an odour hit, cast crosswind when it is
-lost. The room has wind and plumes, the fly has two antennae and a wind sense, and the brain's own
-wind-direction DNs (DNp18 / DNp33) steer it upwind with a gain gated by an odour signal. The gate is
-the brain's too: a screen of every lateral-horn, mushroom-body-output and descending cell type at
-fruit and plume-free sites (with heading-matched controls) found six lateral-horn types
-(`body.LH_ODOUR_TYPES`, 14 cells) that fire ~23 Hz next to fruit and ~5 Hz away from it, whichever way
-the fly faces; the wind-facing types (WED, DNp18) fall out of the same screen as a control.
-An energy state closes the loop (`body.Metabolism`): hunger scales the upwind drive, feeding refills
-energy, satiety releases the fly from the fruit, losing the plume triggers crosswind casting, and a
-hungry fly without odour runs the documented offset response -- a downwind drift with local search --
-until it finds a plume again. Body-level assumptions (all named parameters of `body.Locomotion` /
-`Flight`): the gate threshold, the search program, contact-mediated table-edge behaviour, and
-escape habituation (the escape threshold rises with the giant fibre's recent activity, so a loom
-still fires it but a wall 10 cm from the eye does not keep it hopping).
-`scripts/probe_sustain.py` runs the fly for minutes and counts meals; the numbers are in the notes.
+The default model is the connectome plus a **plain body**: rates in, motion out (forward DNs ->
+speed, DNa02 -> turning, the optomotor DNs -> stabilisation, MN9 -> proboscis, the giant fibre ->
+jump, wing motor neurons -> flight), contact at table edges, an energy state. Nothing in that path
+decides behaviour; what the fly does is what the wiring does.
+
+Foraging by odour-gated anemotaxis -- surge upwind on an odour hit, cast when it is lost, search
+when hungry -- is a **behaviour program** (`flyverse/programs.py`), an explicit, swappable stand-in
+for the lateral-accessory-lobe / central-complex steering circuit, off by default and enabled with
+`--program anemotaxis` (`--escape-gating` adds habituation of the escape). It reads only brain
+signals the model carries -- the wind-direction DNs (DNp18 / DNp33) and the odour signal of six
+lateral-horn types (`motor.LH_ODOUR_TYPES`, found by a screen: ~23 Hz next to fruit, ~5 Hz away,
+whichever way the fly faces) -- and supplies the integration the model does not (yet) produce.
+`scripts/probe_sustain.py` measures the fly for minutes with and without it.
+
+The tooling for finding where such functions live is `flyverse/screen.py`: record every cell type
+under contrasting conditions, rank by separability with heading / wind controls, ablate or stimulate
+a candidate to test it causally. `scripts/screen_odour.py` reproduces the lateral-horn result;
+`scripts/screen_steering.py` asks whether any population already carries the odour x wind-side
+interaction the program computes.
 
 ## RL on top of the brain
 
@@ -163,12 +168,15 @@ flyverse/fly.py          FlyBrain: the control surface (senses in, MotorRates ou
 flyverse/senses.py       vision / smell / wind / taste encoders onto the connectome's sensory neurons
 flyverse/motor.py        named readout groups and MotorRates (incl. the lateral-horn odour signal)
 flyverse/async_brain.py  the brain on its own thread / CUDA stream for fixed-tick hosts
-flyverse/body.py         fly pose (3-D), walking / flight / metabolism: MotorRates -> motion
+flyverse/body.py         fly pose (3-D), walking / flight / metabolism: MotorRates -> motion, nothing decided
+flyverse/programs.py     hand-designed behaviour programs (anemotaxis, escape gating), opt-in stand-ins for circuits
+flyverse/screen.py       condition screens, ranking, ablation: which cells carry what
 flyverse/brainmap.py     soma projections for the --brain-map panel
 flyverse/env.py          vectorised RL environment
 scripts/room_demo.py     the interactive demo
 scripts/benchmark.py     one-shot calibration harness;  scripts/probe_*.py  one behaviour each
 scripts/screen_dns.py    the DN activation screen;  scripts/find_sweet_grns.py  sugar GRNs
+scripts/screen_odour.py  the lateral-horn odour screen;  scripts/screen_steering.py  odour x wind steering
 scripts/profile_room.py  per-frame profile of the demo loop;  scripts/profile_brain.py  the brain alone
 tests/                   control-surface, world and integration tests
 docs/NOTES.md            everything learned, session by session, with numbers

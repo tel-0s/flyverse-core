@@ -112,66 +112,24 @@ class Metabolism:
 
 @dataclass
 class Locomotion:
+    """Walking: a physical readout of the motor signals in `MotorRates`. No behaviour lives here -- the
+    odour-gated steering, casting, hunger and search programs are in `programs.py` and are off by
+    default. The two filters below are readout corrections, not behaviour: the optomotor term is
+    high-passed (DNp04's right side carries a chronic bias from the model's asymmetric eye), and MDN
+    only counts above a threshold (it fires a few Hz from self-motion optic flow)."""
     k_fwd: float = 0.02 / 40.0     # m/s per Hz of forward-DN mean rate (40 Hz -> 2 cm/s, a brisk fly walk)
     k_leg: float = 0.02 / 60.0     # m/s per Hz of mean leg-MN rate
     k_back: float = 0.02 / 40.0
-    k_turn: float = np.deg2rad(200) / 40.0   # rad/s per Hz of DNa02 asymmetry
+    k_turn: float = np.deg2rad(200) / 40.0   # rad/s per Hz of DNa02 asymmetry (ipsilateral turning, Rayshubskiy 2020)
     k_opto: float = np.deg2rad(150) / 15.0   # rad/s per Hz of DNp04/LPT asymmetry (optomotor, stabilising)
-    opto_hp_tau_s: float = 2.0               # the optomotor term uses the asymmetry minus its 2 s running mean:
-                                             # DNp04's right side carries a chronic bias (asymmetric eye) that
-                                             # otherwise turns the stabilising term into a constant spin
-    # odour-gated anemotaxis (van Breugel & Dickinson 2014): the wind-direction DNs (DNp18 ipsilateral,
-    # DNp33 contralateral to the wind; scripts/probe_wind.py) steer the fly upwind, with a gain gated by
-    # the antennal lobe's odour signal; the gate decays over ~1.5 s after the plume is lost (the surge)
-    k_wind: float = np.deg2rad(120) / 40.0   # rad/s per Hz of wind-DN asymmetry at full gate
-    # gate = clip((max over glomeruli of the 1 s-smoothed mean PN rate - median over glomeruli - pn_base_hz) / pn_gate_hz).
-    # Chosen offline on recorded PN activity (NOTES, session 8): fruit odour is a sustained, glomerulus-specific
-    # elevation (blueberry: DM2 80 Hz; apple: DM1 / VA2 / DM2), the model's antennal-lobe noise is 1 s bursts of
-    # 2-cell glomeruli; smoothing + a minimum glomerulus size + max-minus-median separates them (0% false gate on
-    # a plume-free spot, 100% next to fruit). An adaptive baseline on the max was tried first and rejected.
-    pn_base_hz: float = 20.0
-    pn_gate_hz: float = 40.0
-    pn_smooth_s: float = 1.0
-    pn_min_cells: int = 3
-    # ... or, by default, the brain's own odour signal: the mean rate of the lateral-horn population
-    # LH_ODOUR_TYPES (1 s smoothed), gate = clip((rate - lh_base_hz) / lh_gate_hz)
-    odour_source: str = "lh"                 # "lh" | "pn"
-    lh_base_hz: float = 10.0
-    lh_gate_hz: float = 12.0
-    gate_tau_s: float = 1.5
-    wind_speed_bonus: float = 0.006          # m/s of extra forward drive at full gate (surge upwind)
-    # casting: when the plume is lost after a hit, search crosswind -- a zigzag whose sign alternates
-    # every `cast_half_period_s`, for up to `cast_duration_s` (the fly's search program, body-level)
-    cast_yaw: float = np.deg2rad(90)
-    cast_half_period_s: float = 1.5
-    cast_duration_s: float = 8.0
-    lost_gate: float = 0.25                  # gate below this (after having been above 0.6) = plume lost
-    hunger_gain_min: float = 0.1             # upwind drive at zero hunger, relative to full hunger (0.3 walked sated
-                                             # flies past the fruit to the upwind edge, where no plume reaches)
-    # search program when hungry and without odour (Alvarez-Salvado et al. 2018: walking flies that lose an
-    # odour turn and walk downwind for a while, then wander): after `offset_delay_s` without odour, a
-    # hunger-scaled downwind drift (the wind DNs with reversed sign; facing downwind is its stable point)
-    # plus Ornstein-Uhlenbeck yaw noise for local search
-    search_hunger: float = 0.3               # hunger above which the search program runs
-    offset_delay_s: float = 10.0
-    k_downwind: float = np.deg2rad(60) / 40.0
-    search_yaw_sd: float = np.deg2rad(60)    # rad/s standard deviation of the OU yaw noise
-    search_yaw_tau_s: float = 1.0
-    # klinokinesis while exploring (Jung et al. 2015; Alvarez-Salvado et al. 2018: walking flies turn less
-    # while the odour rises and more when it falls): the OU turning is scaled by `search_rising_turn` when
-    # the 1 s odour signal exceeds its 4 s average, which climbs the isotropic near-field gradient of a fruit
-    search_rising_turn: float = 0.25
-    search_trend_tau_s: float = 4.0
-    search_speed: float = 0.006              # m/s extra walking drive while exploring (hungry flies walk faster)
-    rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng(0))
-    metabolism: Metabolism = field(default_factory=Metabolism)
+    opto_hp_tau_s: float = 2.0
     k_leg_turn: float = np.deg2rad(100) / 30.0
     max_speed: float = 0.03
     max_yaw: float = np.deg2rad(400)
     edge_turn: float = np.deg2rad(90)   # turn rate towards the interior while the fly is against an edge / wall
     tau_ms: float = 80.0           # motor smoothing
     baseline_speed: float = 0.008  # m/s intrinsic walking drive (flies walk spontaneously; keeps optic flow alive)
-    mdn_threshold: float = 15.0    # Hz; MDN fires a few Hz from self-motion optic flow, only a real burst means "back up"
+    mdn_threshold: float = 15.0    # Hz
 
     def readout(self, motor, g: MotorGroups | None = None, dt_s: float = 0.01) -> dict:
         # Legacy (Brain, MotorGroups) probes use the same raw-rate adapter.
@@ -180,68 +138,18 @@ class Locomotion:
         tL, tR = motor.turn_L, motor.turn_R
         oL, oR = motor.opto_L, motor.opto_R
         lL, lR = motor.leg_L, motor.leg_R
-        prob = motor.proboscis
-        wiL, wiR = motor.wind_ipsi_L, motor.wind_ipsi_R
-        wcL, wcR = motor.wind_contra_L, motor.wind_contra_R
-        upwind = 0.5 * ((wiL - wiR) - (wcL - wcR))          # + = wind from the left = turn left to face it
         asym = oL - oR
         a_hp = np.exp(-dt_s / self.opto_hp_tau_s)
         self._opto_bias = a_hp * getattr(self, "_opto_bias", asym) + (1 - a_hp) * asym
         opto = asym - self._opto_bias
-        a_sm = np.exp(-dt_s / self.pn_smooth_s)
-        if self.odour_source == "lh":
-            lh = float(motor.lh_odour)
-            self._lh_smooth = a_sm * getattr(self, "_lh_smooth", lh) + (1 - a_sm) * lh
-            odour = float(np.clip((self._lh_smooth - self.lh_base_hz) / self.lh_gate_hz, 0.0, 1.0))
-            self._odour_hz = self._lh_smooth
-        else:
-            names = list(motor.pn_glomeruli)
-            glom_mean = np.array([float(motor.pn_glomeruli[n]) for n in names], float)
-            n_pn = np.array([motor.pn_glom_cells.get(n, 1) for n in names])
-            self._glom_smooth = a_sm * getattr(self, "_glom_smooth", glom_mean) + (1 - a_sm) * glom_mean
-            x = self._glom_smooth[n_pn >= self.pn_min_cells] if (n_pn >= self.pn_min_cells).any() else self._glom_smooth
-            odour = float(np.clip((x.max() - np.median(x) - self.pn_base_hz) / self.pn_gate_hz, 0.0, 1.0)) if len(x) else 0.0
-            self._odour_hz = float(x.max() - np.median(x)) if len(x) else 0.0
-        self._gate = max(odour, getattr(self, "_gate", 0.0) * np.exp(-dt_s / self.gate_tau_s))
-        # plume-loss detection and casting
-        t = getattr(self, "_t", 0.0) + dt_s; self._t = t
-        if self._gate > 0.6:
-            self._last_hit = t; self._cast_from = None
-        elif self._gate < self.lost_gate and getattr(self, "_last_hit", -1e9) > t - 30.0 and getattr(self, "_cast_from", None) is None:
-            self._cast_from = t                                              # plume lost: start casting
-        cast = 0.0
-        if getattr(self, "_cast_from", None) is not None:
-            age = t - self._cast_from
-            if age < self.cast_duration_s:
-                cast = self.cast_yaw * (1.0 if int(age / self.cast_half_period_s) % 2 == 0 else -1.0)
-            else:
-                self._cast_from = None; self._last_hit = -1e9
-        self._cast = cast
-        hunger_scale = self.hunger_gain_min + (1 - self.hunger_gain_min) * self.metabolism.hunger
-        # search program: hungry, no odour for a while, not casting
-        since_hit = t - getattr(self, "_last_hit", -1e9)
-        # (runs below the surge level too: in the isotropic near-field of a fruit the gate sits at 0.3-0.5, an
-        # upwind surge goes nowhere, and the way into the plume proper is downwind of the source)
-        searching = (self.metabolism.hunger > self.search_hunger and self._gate < 0.6 and cast == 0.0
-                     and since_hit > self.offset_delay_s)
-        a_ou = np.exp(-dt_s / self.search_yaw_tau_s)
-        self._ou = a_ou * getattr(self, "_ou", 0.0) + np.sqrt(1 - a_ou ** 2) * self.search_yaw_sd * self.rng.standard_normal()
-        downwind = self.k_downwind * self.metabolism.hunger * max(1.0 - self._gate / 0.6, 0.0)   # fades as the odour grows
-        a_tr = np.exp(-dt_s / self.search_trend_tau_s)
-        self._odour_slow = a_tr * getattr(self, "_odour_slow", self._odour_hz) + (1 - a_tr) * self._odour_hz
-        rising = self._odour_hz > self._odour_slow + 0.5
-        search_yaw = ((self.search_rising_turn if rising else 1.0) * self._ou - downwind * upwind) if searching else 0.0
-        self._searching = bool(searching)
         back_eff = max(back - self.mdn_threshold, 0.0) if np.isscalar(back) else np.maximum(back - self.mdn_threshold, 0.0)
-        speed = (self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff
-                 + self.wind_speed_bonus * self._gate * hunger_scale + (self.search_speed if searching else 0.0))
-        # convention: DNa02 drives ipsilateral turning (Rayshubskiy et al. 2020): right DNa02 -> turn right
-        yaw = -self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR) + self.k_wind * self._gate * hunger_scale * upwind + cast + search_yaw
+        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff
+        yaw = -self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR)
         return {"speed": float(np.clip(speed, -self.max_speed, self.max_speed)),
                 "yaw": float(np.clip(yaw, -self.max_yaw, self.max_yaw)),
-                "proboscis": float(np.clip(prob / 30.0, 0, 1)),
-                "mode": "casting" if cast else ("surging" if self._gate > 0.6 else ("exploring" if searching else "searching")),
-                "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "wind_L": wiL, "wind_R": wiR, "odour Hz": self._odour_hz, "gate x10": self._gate * 10, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": prob}}
+                "proboscis": float(np.clip(motor.proboscis / 30.0, 0, 1)),
+                "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "wind_L": motor.wind_ipsi_L, "wind_R": motor.wind_ipsi_R,
+                          "LH odour": motor.lh_odour, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": motor.proboscis}}
 
     def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds: tuple) -> None:
         if isinstance(cmd, MotorRates):
@@ -296,24 +204,14 @@ class Flight:
     orient_tau_ms: float = 120.0       # pitch/roll settle with this time constant (haltere-mediated stabilisation)
     takeoff_power_hz: float = 50.0     # sustained power-MN rate that launches a voluntary takeoff
     takeoff_hold_s: float = 0.3        # ... sustained for this long (a wingbeat command, not a flicker)
-    gf_hz: float = 30.0                # smoothed GF rate that counts as an escape (a burst, not one crosstalk spike)
-    # escape habituation: the threshold rises by `gf_habituation` x the GF's running mean over `gf_hab_tau_s`.
-    # A loom is a burst out of silence (45 Hz from ~3) and fires; the sustained 60-80 Hz the model's
-    # LPLC2 / LC4 produce next to a wall (10 cm away, filling the eye, expanding with every turn) does
-    # not keep the fly hopping. Looming-evoked escapes habituate in the animal too.
-    gf_habituation: float = 1.0
-    gf_hab_tau_s: float = 10.0
+    gf_hz: float = 30.0                # smoothed GF rate that counts as an escape (a burst, not one crosstalk spike);
+                                       # habituation / efference-copy gating live in programs.EscapeGating
     tau_ms: float = 40.0
 
     def readout(self, motor, wg: WingGroups | None = None, dt_s: float = 0.01) -> dict:
         motor = read_motor(motor, wings=wg) if wg is not None else motor
-        gf = float(motor.gf)
-        a = np.exp(-dt_s / self.gf_hab_tau_s)
-        # warm start: the first frames after a reset are a brain-wide transient (rest -> full sensory input)
-        # that fired the GF within a second in every run; the threshold starts doubled and relaxes over ~10 s
-        self._gf_mean = a * getattr(self, "_gf_mean", self.gf_hz) + (1 - a) * gf
-        out = {name: getattr(motor, name) for name in ("gf", "ttm", "power", "steer_L", "steer_R", "haltere")}
-        out["gf_threshold"] = self.gf_hz + self.gf_habituation * self._gf_mean
+        out = {name: float(getattr(motor, name)) for name in ("gf", "ttm", "power", "steer_L", "steer_R", "haltere")}
+        out["gf_threshold"] = self.gf_hz
         return out
 
     landing_refractory_s: float = 1.0  # no new escape within this time of landing (a jump-land-jump chain is not fly behaviour)

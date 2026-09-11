@@ -483,6 +483,23 @@ body assumption, not the connectome:
   readouts; `Locomotion` / `Flight` readouts take `dt_s`). Checks on the merged tree: loom escape
   (GF 46-50 Hz vs 23-25 walking), corner 3 hops / 20 s, odour gate 0% floor / 100% by the apple / 0%
   plume-free; 25 tests pass.
+* **Where the behaviour lives -- the split.** By this point the body layer had accumulated the odour x
+  wind product, casting, hunger scaling, a search program, escape habituation and an efference-copy
+  discount: a behaviour layer bolted onto the full model, each piece with a citation and all of them
+  hand-designed. Now: `body.Locomotion` / `body.Flight` are a physical readout only (two readout
+  filters remain and are labelled as such: the optomotor high-pass for the model's eye asymmetry, the
+  MDN threshold), and the programs live in `flyverse/programs.py` as opt-in, swappable stand-ins for
+  circuits (`AnemotaxisProgram` for the LAL / CX steering integration, `EscapeGating` for the
+  wide-field suppression the rate LPLC2 lacks). They read only brain signals (DNp18 / DNp33, the LH
+  odour population) and the demo / probes run the plain model unless `--program anemotaxis` is given.
+  The efference-copy escape discount (threshold x (1 + |yaw| / 90 deg/s)) was tried and rejected
+  here: a loom makes the fly turn, so it blocked 3 of 3 real escapes (GF peaks 37-73 Hz).
+* **Screens as the method.** `flyverse/screen.py` turns the LH screen into a tool: `TypeRecorder`
+  (per-type or per-type-and-side population means from a rate snapshot), `record`, `rank` (d'
+  between the worst positive and best negative condition, so confounds score low), `contrast`,
+  `ablate` / `restore`. `scripts/screen_odour.py` reproduces the LH result; `scripts/screen_steering.py`
+  asks whether any bilateral population's L - R asymmetry flips with wind side more under odour --
+  i.e. whether the brain already computes the gated steering the program supplies.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

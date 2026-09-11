@@ -26,18 +26,21 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--start", type=str, default="-0.15,0.15")
     ap.add_argument("--energy", type=float, default=0.4)
+    ap.add_argument("--program", default="none", choices=["none", "anemotaxis"])
+    ap.add_argument("--escape-gating", action="store_true")
     args = ap.parse_args()
     x, y = [float(v) for v in args.start.split(",")]
-    sim = rd.Sim(args.seed, start=(x, y, 0.75), trail_seconds=0.0)
+    sim = rd.Sim(args.seed, start=(x, y, 0.75), trail_seconds=0.0, program=args.program, escape_gating=args.escape_gating)
+    print(f"program {args.program}, escape gating {args.escape_gating}")
     sim.fly.heading = np.random.default_rng(args.seed).uniform(-np.pi, np.pi)
-    sim.loco.metabolism.energy = args.energy
+    sim.metabolism.energy = args.energy
     n = int(args.minutes * 60 * 100)
     modes = {}; hops = 0; was = False; min_energy = 1.0; path = 0.0; last = np.array([sim.fly.x, sim.fly.y])
     print("  t(s)  energy  meals  state     mode       dist_cm  pos")
     for k in range(n):
         sim.step()
-        mb = sim.loco.metabolism
-        mode = "feeding" if getattr(sim, "feeding", False) else sim.cmd.get("mode", "?")
+        mb = sim.metabolism
+        mode = "feeding" if getattr(sim, "feeding", False) else sim.cmd.get("mode", "plain")
         modes[mode] = modes.get(mode, 0) + 1
         min_energy = min(min_energy, mb.energy)
         if sim.fly.airborne and not was: hops += 1

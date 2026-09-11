@@ -25,7 +25,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from flyverse import air, body, brain, brainmap, optic, world  # noqa: E402
+from flyverse import air, body, brain, brainmap, optic, programs, world  # noqa: E402
 from flyverse.fly import FlyBrain  # noqa: E402
 
 FRAME_MS = 10.0          # brain time per frame (20 LIF steps at 0.5 ms)
@@ -88,7 +88,7 @@ class OrbitCam:
 class Sim:
     def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0,
                  wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32",
-                 sensory_cuda_graphs=None):
+                 sensory_cuda_graphs=None, program="none", escape_gating=False):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
@@ -101,6 +101,10 @@ class Sim:
         self.groups, self.wings = self.fb.groups, self.fb.wings
         self.loco = body.Locomotion()
         self.flight = body.Flight()
+        self.metabolism = body.Metabolism()
+        # behaviour programs (hand-designed stand-ins, off by default): flyverse/programs.py
+        self.program = programs.make_program(program)
+        self.gating = programs.EscapeGating() if escape_gating else None
         self.world, self.info = world.make_room(seed)
         self.world.spheres.append(world.Sphere((9, 9, 9), (0.03, 0.03, 0.03), "black"))   # looming ball (L key)
         self.loom_idx = len(self.world.spheres) - 1
@@ -188,7 +192,8 @@ class Sim:
         b, o = self.brain, self.optic
         state = {
             "controller": self.fb.state_dict(),
-            "locomotion": {k: v for k, v in vars(self.loco).items() if k != "metabolism"},
+            "locomotion": dict(vars(self.loco)),
+            "program": self.program.state() if self.program else None, "gating": self.gating.state() if self.gating else None,
             "flight": vars(self.flight).copy(),
             "cmd": self.cmd, "wcmd": self.wcmd, "feeding": getattr(self, "feeding", False),
             "air_phase": self.air.phase.copy(),
@@ -197,8 +202,8 @@ class Sim:
             "trail": self.trail, "spike_hist": self.spike_hist, "tasting": self.tasting,
             "pulses": {"wing_pulse": getattr(self, "wing_pulse", 0), "gf_pulse": getattr(self, "gf_pulse", 0)},
             "flight_hold": getattr(self.flight, "_power_hold", 0.0),
-            "air_t": self.air.t, "gate": getattr(self.loco, "_gate", 0.0),
-            "metabolism": dataclasses.asdict(self.loco.metabolism),
+            "air_t": self.air.t,
+            "metabolism": dataclasses.asdict(self.metabolism),
         }
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         torch.save(state, path)
@@ -240,9 +245,13 @@ class Sim:
                     if count > 1:
                         self.fb.stimulate(selection, hz, (count - 1) * FRAME_MS)
         self.flight._power_hold = state["flight_hold"]
-        self.air.t = state.get("air_t", 0.0); self.loco._gate = state.get("gate", 0.0)
+        self.air.t = state.get("air_t", 0.0)
         if "metabolism" in state:
-            self.loco.metabolism = body.Metabolism(**state["metabolism"])
+            self.metabolism = body.Metabolism(**state["metabolism"])
+        if self.program and state.get("program"):
+            self.program.load_state(state["program"])
+        if self.gating and state.get("gating"):
+            self.gating.load_state(state["gating"])
         self.col_rad = self.column_radiance()
         if "cmd" in state:
             self.cmd, self.wcmd = state["cmd"], state["wcmd"]
@@ -274,16 +283,20 @@ class Sim:
         motor = self.fb.motor()
         self.cmd = self.loco.readout(motor, dt_s=FRAME_MS / 1000)
         self.wcmd = self.flight.readout(motor)
+        if self.program is not None:
+            self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000)
+        if self.gating is not None:
+            self.wcmd = self.gating.apply(motor, self.wcmd, self.fly, FRAME_MS / 1000)
         x0, x1, y0, y1 = self.info["table_extent"]
         if self.fly.airborne:
             self.feeding = False
-            self.loco.metabolism.update(False, 0.0, FRAME_MS / 1000)
+            self.metabolism.update(False, 0.0, FRAME_MS / 1000)
             self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, self.surface_z, (-2, 2, -2, 2, 2.6))
         elif not self.flight.maybe_takeoff(self.fly, self.wcmd):
             on_table = abs(self.fly.z - self.info["table_top_z"]) < 1e-3
             bounds = (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02) if on_table else (-1.95, 1.95, -1.95, 1.95)
             cmd = self.decoder_cmd() if getattr(self, "decoder", False) else self.cmd
-            self.feeding = self.loco.metabolism.update(bool(self.tasting), self.fly.speed, FRAME_MS / 1000)
+            self.feeding = self.metabolism.update(bool(self.tasting), self.fly.speed, FRAME_MS / 1000)
             if self.feeding:                                   # a fly that is feeding stops walking
                 cmd = dict(cmd, speed=0.0, yaw=0.0)
             self.loco.step(self.fly, cmd, FRAME_MS / 1000, bounds)
@@ -386,7 +399,7 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
         blit_text(screen, font, f"{k:9s} {val:5.1f}", ox, y - 2); y += 14
     y += 8
     blit_text(screen, font, f"speed cmd {sim.cmd['speed'] * 100:+.2f} cm/s  yaw {np.rad2deg(sim.cmd['yaw']):+.0f} deg/s  proboscis {sim.cmd['proboscis']:.2f}", ox, y); y += 16
-    mb = sim.loco.metabolism
+    mb = sim.metabolism
     pygame.draw.rect(screen, (60, 60, 70), (ox + 60, y + 2, 120, 10)); pygame.draw.rect(screen, (90, 200, 90) if mb.energy > 0.3 else (220, 80, 60), (ox + 60, y + 2, int(120 * mb.energy), 10))
     blit_text(screen, font, f"energy {'':10s}  {mb.energy:.2f} {mb.state}, meals {mb.meals}  [{'feeding' if getattr(sim, 'feeding', False) else sim.cmd.get('mode', '')}]", ox, y); y += 18
     if len(sim.spike_hist) > 2:
@@ -442,6 +455,9 @@ def main():
     ap.add_argument("--wing-at", type=float, default=-1, help="stimulate the flight DNs (DNg02_a, DNa08) at this brain time (s)")
     ap.add_argument("--fast", action="store_true", help="speed preset for slower GPUs (Apple MPS): brain dt 1 ms, optic dt 2 ms, half-res camera")
     ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
+    ap.add_argument("--program", default="none", choices=["none", "anemotaxis"],
+                    help="hand-designed behaviour program between the brain and the body (flyverse/programs.py); default: none, the plain model")
+    ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
     ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames and sensory ray tracing on CUDA")
     ap.add_argument("--sensory-cuda-graphs", action=argparse.BooleanOptionalAction, default=None,
                     help="override sensory ray capture independently (default: follows --cuda-graphs)")
@@ -479,7 +495,7 @@ def main():
         v = [float(t) for t in args.start.split(",")]
         start = (v[0], v[1], v[2] if len(v) > 2 else 0.75)
     sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir,
-              cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype,
+              cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype, program=args.program, escape_gating=args.escape_gating,
               sensory_cuda_graphs=args.sensory_cuda_graphs, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)

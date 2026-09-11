@@ -22,9 +22,9 @@ import room_demo as rd  # noqa: E402
 
 
 def run(seed, seconds, wind_term, start, wind_speed):
-    sim = rd.Sim(seed, start=start, trail_seconds=0.0, wind_speed=wind_speed)
+    sim = rd.Sim(seed, start=start, trail_seconds=0.0, wind_speed=wind_speed, program="anemotaxis", escape_gating=True)
     if not wind_term:
-        sim.loco.k_wind = 0.0; sim.loco.wind_speed_bonus = 0.0
+        sim.program.k_wind = 0.0; sim.program.wind_speed_bonus = 0.0
     sim.fly.heading = np.random.default_rng(seed).uniform(-np.pi, np.pi)
     d0 = sim.nearest_fruit()[1]
     dist = []; tasted = 0; hops = 0; was_air = False
