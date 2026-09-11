@@ -1,5 +1,6 @@
 """Opt-in full-connectome checks: FLYVERSE_INTEGRATION=1 python -m unittest discover -s tests."""
 import os
+from dataclasses import asdict
 from pathlib import Path
 import sys
 import tempfile
@@ -17,6 +18,19 @@ class FullConnectomeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.c = connectome.load(verbose=False)
+
+    def assert_pose_equal(self, actual, expected):
+        # Surface poses include vectors and a Face with array-valued bounds.
+        # Compare every field exactly, including nested surface geometry.
+        self.assertEqual(actual.keys(), expected.keys())
+        for name, value in actual.items():
+            with self.subTest(pose_field=name):
+                if isinstance(value, dict):
+                    self.assert_pose_equal(value, expected[name])
+                elif isinstance(value, np.ndarray):
+                    np.testing.assert_array_equal(value, expected[name])
+                else:
+                    self.assertEqual(value, expected[name])
 
     def test_retina_and_sensory_laterality_survive_pruning(self):
         full = retina.build_retina(self.c)
@@ -67,7 +81,7 @@ class FullConnectomeTests(unittest.TestCase):
             sim.save_state(path)
             for _ in range(5): sim.step()
             expected = sim.fb.state_dict()
-            pose, command = vars(sim.fly).copy(), sim.cmd.copy()
+            pose, command = asdict(sim.fly), sim.cmd.copy()
             sim.load_state(path)
             self.assertEqual(sim.loco._opto_bias, 3.25)
             saved = torch.load(path, weights_only=False)["controller"]
@@ -77,7 +91,7 @@ class FullConnectomeTests(unittest.TestCase):
         for name in sim.fb.BRAIN_TENSORS:
             tol = dict(rtol=1e-5, atol=2e-4) if name in ("v", "g", "drive") else dict(rtol=0, atol=0)
             torch.testing.assert_close(getattr(sim.brain, name).cpu(), expected["brain"][name], **tol)
-        self.assertEqual(vars(sim.fly), pose)
+        self.assert_pose_equal(asdict(sim.fly), pose)
         self.assertEqual(sim.cmd, command)
 
     def test_sensory_capture_in_demo_and_batched_env(self):
@@ -95,7 +109,7 @@ class FullConnectomeTests(unittest.TestCase):
             torch.testing.assert_close(a.col_rad, b.col_rad, rtol=0, atol=0)
             torch.testing.assert_close(a.brain.spikes, b.brain.spikes, rtol=0, atol=0)
             self.assertEqual(a.cmd, b.cmd)
-            self.assertEqual(vars(a.fly), vars(b.fly))
+            self.assert_pose_equal(asdict(a.fly), asdict(b.fly))
         self.assertEqual(len(b.world._trace_graphs), 1)
         del a, b
         env = FlyRoomEnv(batch=2, params=EnvParams(cuda_graphs=True, brain_dt_ms=1., weight_dtype="float16"))
