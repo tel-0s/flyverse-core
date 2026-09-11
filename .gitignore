@@ -11,3 +11,6 @@ build/
 # infrastructure notes (public repo)
 docs/CLUSTER.md
 .cluster.json
+
+# downloaded third-party expression / typing tables (not ours to redistribute)
+data/external/
