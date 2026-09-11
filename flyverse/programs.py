@@ -167,7 +167,7 @@ class KlinotaxisProgram:
     def apply(self, motor, cmd: dict, fly, metabolism, dt_s: float, antennae=None) -> dict:
         if antennae is None:
             return cmd
-        cL, cR = (sum(d.values()) for d in antennae)
+        cL, cR = (float(np.sum([float(np.asarray(v).ravel()[0]) if np.ndim(v) else float(v) for v in d.values()])) if d else 0.0 for d in antennae)
         a = np.exp(-dt_s / self.smooth_s)
         self._L = a * getattr(self, "_L", cL) + (1 - a) * cL; self._R = a * getattr(self, "_R", cR) + (1 - a) * cR
         tot = self._L + self._R

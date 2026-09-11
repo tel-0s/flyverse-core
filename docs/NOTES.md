@@ -901,6 +901,30 @@ body assumption, not the connectome:
   the suppression at a tenth of the amplitude -- the price of the anti-runaway measures the whole
   brain with sensory input needs (session 3); the two-parameter-set comparison is the honest way to
   quote it.
+* **Final sustain runs of the session** (`probe_sustain.py`, 5 min, energy 0.4 at start, native event
+  backend; seeds 0 / 1 / 2 as meals, hops):
+
+  | configuration | full table (unfenced) | single apple, fenced |
+  |---|---|---|
+  | plain model | 1, 0, 1 meals (3 / 4 / 2 hops) | 0, 0, 0 (closest 18 / 7 / 18 cm) |
+  | anemotaxis program + gating | 0, 0, 0 (2 / 1 / 1 hops) | 0, 0, 0 (closest 12 / 9 / 6 cm) |
+  | CX module + gating | 0, 0, 0 (1 / 1 / 1) | 0, 0, 0 (closest 12 / 9 / 8 cm) |
+  | anemotaxis + klinotaxis | 0, 0, 0 (2 / 1 / 1) | 0, 0, 0 (closest 8 / 8 / 6 cm; klino mode 65-67%) |
+  | CX + klinotaxis | 0, 0, 0 (1 / 1 / 3) | **0, 1, 1 meals** (closest 17 / 1.4 / 1.5 cm; seed 1 ended at 0.07) |
+  | CX alone, the mis-dispatched "CX + klinotaxis" batch | -- | **1, 0, 1 meals** (closest 0.8 / 8.6 / 1.4 cm; seed 0 ended at energy 0.38) |
+
+  (The composite rows are the rerun after two bugs: the first batch crashed the anemotaxis composite
+  on an array-valued antennal sum and dispatched the CX composite without antennae.) Three readings.
+  The klinotaxis subsystem is what closes the last centimetres for the CX fly (2 of 3 seeds fed, 1.4
+  and 1.5 cm closest approach) but not for the body program (6-8 cm): the CX module's steering is
+  expressed through DNa02 and the leg motor neurons, which the antennal contrast term adds to, while
+  the body program's yaw injection swamps it. On the unfenced table every programmed fly hops off once or twice in five minutes
+  and cannot return (the plain fly gets its meals by wandering into fruit before it leaves), so the
+  full-table row measures the edge problem, not foraging. On the fenced single apple the CX module
+  reached the apple and fed in 2 of 6 runs (the extra three came from a dispatch bug that ran plain
+  CX with a different RNG stream -- useful as replication), which is the first success on a lone
+  source; the body program's closest approach was 6 cm. Every fly starts hungry and is starving by
+  ~110 s, so a first meal has to come inside two minutes.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

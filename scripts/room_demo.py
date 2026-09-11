@@ -296,13 +296,15 @@ class Sim:
         self.cmd = self.loco.readout(motor, dt_s=FRAME_MS / 1000)
         self.wcmd = self.flight.readout(motor)
         if self.program is not None:
-            if hasattr(self.program, "pfl_hz"):          # cx.CompassSteering: drives PFL3 / DNp09 in the brain, the body is untouched
-                info = self.program.apply(self.fb, motor, self.fly, self.metabolism, FRAME_MS / 1000)
-                self.cmd = dict(self.cmd, mode=info["mode"], rates=dict(self.cmd["rates"], **{"odour Hz": info["odour_hz"], "gate x10": info["gate"] * 10, "steer err x10": info["error"] * 10}))
-            elif isinstance(self.program, (programs.KlinotaxisProgram, programs.Composite)):
-                self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000, antennae=self.smell_values)
-            else:
-                self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000)
+            parts = self.program.parts if isinstance(self.program, programs.Composite) else [self.program]
+            for part in parts:                            # each part by its kind: brain-side, sensor-side, or body-side
+                if hasattr(part, "pfl_hz"):               # cx.CompassSteering: drives PFL3 / DNp09 in the brain, the body is untouched
+                    info = part.apply(self.fb, motor, self.fly, self.metabolism, FRAME_MS / 1000)
+                    self.cmd = dict(self.cmd, mode=info["mode"], rates=dict(self.cmd["rates"], **{"odour Hz": info["odour_hz"], "gate x10": info["gate"] * 10, "steer err x10": info["error"] * 10}))
+                elif isinstance(part, programs.KlinotaxisProgram):
+                    self.cmd = part.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000, antennae=self.smell_values)
+                else:
+                    self.cmd = part.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000)
         if self.gating is not None:
             self.wcmd = self.gating.apply(motor, self.wcmd, self.fly, FRAME_MS / 1000)
         if self.fly.airborne:

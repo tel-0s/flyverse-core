@@ -125,7 +125,12 @@ for the lateral-accessory-lobe / central-complex steering circuit, off by defaul
 signals the model carries -- the wind-direction DNs (DNp18 / DNp33) and the odour signal of six
 lateral-horn types (`motor.LH_ODOUR_TYPES`, found by a screen: ~23 Hz next to fruit, ~5 Hz away,
 whichever way the fly faces) -- and supplies the integration the model does not (yet) produce.
-`scripts/probe_sustain.py` measures the fly for minutes with and without it.
+`scripts/probe_sustain.py` measures the fly for minutes with and without it. Where things stand
+(5 min, three seeds): on the full table every configuration loses the table to an escape hop within
+minutes; on a fenced table with a single apple 40 cm upwind the plain model never finds it, the body
+program gets to 6 cm, the CX module feeds in 2 of 6 runs, and CX + `KlinotaxisProgram` (a sensor-side
+near-field subsystem, `--program cx+klinotaxis`) in 2 of 3. The two open model questions behind
+the rest -- the silent compass and the absent small-object pathway -- are mapped in the notes.
 
 The principled replacement is a **module that plugs into the brain**: the screens (below) showed
 the model's central complex is silent -- no compass, no goal comparison -- while its inputs (wind
