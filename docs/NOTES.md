@@ -303,6 +303,20 @@ and spike-frequency adaptation.
   follows the velocity vector (climb/dive) and the wings bank into the turn (0.12 rad per rad/s of
   yaw, clipped at 60 deg); landing zeroes both. Trail: 20 samples/s, faded over `--trail-seconds`.
 
+* **Texture at fly scale.** The room's checks (3 cm), stripes (50 cm) and planks were coarse, periodic
+  and uniform at the scale a fly sees from 1 mm above a surface. `world.py` now multiplies every
+  surface's reflectance by three octaves of value noise (2 cm, 8 mm, 3 mm; `World.detail` = 1.4,
+  clamped at 0.1) -- weave, grain, fibres, fruit-skin speckle -- and the room has non-periodic
+  landmarks (a dark picture on the +y wall, a bright door on the +x wall, a skirting strip). Mean
+  |contrast| while walking forward went from 0.012 (flat) to 0.021 (detail 0.6) to 0.039 (detail 1.4);
+  rotation 0.11-0.13. Walking still leaves the GF at 0.1 Hz; the loom escape still fires at 3.5 cm.
+* **Roll is now commanded.** `Flight.k_roll`: the wing steering-muscle asymmetry (L - R) rolls the body
+  (a banked turn is what an asymmetric stroke produces) on top of the bank that follows the yaw rate;
+  pitch follows half the flight-path angle, clipped at 40 deg. Both relax towards level with a 120 ms
+  time constant -- the haltere-mediated stabilising reflexes that keep a real fly upright, which the
+  brain model has no haltere input to provide. Before this, pitch and roll were pure consequences of
+  the flight path (the fly dove at -82 deg after hops).
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

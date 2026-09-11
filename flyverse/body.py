@@ -185,7 +185,10 @@ class Flight:
     k_yaw: float = np.deg2rad(600) / 30.0
     max_yaw: float = np.deg2rad(900)
     bank_per_yaw: float = 0.12         # rad of roll per rad/s of yaw rate (banked turns), clipped to 60 deg
-    orient_tau_ms: float = 60.0        # pitch/roll follow the flight path with this time constant
+    k_roll: float = np.deg2rad(40) / 30.0   # rad of commanded roll per Hz of steering-MN asymmetry (L - R)
+    pitch_follow: float = 0.5          # how much of the flight-path angle the nose follows (haltere reflex levels the rest)
+    max_pitch: float = np.deg2rad(40)
+    orient_tau_ms: float = 120.0       # pitch/roll settle with this time constant (haltere-mediated stabilisation)
     takeoff_power_hz: float = 50.0     # sustained power-MN rate that launches a voluntary takeoff
     takeoff_hold_s: float = 0.3        # ... sustained for this long (a wingbeat command, not a flicker)
     gf_hz: float = 20.0                # smoothed GF rate that counts as an escape spike
@@ -230,11 +233,14 @@ class Flight:
         fly.vx += ax * dt_s; fly.vy += ay * dt_s; fly.vz += az * dt_s
         fly.x += fly.vx * dt_s; fly.y += fly.vy * dt_s; fly.z += fly.vz * dt_s
         fly.air_time += dt_s
-        # free orientation in the air: nose along the flight path, wings banked into the turn
+        # orientation in the air. Roll: commanded by the wing steering-muscle asymmetry (a banked turn is
+        # what an asymmetric stroke produces) plus the bank that goes with the yaw rate; pitch: the nose
+        # follows part of the flight-path angle. Both relax towards level -- the haltere-mediated
+        # stabilising reflexes that keep a real fly upright -- with `orient_tau_ms`.
         ao = np.exp(-dt_s * 1000 / self.orient_tau_ms)
         horiz = float(np.hypot(fly.vx, fly.vy))
-        pitch_t = float(np.arctan2(fly.vz, max(horiz, 0.05)))
-        roll_t = float(np.clip(-self.bank_per_yaw * fly.yaw_rate, -np.deg2rad(60), np.deg2rad(60)))
+        pitch_t = float(np.clip(self.pitch_follow * np.arctan2(fly.vz, max(horiz, 0.05)), -self.max_pitch, self.max_pitch))
+        roll_t = float(np.clip(-self.bank_per_yaw * fly.yaw_rate + self.k_roll * (w["steer_L"] - w["steer_R"]), -np.deg2rad(60), np.deg2rad(60)))
         fly.pitch = ao * fly.pitch + (1 - ao) * pitch_t
         fly.roll = ao * fly.roll + (1 - ao) * roll_t
         x0, x1, y0, y1, z1 = room

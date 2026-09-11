@@ -17,6 +17,29 @@ from .device import default_device
 INF = 1e9
 
 
+def _hash3(i: torch.Tensor) -> torch.Tensor:
+    """Deterministic pseudo-random value in [-1, 1] per integer lattice point (M, 3)."""
+    h = (i[:, 0] * 374761393 + i[:, 1] * 668265263 + i[:, 2] * 2147483647) % 2147483647
+    h = (h ^ (h >> 13)) * 1274126177 % 2147483647
+    return (h % 65536).float() / 32768.0 - 1.0
+
+
+def value_noise(p: torch.Tensor, scale: float) -> torch.Tensor:
+    """Trilinearly interpolated lattice noise in [-1, 1] at spatial period `scale` (metres), (M,)."""
+    q = p / scale
+    i0 = torch.floor(q).long(); f = q - i0.float()
+    f = f * f * (3 - 2 * f)                                          # smoothstep
+    out = torch.zeros(p.shape[0], device=p.device)
+    for dx in (0, 1):
+        wx = f[:, 0] if dx else 1 - f[:, 0]
+        for dy in (0, 1):
+            wy = f[:, 1] if dy else 1 - f[:, 1]
+            for dz in (0, 1):
+                wz = f[:, 2] if dz else 1 - f[:, 2]
+                out += wx * wy * wz * _hash3(i0 + torch.tensor([dx, dy, dz], device=p.device))
+    return out
+
+
 @dataclass
 class Material:
     name: str
@@ -75,6 +98,7 @@ class World:
     light_pos: tuple = (0.0, 0.0, 2.3)
     light_color: tuple = (0.9, 1.8, 1.8, 1.8)    # UV, B, G, R power (a bright lamp with some UV)
     ambient: tuple = (0.12, 0.15, 0.15, 0.15)
+    detail: float = 1.4                          # amplitude of the multi-scale surface noise (0 = flat colours)
     device: torch.device = field(default_factory=default_device)
 
     # ---------------------------------------------------------------- dynamic objects
@@ -191,7 +215,13 @@ class World:
         stripes = (horiz % 2) == 1
         planks = ((fy % 2) == 1) | (((fx + 3 * fy) % 7) == 0)
         second = torch.where(pat == 1, checks, torch.where(pat == 2, stripes, torch.where(pat == 3, planks, torch.zeros_like(checks))))
-        return torch.where(second[:, None], self._refl2[mid], self._refl[mid])
+        refl = torch.where(second[:, None], self._refl2[mid], self._refl[mid])
+        # fine, non-periodic detail at fly scale: value noise at 2 cm, 8 mm and 3 mm (weave, grain, fibres,
+        # fruit-skin speckle). A fly 1 mm above a surface sees millimetre structure as degrees of texture.
+        if self.detail > 0:
+            m = 1.0 + self.detail * (0.5 * value_noise(p, 0.02) + 0.3 * value_noise(p, 0.008) + 0.2 * value_noise(p, 0.003))
+            refl = refl * m.clamp_min(0.1)[:, None]
+        return refl
 
     @torch.no_grad()
     def render_camera(self, pos, forward, up, width=320, height=200, fov_deg=90.0) -> torch.Tensor:
@@ -219,6 +249,10 @@ def make_room(seed: int = 0) -> tuple[World, dict]:
     w.planes += [Plane((0, 0, 0), (0, 0, 1), "floor"), Plane((0, 0, 2.6), (0, 0, -1), "ceiling"),
                  Plane((2, 0, 0), (-1, 0, 0), "wall"), Plane((-2, 0, 0), (1, 0, 0), "wall"),
                  Plane((0, 2, 0), (0, -1, 0), "wall"), Plane((0, -2, 0), (0, 1, 0), "wall")]
+    # landmarks: a dark picture on the +y wall, a bright door on the +x wall, a black skirting strip
+    w.boxes.append(Box((-0.6, 1.99, 1.0), (0.2, 2.0, 1.6), "black"))
+    w.boxes.append(Box((1.99, -1.3, 0.0), (2.0, -0.5, 2.0), "plate"))
+    w.boxes.append(Box((-2.0, -2.0, 0.0), (2.0, -1.99, 0.08), "black"))
     # table: top 1.2 x 0.8 m, height 0.75
     top_z = 0.75
     w.boxes.append(Box((-0.6, -0.4, top_z - 0.03), (0.6, 0.4, top_z), "cloth"))
