@@ -10,6 +10,7 @@ import torch
 
 from . import brain, connectome, optic, regions, retina, senses
 from .motor import MotorRates, motor_groups, wing_groups, read_motor
+from .nt_readout import NTSource, NTSnapshot
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ class FlyBrain:
 
     def __init__(self, c=None, *, modules=None, batch=1, device=None, seed=0,
                  lif_params=None, optic_params=None, eye_geometry=None, cuda_graphs=False, cuda_kernels=None,
-                 cuda_sparse="torch", cuda_compact=True):
+                 cuda_sparse="torch", cuda_compact=True, nt_source: NTSource | None = None):
         self.c = regions.subset(c if c is not None else connectome.load(verbose=False), modules)
         if self.c.n == 0:
             raise ValueError("FlyBrain needs at least one neuron")
@@ -82,6 +83,7 @@ class FlyBrain:
         self._pulses = []
         self._activity_ms = np.zeros(self.B)
         self._budget_estimate = None
+        self.nt_source = nt_source
 
     @property
     def t(self):
@@ -91,6 +93,25 @@ class FlyBrain:
     def available_senses(self):
         return tuple(name for name, value in (("vision", self.optic), ("smell", self.olfaction),
                      ("wind", self.wind_sense), ("taste", self.taste_sense)) if value is not None)
+
+    def neurotransmitters(self, batch_index=0) -> NTSnapshot | None:
+        """Optional live NT levels, sampled on demand through a read-only adapter.
+
+        The NT module's owner advances and checkpoints it. This hook does not infer
+        levels from transmitter labels, register dynamics, or run during ``step``.
+        Sources may be attached/detached through ``nt_source`` at runtime.
+        """
+        if not isinstance(batch_index, (int, np.integer)) or not 0 <= batch_index < self.B:
+            raise IndexError(batch_index)
+        if self.nt_source is None:
+            return None
+        readout = getattr(self.nt_source,"readout",None)
+        if not callable(readout):
+            raise TypeError("NTSource must implement readout(batch_index=...)")
+        snapshot = readout(batch_index=batch_index)
+        if snapshot is not None and not isinstance(snapshot, NTSnapshot):
+            raise TypeError("NTSource.readout must return NTSnapshot or None")
+        return snapshot
 
     def _require(self, name, sensor):
         if sensor is None:

@@ -6,10 +6,10 @@ ventral nerve cord). The fly gets colour vision, smell, taste, wind sense, a bod
 flies, and a room with a table with fruit on it. The connectome is never trained or edited; everything
 the fly does comes from the wiring plus a small, documented set of physiological assumptions.
 
-![demo](docs/demo_ui.png)
-*The demo with `--brain-map`: fly's-eye camera, orbiting scene view with the fly's trail and the wind
-arrow, the two eyes' photoreceptor mosaics, brain-activity panels, and every soma of the CNS with
-activity as highlights (brain left, VNC right).*
+![The flyverse room console](docs/demo_ui.png)
+*The room console: body camera, small orbit view, both retinal mosaics, antennal inputs,
+and simultaneous population, motor and body readouts. `--brain-map` opens the soma map.
+[UI controls and display details](docs/ROOM_UI.md).*
 
 ## Run it
 
@@ -42,7 +42,11 @@ and the ray tracer run on custom Metal kernels (`flyverse/metal.py`): 0.8x real 
 Options: `--brain-map` (all 140k located somata in dorsal and lateral view, activity as highlights;
 `--map-every N`, `--map-no-blur`), `--trail-seconds` (decaying trail in the scene view), `--start x,y[,z]`
 | `floor`, `--wind-speed`, `--wind-dir`, `--load state.pt`, `--window WxH` (the window is resizable, the
-UI scales to fit), `--fast` (preset for Macs / slower GPUs; `--brain-dt`, `--optic-dt`, `--cam-scale`).
+UI reflows above 1100x720 and scales below it), `--fast` (preset for Macs / slower GPUs;
+`--brain-dt`, `--optic-dt`, `--cam-scale`). `?` opens the controls guide; `1`–`4` select inspector
+views and `V` cycles retinal both/colour/contrast. `--screenshot out/console.png` saves the final UI.
+`N` toggles the map to live NT levels; `--brain-map-mode nt` opens it at launch. This
+requires an optional readout source, not NT labels; see [the NT interface](docs/NT_READOUT.md).
 Save states are ~10 MB and resume bit-exactly.
 
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
@@ -200,6 +204,7 @@ flyverse/programs.py     hand-designed behaviour programs (anemotaxis, escape ga
 flyverse/cx.py           CompassSteering: a simulated central-complex stage that drives PFL3 inside the brain
 flyverse/screen.py       condition screens, ranking, ablation: which cells carry what
 flyverse/brainmap.py     soma projections for the --brain-map panel
+flyverse/room_ui.py      dense room console, controls and neural telemetry
 flyverse/env.py          vectorised RL environment
 scripts/room_demo.py     the interactive demo
 scripts/benchmark.py     one-shot calibration harness;  scripts/probe_*.py  one behaviour each
