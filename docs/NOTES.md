@@ -464,6 +464,42 @@ body assumption, not the connectome:
   mean rate - 10) / 12); the PN level statistic remains as `odour_source = "pn"`.
 * `scripts/probe_sustain.py` scores minutes of autonomy: meals, minimum energy, hops, path length,
   time in each mode. Numbers for the current defaults are below.
+* **Search program.** With the gate fixed, the failure moved: the fly feeds once, and the sated fly's
+  residual upwind pull (0.3 x) walks it past the fruit to the upwind table edge, where no plume can
+  reach it; hungry again, "searching" had no program (baseline walking + DN noise) and it starved
+  20-30 cm from the apple. Now: sated odour gain 0.1; and a hungry fly without a surge-level odour
+  for 10 s runs the documented offset response (Alvarez-Salvado et al. 2018) -- a hunger-scaled
+  downwind drift (the wind DNs with reversed sign, fading as the odour grows) with Ornstein-Uhlenbeck
+  turning, and klinokinesis (turning x0.25 while the 1 s odour signal exceeds its 4 s average; Jung et
+  al. 2015), which climbs the isotropic near-field of a fruit where an upwind surge goes nowhere.
+* **Startup escape.** Every run's first hop came at 0.8-1.1 s: the brain starts at rest, the first
+  frames of full sensory input are a brain-wide transient, and the habituation mean was zero exactly
+  then. The habituation state now starts at `gf_hz` (threshold doubled, relaxing over ~10 s).
+* **Overhaul merged** (branch `refactor/control-surface`, by another agent; `docs/ARCHITECTURE.md`,
+  `docs/CONTROL_SURFACE.md`, `docs/PERFORMANCE.md`): `Connectome.subset` + `regions.py` modules,
+  `FlyBrain` (senses in, `MotorRates` out), the demo and RL env rebuilt on it, CUDA-graph capture of
+  neural frames and sensory rays, fp16 weights (opt-in), `step_budget` / `AsyncFlyBrain`, tests. The
+  session-8 behaviour was ported onto `MotorRates` in the merge (`lh_odour` and `pn_glom_cells`
+  readouts; `Locomotion` / `Flight` readouts take `dt_s`). Checks on the merged tree: loom escape
+  (GF 46-50 Hz vs 23-25 walking), corner 3 hops / 20 s, odour gate 0% floor / 100% by the apple / 0%
+  plume-free; 25 tests pass.
+* **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
+  time on an idle RTX 4090, B = 1, full brain):
+
+  | configuration | ms / frame | x real time |
+  |---|---|---|
+  | eager (default) | 21.3 | 0.47 |
+  | `--cuda-graphs` (neural frames + sensory rays) | 14.5 | 0.69 |
+  | `--cuda-graphs --weight-dtype float16` | 13.7 | 0.73 |
+  | `--cuda-graphs`, neural capture only (no sensory capture) | 20.8 | 0.48 |
+  | `--fast` (brain dt 1 ms, optic dt 2 ms, camera 1/4) | 15.5 | 0.64 |
+  | `--fast --cuda-graphs` | 9.3 | 1.07 |
+
+  Nearly all of the gain is the captured ray tracing (the ~20 ray kernels per frame were
+  launch-bound); capturing the neural frame itself saves ~0.5 ms. Determinism: with CUDA graphs the
+  spike counts match the eager path for the first 136 frames and then differ by one spike (chaos
+  amplifying a ~1e-6 rounding difference; the same fly, not bit-exact); float16 differs from frame 0.
+  Both stay opt-in; the probes and the sustain test run eager.
 
 ## Batched brains and the RL environment
 

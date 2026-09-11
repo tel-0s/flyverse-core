@@ -157,6 +157,12 @@ class Locomotion:
     k_downwind: float = np.deg2rad(60) / 40.0
     search_yaw_sd: float = np.deg2rad(60)    # rad/s standard deviation of the OU yaw noise
     search_yaw_tau_s: float = 1.0
+    # klinokinesis while exploring (Jung et al. 2015; Alvarez-Salvado et al. 2018: walking flies turn less
+    # while the odour rises and more when it falls): the OU turning is scaled by `search_rising_turn` when
+    # the 1 s odour signal exceeds its 4 s average, which climbs the isotropic near-field gradient of a fruit
+    search_rising_turn: float = 0.25
+    search_trend_tau_s: float = 4.0
+    search_speed: float = 0.006              # m/s extra walking drive while exploring (hungry flies walk faster)
     rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng(0))
     metabolism: Metabolism = field(default_factory=Metabolism)
     k_leg_turn: float = np.deg2rad(100) / 30.0
@@ -221,10 +227,14 @@ class Locomotion:
         a_ou = np.exp(-dt_s / self.search_yaw_tau_s)
         self._ou = a_ou * getattr(self, "_ou", 0.0) + np.sqrt(1 - a_ou ** 2) * self.search_yaw_sd * self.rng.standard_normal()
         downwind = self.k_downwind * self.metabolism.hunger * max(1.0 - self._gate / 0.6, 0.0)   # fades as the odour grows
-        search_yaw = (self._ou - downwind * upwind) if searching else 0.0
+        a_tr = np.exp(-dt_s / self.search_trend_tau_s)
+        self._odour_slow = a_tr * getattr(self, "_odour_slow", self._odour_hz) + (1 - a_tr) * self._odour_hz
+        rising = self._odour_hz > self._odour_slow + 0.5
+        search_yaw = ((self.search_rising_turn if rising else 1.0) * self._ou - downwind * upwind) if searching else 0.0
         self._searching = bool(searching)
         back_eff = max(back - self.mdn_threshold, 0.0) if np.isscalar(back) else np.maximum(back - self.mdn_threshold, 0.0)
-        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff + self.wind_speed_bonus * self._gate * hunger_scale
+        speed = (self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff
+                 + self.wind_speed_bonus * self._gate * hunger_scale + (self.search_speed if searching else 0.0))
         # convention: DNa02 drives ipsilateral turning (Rayshubskiy et al. 2020): right DNa02 -> turn right
         yaw = -self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR) + self.k_wind * self._gate * hunger_scale * upwind + cast + search_yaw
         return {"speed": float(np.clip(speed, -self.max_speed, self.max_speed)),
@@ -299,7 +309,9 @@ class Flight:
         motor = read_motor(motor, wings=wg) if wg is not None else motor
         gf = float(motor.gf)
         a = np.exp(-dt_s / self.gf_hab_tau_s)
-        self._gf_mean = a * getattr(self, "_gf_mean", 0.0) + (1 - a) * gf
+        # warm start: the first frames after a reset are a brain-wide transient (rest -> full sensory input)
+        # that fired the GF within a second in every run; the threshold starts doubled and relaxes over ~10 s
+        self._gf_mean = a * getattr(self, "_gf_mean", self.gf_hz) + (1 - a) * gf
         out = {name: getattr(motor, name) for name in ("gf", "ttm", "power", "steer_L", "steer_R", "haltere")}
         out["gf_threshold"] = self.gf_hz + self.gf_habituation * self._gf_mean
         return out

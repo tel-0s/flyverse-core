@@ -26,6 +26,10 @@ Keys: `SPACE` pause · `R` reset · `T` teleport to the apple (taste) · `L` loo
 flight) · arrows / mouse drag orbit the scene camera, `+`/`-` or wheel zoom, `C` follow the fly, `HOME`
 reset · `F5`/`F9` quick-save / quick-load, `S` timestamped save · `ESC` quit.
 
+Speed options: `--cuda-graphs` (capture and replay each neural frame and the sensory ray tracing;
+bit-identical to the eager path), `--weight-dtype float16` (half-precision synaptic weights, fp32
+accumulate; opt-in, can change spikes), `--fast` (preset for slower GPUs). Numbers in `docs/NOTES.md`.
+
 Options: `--brain-map` (all 140k located somata in dorsal and lateral view, activity as highlights;
 `--map-every N`, `--map-no-blur`), `--trail-seconds` (decaying trail in the scene view), `--start x,y[,z]`
 | `floor`, `--wind-speed`, `--wind-dir`, `--load state.pt`, `--window WxH` (the window is resizable, the
@@ -119,6 +123,32 @@ the per-glomerulus odour code), actions are walking commands, reward is progress
 and documented: a hand-written klinotaxis policy on the odour code beats chance (93 vs 47 tasted
 frames), ES did not find it in 40 generations.
 
+## Use the brain in your own simulation
+
+The connectome model is a control system with one small surface (`docs/CONTROL_SURFACE.md`,
+`docs/ARCHITECTURE.md`): the environment supplies physical sensor values, the brain returns named
+rates, the body classes (or your own) turn rates into motion.
+
+```python
+from flyverse import FlyBrain
+from flyverse.body import FlyState, Locomotion
+
+fb = FlyBrain(modules=["antennal_lobe", "mushroom_body", "mechanosensory", "central", "descending", "vnc"])   # modules=None: everything
+fb.smell({"DM1": 0.4, "VA2": 0.2}, {"DM1": 0.2, "VA2": 0.1})   # concentration per glomerulus, left / right antenna
+fb.wind(0.3, 0.3); fb.taste(0.0)                              # antennal deflection; sugar contact
+fb.step(10.0)                                                 # 10 ms of brain
+motor = fb.motor()                                            # MotorRates: fwd_dn, turn_L/R, wind_ipsi_L/R, lh_odour, gf, power, ...
+pose, legs = FlyState(), Locomotion()
+cmd = legs.readout(motor, dt_s=0.01); legs.step(pose, cmd, 0.01, bounds=(-1, 1, -1, 1))
+```
+
+`modules` picks the parts of the CNS to simulate (`flyverse/regions.py`: optic, visual_projection,
+antennal_lobe, mushroom_body, gustatory, mechanosensory, central, descending, vnc); retained synapses
+keep the strength they have in the full model. `FlyBrain(cuda_graphs=True)` replays captured frames,
+`fb.step_budget(wall_ms)` fits the brain into a game tick and reports the time dilation, and
+`flyverse.async_brain.AsyncFlyBrain` runs it on its own thread so a fixed-tick host never waits on
+the GPU. `tests/` covers the surface (`python -m pytest tests -q`).
+
 ## Layout
 
 ```
@@ -128,13 +158,21 @@ flyverse/world.py        torch ray tracer: room, table, fruit, 4-channel light, 
 flyverse/optic.py        graded optic lobe + photoreceptor contrast stage + interface to the LIF
 flyverse/brain.py        whole-CNS LIF (torch sparse, batched)
 flyverse/air.py          wind, plumes, bilateral olfaction, Johnston's organ wind sense
-flyverse/body.py         fly pose (3-D), walking / flight, motor readout from named neuron groups
+flyverse/regions.py      named brain modules, Connectome subsets, path-based paring
+flyverse/fly.py          FlyBrain: the control surface (senses in, MotorRates out, step / budget / state)
+flyverse/senses.py       vision / smell / wind / taste encoders onto the connectome's sensory neurons
+flyverse/motor.py        named readout groups and MotorRates (incl. the lateral-horn odour signal)
+flyverse/async_brain.py  the brain on its own thread / CUDA stream for fixed-tick hosts
+flyverse/body.py         fly pose (3-D), walking / flight / metabolism: MotorRates -> motion
 flyverse/brainmap.py     soma projections for the --brain-map panel
 flyverse/env.py          vectorised RL environment
 scripts/room_demo.py     the interactive demo
 scripts/benchmark.py     one-shot calibration harness;  scripts/probe_*.py  one behaviour each
 scripts/screen_dns.py    the DN activation screen;  scripts/find_sweet_grns.py  sugar GRNs
+scripts/profile_room.py  per-frame profile of the demo loop;  scripts/profile_brain.py  the brain alone
+tests/                   control-surface, world and integration tests
 docs/NOTES.md            everything learned, session by session, with numbers
+docs/ARCHITECTURE.md, docs/CONTROL_SURFACE.md, docs/PERFORMANCE.md   the control surface and its cost
 ```
 
 ![retina](docs/retina_map.png)
