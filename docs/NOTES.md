@@ -1030,6 +1030,30 @@ body assumption, not the connectome:
   amplifying a ~1e-6 rounding difference; the same fly, not bit-exact); float16 differs from frame 0.
   Both stay opt-in; the probes and the sustain test run eager.
 
+### Session 9 addendum: headless runs move to the cluster
+
+From now on GPU sweeps, screens and the benchmark suite run on the group's B200 cluster through its job
+manager rather than on this desktop; the recipe, addresses and the first results live in `docs/CLUSTER.md`
+(git-ignored on purpose: infrastructure stays out of the public repo). `scripts/cluster_run.py` is the
+committed helper: it ships the local working-tree changes to a fresh per-run copy of the cluster checkout,
+submits one job per command (several commands in one call run concurrently and pack onto a GPU by VRAM
+budget), waits, prints the logs and fetches results back. The workflow agents of this session were
+reloaded with the instruction to use it instead of the local GPU.
+
+First cluster run of the fenced single-apple sustain probe (seed 0, `--program cx`, fast configuration,
+`probe_sustain.py`): 5 min, meals 0, final energy 0, hops 0, path 3.78 m; exploring 52 %, surging 19 %,
+casting 17 %, searching 12 % -- 9.6 min wall-clock, i.e. 1.9x slower than real time, against 1.24x real time on the local RTX 4090. That number includes the first-time compilation of the native kernels for sm_100 and two other jobs sharing the GPU for part of the run, so it is not yet a clean B200 timing; the sim is latency-bound (small kernels per 0.5 ms step), which is exactly the regime where a datacentre GPU does not beat a desktop one and where batching flies per process would pay. Same
+outcome class as the local runs (session 9: CX fed in 2 of 6). The smoke job (control / cuda / world
+tests) passed on the B200: 25 passed, 10 skipped.
+
+Follow-up worth doing next on the performance side: a **BatchSim**. The brain (`Brain`, `OpticLobe`,
+`FlyBrain`) is batched over B flies and `env.FlyRoomEnv` uses that, but the demo `Sim` -- body physics,
+surfaces, metabolism, programs, the odour / wind / taste sensing -- is written for one fly, so a seed
+sweep today is B processes packed onto a GPU (each at ~20 % of a B200's memory). Vectorising the body
+over B would let one process run a whole sweep through a single batched brain step, which is roughly
+B times cheaper than B processes; the warp-CSR path is batch-1 only, so the batched configuration would
+use cuSPARSE (`--cuda-sparse torch`) with kernels + graphs.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
