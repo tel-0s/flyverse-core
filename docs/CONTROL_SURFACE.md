@@ -136,6 +136,10 @@ the demo's UI work. The rendering workload uses one pose broadcast to the batch;
 batched controller cost, not rendering B independent viewpoints. `EnvParams` also exposes
 `cuda_graphs`, `weight_dtype` and `brain_dt_ms`.
 
+For the actual interactive demo loop, `scripts/profile_room.py` includes drawing and presentation
+and can export a CPU/CUDA timeline. See [room-demo profiling](PERFORMANCE.md) for commands, the
+distinction between visible and headless runs, and validation of optic input hoisting.
+
 A local RTX 4090 measurement (PyTorch 2.10.0+cu128, B=1, 30 measured frames after 8 warmup frames,
 10 ms of simulated time per frame) gave these mean latencies. They are a development snapshot on
 a shared workstation, not a controlled hardware benchmark; absolute timings varied between runs.

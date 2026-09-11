@@ -202,12 +202,12 @@ class OpticLobe:
         return (self.v + self.b_vec[None]).clamp(0.0, 1.0)
 
     @torch.no_grad()
-    def _substep(self, a_pr: torch.Tensor, s_spk: torch.Tensor | None) -> None:
+    def _substep(self, pr_input: torch.Tensor, spk_input: torch.Tensor) -> None:
         p = self.p
         dr = self.rates() - self.b_vec[None]                                                 # (B, n_rate)
-        inp = p.gain_rr * (self.W_rr @ dr.T.contiguous()).T + p.gain_in * (self.W_rp @ a_pr.T.contiguous()).T - p.adapt_gain * self.adapt
-        if s_spk is not None:
-            inp = inp + p.gain_fb * (self.W_rs @ s_spk.T.contiguous()).T
+        # Keep the addition order: combining the held inputs would change rounding.
+        inp = p.gain_rr * (self.W_rr @ dr.T.contiguous()).T + pr_input - p.adapt_gain * self.adapt
+        inp = inp + spk_input
         torch.add(inp, (self.v - inp) * self._a[None], out=self.v)
         torch.add(dr, (self.adapt - dr) * self._a_ad, out=self.adapt)
 
@@ -229,8 +229,13 @@ class OpticLobe:
         total = self._pending_ms + frame_ms
         steps = int(np.floor((total + 1e-9) / self.p.dt_ms))
         self._pending_ms = max(0.0, total - steps * self.p.dt_ms)
-        for _ in range(steps):
-            self._substep(a_pr, s)
+        if steps:
+            # Photoreceptor activity and spiking feedback are held for this frame.
+            # Only the recurrent optic product changes between substeps.
+            pr_input = self.p.gain_in * (self.W_rp @ a_pr.T.contiguous()).T
+            spk_input = self.p.gain_fb * (self.W_rs @ s.T.contiguous()).T
+            for _ in range(steps):
+                self._substep(pr_input, spk_input)
         torch.sub(self.rates(), self.r0, out=self.delta_rate)
         dr = self.delta_rate
         drive = torch.zeros(self.B, self.c.n, device=self.device)
