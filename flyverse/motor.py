@@ -24,14 +24,19 @@ class MotorGroups:
     names: dict = field(default_factory=dict)
     pn_glom: np.ndarray = None  # glomerulus id of each PN
     pn_names: np.ndarray = None
-    lh_odour: np.ndarray = None # lateral-horn types whose rate is the food-odour signal (LH_ODOUR_TYPES)
+    lh_odour: dict = None       # channel -> lateral-horn cell indices (LH_ODOUR_CHANNELS)
 
 
-# Lateral-horn cell types that report fruit odour in the model, found by recording every LH / MB-output / DN
-# type at fruit and plume-free sites with heading-matched controls (NOTES, session 8): ~23 Hz next to fruit
-# (blueberry or apple, facing into or away from the wind) vs ~5-10 Hz on a plume-free table spot and ~2-5 on
-# the floor. The LH is the innate-valence output of the olfactory system; these 14 cells are the odour gate.
-LH_ODOUR_TYPES = ["LHPD4d2_b", "LHPD4a2", "LHAV3k1", "LHAV3h1", "LHPD5c1", "LHAD1f2"]
+# Lateral-horn populations that report fruit odours in the model, found by screening every LH / MB-output / DN
+# type at fruit and plume-free sites with heading-matched controls (NOTES, session 8). The LH is odour-tuned:
+# the mixed-fruit table (blueberries dominant) selected one set (~23 Hz next to fruit, ~5 plume-free), a lone
+# apple another (LHPD4d1 20.6 Hz at 8 cm, 12.5 at 40 cm, 3.4 plume-free -- graded with distance). Each is a
+# channel with its own baseline; a gate reads the strongest. LHPD5c1 appears in both.
+LH_ODOUR_CHANNELS = {
+    "berry": ["LHPD4d2_b", "LHPD4a2", "LHAV3k1", "LHAV3h1", "LHPD5c1", "LHAD1f2"],
+    "apple": ["LHPD4d1", "LHAV4a1_a", "LHAV4a1_b", "LHCENT12_a", "LHPD2a1"],
+}
+LH_ODOUR_TYPES = LH_ODOUR_CHANNELS["berry"]      # backwards compatibility
 
 
 def motor_groups(c: Connectome) -> MotorGroups:
@@ -41,8 +46,11 @@ def motor_groups(c: Connectome) -> MotorGroups:
         back_dn=c.select(type="MDN"),
         turn_L=c.select(type="DNa02", somaSide="L"),
         turn_R=c.select(type="DNa02", somaSide="R"),
-        opto_L=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="L"),
-        opto_R=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="R"),
+        # optomotor: the populations whose L - R flips sign under sustained imposed yaw (scripts/screen_rotation.py):
+        # HSN / HSE (the horizontal-system tangential cells) and DNp20. DNp04 + LPT27/30, used until session 8,
+        # do not flip (d' 0.1-0.5) and are driven by walking instead.
+        opto_L=c.select(type=["DNp20", "HSN", "HSE"], somaSide="L"),
+        opto_R=c.select(type=["DNp20", "HSN", "HSE"], somaSide="R"),
         wind_ipsi_L=c.select(type=["DNp18", "DNge016", "DNge175", "DNg05_a", "DNp19"], somaSide="L"),
         wind_ipsi_R=c.select(type=["DNp18", "DNge016", "DNge175", "DNg05_a", "DNp19"], somaSide="R"),
         wind_contra_L=c.select(type=["DNp33", "DNg99"], somaSide="L"),
@@ -56,8 +64,8 @@ def motor_groups(c: Connectome) -> MotorGroups:
     )
     gl = np.array([t.split("_")[0] for t in c.neurons.type.to_numpy()[g.pn]])
     g.pn_names, g.pn_glom = np.unique(gl, return_inverse=True)
-    g.lh_odour = c.select(type=LH_ODOUR_TYPES)
-    g.names = {"fwd_dn": fwd_types, "back_dn": ["MDN"], "turn": ["DNa02 L/R"], "opto": ["DNp04, LPT27, LPT30 L/R"], "leg": ["leg MNs L/R"], "proboscis": ["MN9"]}
+    g.lh_odour = {name: c.select(type=types) for name, types in LH_ODOUR_CHANNELS.items()}
+    g.names = {"fwd_dn": fwd_types, "back_dn": ["MDN"], "turn": ["DNa02 L/R"], "opto": ["DNp20, HSN, HSE L/R"], "leg": ["leg MNs L/R"], "proboscis": ["MN9"]}
     return g
 
 
@@ -105,7 +113,7 @@ class MotorRates:
     steer_L: float | np.ndarray = 0.0
     steer_R: float | np.ndarray = 0.0
     haltere: float | np.ndarray = 0.0
-    lh_odour: float | np.ndarray = 0.0
+    lh_odour: dict = field(default_factory=dict)         # channel -> mean rate (Hz) of its LH population
     pn_glomeruli: dict = field(default_factory=dict)
     pn_glom_cells: dict = field(default_factory=dict)   # PNs per glomerulus (the PN gate ignores tiny ones)
     time_ms: float = 0.0
@@ -123,6 +131,7 @@ class MotorRates:
         return MotorRates(**{f.name: ({k: at(v) for k, v in self.pn_glomeruli.items()}
                             if f.name == "pn_glomeruli" else self.time_ms if f.name == "time_ms"
                             else dict(self.pn_glom_cells) if f.name == "pn_glom_cells"
+                            else {k: at(v) for k, v in self.lh_odour.items()} if f.name == "lh_odour"
                             else at(getattr(self, f.name))) for f in fields(self)})
 
 
@@ -142,7 +151,7 @@ def read_motor(brain, groups: MotorGroups | None = None, wings: WingGroups | Non
         "fwd_dn", "back_dn", "turn_L", "turn_R", "opto_L", "opto_R", "wind_ipsi_L", "wind_ipsi_R",
         "wind_contra_L", "wind_contra_R", "leg_L", "leg_R", "proboscis")}
     values.update({f.name: mean(getattr(wings, f.name)) for f in fields(wings)})
-    values["lh_odour"] = mean(groups.lh_odour if groups.lh_odour is not None else np.zeros(0, int))
+    values["lh_odour"] = {name: mean(idx) for name, idx in (groups.lh_odour or {}).items()}
     gloms = groups.pn_names
     pn = rates[:, groups.pn]
     if len(gloms):

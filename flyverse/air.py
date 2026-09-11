@@ -48,10 +48,13 @@ class PlumeParams:
 
 class Air:
     def __init__(self, sources, wind: WindParams | None = None, plume: PlumeParams | None = None, seed: int = 0):
-        """sources: list of (odour_name, (x, y, z), strength)."""
+        """sources: list of (odour_name, (x, y, z), strength[, radius]). The radius makes the plume's vertical
+        extent that of the fruit: odour from a fruit on a substrate fills the boundary layer down to the
+        surface, so a walking fly under the fruit's rim is on the plume axis, not 4 cm below it."""
         self.wind = wind or WindParams()
         self.plume = plume or PlumeParams()
-        self.sources = [(name, np.array(pos, float), s) for name, pos, s in sources if name in ODOURS]
+        self.sources = [(src[0], np.array(src[1], float), src[2]) for src in sources if src[0] in ODOURS]
+        self.src_rad = np.array([(src[3] if len(src) > 3 else 0.0) for src in sources if src[0] in ODOURS], float)
         self.rng = np.random.default_rng(seed)
         self.phase = self.rng.uniform(0, 2 * np.pi, len(self.sources))
         self.t = 0.0
@@ -93,9 +96,10 @@ class Air:
         d = pos[:, None, :] - src[None, :, :]                                        # (M, S, 3)
         x = d @ d_hat                                                                  # (M, S) downwind distance
         perp = d - x[..., None] * d_hat
-        r2 = perp[..., 0] ** 2 + perp[..., 1] ** 2 + (2 * perp[..., 2]) ** 2
+        pz = np.maximum(np.abs(perp[..., 2]) - self.src_rad[None, :], 0.0)     # vertical offset outside the fruit's extent
+        r2 = perp[..., 0] ** 2 + perp[..., 1] ** 2 + (2 * pz) ** 2
         conc = pp.near_gain / (1.0 + (np.linalg.norm(d, axis=-1) / pp.near_d0) ** 2)
-        sig = pp.sigma0 + pp.spread * np.maximum(x, 0)
+        sig = np.maximum(pp.sigma0, self.src_rad)[None, :] + pp.spread * np.maximum(x, 0)   # a plume starts as wide as its source
         puff = 1.0 + pp.puff_depth * np.sin(2 * np.pi * self.t / pp.puff_period_s + self.phase)[None, :]
         conc = conc + np.where(x > 0, pp.plume_gain * puff * (pp.sigma0 / sig) ** 2 * np.exp(-r2 / (2 * sig ** 2)), 0.0)
         return (conc * strength[None, :]) @ self._odour_mat                            # (M, n_glom)

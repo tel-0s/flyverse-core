@@ -216,7 +216,13 @@ class Locomotion:
     k_leg: float = 0.02 / 60.0     # m/s per Hz of mean leg-MN rate
     k_back: float = 0.02 / 40.0
     k_turn: float = np.deg2rad(200) / 40.0   # rad/s per Hz of DNa02 asymmetry (ipsilateral turning, Rayshubskiy 2020)
-    k_opto: float = np.deg2rad(150) / 15.0   # rad/s per Hz of DNp04/LPT asymmetry (optomotor, stabilising)
+    # optomotor (course stabilisation): + k_opto * (opto_L - opto_R - its 2 s mean). The group is DNp20 + HSN +
+    # HSE, whose L - R grows under clockwise (right) rotation by ~6 Hz at 90 deg/s (scripts/screen_rotation.py,
+    # NOTES session 8), so a positive (left) yaw opposes it. OFF by default: the same cells respond to the fly's
+    # own walking (translational flow) with |L - R| swings of ~60 deg/s-equivalent, and the plain readout has no
+    # way to separate rotation from translation, so the term injects noise rather than stabilising. The old
+    # group (DNp04 + LPT27/30) did not flip under sustained rotation at all. Set e.g. np.deg2rad(8) to enable.
+    k_opto: float = 0.0
     opto_hp_tau_s: float = 2.0
     k_leg_turn: float = np.deg2rad(100) / 30.0
     max_speed: float = 0.03
@@ -239,12 +245,12 @@ class Locomotion:
         opto = asym - self._opto_bias
         back_eff = max(back - self.mdn_threshold, 0.0) if np.isscalar(back) else np.maximum(back - self.mdn_threshold, 0.0)
         speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff
-        yaw = -self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR)
+        yaw = self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR)
         return {"speed": float(np.clip(speed, -self.max_speed, self.max_speed)),
                 "yaw": float(np.clip(yaw, -self.max_yaw, self.max_yaw)),
                 "proboscis": float(np.clip(motor.proboscis / 30.0, 0, 1)),
                 "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "wind_L": motor.wind_ipsi_L, "wind_R": motor.wind_ipsi_R,
-                          "LH odour": motor.lh_odour, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": motor.proboscis}}
+                          "LH odour": max(motor.lh_odour.values()) if motor.lh_odour else 0.0, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": motor.proboscis}}
 
     def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds) -> None:
         """Walk. `bounds` is a surfaces.Surfaces (the fly sticks to faces, walks over edges and up walls) or,

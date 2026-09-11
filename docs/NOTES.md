@@ -673,6 +673,70 @@ body assumption, not the connectome:
   60-63 in the two loom-miss seeds, where the passed ball was still next to the edge. Threshold sweep:
   30 -> 4/6 looms, 1.2 spontaneous hops per minute; 36-40 -> 4/6 looms, 0.6 / min; 42 -> 3/6 looms,
   0 / min. `Flight.gf_hz` is now 38: above the 99th percentile of walking, below the weakest loom.
+* **The single-apple table: 0 meals in 9 runs, and why.** Plain, body program and CX module, three
+  seeds each, fenced, starting 40 cm directly downwind of the apple: nobody found it. The programmed
+  flies never reached "surging": the LH odour gate never crossed 0.6, so the search program's
+  downwind drift walked them to the downwind edge and left them there; the plain flies climbed the
+  fence (a glass wall is walkable) and sat on its rim. Three defects, all in the world / programs:
+  (a) every fruit emitted odour at strength 1 regardless of size -- a 4 cm apple and a 6 mm blueberry
+  were the same source, and the LH gate had been calibrated on the blueberries (23 Hz next to one)
+  while the apple gave 15 Hz at 8 cm and nothing at 40; emission now scales with radius (strength 1
+  at 2 cm: apple 2x, blueberry 0.3x, banana 4.5x); (b) the fence is now a fixture -- the legacy plane
+  bounds for walking and a clamp for flight -- not a climbable box; (c) the offset response is an
+  episode (20 s after the 10 s delay), after which the hungry fly does pure local search rather
+  than a permanent downwind pull.
+* **Unfenced sustain with everything above** (gradual edge, gf_hz 38; 5 min, seeds 0-2, meals / hops):
+  plain 0 / 13, 1 / 7, 0 / 2; CX module + gating 0 / 2, 1 / 2, 1 / 2 -- every fly still ends on the
+  floor with energy 0. Hops are down from 19-36 to 2-13 per five minutes, but two hops near an edge
+  are enough, and a fly on the floor has no way back (a 16 m^2 random walk does not find a 5 cm leg;
+  the animal would fly up). So the table-edge item ends here with a clear statement rather than a
+  number: the physics is right, the remaining loss is (a) the loom pathway's response to self-motion
+  (a few escapes per five minutes on a fruit table) and (b) the absence of goal-directed flight --
+  both model questions. Foraging is scored on the fenced table from here on.
+* **The plume was 4 cm above the fly.** Measuring the LH signal along the apple's plume axis
+  (fly pinned, facing upwind) gave concentrations of 0.22 at 8 cm and 0.07 at 40 cm: the plume was
+  centred on the apple's centre, 4 cm above the table, with a vertical width of sigma / 2 (1.2 cm at
+  8 cm downwind), so a walking fly sat exp(-5) below the core. The blueberries only ever worked
+  because they are 6 mm tall and there are six. Odour from a fruit on a substrate fills the boundary
+  layer down to the surface: `Air` sources now carry the fruit's radius and the vertical offset is
+  measured outside the fruit's extent, so a fly under the rim is on the axis. Concentrations become
+  1.87 at 8 cm, 0.79 at 15, 0.34 at 25, 0.14 at 40, 0.08 at 55 (the RL env's sources updated too).
+  The LH population then reads 7.2 / 7.0 / 6.6 / 5.8 / 5.1 Hz at those distances against 3.5 Hz
+  plume-free -- graded, but a lone apple drives the population found on the mixed-fruit table far
+  below its 10 + 12 Hz gate, which is why the single-apple runs never surged. The gate is re-derived
+  from a screen on the single-apple table rather than re-tuned by hand (next entry).
+* **The apple has its own lateral-horn population.** `scripts/screen_odour.py --fruit apple` (8 cm
+  downwind into and away from the wind, 40 cm downwind, plume-free into and away, floor; 3,233
+  populations): LHPD4d1 d' 4.51 -- 20.6 Hz at 8 cm, 12.5 at 40 cm, 3.4 plume-free; LHAV4a1_b 4.20
+  (19.0 / 12.7 / 4.7); LHAV4a1_a 3.92 (21.9 / 12.7 / 4.5); LHCENT12_a 3.75; LHPD2a1 3.65; all
+  heading-invariant, 100% / 0% at a midpoint threshold, and graded with distance. None of the
+  blueberry-selected types is in this list except LHPD5c1, which is in both. The LH is odour-tuned
+  -- the single "food population" was a simplification of the mixed-fruit table. `motor.LH_ODOUR_CHANNELS`
+  now carries a berry and an apple population; `MotorRates.lh_odour` is a per-channel dict; the
+  program's gate reads each channel against its own baseline (berry 10 + 12 Hz, apple 5 + 8 Hz from
+  the screens) and takes the strongest. A third fruit would be a third screen, not a retune.
+* **The optomotor readout was on the wrong cells.** On the single-apple table the surge went
+  crosswind for both programs. The yaw decomposition of a walking fly in wind: the optomotor term
+  (DNp04 + LPT27/30, L - R) mean |48| deg/s, std 73; DNa02 0; leg MNs 1; heading std 31 deg. Under
+  sustained imposed rotation, pinned, no wind, those DNs do not flip (DNp04 1.4 / 3.5 Hz at +90
+  deg/s, 0.6 / 3.4 at -90; identical on the pre-merge commit, so not a regression: session 5's
+  benchmark rotated for 0.8 s and measured an onset transient), they do not respond to wind (0.3-1 Hz
+  pinned, wind on or off), and walking drives them to 15-35 Hz asymmetries. T4 / T5 direction
+  selectivity is intact (`probe_motion`: T5a DSI 0.38, T4c / T4d 0.23 / 0.24, correct preferred
+  directions). So the term was self-motion noise injected as "stabilisation". With it off, the body
+  program turns from crosswind to upwind in 6 s and closes 36 -> 19 cm in 20 s.
+  `scripts/screen_rotation.py` (every DN / LPT / HS / VS type by side, +90 vs -90 deg/s sustained,
+  pinned, no wind) finds the real rotation populations: HSN d' 4.2 (L - R -1.4 Hz CCW, +5.7 CW), DNp20
+  3.1 (-4.5 / +7.8, the strongest in Hz), Nod1 2.8, LPT26 2.7, LPT50 2.4, HSE 2.2, VS 1.8; DNp04 0.3,
+  LPT27 0.1, LPT30 0.5. The optomotor group is now DNp20 + HSN + HSE (the horizontal-system cells
+  are the textbook optomotor neurons), sign from the screen (L - R grows under clockwise rotation, so
+  + k * (L - R) opposes it). Checked: under imposed +-90 deg/s the commanded yaw opposes the rotation
+  (-4 / +5 / +12 deg/s at 8 deg/s per Hz: loop gain ~0.1) -- but a walking fly in wind drives the same
+  term to mean |62| deg/s, std 80: HS cells respond to translational flow as they do in the animal, and
+  the plain readout cannot separate rotation from translation (the animal uses matched filters
+  across the VS / HS population and efference copies). So `k_opto` is 0 by default: the group and sign
+  are recorded for whoever builds the separation; a stabilising reflex that fires on the fly's own
+  walking is noise. The body program steers upwind correctly with it off.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

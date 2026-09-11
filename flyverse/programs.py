@@ -33,8 +33,9 @@ class AnemotaxisProgram:
     # the odour gate: the lateral-horn population's mean rate (1 s smoothed) against a threshold, or the
     # PN level statistic (max - median over glomeruli with >= pn_min_cells PNs); NOTES session 8
     odour_source: str = "lh"                 # "lh" | "pn"
-    lh_base_hz: float = 10.0
-    lh_gate_hz: float = 12.0
+    # per-channel (baseline Hz, gate range Hz) for motor.LH_ODOUR_CHANNELS: berry from the mixed-fruit screen,
+    # apple from the single-apple screen (3.4-4.7 Hz plume-free, 12.5 at 40 cm, 20 at 8 cm)
+    lh_channels: dict = field(default_factory=lambda: {"berry": (10.0, 12.0), "apple": (5.0, 8.0)})
     pn_base_hz: float = 20.0
     pn_gate_hz: float = 40.0
     pn_min_cells: int = 3
@@ -53,6 +54,7 @@ class AnemotaxisProgram:
     # fading with odour) + Ornstein-Uhlenbeck turning, with klinokinesis (less turning while the odour rises)
     search_hunger: float = 0.3
     offset_delay_s: float = 10.0
+    offset_duration_s: float = 20.0          # the downwind drift is an episode after plume loss, then pure local search
     k_downwind: float = np.deg2rad(60) / 40.0
     search_yaw_sd: float = np.deg2rad(60)
     search_yaw_tau_s: float = 1.0
@@ -64,10 +66,13 @@ class AnemotaxisProgram:
     def odour(self, motor, dt_s: float) -> float:
         a = np.exp(-dt_s / self.smooth_s)
         if self.odour_source == "lh":
-            lh = float(motor.lh_odour)
-            self._lh_smooth = a * getattr(self, "_lh_smooth", lh) + (1 - a) * lh
-            self.odour_hz = self._lh_smooth
-            return float(np.clip((self._lh_smooth - self.lh_base_hz) / self.lh_gate_hz, 0.0, 1.0))
+            lh = {k: float(v) for k, v in motor.lh_odour.items()}
+            sm = getattr(self, "_lh_smooth", lh)
+            self._lh_smooth = {k: a * sm.get(k, v) + (1 - a) * v for k, v in lh.items()}
+            gates = {k: float(np.clip((self._lh_smooth[k] - base) / rng, 0.0, 1.0)) for k, (base, rng) in self.lh_channels.items() if k in self._lh_smooth}
+            best = max(gates, key=gates.get) if gates else None
+            self.odour_hz = self._lh_smooth.get(best, 0.0); self.odour_channel = best
+            return gates.get(best, 0.0)
         names = list(motor.pn_glomeruli)
         glom = np.array([float(motor.pn_glomeruli[n]) for n in names], float)
         n_pn = np.array([motor.pn_glom_cells.get(n, 1) for n in names])
@@ -100,7 +105,8 @@ class AnemotaxisProgram:
         searching = hunger > self.search_hunger and self.gate < 0.6 and cast == 0.0 and since_hit > self.offset_delay_s
         a_ou = np.exp(-dt_s / self.search_yaw_tau_s)
         self._ou = a_ou * getattr(self, "_ou", 0.0) + np.sqrt(1 - a_ou ** 2) * self.search_yaw_sd * self.rng.standard_normal()
-        downwind = self.k_downwind * hunger * max(1.0 - self.gate / 0.6, 0.0)
+        in_offset = since_hit < self.offset_delay_s + self.offset_duration_s          # only for a while after a real hit
+        downwind = self.k_downwind * hunger * max(1.0 - self.gate / 0.6, 0.0) * (1.0 if in_offset else 0.0)
         a_tr = np.exp(-dt_s / self.search_trend_tau_s)
         self._odour_slow = a_tr * getattr(self, "_odour_slow", self.odour_hz) + (1 - a_tr) * self.odour_hz
         rising = self.odour_hz > self._odour_slow + 0.5

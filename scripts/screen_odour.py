@@ -23,13 +23,17 @@ sys.path.insert(0, os.path.dirname(__file__))
 import room_demo as rd  # noqa: E402
 from flyverse import screen  # noqa: E402
 
-SITES = {  # name: (x, y, z, heading_deg); the wind blows towards -x, so heading 0 faces into it
+SITES_ALL = {  # name: (x, y, z, heading_deg); the wind blows towards -x, so heading 0 faces into it
     "blueberry_into_wind": (-0.14, 0.30, 0.75, 0), "blueberry_away": (-0.14, 0.30, 0.75, 180),
     "apple_into_wind": (0.12, 0.15, 0.75, 0),
     "clean_into_wind": (0.55, 0.35, 0.75, 0), "clean_away": (0.55, 0.35, 0.75, 180), "floor_away": (0.8, 0.8, 0.0, 180),
 }
-POSITIVE = ["blueberry_into_wind", "blueberry_away", "apple_into_wind"]
-NEGATIVE = ["clean_into_wind", "clean_away", "floor_away"]
+SITES_APPLE = {  # a single apple at (0.25, 0.15): its plume runs towards -x
+    "apple8_into_wind": (0.17, 0.15, 0.75, 0), "apple8_away": (0.17, 0.15, 0.75, 180), "apple40_into_wind": (-0.15, 0.15, 0.75, 0),
+    "clean_into_wind": (0.55, 0.35, 0.75, 0), "clean_away": (0.55, 0.35, 0.75, 180), "floor_away": (0.8, 0.8, 0.0, 180),
+}
+SETS = {"all": (SITES_ALL, ["blueberry_into_wind", "blueberry_away", "apple_into_wind"], ["clean_into_wind", "clean_away", "floor_away"]),
+        "apple": (SITES_APPLE, ["apple8_into_wind", "apple8_away", "apple40_into_wind"], ["clean_into_wind", "clean_away", "floor_away"])}
 
 
 def pinned_step(sim, x, y, heading):
@@ -46,11 +50,14 @@ def main():
     ap.add_argument("--seconds", type=float, default=30.0)
     ap.add_argument("--pattern", default=r"^(LH|MBON|PPL1|PAM|DN[a-z]|MDN|WED|AVLP|PLP|SLP|SIP|SMP|CRE|LAL)")
     ap.add_argument("--top", type=int, default=20)
-    ap.add_argument("--out", default="out/screen_odour.csv")
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--fruit", default="all", choices=["all", "apple"])
     args = ap.parse_args()
+    SITES, POSITIVE, NEGATIVE = SETS[args.fruit]
+    args.out = args.out or f"out/screen_odour_{args.fruit}.csv"
     runs = {}; rec = None
     for name, (x, y, z, hd) in SITES.items():
-        sim = rd.Sim(0, start=(x, y, z), trail_seconds=0.0)
+        sim = rd.Sim(0, start=(x, y, z), trail_seconds=0.0, fruit_set=args.fruit)
         rec = rec or screen.TypeRecorder.build(sim.c, pattern=args.pattern)
         runs[name] = screen.record(pinned_step(sim, x, y, np.deg2rad(hd)), rec, args.seconds)
         print(f"{name}: done")

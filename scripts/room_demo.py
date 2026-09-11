@@ -110,11 +110,7 @@ class Sim:
         self.surfaces = surfaces.Surfaces(self.info["room"], self.info["solids"], self.info["solid_labels"])
         # --fence: an invisible glass box around the table top (walls the fly can walk on, no visual change):
         # holds the fly on the table so foraging can be scored independently of the escape-hop problem
-        self.fence = fence
-        if fence:
-            x0, x1, y0, y1 = self.info["table_extent"]; z = self.info["table_top_z"]
-            self.surfaces = surfaces.Surfaces((x0, x1, y0, y1, z, z + 0.1), [], [])
-            self.surfaces.faces = [f for f in self.surfaces.faces if f.label != "ceiling"]
+        self.fence = fence                     # a test fixture: the fly cannot leave the table top by walking or hopping
         self.world.spheres.append(world.Sphere((9, 9, 9), (0.03, 0.03, 0.03), "black"))   # looming ball (L key)
         self.loom_idx = len(self.world.spheres) - 1
         self.loom_t = -1.0
@@ -122,7 +118,9 @@ class Sim:
         self.wts_t = torch.from_numpy(self.wts).float().to(self.world.device)
         # air: wind + a plume from every fruit; smelled bilaterally by the antennae, wind felt by the
         # Johnston's organ (flyverse/air.py)
-        self.air = air.Air([(name, cen, 1.0) for name, cen, rad in self.info["fruit"]],
+        # odour emission scales with the fruit's size (surface): strength 1 for a 2 cm radius, so the apple
+        # (4 cm) emits 2x, a blueberry (6 mm) 0.3x, the banana (9 cm) 4.5x. One value per source, not per fruit type.
+        self.air = air.Air([(name, cen, rad / 0.02, rad) for name, cen, rad in self.info["fruit"]],
                            air.WindParams(speed=wind_speed, direction_deg=wind_dir), seed=seed)
         self.smell_values = ({}, {})
         self.reset_fly()
@@ -303,13 +301,21 @@ class Sim:
         if self.fly.airborne:
             self.feeding = False
             self.metabolism.update(False, 0.0, FRAME_MS / 1000)
-            self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, self.surfaces, (-2, 2, -2, 2, 2.6))
+            if self.fence:
+                x0, x1, y0, y1 = self.info["table_extent"]
+                self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, lambda x, y: self.info["table_top_z"], (x0, x1, y0, y1, 2.6))
+            else:
+                self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, self.surfaces, (-2, 2, -2, 2, 2.6))
         elif not self.flight.maybe_takeoff(self.fly, self.wcmd):
             cmd = self.decoder_cmd() if getattr(self, "decoder", False) else self.cmd
             self.feeding = self.metabolism.update(bool(self.tasting), self.fly.speed, FRAME_MS / 1000)
             if self.feeding:                                   # a fly that is feeding stops walking
                 cmd = dict(cmd, speed=0.0, yaw=0.0)
-            self.loco.step(self.fly, cmd, FRAME_MS / 1000, self.surfaces)
+            if self.fence:
+                x0, x1, y0, y1 = self.info["table_extent"]
+                self.loco.step(self.fly, cmd, FRAME_MS / 1000, (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02))
+            else:
+                self.loco.step(self.fly, cmd, FRAME_MS / 1000, self.surfaces)
         self.update_loom()
         if self.trail_seconds > 0 and int(self.brain.t / FRAME_MS) % 5 == 0:      # 20 samples per second
             t_now = self.brain.t / 1000
@@ -474,7 +480,7 @@ def main():
     ap.add_argument("--dt-by-module", default=None, help="per-module LIF clocks, e.g. vnc=1.0 or vnc=1.0,descending=1.0 (ms; multiples of --brain-dt)")
     ap.add_argument("--no-prune", action="store_true", help="keep the optic-lobe synapses in the LIF matrix (they are zeros; for timing comparisons)")
     ap.add_argument("--fruit", default="all", choices=["all", "apple"], help="fruit on the table: all 19 items, or the apple alone (a single source)")
-    ap.add_argument("--fence", action="store_true", help="invisible walls around the table top: the fly cannot leave it (scores foraging without the escape problem)")
+    ap.add_argument("--fence", action="store_true", help="test fixture: the fly cannot leave the table top by walking or hopping (scores foraging without the escape problem)")
     ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"],
                     help="hand-designed behaviour program between the brain and the body (flyverse/programs.py); default: none, the plain model")
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")

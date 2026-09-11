@@ -66,7 +66,7 @@ class FlyRoomEnv:
         if self.optic is not None:
             self.dirs_b, self.wts = self.r.ray_directions()
             self.wts_t = torch.from_numpy(self.wts).float().to(self.world.device)
-        self.air = air.Air([(name, cen, 1.0) for name, cen, rad in self.info["fruit"]], air.WindParams(speed=self.p.wind_speed), seed=self.p.seed)
+        self.air = air.Air([(name, cen, rad / 0.02, rad) for name, cen, rad in self.info["fruit"]], air.WindParams(speed=self.p.wind_speed), seed=self.p.seed)
         n = self.c.neurons
         if self.p.obs == "descending":
             self.obs_idx = self.c.select(superclass="descending_neuron")
