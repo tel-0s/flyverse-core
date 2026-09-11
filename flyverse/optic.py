@@ -82,6 +82,10 @@ DEFAULT_TAU_BY_TYPE = {"Mi4": 150.0, "Mi9": 150.0, "CT1": 150.0, "Tm9": 150.0, "
 T4T5 = ["T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d"]
 DEFAULT_BASELINE_BY_TYPE = {t: 0.0 for t in T4T5}
 DEFAULT_PAIR_GAIN = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0), (r"^(Tm4|Tm9|CT1|TmY15)$", r"^T5[abcd]$", 5.0),
+                     # LPi -> LPLC2: the lobula-plate inhibitory interneurons make LPLC2 expansion-selective in the animal;
+                     # under the uniform synapse they were a tenth of its T4/T5 excitation, so the fly's own turning
+                     # drove the giant fibre. x4 halves the walking GF and keeps the loom (NOTES, session 9).
+                     (r"^LPi(34|43)$", r"^LPLC2$", 4.0),
                      # T4/T5 outputs x4: rectified, strongly inhibited DS units respond weakly to natural
                      # scenes; this restores drive to LPi / HS / VS / LPLC and the descending neurons
                      (r"^T[45][abcd]$", r".*", 2.0),

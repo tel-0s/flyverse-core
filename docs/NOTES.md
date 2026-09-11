@@ -925,6 +925,75 @@ body assumption, not the connectome:
   CX with a different RNG stream -- useful as replication), which is the first success on a lone
   source; the body program's closest approach was 6 cm. Every fly starts hungry and is starving by
   ~110 s, so a first meal has to come inside two minutes.
+## Session 9: improving the model itself
+
+* **LPi -> LPLC2: the missing inhibition behind the self-motion escapes.** Structure first: under the
+  uniform synapse the six T4 / T5 subtypes give each LPLC2 +414 synapse-equivalents of excitation and
+  the two LPi types (glutamate, sign -1: correct) only -40 (LPi43 -32, LPi34 -8), while the LPi are
+  themselves driven hard (T4c / T5c -> LPi34 +650 / +780 per cell). In the animal that inhibition is
+  what makes LPLC2 expansion-selective. A pair-gain sweep on LPi34 / LPi43 -> LPLC2 (pinned fly,
+  no wind; then the loom; then 15 s of free walking; native backend, contended):
+
+  | gain | GF under +-90 deg/s rotation | loom GF peak | walking GF per-second max: median / 90% / max |
+  |---|---|---|---|
+  | x1 | 6.6 / 7.4 Hz (max 24) | 28.0 | 18 / 23 / 28 |
+  | x4 | 3.7 / 2.9 (max 18) | 32.5 | 11 / 17 / 19 |
+  | x10 | 0.9 / 1.1 (max 9) | 20.4 | 6 / 9 / 15 |
+
+  x4 cuts the self-motion drive on the giant fibre and raises the loom peak; x10 overshoots. This is
+  a model change with a physiological basis, not a readout, and it is the first that separates
+  looms from walking at the source instead of at the threshold.
+* **Where the optic lobe loses a small object -- found.** `scripts/probe_figure_ground.py`: pinned fly,
+  apple 5 cm ahead-left, heading oscillating +-20 deg (self-motion), the same scene with no fruit; for
+  every optic type the time-averaged |delta-rate| in the 159 columns that view the apple minus the
+  same in 1,050 background columns, apple minus none, as a z-score against the background scatter.
+  (Only 19,817 of 89,390 optic cells carry a hex column in the annotations; the rest inherit the
+  column of their strongest input partner in three passes, 89,380 assigned.) The object is
+  represented retinotopically in the medulla: Mi4 z 7.4 (0.14 vs 0.10 rate units in its columns --
+  a 40% modulation), Tm3 4.0, Tm9 3.7, Mi9 3.6, L1 2.2, L3 1.7, and Tm1 / Tm2 carry it with the
+  opposite sign (-3.9 / -2.4: the dark apple lowers their transients). It is gone one stage later, in
+  the types that feed LC10a: Tm5Y z 0.5 (a 4% modulation), TmY21 -0.2, TmY3 -0.7, T2 -0.8, T3 -1.3.
+  Per cell: the LPLC2 cells viewing the apple's direction receive +3.8 / +3.3 / +3.1 mV of extra
+  drive (the loom detectors see a stationary-relative object), LC10a's best cell +0.85 mV against a
+  7 mV threshold. So the small-object pathway is lost between the medulla and Tm5Y / TmY21 -- one
+  synaptic stage -- and the population-mean screens could never have seen it. Next: is that stage
+  a weight problem (the figure-carrying inputs are a small fraction of Tm5Y's normalised input) or
+  a dynamics problem (the rate model flattens it)?
+* **The signed figure, and where the object pathway loses it -- structurally.** Signed (apple - none)
+  mean delta-rate per type, apple columns minus background: the dark object *lowers* the ON channel
+  (Mi1 z -7.6, Tm3 -8.3) and *raises* the OFF channel (L2 +10.2, Tm1 +3.0, Tm2 +3.4, Tm4 +5.3), the
+  lamina (L1 +12.8, L4 +4.4) and the Dm / Pm interneurons carry it (Pm5 +6.5, Dm16 +5.8, Dm12 +4.1,
+  Pm1 -6.5) -- a physiologically coherent contrast figure. A linear estimate from each type's inputs
+  (signed L1 input fraction x the input type's signed figure) recovers 30-40% of Tm3's and Tm4's
+  own figure and ~15% of Tm20's: the rate dynamics amplify what the wiring delivers, 3-6x. At Tm5Y
+  the estimate is -0.0002 against an own figure of +0.0002 -- its inputs (Tm20 13%, Li19 9%, Y3 7%,
+  Tm32, Tm5a, T2a; photoreceptors 0.1%, unlike Tm5a / b / c at ~5%) deliver nothing to amplify;
+  TmY21 (TmY5a, TmY13, Tm20; photoreceptors 0%) the same. So LC10a's input types are not fed by the
+  contrast channels that carry a static figure in this connectome. The retina's contrast stage shows
+  the apple as a 0.2-0.4% offset in its columns (adaptation removes a static object and leaves its
+  edges). The stimulus LC10 is built for is an object moving *relative* to the background; that is
+  the test that decides whether the pathway is absent or merely untested.
+* **Relative motion: the small-object pathway is absent, not untested.** Pinned fly, empty table, a
+  1 cm black ball 5 cm ahead sweeping 12 cm laterally in 3 s (~45 deg/s across ~11 deg of the eye --
+  a textbook LC11 / LC10 stimulus), vs the same scene without the ball, drive per cell over 9 s:
+  LC10a max cell +0.19 mV mean (+1.4 mV peak), LC11 +0.09 (+1.9 peak), LC10b +0.21 (+2.1), LC16
+  +0.32 (+3.4) -- all against a 7 mV threshold, and their rates 0.0-1.3 Hz with or without the
+  ball -- while the same object drives LPLC2 to +9.8 mV peak (0.09 -> 0.20 Hz). So the lobula's
+  small-field object-motion channels (T2 / T3 / Tm -> LC11 / LC10) do not carry a small moving
+  object in the rate optic lobe, whereas the wide-field loom channel does. This is the model item:
+  the medulla -> lobula small-field stage, with `scripts/probe_figure_ground.py` (static figure,
+  retinotopic) and this sweep as its two benchmarks. The escape-hop side of the same optic question
+  is fixed at the source (LPi x4 above); the object side is not a gain.
+* **LPi x4 is the default; the escape threshold re-derived from it.** Six-seed protocol (20 s of
+  walking with hops disabled, then a loom, then a walk over the +x edge): walking per-second GF
+  maxima median 12.1, 90th percentile 18.6, 99th 22.5, max 28 (were 20 / 28 / 32 / 41.5); loom peaks
+  38, 42, 15, 34, 56, 52 -- five of six seen (four before). Threshold sweep: 30-33 -> 5 / 6 looms, 0
+  spontaneous hops per minute; 36-38 -> 4 / 6. `Flight.gf_hz` 38 -> 33. The edge crossing became the
+  dominant spurious trigger (27-49 Hz at the 4 mm edge rotation, 32-43 at 10 mm: a 90 deg sensed
+  rotation over 0.2-0.5 s is a 180-450 deg/s sweep that LPi inhibition does not cancel), and at 20 mm
+  -- ~90 deg/s at walking speed, the range the visual system operates in -- it is 18-23 Hz, below
+  threshold on all six seeds. `FlyState.edge_len` 4 -> 20 mm. In the walking demo the change gives
+  walking GF maxima 16 / 18 / 18 (were 34 / 17 / 25) and no hops in 60 s of wandering on the full table.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

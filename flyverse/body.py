@@ -55,7 +55,8 @@ class FlyState:
     _edge_axis: np.ndarray = field(default_factory=lambda: np.zeros(3))
     _edge_theta: float = 0.0  # signed rotation from the old frame to the new (rad), 0 = no blend
     _edge_left: float = 0.0   # metres of travel left in the blend
-    edge_len: float = 0.004
+    edge_len: float = 0.020   # 20 mm: at walking speed the sensed rotation over an edge is ~90 deg/s; at 4-10 mm (450-180 deg/s)
+                              # the sweep still fired the giant fibre at 27-49 Hz even with LPi inhibition (NOTES, session 9)
 
     @property
     def pos(self) -> np.ndarray:
@@ -318,7 +319,7 @@ class Flight:
     # walking GF have median 20 Hz, 90th percentile 28, 99th 32; real loom bursts are 41-67 Hz. 38 sits above the
     # 99th percentile and below the weakest loom (was 30, set when the walking GF peaked at 26). Habituation
     # lives in programs.EscapeGating.
-    gf_hz: float = 38.0
+    gf_hz: float = 33.0   # re-derived after LPi x4 (session 9): walking 99th percentile 22.5 Hz, looms 34-56 in 5 of 6 seeds
     tau_ms: float = 40.0
 
     def readout(self, motor, wg: WingGroups | None = None, dt_s: float = 0.01) -> dict:
