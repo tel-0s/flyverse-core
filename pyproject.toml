@@ -9,4 +9,4 @@ dependencies = ["numpy", "pandas", "pyarrow", "scipy", "torch", "pygame", "image
 packages = ["flyverse"]
 
 [tool.setuptools.package-data]
-flyverse = ["data/*.csv"]
+flyverse = ["data/*.csv", "kernels/*.cu"]

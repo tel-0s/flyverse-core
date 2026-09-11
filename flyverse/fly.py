@@ -36,14 +36,16 @@ class FlyBrain:
     OPTIC_TENSORS = ("v", "adapt", "I_lp", "I_mean", "_fresh", "contrast", "delta_rate")
 
     def __init__(self, c=None, *, modules=None, batch=1, device=None, seed=0,
-                 lif_params=None, optic_params=None, eye_geometry=None, cuda_graphs=False):
+                 lif_params=None, optic_params=None, eye_geometry=None, cuda_graphs=False, cuda_kernels=None,
+                 cuda_sparse="torch", cuda_compact=True):
         self.c = regions.subset(c if c is not None else connectome.load(verbose=False), modules)
         if self.c.n == 0:
             raise ValueError("FlyBrain needs at least one neuron")
-        self.brain = brain.Brain(self.c, lif_params, device=device, batch=batch, seed=seed)
+        self.brain = brain.Brain(self.c, lif_params, device=device, batch=batch, seed=seed, cuda_kernels=cuda_kernels,
+                                 cuda_sparse=cuda_sparse, cuda_compact=cuda_compact)
         self.B, self.device = self.brain.B, self.brain.device
-        if cuda_graphs and (self.device.type != "cuda" or self.brain.event_driven):
-            raise ValueError("CUDA graphs require a CUDA device and the sparse-matmul backend")
+        if cuda_graphs and (self.device.type != "cuda" or (self.brain.event_driven and not self.brain.cuda)):
+            raise ValueError("CUDA graphs require CUDA and either sparse matmul or native CUDA events")
         self.cuda_graphs = cuda_graphs
         self._graphs = {}
         self.brain.record_activity = True
@@ -51,7 +53,8 @@ class FlyBrain:
         if len(self.c.select(type=connectome.PHOTORECEPTOR_TYPES)) and len(self.c.select(superclass="ol_intrinsic")):
             self.retina = retina.build_retina(self.c, eye_geometry)
             if self.retina.n_columns:
-                self.optic = optic.OpticLobe(self.c, self.retina, optic_params, device=self.device, batch=self.B)
+                self.optic = optic.OpticLobe(self.c, self.retina, optic_params, device=self.device, batch=self.B,
+                                           cuda_kernels=cuda_kernels, cuda_sparse=cuda_sparse)
                 self.optic.relax()
                 self.brain.freeze(self.optic.rate_idx)
                 if self.brain.p.prune_frozen:
@@ -198,8 +201,12 @@ class FlyBrain:
 
     def _graph_frame(self, steps):
         b, o = self.brain, self.optic
+        if getattr(self, "_graph_weights_version", None) != b._weights_version:
+            self._graphs.clear()
+            self._graph_weights_version = b._weights_version
         optic_pending = o._pending_ms if o is not None else 0.0
-        key = (steps, b.buf_pos, b.step_count % b.K, b._poisson_on, self._radiance is not None, round(optic_pending, 9))
+        key = (steps, b.buf_pos, b.step_count % b.K, b._poisson_on, b.record_activity, b.cuda_compact,
+               self._radiance is not None, round(optic_pending, 9))
         if steps % b.K:
             self._frame(steps)          # a frame that is not a whole number of clock periods is not capturable
             return
@@ -355,6 +362,8 @@ class FlyBrain:
         return {"version": 1, "body_ids": self.c.neurons.bodyId.to_numpy().copy(),
                 "lif_params": asdict(b.p), "optic_params": asdict(o.p) if o is not None else None,
                 "brain": {k: getattr(b, k).detach().cpu().clone() for k in self.BRAIN_TENSORS},
+                "clock_multipliers": b._kvec.copy() if b._kvec is not None else None,
+                "clock_accumulators": {k:v.detach().cpu().clone() for k,v in b._acc.items()},
                 "brain_scalars": {k: getattr(b, k) for k in ("buf_pos", "t", "step_count", "_poisson_on")},
                 "rng": b.gen.get_state().cpu().clone(),
                 "optic": {k: getattr(o, k).detach().cpu().clone() for k in self.OPTIC_TENSORS} if o is not None else None,
@@ -372,10 +381,18 @@ class FlyBrain:
         for name, tensor in state["brain"].items():
             if tensor.shape != getattr(self.brain, name).shape:
                 raise ValueError(f"state shape mismatch for {name}")
+        if not np.array_equal(state.get("clock_multipliers"), self.brain._kvec):
+            raise ValueError("state integration clocks do not match (older clocked checkpoints lack this state)")
+        accumulators = state.get("clock_accumulators", {})
+        if accumulators.keys() != self.brain._acc.keys() or any(
+                v.shape != self.brain._acc[k].shape for k,v in accumulators.items()):
+            raise ValueError("state clock accumulators do not match")
         self._graphs.clear()
         self._budget_estimate = None
         for name, tensor in state["brain"].items():
             getattr(self.brain, name).copy_(tensor.to(self.device))
+        for k,v in accumulators.items():
+            self.brain._acc[k].copy_(v.to(self.device))
         for name, value in state["brain_scalars"].items():
             setattr(self.brain, name, value)
         self.brain.gen.set_state(state["rng"].cpu())

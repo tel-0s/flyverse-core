@@ -89,16 +89,21 @@ class Sim:
     def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0,
                  wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32",
                  sensory_cuda_graphs=None, program="none", escape_gating=False, dt_by_module=None, prune_frozen=True,
-                 fruit_set="all", fence=False):
+                 fruit_set="all", fence=False,
+                 cuda_kernels=None, event_driven=None, cuda_sparse="torch", cuda_compact=True):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
         self.trail = []                          # (brain time s, position) samples, for the scene view
         self.cam_scale = int(cam_scale)          # fly's-eye camera rendered at 1/cam_scale resolution, upscaled
         self.sensory_cuda_graphs = cuda_graphs if sensory_cuda_graphs is None else sensory_cuda_graphs
-        self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(dt=brain_dt, weight_dtype=weight_dtype, dt_by_module=dt_by_module, prune_frozen=prune_frozen),
-                           optic_params=optic.OpticParams(dt_ms=optic_dt), cuda_graphs=cuda_graphs)
+        self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(dt=brain_dt, weight_dtype=weight_dtype, dt_by_module=dt_by_module,
+                                                              prune_frozen=prune_frozen, event_driven=event_driven),
+                           optic_params=optic.OpticParams(dt_ms=optic_dt), cuda_graphs=cuda_graphs, cuda_kernels=cuda_kernels,
+                           cuda_sparse=cuda_sparse, cuda_compact=cuda_compact)
         self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain
+        if self.brain.cuda and self.optic is not None:
+            self.optic.diagnostics = False  # the UI samples contrast only when drawing
         self.groups, self.wings = self.fb.groups, self.fb.wings
         self.loco = body.Locomotion()
         self.flight = body.Flight()
@@ -294,6 +299,8 @@ class Sim:
             if hasattr(self.program, "pfl_hz"):          # cx.CompassSteering: drives PFL3 / DNp09 in the brain, the body is untouched
                 info = self.program.apply(self.fb, motor, self.fly, self.metabolism, FRAME_MS / 1000)
                 self.cmd = dict(self.cmd, mode=info["mode"], rates=dict(self.cmd["rates"], **{"odour Hz": info["odour_hz"], "gate x10": info["gate"] * 10, "steer err x10": info["error"] * 10}))
+            elif isinstance(self.program, (programs.KlinotaxisProgram, programs.Composite)):
+                self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000, antennae=self.smell_values)
             else:
                 self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000)
         if self.gating is not None:
@@ -386,6 +393,8 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
     blit_text(screen, font, "wind", ax - 14, ay + 22, (150, 200, 255))
     # 3. hex mosaics: fly false colour and drive
     fc = world.to_fly_false_color(sim.col_rad, exposure=2.5).astype(int)
+    if not sim.optic.diagnostics:
+        sim.optic.last["contrast"] = sim.optic.contrast.view(sim.fb.B, -1, 5).cpu().numpy()
     cf = sim.optic.last["contrast"][0][:, 0] if "contrast" in sim.optic.last else np.zeros(sim.r.n_columns)
     v = np.clip(128 + 127 * cf / 0.5, 0, 255).astype(int)
     if not hasattr(sim, "_hex_xy"):
@@ -481,10 +490,18 @@ def main():
     ap.add_argument("--no-prune", action="store_true", help="keep the optic-lobe synapses in the LIF matrix (they are zeros; for timing comparisons)")
     ap.add_argument("--fruit", default="all", choices=["all", "apple"], help="fruit on the table: all 19 items, or the apple alone (a single source)")
     ap.add_argument("--fence", action="store_true", help="test fixture: the fly cannot leave the table top by walking or hopping (scores foraging without the escape problem)")
-    ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"],
-                    help="hand-designed behaviour program between the brain and the body (flyverse/programs.py); default: none, the plain model")
+    ap.add_argument("--program", default="none",
+                    help="hand-designed behaviour program between the brain and the body (flyverse/programs.py): none | anemotaxis | klinotaxis | cx, or a+b to compose; default none, the plain model")
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
     ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames and sensory ray tracing on CUDA")
+    ap.add_argument("--cuda-kernels", action=argparse.BooleanOptionalAction, default=None,
+                    help="fused CUDA neuron updates (requires nvcc and a host C++ compiler)")
+    ap.add_argument("--event-driven", action=argparse.BooleanOptionalAction, default=None,
+                    help="traverse active synapses; CUDA graph capture requires --cuda-kernels")
+    ap.add_argument("--cuda-sparse", choices=["torch", "warp"], default="torch",
+                    help="sparse products: cuSPARSE or experimental CUDA warp CSR (batch 1; requires --cuda-kernels)")
+    ap.add_argument("--cuda-compact", action=argparse.BooleanOptionalAction, default=True,
+                    help="compact native CUDA event traversal and skip frozen cells at rest; preserves full state")
     ap.add_argument("--sensory-cuda-graphs", action=argparse.BooleanOptionalAction, default=None,
                     help="override sensory ray capture independently (default: follows --cuda-graphs)")
     ap.add_argument("--weight-dtype", choices=["float32", "float16"], default="float32", help="LIF sparse weights; float16 requires CUDA")
@@ -523,6 +540,8 @@ def main():
     sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir,
               cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype, program=args.program, escape_gating=args.escape_gating,
               dt_by_module=parse_dt_by_module(args.dt_by_module), prune_frozen=not args.no_prune, fruit_set=args.fruit, fence=args.fence,
+              cuda_kernels=args.cuda_kernels, event_driven=args.event_driven, cuda_sparse=args.cuda_sparse,
+              cuda_compact=args.cuda_compact,
               sensory_cuda_graphs=args.sensory_cuda_graphs, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)

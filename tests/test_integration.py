@@ -54,14 +54,14 @@ class FullConnectomeTests(unittest.TestCase):
         for name in b.BRAIN_TENSORS:
             torch.testing.assert_close(getattr(b.brain, name).cpu(), expected["brain"][name], rtol=1e-5, atol=2e-4)
 
-    def test_demo_resume_preserves_body_timers(self):
+    def test_demo_resume_preserves_body_state(self):
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
         from room_demo import Sim
         sim = Sim(seed=7)
         for _ in range(10): sim.step()
         sim.stimulate_wing_dns(100)
-        sim.loco._cast_from = sim.loco._t
-        sim.loco._last_hit = sim.loco._t
+        # Casting moved to optional programs; the body now carries optomotor adaptation.
+        sim.loco._opto_bias = 3.25
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory) / "state.pt")
             sim.save_state(path)
@@ -69,6 +69,7 @@ class FullConnectomeTests(unittest.TestCase):
             expected = sim.fb.state_dict()
             pose, command = vars(sim.fly).copy(), sim.cmd.copy()
             sim.load_state(path)
+            self.assertEqual(sim.loco._opto_bias, 3.25)
             saved = torch.load(path, weights_only=False)["controller"]
             for name in sim.fb.BRAIN_TENSORS:
                 torch.testing.assert_close(getattr(sim.brain, name).cpu(), saved["brain"][name], rtol=0, atol=0)

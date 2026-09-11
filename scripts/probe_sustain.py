@@ -26,7 +26,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--start", type=str, default="-0.15,0.15")
     ap.add_argument("--energy", type=float, default=0.4)
-    ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"])
+    ap.add_argument("--program", default="none")
     ap.add_argument("--escape-gating", action="store_true")
     ap.add_argument("--fruit", default="all", choices=["all", "apple"])
     ap.add_argument("--fence", action="store_true")

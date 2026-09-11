@@ -807,6 +807,25 @@ body assumption, not the connectome:
   (near-field klinotaxis on the bilateral antennae, which the animal also does) or an optic-lobe
   question (why LC10 is silent when LC4 / LPLC2 are not). Left as the second open model question
   beside the compass; the single-apple table stays at 0 / 6 with the approach to 3.5-9 cm recorded.
+* **Native CUDA backends merged** (branch `perf/neural-execution`: fused LIF / optic kernels, warp-CSR
+  products, native event traversal, native motor readout; `docs/PERFORMANCE.md`). The native motor
+  readout now carries the per-channel LH populations, and the native LIF falls back to the Torch
+  path when `adapt_by_type` is set (the kernel takes the scalar jump). First timing, *contended* (a
+  compass experiment shared the GPU): eager 23.6 ms/frame, `--cuda-graphs` 12.6, `--cuda-kernels
+  --cuda-graphs` 16.4, `+ --cuda-sparse warp` 11.3, `+ --event-driven` 11.3; spike trains diverge
+  from eager at frame 36 (atomic accumulation order; documented as non-bitwise). A clean timing on
+  an idle GPU follows before any of this is called a speed-up.
+* **LC10, first look.** LC10a (275 cells, 910 input synapses per cell) takes 10% of its input from
+  itself, 7% from TuTuA_2 (0 Hz), 6% AOTU042 (0.2 Hz), 6% Tm5Y (0.47 rate units), 4% LC9 (0), 4%
+  LC10c (0), 3% TmY21 (0.44 ru): active optic-lobe units at the same level that feeds LC4 (T2 0.51,
+  TmY3 0.46, Tm4 0.47), plus silent central cells. With a *static* apple 5 cm ahead of a pinned fly
+  both LC4 and LC10a are at 0 Hz -- and LC10 is a small-object motion detector in the animal, so the
+  object screen showed it the wrong stimulus. Next: the same with self-motion (the apple sweeping
+  the eye as the fly turns).
+* `programs.KlinotaxisProgram`: near-field chemotaxis from the two antennae (bilateral contrast ->
+  turn towards the stronger side; turn less while the odour rises) -- a subsystem approximation
+  that reads the sensor, meant for offloading the olfactory brain, composable as
+  `--program anemotaxis+klinotaxis`.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

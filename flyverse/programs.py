@@ -149,12 +149,82 @@ class EscapeGating:
         self.__dict__.update(d)
 
 
+@dataclass
+class KlinotaxisProgram:
+    """Near-field chemotaxis from the two antennae -- a subsystem approximation that reads the SENSOR, not the
+    brain: the bilateral concentration difference steers towards the stronger side (klinotaxis) and the
+    temporal trend scales turning (klinokinesis: turn less while the odour rises). It stands in for the
+    antennal lobe -> lateral horn -> steering pathway at close range, where an upwind surge runs past the
+    source; it is the piece to offload when a simulation does not need the olfactory brain at all. Reads
+    `antennae` = (left, right) concentration dicts from `Air.antennae`; composes after another program."""
+    k_turn: float = np.deg2rad(120)          # rad/s at full bilateral contrast
+    contrast_floor: float = 0.05             # total concentration below which there is no gradient to follow
+    smooth_s: float = 0.25
+    trend_tau_s: float = 2.0
+    rising_turn: float = 0.4                 # OU / program turning is scaled by this while the odour rises
+    speed_gain: float = 0.004                # m/s of extra forward drive at full contrast
+
+    def apply(self, motor, cmd: dict, fly, metabolism, dt_s: float, antennae=None) -> dict:
+        if antennae is None:
+            return cmd
+        cL, cR = (sum(d.values()) for d in antennae)
+        a = np.exp(-dt_s / self.smooth_s)
+        self._L = a * getattr(self, "_L", cL) + (1 - a) * cL; self._R = a * getattr(self, "_R", cR) + (1 - a) * cR
+        tot = self._L + self._R
+        contrast = (self._L - self._R) / (tot + 1e-9) if tot > self.contrast_floor else 0.0   # + = stronger on the left
+        at = np.exp(-dt_s / self.trend_tau_s)
+        self._slow = at * getattr(self, "_slow", tot) + (1 - at) * tot
+        rising = tot > self._slow * 1.05
+        out = dict(cmd)
+        out["yaw"] = cmd["yaw"] * (self.rising_turn if rising else 1.0) + self.k_turn * float(np.clip(contrast, -1, 1))
+        out["speed"] = cmd["speed"] + self.speed_gain * abs(contrast)
+        if tot > self.contrast_floor:
+            out["mode"] = "klino" if cmd.get("mode") in (None, "searching", "exploring", "plain") else cmd.get("mode")
+        out["rates"] = dict(cmd.get("rates", {}), **{"antennae L/R x10": tot and 10 * (self._L - self._R)})
+        self.contrast = contrast
+        return out
+
+    def state(self) -> dict:
+        return dict(vars(self))
+
+    def load_state(self, d: dict) -> None:
+        self.__dict__.update(d)
+
+
+class Composite:
+    """Programs applied in sequence: `--program anemotaxis+klinotaxis`."""
+    def __init__(self, parts):
+        self.parts = parts
+
+    def apply(self, motor, cmd, fly, metabolism, dt_s, antennae=None):
+        for prog in self.parts:
+            if isinstance(prog, KlinotaxisProgram):
+                cmd = prog.apply(motor, cmd, fly, metabolism, dt_s, antennae=antennae)
+            else:
+                cmd = prog.apply(motor, cmd, fly, metabolism, dt_s)
+        return cmd
+
+    def __getattr__(self, name):                       # gate / mode bookkeeping of the first part
+        return getattr(self.parts[0], name)
+
+    def state(self) -> dict:
+        return {"parts": [prog.state() for prog in self.parts]}
+
+    def load_state(self, d: dict) -> None:
+        for prog, st in zip(self.parts, d.get("parts", [])):
+            prog.load_state(st)
+
+
 def make_program(name: str | None):
-    """'none' | 'anemotaxis' -> program instance or None."""
+    """'none' | 'anemotaxis' | 'klinotaxis' | 'cx' | 'a+b' (composed, in order) -> program instance or None."""
     if name in (None, "none", ""):
         return None
+    if "+" in name:
+        return Composite([make_program(part) for part in name.split("+")])
     if name == "anemotaxis":
         return AnemotaxisProgram()
+    if name == "klinotaxis":
+        return KlinotaxisProgram()
     if name == "cx":
         from .cx import CompassSteering        # steers through the brain (PFL3 stimulation), not the body
         return CompassSteering()

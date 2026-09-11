@@ -99,9 +99,13 @@ current, synchronized measurements rather than the original 16.6 ms estimates. A
 3. **Half-precision LIF weights** (`LIFParams(weight_dtype="float16")`): CUDA sparse matmul with
    half weights/transmitted spikes and a float32 output/accumulator. Optic and membrane state remain
    float32. Opt-in: rounding can change spikes, and speed gains are workload dependent.
-4. **Event-driven synaptic input on CUDA** (`LIFParams(event_driven=True)`): the existing gather
-   backend is also usable on CUDA, but its dynamic host synchronization prevents graph capture.
-   It remains the default on MPS/CPU; current CUDA measurements favor sparse matmul.
+4. **Native CUDA kernels** (`FlyBrain(cuda_kernels=True)`): fused LIF/optic updates, compact
+   event traversal, GPU motor reductions and optional warp-per-row CSR. Native
+   `LIFParams(event_driven=True)` supports graph capture and helps sparse activity; cuSPARSE
+   remains the default and handles dense/batched workloads better than the custom CSR.
+   Requires nvcc and a host compiler. Full state indices and all brain modules are retained.
+   The Torch event fallback still synchronizes with the host and cannot be captured.
+   See `docs/PERFORMANCE.md` for CUDA backend choices, compaction limits and measured work counts.
 5. **Coarser dt** where the benchmark allows (1 ms instead of 0.5).
 6. **Metal kernels on MPS** (`flyverse/metal.py`, automatic on a Mac; `Brain(metal_kernels=...)`,
    `OpticLobe(metal_kernels=...)`, `FLYVERSE_METAL=0` disables): the event-driven scatter, the LIF update,
