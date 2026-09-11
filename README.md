@@ -209,6 +209,8 @@ scripts/profile_room.py  per-frame profile of the demo loop;  scripts/profile_br
 tests/                   control-surface, world and integration tests
 docs/NOTES.md            everything learned, session by session, with numbers
 docs/ARCHITECTURE.md, docs/CONTROL_SURFACE.md, docs/PERFORMANCE.md   the control surface and its cost
+docs/BENCHMARK_BATTERY.md   behavioural assays and how the plain model scores on each
+docs/NT_INTEGRATION.md      receptor-expression data integration: findings, sources, task outline
 ```
 
 ![retina](docs/retina_map.png)
