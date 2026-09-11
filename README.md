@@ -28,9 +28,13 @@ Keys: `SPACE` pause · `R` reset · `T` teleport to the apple (taste) · `L` loo
 flight) · arrows / mouse drag orbit the scene camera, `+`/`-` or wheel zoom, `C` follow the fly, `HOME`
 reset · `F5`/`F9` quick-save / quick-load, `S` timestamped save · `ESC` quit.
 
-Speed options: `--cuda-graphs` (capture and replay each neural frame and the sensory ray tracing;
-bit-identical to the eager path), `--weight-dtype float16` (half-precision synaptic weights, fp32
-accumulate; opt-in, can change spikes), `--fast` (preset for slower GPUs). Numbers in `docs/NOTES.md`.
+Speed: eager, one fly on an RTX 4090, runs at 0.5x real time (19.8 ms per 10 ms frame; the LIF matrix
+no longer carries the optic lobe's synapses -- exact, 24.7M -> 13.0M nnz). `--cuda-graphs` (capture
+and replay each neural frame and the sensory ray tracing) gives 0.8x; `--dt-by-module vnc=1.0`
+(integrate the VNC at 1 ms, the brain at 0.5) and `--weight-dtype float16` bring it to real time
+(10.4 ms); `--fast --cuda-graphs` is 1.3x. Graphs match the eager spike train for ~130 frames and
+then diverge by a spike (chaos); fp16 and the coarser clock change spikes from the start, so the
+probes run eager. Numbers and behavioural checks in `docs/NOTES.md`.
 
 Options: `--brain-map` (all 140k located somata in dorsal and lateral view, activity as highlights;
 `--map-every N`, `--map-no-blur`), `--trail-seconds` (decaying trail in the scene view), `--start x,y[,z]`
@@ -55,8 +59,8 @@ input is an event-driven gather instead of the sparse matmul (`flyverse/device.p
 | wind | Johnston's organ C / E neurons, sided by their AMMC/WED targets | antennal deflection per side from the wind vector in the body frame | `air.py` |
 | body | walking, escape jumps, flight with pitch and roll | named readout from measured groups: DNp04 + LPT27/30 (optomotor), DNp18 / DNp33 (wind direction, gated by the odour signal), DNa02 (goal steering), MDN (back up), MN9 (proboscis); giant fibre -> escape jump; DLMn / DVMn -> wingbeat; wing steering MNs -> yaw and roll | `body.py` |
 
-Speed: ~0.6x real time for one fly on an RTX 4090 (10 ms of brain per 16.6 ms frame). Batched brains
-(`Brain(c, batch=64)`) run 64 flies at 1.8 ms per fly-frame -- one sparse matmul serves them all.
+Batched brains (`Brain(c, batch=64)`) run 64 flies at 1.8 ms per fly-frame -- one sparse matmul
+serves them all; single-fly speed is in "Run it".
 
 ## What the connectome does, unprompted
 

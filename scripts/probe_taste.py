@@ -22,7 +22,7 @@ PROBE = ["MN9", "MN1", "MN2Da", "MN6", "MN11D", "MN12D", "GNG232", "GNG132", "GN
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rate", type=float, default=100.0)
-    ap.add_argument("--group", default="leg")
+    ap.add_argument("--group", default="labellar")   # the 165 labellar sugar GRNs; "leg" is 3 cells and drives nothing
     ap.add_argument("--ms", type=float, default=1500)
     ap.add_argument("--norm-ref", type=float, default=5000.0)
     ap.add_argument("--norm-alpha", type=float, default=1.0)

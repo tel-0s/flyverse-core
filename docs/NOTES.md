@@ -557,6 +557,59 @@ body assumption, not the connectome:
 * `scripts/screen_odour.py` (the tool) reproduces the hand-made screen: LHPD4d2_b d' 7.04, LHPD4a2
   6.84, LHAV3h1 6.05, LHAV3k1 5.80, LHPD5c1 5.66, LHAD1f2 5.43, all 100% / 0% at a midpoint threshold,
   3,233 populations in ~6 x 30 s.
+* **Sustain, honestly measured** (`probe_sustain.py`, 5 min, energy 0.4 at start, 10 cm from the
+  blueberries; meals / final energy / hops):
+
+  | seed | plain model | anemotaxis program + escape gating | CX module (PFL3 stimulation) + gating |
+  |---|---|---|---|
+  | 0 | 3 meals / 0.94 / 8 hops | 1 / 0.00 / 3 (hopped off the table at ~50 s) | 2 / 0.32 / 3 (off the table at ~200 s; min 0.28) |
+  | 1 | 1 / 0.00 / 35 (off the table at ~50 s) | 2 / 0.75 / 3 | 2 / 0.02 / 2 (min 0.02, never zero) |
+  | 2 | 1 / 0.50 / 5 | -- | -- |
+
+  The CX module -- the same decisions, expressed through PFL3 -> DNa02 -> legs instead of the body --
+  is the only configuration in which energy never reached zero in either seed. The plain connectome model, wandering (baseline walking, DN drive, optomotor) and relocated by
+  escape hops, finds a fruit roughly every 100 s on a table with 19 fruit items, and so does the
+  programmed forager; both lose runs to the table edge (the escape hop that lands on the floor,
+  where no plume reaches and the fly cannot climb back). The upwind program's systematic bias is
+  not an advantage here: it walks sated flies past the fruit to the upwind edge, and hungry ones into
+  the corner. Two conclusions: (i) "sustains itself" is a property of the table as much as of the
+  fly -- a single fruit source would separate the strategies; (ii) the remaining body-level
+  failure is the edge, which is a physics question (a fly at a table edge grips, and a hop from the
+  edge is a flight), not a behaviour one.
+* Taste after the merge: forced sugar contact -> the 165 labellar GRNs at 122 Hz -> MN9 6 Hz, off ->
+  0; the pathway is intact. `teleport_to_fruit` (the T key) was making the fly escape 40 ms after
+  arrival -- a jump cut next to a 4 cm apple *is* a loom to LPLC2 / LC4 -- so the teleport now carries
+  a 3 s escape refractory (UI convenience, documented as such). `probe_taste.py` defaults to the
+  labellar set; its old "leg" default was 3 cells that drive nothing.
+* **Optic-column prune** (`LIFParams.prune_frozen`, default on): the LIF matrix carried every
+  synapse from and onto the 89k optic-lobe rate units although they never spike there; dropping them
+  takes the matrix from 24.7M to 13.0M nnz with spike counts identical for 200 / 200 frames.
+* **Per-module clocks** (`LIFParams.dt_by_module`, e.g. `{"vnc": 1.0}`; demo `--dt-by-module
+  vnc=1.0`): a slow module integrates every k base steps from the spikes accumulated since its last
+  update, through the delay buffer (the slowest clock may not exceed the 1.8 ms delay). Row-split
+  matrices and per-phase coefficient vectors keep the elementwise work identical and the spmm
+  proportional to the fast module's synapses; it captures into CUDA graphs (spike counts identical
+  eager vs replay, 200 / 200). Behaviour with the VNC at 1 ms: loom escape fires (GF 65 / 44 Hz),
+  rest rates within ~10% (central 1.57 vs 1.50 Hz, DNs 2.12 vs 1.92, VNC motor 3.87 vs 4.18), wind DN
+  asymmetry +19 vs +20 Hz; with descending at 1 ms as well, +23 Hz and GF 67 / 61. Opt-in for now.
+* **Clean timing with the prune and the clocks** (same protocol, idle 4090, 300 frames):
+
+  | configuration | ms / frame | x real time |
+  |---|---|---|
+  | eager, no prune (previous default) | 22.5 | 0.44 |
+  | eager, prune (new default) | 19.8 | 0.51 |
+  | prune + VNC at 1 ms | 19.8 | 0.51 |
+  | prune + VNC and descending at 1 ms | 19.0 | 0.53 |
+  | prune + `--cuda-graphs` | 12.7 | 0.79 |
+  | prune + VNC 1 ms + `--cuda-graphs` | 11.6 | 0.86 |
+  | prune + VNC 1 ms + `--cuda-graphs --weight-dtype float16` | 10.4 | 0.96 |
+  | prune + `--fast --cuda-graphs` | 7.7 | 1.31 |
+
+  The eager loop is launch-bound, so halving the synapses (prune) buys 2.7 ms and halving the VNC's
+  share (clock) buys nothing until the launches are captured; under CUDA graphs the kernels dominate
+  and the clock is worth ~1 ms, fp16 another ~1 ms. The forecast of "~14 ms eager" was wrong for
+  that reason. Real time for the full brain at B = 1 is now `--cuda-graphs --dt-by-module vnc=1.0
+  --weight-dtype float16` (0.96x) or `--fast --cuda-graphs` (1.31x).
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

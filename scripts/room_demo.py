@@ -135,6 +135,7 @@ class Sim:
         name, (x, y, z), rad = self.info["fruit"][0]
         self.fly.x, self.fly.y = x - rad - 0.005, y     # front legs touching the apple
         self.fly.heading = 0.0
+        self.fly.ground_time = -3.0                      # a jump cut is a loom to the model: no escape for 3 s (UI convenience)
 
     def column_radiance(self):
         d = self.fly.body_to_world(self.dirs_b.reshape(-1, 3))
