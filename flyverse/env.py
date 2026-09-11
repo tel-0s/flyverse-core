@@ -46,6 +46,10 @@ class EnvParams:
     modules: tuple[str, ...] | None = None
     brain_dt_ms: float = 0.5
     cuda_graphs: bool = False
+    cuda_kernels: bool | None = None
+    event_driven: bool | None = None
+    cuda_sparse: str = "torch"
+    cuda_compact: bool = True
     weight_dtype: str = "float32"
     sensory_cuda_graphs: bool | None = None  # None follows cuda_graphs; UI rendering is independent
 
@@ -57,7 +61,9 @@ class FlyRoomEnv:
         self.rng = np.random.default_rng(self.p.seed)
         self.fb = FlyBrain(seed=self.p.seed, batch=self.B, device=device,
                            modules=self.p.modules, cuda_graphs=self.p.cuda_graphs,
-                           lif_params=LIFParams(dt=self.p.brain_dt_ms, weight_dtype=self.p.weight_dtype),
+                           cuda_kernels=self.p.cuda_kernels, cuda_sparse=self.p.cuda_sparse, cuda_compact=self.p.cuda_compact,
+                           lif_params=LIFParams(dt=self.p.brain_dt_ms, weight_dtype=self.p.weight_dtype,
+                                                event_driven=self.p.event_driven),
                            optic_params=optic.OpticParams(dt_ms=self.p.optic_dt_ms),
                            eye_geometry=retina.EyeGeometry(rays_per_ommatidium=self.p.rays_per_ommatidium))
         self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain

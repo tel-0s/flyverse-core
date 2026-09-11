@@ -1,5 +1,147 @@
 # Room-demo profiling and optimizations
 
+## Native CUDA execution (September 11, 2026)
+
+For the full-brain, single-fly room demo, try:
+
+```powershell
+python scripts/room_demo.py --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp --cam-scale 4 --trail-seconds 0
+```
+
+This retains all 167,106 neurons, the 0.5 ms LIF step, the 1 ms optic step and sensory
+sampling. `--cam-scale` affects the display camera. Add `--fast --weight-dtype float16`
+only if the existing coarser timesteps and half-weight rounding are acceptable.
+Native kernels are opt-in; `--no-cuda-kernels` overrides `FLYVERSE_CUDA_KERNELS=1`.
+For a dense or batched workload, start with `--cuda-kernels --cuda-graphs`, keeping
+the default cuSPARSE products, then compare `--event-driven` with the actual activity.
+Module clocks still require the matrix-product backend.
+
+The implementation in `flyverse/cuda.py` builds `kernels/neural.cu` with `nvcc` and a
+host C++ compiler (MSVC on Windows). Both must be discoverable by the CUDA toolchain.
+It caches a small shared library under `~/.cache/flyverse/cuda` (override with
+`FLYVERSE_CUDA_CACHE`), keyed by source, compiler version and build flags/device architecture.
+The C interface avoids a PyTorch C++ ABI dependency. Kernels use Torch's current CUDA stream
+and support graph capture. Compilation happens during construction, before capture.
+The source ships in the wheel; compiled binaries are local. Windows, Torch 2.10.0+cu128,
+CUDA toolkit 12.9 and an RTX 4090 were tested; Linux compilation has not been exercised here.
+
+### What changed and what was retained
+
+- LIF membrane, refractory period, adaptation, STD, rate and spike-count updates run in
+  one kernel. Optic integration and the next rectified recurrent input run in one kernel.
+  Poisson draws still use the same Torch generator and full tensor shape. Delays, update
+  order and per-module clocks remain intact. Fast math is disabled; the adaptation
+  increment explicitly follows Torch's contracted multiply-add.
+- CUDA sparse matrices use 32-bit indices when dimensions/nnz fit, with an int64 fallback.
+  This saves about 50 MiB of LIF index storage and 34 MiB of optic-recurrence index storage.
+  CPU/MPS index choices are unchanged.
+- Native events traverse outgoing CSC edges on the GPU, with no `nonzero`, dynamic
+  host-sized work queue or per-step host read. Compact traversal launches only for
+  neurons with outgoing edges. Atomic accumulation can change floating-point order;
+  this is an optional backend, not a bitwise-deterministic mode.
+- `--cuda-sparse warp` selects a custom warp-per-row CSR kernel for LIF products and
+  optic recurrence. The other held optic products remain on cuSPARSE. It helps B=1
+  here but repeats matrix reads across flies and loses at B=8, so it is not the default.
+- Native motor readout reduces 90 groups on the GPU and transfers 91 doubles per fly,
+  including the spike-history total: 728 bytes instead of the 668,424-byte full rate
+  vector plus a separate total. PN means use double accumulation; ordinary group means
+  can differ from NumPy's float32 reduction by roundoff. Returned snapshots own CPU data.
+  The demo downloads contrast and full rates only at display cadence; explicit full
+  probes still work. A standalone controller retains its diagnostic setting.
+
+**Compaction decision:** full `(B,N)` state tensors remain publicly writable and keep
+their original indices/checkpoint layout. Frozen optic cells can receive forced pulses,
+and restored or directly edited state still needs integration. Native LIF skips a frozen
+cell only while every relevant state/input is at rest; otherwise it uses the full update.
+`--no-cuda-compact` disables this fast path and compact event traversal for comparison.
+This is compact execution, not physically packed LIF storage. Physical state packing is
+deferred: a captured full-brain LIF update is now about 6 us, and changing the public state
+contract mainly promises memory savings for large batches. Removing empty CSR rows alone
+barely helped B=1, before adding the cost of scattering their output back.
+
+### Measurements on the shared machine
+
+Fable was also using this machine. Kernel/transfer counts are the primary evidence;
+component timings below are exploratory GPU measurements, **not reliable end-to-end
+speedup estimates**. All UI traces use seed 0, 40 warmup + 8 measured frames, graph capture,
+default timesteps, float32 weights, camera scale 4 and no trail. Each frame advances 10 ms.
+
+| Per simulation frame | Torch at `7a0ceab` | Native fusion + cuSPARSE | Native events + warp CSR |
+|---|---:|---:|---:|
+| Neural GPU kernels | 1,090 | 261 | 151 |
+| Captured neural/housekeeping host launches | 3 | 3 | 3 |
+| Motor rate transfer | 668,424 bytes | 720 bytes before packing total | 728 bytes including total |
+| Contrast transfers per 8 frames | 8 | 2 | 2 |
+
+Headless/dummy-driver traces independently reproduced the 1,090-to-151 neural kernel
+reduction. They still draw every fourth frame. The final packed total removes the separate
+spike-history D2H copy/synchronization. Full-rate transfers move to `ui.draw`; they have not
+disappeared. Removing the per-frame contrast copy also moves the GPU wait from `brain.frame`
+into `brain.motor`, so inclusive CPU scope durations must not be interpreted as isolated
+computation. Sensory rays still execute 796 GPU kernels per frame through one captured graph.
+
+`benchmark_cuda.py` compares the actual pruned LIF matrix (12,991,449 nnz) and optic
+recurrence (8,780,774 nnz), fp32/fp16 LIF weights, B=1/8, and 0.1/1/10/100% activity.
+It alternates backend order and times captured repetitions with CUDA events. Example
+medians in microseconds from `out/cuda_sparse_compact.json` (5 rounds, 8 products/round):
+
+| Matrix / batch / activity | cuSPARSE int64 | cuSPARSE int32 | Warp CSR | Compact events, including clear |
+|---|---:|---:|---:|---:|
+| LIF / 1 / 1% | 187 | 166 | 148 | 12 |
+| LIF / 8 / 1% | 618 | 530 | 1,173 | 67 |
+| LIF / 1 / 100% | 184 | 160 | 147 | 315 |
+| Optic / 1 / dense | 134 | 121 | 112 | — |
+| Optic / 8 / dense | 415 | 354 | 845 | — |
+
+Events win strongly at low activity and lose during storms; no automatic runtime switching
+is implemented. For half weights, both matrix backends round the dense operand to half and
+accumulate into float32. Events retain float32 transmitted amplitudes, matching the existing
+event backend; the rounding contract therefore differs from half-precision matrix products.
+
+The remaining neural target is optic recurrence (~107 us per substep in the captured UI
+trace). Outside the brain, sensory uploads still synchronize, and display cameras still use
+eager rendering. These need separate profiling rather than extrapolating neural speedups to UI FPS.
+
+### Reproduce and validate
+
+```powershell
+python scripts/profile_room.py --warmup 40 --frames 8 --trace out/cuda_ui.trace.json --json out/cuda_ui.json --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp --cam-scale 4 --trail-seconds 0
+python scripts/summarize_cuda_trace.py out/cuda_ui.trace.json --json out/cuda_work.json
+python scripts/benchmark_cuda.py --rounds 5 --repeats 8 --json out/cuda_sparse.json
+$env:FLYVERSE_CUDA_TESTS='1'
+$env:FLYVERSE_INTEGRATION='1'
+python -m unittest discover -s tests -v
+```
+
+Repeat the profile with `--headless` and a separate filename. Use longer runs without
+`--trace` for throughput when the machine is available. `summarize_cuda_trace.py` associates
+GPU work with CPU scopes through runtime correlation IDs, including graph replay; it does
+not infer GPU ownership from overlapping wall-clock intervals.
+
+Validation covers neuron/optic arithmetic, STD, clocks, identical Torch RNG progression,
+delay-buffer storage offsets, nondefault streams, sparse/event products, empty matrices,
+bad tensor layouts/dtypes, motor groups and independent snapshots, direct probe edits,
+partial resets, pulse expiry, graph replay and full-connectome/B=2 environment runs.
+Short full-hybrid comparisons preserve exact spike histories within the tested cases;
+subthreshold sparse reductions are compared with tolerances. Long chaotic trajectories
+are not guaranteed identical across sparse algorithms.
+The final full run passed 39 tests and skipped 8 Metal-only tests on Windows. Wheel
+construction also succeeded and included the CUDA source and loader.
+
+Checkpoint testing also found and fixed missing per-clock spike accumulators. New saves
+include them and clock multipliers; older unclocked saves still load, while older clocked
+saves are rejected because their pending inputs cannot be reconstructed. Replacing sparse
+weights or clock partitions invalidates captured frames. One pre-existing demo test was
+updated from removed casting timers to the body's current optomotor adaptation state.
+
+Local artifacts are ignored under `out/`: `cuda_before_ui`, `cuda_after_ui`, `cuda_events_ui`,
+`cuda_final_ui`, `cuda_torch_headless`, `cuda_events_headless`, their `.trace.json` timelines
+and `*_trace.json` reports, `cuda_final_headless`, plus `cuda_sparse_compact.json`. The initial UI baseline uses
+int64 indices; the later Torch headless control already uses int32. Counts agree, but their
+timings should not be treated as a matched index-width experiment.
+
+## Earlier optic input optimization
+
 The first optimization after the control-surface refactor computes the photoreceptor-input
 and spiking-feedback products once per optic frame. Their source vectors are held constant
 inside `OpticLobe.step_frame`; recurrent optic input and adaptation still change each substep.

@@ -30,6 +30,9 @@ def main():
     ap.add_argument("--dt", type=float, default=.5)
     ap.add_argument("--device", default=None)
     ap.add_argument("--cuda-graphs", action="store_true")
+    ap.add_argument("--cuda-kernels", action=argparse.BooleanOptionalAction, default=None)
+    ap.add_argument("--cuda-sparse", choices=["torch", "warp"], default="torch")
+    ap.add_argument("--cuda-compact", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--event-driven", action=argparse.BooleanOptionalAction, default=None)
     ap.add_argument("--weight-dtype", choices=["float32", "float16"], default="float32")
     ap.add_argument("--json", type=Path)
@@ -40,6 +43,7 @@ def main():
     c = connectome.load(verbose=False)
     modules = None if args.modules == "all" else args.modules.split(",")
     fb = FlyBrain(c, modules=modules, batch=args.batch, device=args.device, cuda_graphs=args.cuda_graphs,
+                  cuda_kernels=args.cuda_kernels, cuda_sparse=args.cuda_sparse, cuda_compact=args.cuda_compact,
                   lif_params=LIFParams(dt=args.dt, event_driven=args.event_driven, weight_dtype=args.weight_dtype))
     if fb.optic is not None:
         fb.optic.diagnostics = False  # UI copies are measured separately by the demo
@@ -86,6 +90,7 @@ def main():
               "stored_edges":fb.c.W.nnz, "modules":modules or list(regions.MODULES), "batch":fb.B,
               "lif":asdict(fb.brain.p), "frame_ms":args.frame_ms, "frames":args.frames,
               "cuda_graphs":args.cuda_graphs, "captured_graphs":len(fb._graphs),
+              "cuda_kernels":fb.brain.cuda, "cuda_sparse":fb.brain.cuda_sparse, "cuda_compact":fb.brain.cuda_compact,
               "initialization_ms":initialization, "timing":summary,
               "warmup_ms":warmup_ms,
               "real_time_factor":args.frame_ms / summary['total_ms']['mean'],

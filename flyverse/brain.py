@@ -23,7 +23,7 @@ import torch
 
 from .connectome import Connectome
 from .device import resolve, sparse_matrix
-from . import metal
+from . import metal, cuda
 
 
 @dataclass
@@ -146,7 +146,8 @@ def _shaped_weights(c: Connectome, p: LIFParams):
 
 class Brain:
     def __init__(self, c: Connectome, params: LIFParams | None = None, device: str | None = None,
-                 seed: int = 0, batch: int = 1, metal_kernels: bool | None = None):
+                 seed: int = 0, batch: int = 1, metal_kernels: bool | None = None,
+                 cuda_kernels: bool | None = None, cuda_sparse: str = "torch", cuda_compact: bool = True):
         """metal_kernels: use the custom Metal kernels (flyverse/metal.py) for the event-driven synaptic input
         and the LIF update; None = automatically on MPS when available."""
         self.c = c
@@ -178,6 +179,10 @@ class Brain:
             self.input_scale = scale
         W = W.copy(); W.data = W.data * np.float32(p.w_syn)
         self.event_driven = (self.device.type != "cuda") if p.event_driven is None else bool(p.event_driven)
+        self.cuda = cuda.use(self.device, cuda_kernels)
+        if cuda_sparse not in ("torch", "warp") or (cuda_sparse == "warp" and not self.cuda):
+            raise ValueError("cuda_sparse must be torch or warp; warp requires CUDA kernels")
+        self.cuda_sparse, self.cuda_compact = cuda_sparse, cuda_compact
         self.metal = metal.use(self.device, metal_kernels) and self.event_driven and p.weight_dtype == "float32"
         if metal_kernels and not self.metal:
             raise ValueError("Metal kernels need the event-driven backend with float32 weights")
@@ -225,6 +230,10 @@ class Brain:
         self.std_u_vec = torch.from_numpy(u).to(dev)
         self._std_on = bool((u > 0).any())
         self._a_std = math.exp(-p.dt / p.std_tau) if self._std_on else 1.0
+        if self.cuda:
+            self._cuda_P = torch.tensor([p.v_rest, p.v_reset, p.v_th, self._a_m, p.dt, p.t_ref, p.adapt_jump,
+                                        self._a_ad, self._a_std, self._a_r, (1-self._a_r)*1000.0/p.dt],
+                                       dtype=torch.float32, device=dev)
         if self.metal:   # coefficients for metal.lif_update, see SOURCE
             self._P = torch.tensor([p.v_rest, p.v_reset, p.v_th, self._a_m, p.dt, p.t_ref, p.adapt_jump, self._a_ad,
                                     self._a_std, self._a_r, (1 - self._a_r) * 1000.0 / p.dt], dtype=torch.float32, device=dev)
@@ -232,20 +241,31 @@ class Brain:
     def set_weights(self, W) -> None:
         """Install a (post, pre) scipy sparse matrix of synaptic weights in mV (already scaled by w_syn)."""
         import scipy.sparse as sp
+        self._weights_version = getattr(self, "_weights_version", 0) + 1
         if self.event_driven:
             Wc = sp.csc_matrix(W); Wc.sum_duplicates(); Wc.sort_indices()   # pre-major: outputs of each neuron
             self.W = None
-            itype = torch.int32 if self.metal else torch.int64
+            itype = torch.int32 if self.metal or self.cuda else torch.int64
+            if self.cuda and max(*Wc.shape, Wc.nnz) >= 2**31:
+                raise ValueError("CUDA events require 32-bit dimensions and indices")
             self._out_ptr = torch.from_numpy(Wc.indptr.astype(np.int64)).to(self.device, itype)
             self._out_post = torch.from_numpy(Wc.indices.astype(np.int64)).to(self.device, itype)
             dtype = torch.float16 if self.p.weight_dtype == "float16" else torch.float32
             self._out_w = torch.from_numpy(Wc.data.astype(np.float32)).to(self.device, dtype)
+            self._out_pre = (torch.as_tensor(np.flatnonzero(np.diff(Wc.indptr)), device=self.device, dtype=torch.int32)
+                             if self.cuda and self.cuda_compact else None)
         else:
             dtype = torch.float16 if self.p.weight_dtype == "float16" else torch.float32
-            self.W = sparse_matrix(W, self.device, dtype=dtype)
+            self.W = self._sparse(W, dtype)
             self._syn_input = torch.empty(self.n, self.B, dtype=torch.float32, device=self.device)
 
+    def _sparse(self, W, dtype):
+        return cuda.CSR(W, self.device, dtype) if self.cuda_sparse == "warp" else sparse_matrix(W, self.device, dtype=dtype)
+
     def _matmul_add(self, W, x: torch.Tensor) -> None:
+        if isinstance(W, cuda.CSR):
+            self.g.add_(W.matvec(x))
+            return
         if self.p.weight_dtype == "float16":
             # cuSPARSE accepts half A/B with float C and compute type. Passing an
             # fp32 out buffer avoids the overflow/rounding of a half-precision output.
@@ -287,16 +307,21 @@ class Brain:
                                 "a_std": coef(p.std_tau) if self._std_on else one,
                                 "dt": u * kt * p.dt, "rate_gain": u * (1 - torch.exp(-p.dt * kt / p.rate_tau)) * 1000.0 / (kt * p.dt),
                                 "pois": u * kt})
+            if self.cuda:
+                c = self._phase[-1]
+                c["cuda"] = torch.stack([c[key] for key in
+                    ("a_m", "dt", "a_ad", "a_std", "a_r", "rate_gain", "u", "pois")])
         self._split_weights()
 
     def _split_weights(self) -> None:
         import scipy.sparse as sp
+        self._weights_version += 1
         dtype = torch.float16 if self.p.weight_dtype == "float16" else torch.float32
         self._W_k = {}; self._acc = {}
         for kk in np.unique(self._kvec):
             rows = (self._kvec == kk).astype(np.float32)
             Wk = (sp.diags(rows) @ self._W_cpu).tocsr(); Wk.eliminate_zeros()
-            self._W_k[int(kk)] = sparse_matrix(Wk, self.device, dtype=dtype)
+            self._W_k[int(kk)] = self._sparse(Wk, dtype)
             if kk > 1:
                 self._acc[int(kk)] = torch.zeros(self.B, self.n, device=self.device)
         self.W = None
@@ -308,6 +333,9 @@ class Brain:
             return
         if self.metal:
             metal.event_scatter(self._out_ptr, self._out_post, self._out_w, x, self.g)
+            return
+        if self.cuda:
+            cuda.event_scatter(self._out_ptr, self._out_post, self._out_w, x, self.g, self._out_pre)
             return
         nz = torch.nonzero(x)                                           # (K, 2) [brain, pre]; syncs with host
         if nz.shape[0] == 0:
@@ -363,6 +391,9 @@ class Brain:
         if self.metal:
             self._step_metal(n_steps)
             return
+        if self.cuda:
+            self._step_cuda(n_steps)
+            return
         p = self.p
         for _ in range(n_steps):
             # synaptic input from spikes emitted `delay` ago: one sparse matmul for all B brains
@@ -402,6 +433,17 @@ class Brain:
             self.step_count += 1
 
     @torch.no_grad()
+    def _step_cuda(self, n_steps: int) -> None:
+        for _ in range(n_steps):
+            self.g.mul_(self._a_s)
+            self._add_synaptic_input(self.spike_buf[self.buf_pos])
+            rnd = torch.rand(self.v.shape, generator=self.gen, device=self.device) if self._poisson_on else self.poisson_p
+            cuda.lif_update(self, rnd)
+            self.buf_pos = (self.buf_pos + 1) % self.n_delay
+            self.t += self.p.dt
+            self.step_count += 1
+
+    @torch.no_grad()
     def _step_metal(self, n_steps: int) -> None:
         """The step loop as three launches: synaptic scatter, Poisson draws (torch generator), fused update."""
         p = self.p
@@ -431,6 +473,13 @@ class Brain:
                     acc = self._acc[kk]; acc.add_(x)
                     if (self.step_count % kk) == 0:
                         self._matmul_add(Wk, acc); acc.zero_()
+            if self.cuda:
+                rnd = torch.rand(self.v.shape, generator=self.gen, device=self.device) if self._poisson_on else self.poisson_p
+                cuda.lif_update(self, rnd, c["cuda"])
+                self.buf_pos = (self.buf_pos + 1) % self.n_delay
+                self.t += p.dt
+                self.step_count += 1
+                continue
             target = p.v_rest + self.g + self.drive - self.adapt
             torch.add(target, (self.v - target) * c["a_m"], out=self.v)
             in_ref = self.refrac > 0
@@ -487,6 +536,10 @@ class Brain:
         return self.rate[:, self._idx(idx)].mean(dim=1).cpu().numpy()
 
     def total_spikes(self):
+        cached = getattr(self, "_cuda_spike_total", None)
+        if self.cuda and cached is not None and cached[0] == (self.step_count,self.t,self.spikes._version):
+            value = cached[1]
+            return float(value[0]) if self.B == 1 else value.copy()
         s = self.spikes.sum(dim=1)
         return float(s[0]) if self.B == 1 else s.cpu().numpy()
 

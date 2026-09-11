@@ -118,13 +118,19 @@ This follows the mixed-precision path supported by
 Half precision changes rounding and may change spike timing. It is an experimental performance
 option, not a new calibrated default. Likewise, `LIFParams(dt=1.0)` changes integration accuracy.
 
-`LIFParams(event_driven=True)` enables the gather backend on CUDA as well as CPU/MPS. Its dynamic
-host synchronization prevents CUDA graph capture; selecting both is rejected. On the measured
-CUDA workload it was slower than sparse matmul. It remains the default on CPU/MPS.
+`FlyBrain(cuda_kernels=True)` opts into fused native CUDA updates and compact GPU motor
+readouts (requires nvcc and a host C++ compiler). With this option,
+`LIFParams(event_driven=True)` uses device-only event traversal and supports CUDA graphs.
+The Torch event fallback still synchronizes with the host and cannot be captured.
+`cuda_sparse="warp"` selects experimental CSR for LIF products and optic recurrence;
+keep the default `"torch"` for batched workloads. `cuda_compact=False` disables compact
+event traversal and the frozen-at-rest fast path. Public state retains its full shape.
+See [CUDA measurements and tradeoffs](PERFORMANCE.md#native-cuda-execution-september-11-2026).
 
 ```text
 python scripts/room_demo.py --cuda-graphs
 python scripts/room_demo.py --cuda-graphs --weight-dtype float16
+python scripts/room_demo.py --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp
 python scripts/profile_brain.py --frames 100 --cuda-graphs --json out/profile.json
 python scripts/profile_brain.py --modules antennal_lobe,mushroom_body,central,descending,vnc
 python scripts/profile_brain.py --event-driven
@@ -134,7 +140,8 @@ The profiler separates sensor/rendering, neural stepping and readout wall time, 
 GPU at each boundary. It reports initialization, warmup and steady-frame timing separately from
 the demo's UI work. The rendering workload uses one pose broadcast to the batch; this measures
 batched controller cost, not rendering B independent viewpoints. `EnvParams` also exposes
-`cuda_graphs`, `weight_dtype` and `brain_dt_ms`.
+`cuda_graphs`, `weight_dtype`, `brain_dt_ms`, `cuda_kernels`, `cuda_sparse`, `cuda_compact`
+and `event_driven`.
 
 For the actual interactive demo loop, `scripts/profile_room.py` includes drawing and presentation
 and can export a CPU/CUDA timeline. See [room-demo profiling](PERFORMANCE.md) for commands, the

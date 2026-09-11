@@ -130,6 +130,8 @@ def read_motor(brain, groups: MotorGroups | None = None, wings: WingGroups | Non
     """Gather every readout from one rate snapshot, including batched brains."""
     groups = groups if groups is not None else motor_groups(brain.c)
     wings = wings if wings is not None else wing_groups(brain.c)
+    if getattr(brain, "cuda", False):
+        return _read_cuda_motor(brain, groups, wings)
     rates = brain.rate_np()[None] if brain.B == 1 else brain.rate.detach().cpu().numpy()
 
     def scalar_or_batch(value):
@@ -151,3 +153,41 @@ def read_motor(brain, groups: MotorGroups | None = None, wings: WingGroups | Non
         values["pn_glomeruli"] = {name: scalar_or_batch(means[:, i]) for i, name in enumerate(gloms)}
         values["pn_glom_cells"] = {name: int(counts[i]) for i, name in enumerate(gloms)}
     return MotorRates(**values, time_ms=brain.t)
+
+
+def _read_cuda_motor(brain, groups, wings):
+    """One small GPU reduction and one transfer; full rates stay at diagnostic cadence."""
+    import torch
+    from . import cuda
+    names = ["fwd_dn", "back_dn", "turn_L", "turn_R", "opto_L", "opto_R", "wind_ipsi_L", "wind_ipsi_R",
+             "wind_contra_L", "wind_contra_R", "leg_L", "leg_R", "proboscis"]
+    indices = [getattr(groups, name) for name in names]
+    for f in fields(wings):
+        names.append(f.name); indices.append(getattr(wings, f.name))
+    names.append("lh_odour")
+    indices.append(groups.lh_odour if groups.lh_odour is not None else np.zeros(0, int))
+    gloms = groups.pn_names
+    indices += [groups.pn[groups.pn_glom == i] for i in range(len(gloms))]
+    # Selectors are public and may be edited by experiments. Cache the packing,
+    # not the values, and notice selector edits without transferring rates.
+    indices = [np.asarray(idx) for idx in indices]
+    if any(idx.ndim != 1 or (idx.size and (not np.issubdtype(idx.dtype,np.integer) or
+            (idx < 0).any() or (idx >= brain.n).any())) for idx in indices):
+        raise ValueError("motor groups must be vectors of connectome indices")
+    indices = [idx.astype(np.int32,copy=False) for idx in indices]
+    key = tuple(idx.tobytes() for idx in indices)
+    cached = getattr(brain, "_cuda_motor_groups", None)
+    if cached is None or cached[0] != key:
+        flat = np.concatenate(indices)
+        ptr = torch.tensor(np.r_[0,np.cumsum([len(idx) for idx in indices])], device=brain.device, dtype=torch.int32)
+        idx = torch.tensor(flat, device=brain.device, dtype=torch.int32)
+        brain._cuda_motor_groups = key, ptr, idx
+    _, ptr, idx = brain._cuda_motor_groups
+    means = cuda.group_means(ptr,idx,brain.rate,brain.spikes).cpu().numpy()
+    brain._cuda_spike_total = ((brain.step_count,brain.t,brain.spikes._version),means[:,-1].copy())
+    def value(i):
+        return float(means[0,i]) if brain.B == 1 else means[:,i].copy()
+    values = {name:value(i) for i,name in enumerate(names)}
+    values["pn_glomeruli"] = {name:value(len(names)+i) for i,name in enumerate(gloms)}
+    values["pn_glom_cells"] = {name:len(indices[len(names)+i]) for i,name in enumerate(gloms)}
+    return MotorRates(**values,time_ms=brain.t)

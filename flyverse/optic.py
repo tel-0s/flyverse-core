@@ -38,7 +38,7 @@ import torch
 from .connectome import Connectome, PHOTORECEPTOR_TYPES
 from .retina import Retina
 from .device import resolve, sparse_matrix
-from . import metal
+from . import metal, cuda
 
 FAMILY_OF_TYPE = {"R1-R6": 0, "R7p": 1, "R7y": 2, "R7d": 1, "R7_unclear": 2, "R8p": 3, "R8y": 4,
                   "R8d": 1, "R8_unclear": 4, "R7R8_unclear": 2}
@@ -91,28 +91,33 @@ DEFAULT_PAIR_GAIN = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0), (r"^(Tm4|Tm9|C
                      (r".*", r"^(LC4|LPLC2)$", 1.0)]
 
 
-def _csr(D: sp.spmatrix, device, use_metal: bool = False):
+def _csr(D: sp.spmatrix, device, use_metal: bool = False, cuda_sparse: str = "torch"):
     if use_metal:
         return metal.MetalCSR(D, device)
+    if cuda_sparse == "warp":
+        return cuda.CSR(D, device)
     return sparse_matrix(D.astype(np.float32), device)
 
 
 def _mv(M, x: torch.Tensor) -> torch.Tensor:
     """(B, rows) = M @ x for x (B, cols), M a torch sparse matrix or a MetalCSR."""
-    if isinstance(M, metal.MetalCSR):
+    if isinstance(M, (metal.MetalCSR, cuda.CSR)):
         return M.matvec(x)
     return (M @ x.T.contiguous()).T
 
 
 class OpticLobe:
     def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1,
-                 metal_kernels: bool | None = None):
+                 metal_kernels: bool | None = None, cuda_kernels: bool | None = None, cuda_sparse: str = "torch"):
         """metal_kernels: custom Metal kernels for the sparse products and the substep (flyverse/metal.py);
         None = automatically on MPS when available."""
         self.c, self.r, self.p = c, retina, params or OpticParams()
         self.B = int(batch)
         self.device = resolve(device)
         self.metal = metal.use(self.device, metal_kernels)
+        self.cuda = cuda.use(self.device, cuda_kernels)
+        if cuda_sparse not in ("torch", "warp") or (cuda_sparse == "warp" and not self.cuda):
+            raise ValueError("cuda_sparse must be torch or warp; warp requires CUDA kernels")
         if not np.isfinite(self.p.dt_ms) or self.p.dt_ms <= 0:
             raise ValueError("optic dt_ms must be positive and finite")
         self._pending_ms = 0.0
@@ -147,7 +152,7 @@ class OpticLobe:
             return M.tocsr()
 
         rt = types[self.rate_idx]
-        self.W_rr = _csr(apply_pair_gain(Wn_ol[self.rate_idx][:, self.rate_idx], rt, rt), self.device, self.metal)
+        self.W_rr = _csr(apply_pair_gain(Wn_ol[self.rate_idx][:, self.rate_idx], rt, rt), self.device, self.metal, cuda_sparse)
         self.W_rp = _csr(Wn_ol[self.rate_idx][:, self.pr_idx], self.device, self.metal)
         self.W_rs = _csr(Wn_ol[self.rate_idx][:, self.spk_idx], self.device, self.metal)
         self.W_sr = _csr(apply_pair_gain((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], rt, types[self.spk_idx]), self.device, self.metal)
@@ -177,6 +182,7 @@ class OpticLobe:
         self.adapt = torch.zeros(self.B, self.n_rate, device=self.device)
         self.delta_rate = torch.zeros(self.B, self.n_rate, device=self.device)
         self._dr = torch.zeros(self.B, self.n_rate, device=self.device)                   # metal substeps: current dr
+        self._cuda_dr = self._dr   # scratch recomputed at each CUDA frame, including after restore
         self.r0 = None
         self.last = {}
         self.diagnostics = True
@@ -249,7 +255,12 @@ class OpticLobe:
             # Only the recurrent optic product changes between substeps.
             pr_input = self.p.gain_in * _mv(self.W_rp, a_pr)
             spk_input = self.p.gain_fb * _mv(self.W_rs, s)
-            if self.metal:
+            if self.cuda:
+                cuda.optic_dr(self.v, self.b_vec, self._cuda_dr)
+                pr_input, spk_input = pr_input.contiguous(), spk_input.contiguous()
+                for _ in range(steps):
+                    cuda.optic_update(self, _mv(self.W_rr, self._cuda_dr), pr_input, spk_input)
+            elif self.metal:
                 p = self.p
                 metal.optic_dr(self.v, self.b_vec, self._dr)
                 for _ in range(steps):

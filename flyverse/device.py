@@ -38,5 +38,8 @@ def sparse_matrix(D: sp.spmatrix, device, dtype=torch.float32) -> torch.Tensor:
         vals = torch.from_numpy(np.asarray(C.data)).to(dtype)
         return torch.sparse_coo_tensor(idx, vals, size=C.shape).coalesce().to(device)
     C = D.tocsr()
-    return torch.sparse_csr_tensor(torch.from_numpy(C.indptr.astype(np.int64)), torch.from_numpy(C.indices.astype(np.int64)),
+    # cuSPARSE reads fewer index bytes with int32. Retain int64 for oversized
+    # matrices and for CPU; the MPS path above is independent.
+    itype = np.int32 if device.type == "cuda" and max(*C.shape, C.nnz) < 2**31 else np.int64
+    return torch.sparse_csr_tensor(torch.from_numpy(C.indptr.astype(itype)), torch.from_numpy(C.indices.astype(itype)),
                                    torch.from_numpy(np.asarray(C.data)).to(dtype), size=C.shape).to(device)
