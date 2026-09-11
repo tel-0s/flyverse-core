@@ -18,7 +18,8 @@ python -m flyverse.connectome              # one-off: compile the graph cache (1
 python scripts/room_demo.py                # live window: fly on the table
 python scripts/room_demo.py --brain-map --trail-seconds 30 --window 1920x1080
 python scripts/room_demo.py --start floor  # begin on the floor (it has to fly to get back up)
-python scripts/room_demo.py --program anemotaxis --escape-gating   # with the hand-designed foraging program
+python scripts/room_demo.py --program cx --escape-gating           # simulated central-complex steering plugged into the brain
+python scripts/room_demo.py --program anemotaxis --escape-gating   # the same logic as a body-level program
 python scripts/room_demo.py --headless --seconds 20 --loom-at 4 --gif out/room.gif
 ```
 
@@ -113,6 +114,12 @@ lateral-horn types (`motor.LH_ODOUR_TYPES`, found by a screen: ~23 Hz next to fr
 whichever way the fly faces) -- and supplies the integration the model does not (yet) produce.
 `scripts/probe_sustain.py` measures the fly for minutes with and without it.
 
+The principled replacement is a **module that plugs into the brain**: the screens (below) showed
+the model's central complex is silent -- no compass, no goal comparison -- while its inputs (wind
+DNs, the LH odour signal) and its output (PFL3 -> DNa02 -> legs) work. `flyverse/cx.py`
+`CompassSteering` fills exactly that hole: it reads the brain's signals and drives PFL3 by
+stimulation; the connectome turns the fly (`--program cx`). Nothing is injected into the body.
+
 The tooling for finding where such functions live is `flyverse/screen.py`: record every cell type
 under contrasting conditions, rank by separability with heading / wind controls, ablate or stimulate
 a candidate to test it causally. `scripts/screen_odour.py` reproduces the lateral-horn result;
@@ -170,6 +177,7 @@ flyverse/motor.py        named readout groups and MotorRates (incl. the lateral-
 flyverse/async_brain.py  the brain on its own thread / CUDA stream for fixed-tick hosts
 flyverse/body.py         fly pose (3-D), walking / flight / metabolism: MotorRates -> motion, nothing decided
 flyverse/programs.py     hand-designed behaviour programs (anemotaxis, escape gating), opt-in stand-ins for circuits
+flyverse/cx.py           CompassSteering: a simulated central-complex stage that drives PFL3 inside the brain
 flyverse/screen.py       condition screens, ranking, ablation: which cells carry what
 flyverse/brainmap.py     soma projections for the --brain-map panel
 flyverse/env.py          vectorised RL environment

@@ -26,7 +26,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--start", type=str, default="-0.15,0.15")
     ap.add_argument("--energy", type=float, default=0.4)
-    ap.add_argument("--program", default="none", choices=["none", "anemotaxis"])
+    ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"])
     ap.add_argument("--escape-gating", action="store_true")
     args = ap.parse_args()
     x, y = [float(v) for v in args.start.split(",")]

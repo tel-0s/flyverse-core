@@ -284,7 +284,11 @@ class Sim:
         self.cmd = self.loco.readout(motor, dt_s=FRAME_MS / 1000)
         self.wcmd = self.flight.readout(motor)
         if self.program is not None:
-            self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000)
+            if hasattr(self.program, "pfl_hz"):          # cx.CompassSteering: drives PFL3 / DNp09 in the brain, the body is untouched
+                info = self.program.apply(self.fb, motor, self.fly, self.metabolism, FRAME_MS / 1000)
+                self.cmd = dict(self.cmd, mode=info["mode"], rates=dict(self.cmd["rates"], **{"odour Hz": info["odour_hz"], "gate x10": info["gate"] * 10, "steer err x10": info["error"] * 10}))
+            else:
+                self.cmd = self.program.apply(motor, self.cmd, self.fly, self.metabolism, FRAME_MS / 1000)
         if self.gating is not None:
             self.wcmd = self.gating.apply(motor, self.wcmd, self.fly, FRAME_MS / 1000)
         x0, x1, y0, y1 = self.info["table_extent"]
@@ -455,7 +459,7 @@ def main():
     ap.add_argument("--wing-at", type=float, default=-1, help="stimulate the flight DNs (DNg02_a, DNa08) at this brain time (s)")
     ap.add_argument("--fast", action="store_true", help="speed preset for slower GPUs (Apple MPS): brain dt 1 ms, optic dt 2 ms, half-res camera")
     ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
-    ap.add_argument("--program", default="none", choices=["none", "anemotaxis"],
+    ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"],
                     help="hand-designed behaviour program between the brain and the body (flyverse/programs.py); default: none, the plain model")
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
     ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames and sensory ray tracing on CUDA")

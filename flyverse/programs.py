@@ -146,4 +146,7 @@ def make_program(name: str | None):
         return None
     if name == "anemotaxis":
         return AnemotaxisProgram()
+    if name == "cx":
+        from .cx import CompassSteering        # steers through the brain (PFL3 stimulation), not the body
+        return CompassSteering()
     raise ValueError(f"unknown program {name!r}")

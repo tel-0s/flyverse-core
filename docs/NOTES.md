@@ -545,6 +545,18 @@ body assumption, not the connectome:
   an attractor. This is a research thread (Delta7 inhibition vs EPG <-> PEN excitation under the
   connection and fan-in caps, and the FB columnar pathway), not a knob; the practical route to
   navigation in the meantime is the module contract above (compass + goal -> PFL3 stimulation).
+* **The first swapped-in module: `flyverse/cx.py` `CompassSteering`.** Built to the contract the
+  causal test gave: it reads the brain's own wind-direction DNs and LH odour signal from
+  `MotorRates`, decides the steering error the LAL / FB circuit would (the same surge / cast / search
+  logic as the body program, reused), and expresses it by stimulating PFL3 left / right (80 Hz at
+  full error; PFL3 projects contralaterally, so the right PFL3 turns the fly left) and DNp09 for
+  forward drive. Nothing is injected into the body: DNa02 and the leg motor neurons do the turning.
+  30 s from 12 cm (seed 0, energy 0.4): plain model 12 -> 15 cm, no meal; CX module 12 -> 4 cm, one
+  meal (PFL3 4.5 Hz mean, DNa02 |L - R| 0.6 Hz mean); body program 12 -> 12 cm, one meal. Demo and
+  sustain probe: `--program cx`. It is the template for module swaps: same slot, brain-side output.
+* `scripts/screen_odour.py` (the tool) reproduces the hand-made screen: LHPD4d2_b d' 7.04, LHPD4a2
+  6.84, LHAV3h1 6.05, LHAV3k1 5.80, LHPD5c1 5.66, LHAD1f2 5.43, all 100% / 0% at a midpoint threshold,
+  3,233 populations in ~6 x 30 s.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
