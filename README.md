@@ -92,13 +92,16 @@ not propagate at all. Two pathway gains (descending -> VNC x3, visual projection
 stand in for per-cell-type synaptic strengths; they were the difference between motor commands that
 reach the legs and ones that do not.
 
-## Food-finding (in progress)
+## Food-finding
 
 Flies find fruit by odour-gated anemotaxis: surge upwind on an odour hit, cast crosswind when it is
-lost. The room now has wind and plumes, the fly has two antennae and a wind sense, and the brain's own
-wind-direction DNs steer it upwind with a gain gated by the antennal lobe's odour signal (the one
-behavioural assumption the wiring does not supply itself). `scripts/probe_foraging.py` starts the fly
-downwind of the apple and measures whether it gets there; see `docs/NOTES.md` for where that stands.
+lost. The room has wind and plumes, the fly has two antennae and a wind sense, and the brain's own
+wind-direction DNs (DNp18 / DNp33) steer it upwind with a gain gated by the antennal lobe's odour
+signal -- the gate is the one behavioural assumption the wiring does not supply itself. Starting
+7-12 cm downwind, the fly reaches fruit and feeds in 2 of 3 runs (`scripts/probe_foraging.py`).
+An energy state closes the loop (`body.Metabolism`): hunger scales the upwind drive, feeding refills
+energy, satiety releases the fly from the fruit, and losing the plume triggers crosswind casting.
+`scripts/probe_sustain.py` runs the fly for minutes and counts meals.
 
 ## RL on top of the brain
 

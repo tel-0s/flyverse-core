@@ -206,6 +206,7 @@ class Sim:
             "pulses": {"wing_pulse": getattr(self, "wing_pulse", 0), "gf_pulse": getattr(self, "gf_pulse", 0)},
             "flight_hold": getattr(self.flight, "_power_hold", 0.0),
             "air_t": self.air.t, "gate": getattr(self.loco, "_gate", 0.0),
+            "metabolism": dataclasses.asdict(self.loco.metabolism),
         }
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         torch.save(state, path)
@@ -230,6 +231,8 @@ class Sim:
             self.wing_idx = self.c.select(type=["DNg02_a", "DNa08"])
         self.flight._power_hold = state["flight_hold"]
         self.air.t = state.get("air_t", 0.0); self.loco._gate = state.get("gate", 0.0)
+        if "metabolism" in state:
+            self.loco.metabolism = body.Metabolism(**state["metabolism"])
         self.col_rad = self.column_radiance()
         self.cmd = self.loco.readout(b, self.groups); self.wcmd = self.flight.readout(b, self.wings)
         print(f"loaded state at t={b.t / 1000:.2f}s <- {path}")
@@ -259,18 +262,23 @@ class Sim:
         self.air.step(FRAME_MS / 1000)
         self.olf.apply(self.brain, self.fly)
         self.windsense.apply(self.brain, self.fly)
+        # sugar GRNs fire while the labellum is on fruit; a sated fly's response is the same (satiety acts
+        # downstream in the animal too), it just does not stop to feed
         self.brain.set_poisson(self.sweet, 120.0 * self.tasting)
         self.brain.step(int(FRAME_MS / self.brain.p.dt))
         self.cmd = self.loco.readout(self.brain, self.groups)
         self.wcmd = self.flight.readout(self.brain, self.wings)
         x0, x1, y0, y1 = self.info["table_extent"]
         if self.fly.airborne:
+            self.feeding = False
+            self.loco.metabolism.update(False, 0.0, FRAME_MS / 1000)
             self.flight.step(self.fly, self.wcmd, FRAME_MS / 1000, self.surface_z, (-2, 2, -2, 2, 2.6))
         elif not self.flight.maybe_takeoff(self.fly, self.wcmd):
             on_table = abs(self.fly.z - self.info["table_top_z"]) < 1e-3
             bounds = (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02) if on_table else (-1.95, 1.95, -1.95, 1.95)
             cmd = self.decoder_cmd() if getattr(self, "decoder", False) else self.cmd
-            if self.tasting:                                   # a fly that is feeding stops walking
+            self.feeding = self.loco.metabolism.update(bool(self.tasting), self.fly.speed, FRAME_MS / 1000)
+            if self.feeding:                                   # a fly that is feeding stops walking
                 cmd = dict(cmd, speed=0.0, yaw=0.0)
             self.loco.step(self.fly, cmd, FRAME_MS / 1000, bounds)
         self.update_loom()
@@ -369,7 +377,10 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
         pygame.draw.rect(screen, (120, 160, 240), (ox + 90, y, int(min(val, 80) * 2), 11))
         blit_text(screen, font, f"{k:9s} {val:5.1f}", ox, y - 2); y += 14
     y += 8
-    blit_text(screen, font, f"speed cmd {sim.cmd['speed'] * 100:+.2f} cm/s  yaw {np.rad2deg(sim.cmd['yaw']):+.0f} deg/s  proboscis {sim.cmd['proboscis']:.2f}", ox, y); y += 22
+    blit_text(screen, font, f"speed cmd {sim.cmd['speed'] * 100:+.2f} cm/s  yaw {np.rad2deg(sim.cmd['yaw']):+.0f} deg/s  proboscis {sim.cmd['proboscis']:.2f}", ox, y); y += 16
+    mb = sim.loco.metabolism
+    pygame.draw.rect(screen, (60, 60, 70), (ox + 60, y + 2, 120, 10)); pygame.draw.rect(screen, (90, 200, 90) if mb.energy > 0.3 else (220, 80, 60), (ox + 60, y + 2, int(120 * mb.energy), 10))
+    blit_text(screen, font, f"energy {'':10s}  {mb.energy:.2f} {mb.state}, meals {mb.meals}  [{'feeding' if getattr(sim, 'feeding', False) else sim.cmd.get('mode', '')}]", ox, y); y += 18
     if len(sim.spike_hist) > 2:
         hh = np.array(sim.spike_hist); mx = max(hh.max(), 1)
         pts = [(ox + i * 280 / 400, y + 80 - 80 * val / mx) for i, val in enumerate(hh)]

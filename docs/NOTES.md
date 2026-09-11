@@ -376,6 +376,19 @@ and spike-frequency adaptation.
   DNp18 / DNp33 for the wind direction and its antennal lobe for the odour -- with the gate between
   them supplied by the body.
 
+## Session 7: closing the loop (sustain)
+
+* `body.Metabolism`: energy in [0, 1], resting drain 1/300 s plus 0.15 per metre walked, feeding refills
+  at 1/15 s; hunger = 1 - energy scales the odour-gated upwind drive (0.3 at zero hunger -> 1.0 when
+  starving), satiety at 0.95 ends the meal and a new one only starts below 0.7 (hysteresis, so a sated
+  fly actually leaves). A feeding fly stands still; airborne flies do not feed. Demo-scale constants:
+  a tank lasts ~4 min of walking, a meal ~15 s.
+* Casting: when the gate falls below 0.25 after having been above 0.6 in the last 30 s, the body runs
+  a crosswind zigzag (+-90 deg/s, sign flipping every 1.5 s) for up to 8 s -- the search program real
+  flies show on plume loss (van Breugel & Dickinson 2014). Modes shown in the UI: searching / surging /
+  casting / feeding, with an energy bar and meal count. `scripts/probe_sustain.py` scores minutes of
+  autonomy: meals, minimum energy, hops, path length, time in each mode.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

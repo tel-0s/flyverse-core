@@ -114,6 +114,47 @@ class FlyState:
 
 
 @dataclass
+class Metabolism:
+    """Energy state that closes the foraging loop. Energy drains with time (faster while walking), refills
+    while feeding; hunger = 1 - energy scales the odour-gated upwind drive (starved flies are more
+    responsive to food odours) and satiety ends a meal (a sated fly leaves the fruit and wanders).
+    Time constants are demo-scale: a full tank lasts ~4 min of walking, a meal takes ~15 s."""
+    energy: float = 0.6
+    drain_per_s: float = 1.0 / 300.0       # resting drain
+    walk_drain_per_m: float = 0.15         # extra drain per metre walked
+    feed_per_s: float = 1.0 / 15.0
+    satiety: float = 0.95                  # stop feeding above this
+    resume_below: float = 0.7              # ... and only start a new meal below this (hysteresis)
+    sated: bool = False
+    meals: int = 0
+    _feeding_prev: bool = False
+
+    @property
+    def hunger(self) -> float:
+        return float(np.clip(1.0 - self.energy, 0.0, 1.0))
+
+    def update(self, tasting: bool, speed: float, dt_s: float) -> bool:
+        """Advance; returns True if the fly is feeding this step."""
+        self.energy -= self.drain_per_s * dt_s + self.walk_drain_per_m * abs(speed) * dt_s
+        if self.sated and self.energy < self.resume_below:
+            self.sated = False
+        feeding = bool(tasting) and not self.sated
+        if feeding:
+            self.energy += self.feed_per_s * dt_s
+            if not self._feeding_prev:
+                self.meals += 1
+            if self.energy >= self.satiety:
+                self.sated = True; feeding = False
+        self._feeding_prev = feeding
+        self.energy = float(np.clip(self.energy, 0.0, 1.0))
+        return feeding
+
+    @property
+    def state(self) -> str:
+        return "sated" if self.sated else ("starving" if self.energy < 0.15 else "hungry" if self.energy < 0.5 else "ok")
+
+
+@dataclass
 class Locomotion:
     k_fwd: float = 0.02 / 40.0     # m/s per Hz of forward-DN mean rate (40 Hz -> 2 cm/s, a brisk fly walk)
     k_leg: float = 0.02 / 60.0     # m/s per Hz of mean leg-MN rate
@@ -127,13 +168,23 @@ class Locomotion:
     # DNp33 contralateral to the wind; scripts/probe_wind.py) steer the fly upwind, with a gain gated by
     # the antennal lobe's odour signal; the gate decays over ~1.5 s after the plume is lost (the surge)
     k_wind: float = np.deg2rad(120) / 40.0   # rad/s per Hz of wind-DN asymmetry at full gate
-    pn_base_hz: float = 25.0                 # gate = clip((most active glomerulus mean PN rate - base) / pn_gate_hz)
-    pn_gate_hz: float = 60.0
+    pn_base_hz: float = 8.0                  # gate = clip((max-glomerulus PN rate - slow baseline - pn_base_hz) / pn_gate_hz)
+    pn_gate_hz: float = 40.0
+    pn_adapt_tau_s: float = 10.0             # the baseline tracks the odour level: sustained odour fades, changes count
     gate_tau_s: float = 1.5
     wind_speed_bonus: float = 0.006          # m/s of extra forward drive at full gate (surge upwind)
+    # casting: when the plume is lost after a hit, search crosswind -- a zigzag whose sign alternates
+    # every `cast_half_period_s`, for up to `cast_duration_s` (the fly's search program, body-level)
+    cast_yaw: float = np.deg2rad(90)
+    cast_half_period_s: float = 1.5
+    cast_duration_s: float = 8.0
+    lost_gate: float = 0.25                  # gate below this (after having been above 0.6) = plume lost
+    hunger_gain_min: float = 0.3             # upwind drive at zero hunger, relative to full hunger
+    metabolism: Metabolism = field(default_factory=Metabolism)
     k_leg_turn: float = np.deg2rad(100) / 30.0
     max_speed: float = 0.03
     max_yaw: float = np.deg2rad(400)
+    edge_turn: float = np.deg2rad(90)   # turn rate towards the interior while the fly is against an edge / wall
     tau_ms: float = 80.0           # motor smoothing
     baseline_speed: float = 0.008  # m/s intrinsic walking drive (flies walk spontaneously; keeps optic flow alive)
     mdn_threshold: float = 15.0    # Hz; MDN fires a few Hz from self-motion optic flow, only a real burst means "back up"
@@ -153,15 +204,34 @@ class Locomotion:
         opto = asym - self._opto_bias
         pn_rates = brain.rates(g.pn)
         glom_mean = np.bincount(g.pn_glom, weights=pn_rates) / np.maximum(np.bincount(g.pn_glom), 1)
-        odour = float(np.clip((glom_mean.max() - self.pn_base_hz) / self.pn_gate_hz, 0.0, 1.0))
+        pn_max = float(glom_mean.max())
+        a_pn = np.exp(-0.01 / self.pn_adapt_tau_s)
+        self._pn_baseline = a_pn * getattr(self, "_pn_baseline", pn_max) + (1 - a_pn) * pn_max
+        odour = float(np.clip((pn_max - self._pn_baseline - self.pn_base_hz) / self.pn_gate_hz, 0.0, 1.0))
         self._gate = max(odour, getattr(self, "_gate", 0.0) * np.exp(-0.01 / self.gate_tau_s))
+        # plume-loss detection and casting
+        t = getattr(self, "_t", 0.0) + 0.01; self._t = t
+        if self._gate > 0.6:
+            self._last_hit = t; self._cast_from = None
+        elif self._gate < self.lost_gate and getattr(self, "_last_hit", -1e9) > t - 30.0 and getattr(self, "_cast_from", None) is None:
+            self._cast_from = t                                              # plume lost: start casting
+        cast = 0.0
+        if getattr(self, "_cast_from", None) is not None:
+            age = t - self._cast_from
+            if age < self.cast_duration_s:
+                cast = self.cast_yaw * (1.0 if int(age / self.cast_half_period_s) % 2 == 0 else -1.0)
+            else:
+                self._cast_from = None; self._last_hit = -1e9
+        self._cast = cast
+        hunger_scale = self.hunger_gain_min + (1 - self.hunger_gain_min) * self.metabolism.hunger
         back_eff = max(back - self.mdn_threshold, 0.0) if np.isscalar(back) else np.maximum(back - self.mdn_threshold, 0.0)
-        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff + self.wind_speed_bonus * self._gate
+        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff + self.wind_speed_bonus * self._gate * hunger_scale
         # convention: DNa02 drives ipsilateral turning (Rayshubskiy et al. 2020): right DNa02 -> turn right
-        yaw = -self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR) + self.k_wind * self._gate * upwind
+        yaw = -self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR) + self.k_wind * self._gate * hunger_scale * upwind + cast
         return {"speed": float(np.clip(speed, -self.max_speed, self.max_speed)),
                 "yaw": float(np.clip(yaw, -self.max_yaw, self.max_yaw)),
                 "proboscis": float(np.clip(prob / 30.0, 0, 1)),
+                "mode": "casting" if cast else ("surging" if self._gate > 0.6 else "searching"),
                 "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "wind_L": wiL, "wind_R": wiR, "gate x10": self._gate * 10, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": prob}}
 
     def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds: tuple) -> None:
@@ -173,10 +243,21 @@ class Locomotion:
         nx = fly.x + fly.speed * dt_s * np.cos(fly.heading)
         ny = fly.y + fly.speed * dt_s * np.sin(fly.heading)
         x0, x1, y0, y1 = bounds
-        if x0 <= nx <= x1 and y0 <= ny <= y1:   # stay on the table (flies rarely walk off edges)
+        in_x, in_y = x0 <= nx <= x1, y0 <= ny <= y1
+        if in_x and in_y:
             fly.x, fly.y = nx, ny
         else:
-            fly.heading += np.pi / 2 * dt_s * 8   # nudge away from the edge
+            # against an edge (table edge: the front legs find no substrate; wall: body contact). Flies
+            # rarely walk off edges: slide along it and turn towards the interior at a walking-turn rate.
+            # (An earlier version spun the fly at 720 deg/s here, which drove the loom detectors from the
+            # rotating scene and made it hop itself off the table -- NOTES, session 8.)
+            if in_x: fly.x = nx
+            if in_y: fly.y = ny
+            fly.x = float(np.clip(fly.x, x0, x1)); fly.y = float(np.clip(fly.y, y0, y1))
+            to_centre = np.arctan2(0.5 * (y0 + y1) - fly.y, 0.5 * (x0 + x1) - fly.x)
+            err = (to_centre - fly.heading + np.pi) % (2 * np.pi) - np.pi
+            fly.heading += np.sign(err) * min(abs(err), self.edge_turn * dt_s)
+        fly.heading = (fly.heading + np.pi) % (2 * np.pi) - np.pi
 
 
 # ---------------------------------------------------------------------------- flight

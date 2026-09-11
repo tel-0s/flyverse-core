@@ -89,7 +89,11 @@ class LIFParams:
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
 # synapses; without it the AL's PN <-> cholinergic-LN loop runs at 300 Hz). Elsewhere depression is off
 # because it blocks descending commands.
-DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0)]
+DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0),
+                          # the central-brain inputs that fire the GF during ordinary walking / feeding in
+                          # this model (input-weighted: SAD073, GNG300, DNp70, CL367, PVLP010) are damped;
+                          # the animal's GF is notoriously hard to fire except by looms and mechanical shocks
+                          (r"^(SAD073|GNG300|DNp70|CL367|PVLP010)$", r"^DNp01$", 0.3)]
 
 DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0),          # benchmarked: specific, ipsilateral leg drive, no storms
                      (r"^visual_projection$", r"^descending_neuron$", 2.0)]   # LC4/LPLC2 -> GF etc.: loom escape margin (x3 re-ignites the AVLP network)
