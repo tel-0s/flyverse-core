@@ -4,13 +4,13 @@
     python scripts/room_demo.py --gif out/room.gif --seconds 20 --headless
     python scripts/room_demo.py --brain-map     # open the soma activity atlas
 
-Panels: orbiting habitat, body camera, spectral compound eyes / R1-R6 contrast and spike history.
-        The inspector has Regions, Motor, Senses and Atlas tabs; long readouts scroll.
+Console: body camera, small orbit view, both retinal mosaics, spike history and antennal samples.
+         Live telemetry shows populations, motors and body state together; long readouts scroll.
 Brain: graded optic lobe (optic.py, 89k rate units) -> spiking LIF central brain + VNC (brain.py, 72k).
 Keys: SPACE pause, R reset fly, T teleport next to fruit, L loom a black ball at the fly, F stimulate the
 giant fibre (escape jump), W stimulate the flight DNs DNg02_a/DNa08 for 1 s (wingbeat), ESC quit.
 Scene camera: arrow keys orbit, +/- (or mouse wheel over the view) zoom, mouse drag in the view orbits,
-C follows the fly, HOME resets. The observatory reflows when resized; ? opens the controls guide.
+C follows the fly, HOME resets. The console reflows when resized; ? opens the key bindings.
 State: F5 / F9 quick-save / quick-load (out/quicksave.pt), S timestamped save, --load file to resume.
 """
 from __future__ import annotations
@@ -397,14 +397,14 @@ def main():
     try:
         win = tuple(int(v) for v in args.window.lower().split("x")) if args.window else (W, H)
     except ValueError:
-        ap.error("--window must be a positive size, e.g. 1440x960")
+        ap.error("--window must be a positive size, e.g. 1360x820")
     if len(win) != 2 or min(win) <= 0:
-        ap.error("--window must be a positive size, e.g. 1440x960")
+        ap.error("--window must be a positive size, e.g. 1360x820")
     DW, DH = canvas_size(win)
     screen = pygame.display.set_mode(win, pygame.RESIZABLE)
     canvas = pygame.Surface((DW, DH))
     recording_size = (DW, DH)
-    pygame.display.set_caption("flyverse · The neural observatory")
+    pygame.display.set_caption("flyverse // room console")
     font = None  # draw's compatibility argument; RoomUI owns its typography
     ui = RoomUI()
     ui.loading(canvas)
@@ -533,7 +533,8 @@ def main():
                 elif ev.key in key_actions:
                     perform(key_actions[ev.key])
                 elif ev.key == pygame.K_v:
-                    perform("retina:" + ("contrast" if ui.retina_mode == "colour" else "colour"))
+                    modes = ("both","colour","contrast")
+                    perform("retina:" + modes[(modes.index(ui.retina_mode)+1)%len(modes)])
                 elif ev.key == pygame.K_LEFT:
                     orbit.orbit(-10, 0); dirty = True
                 elif ev.key == pygame.K_RIGHT:

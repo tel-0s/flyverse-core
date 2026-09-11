@@ -6,9 +6,9 @@ ventral nerve cord). The fly gets colour vision, smell, taste, wind sense, a bod
 flies, and a room with a table with fruit on it. The connectome is never trained or edited; everything
 the fly does comes from the wiring plus a small, documented set of physiological assumptions.
 
-![The flyverse neural observatory](docs/demo_ui.png)
-*The neural observatory: an orbiting habitat, the fly's-eye camera, spectral compound eyes,
-and live brain activity. The inspector has Regions, Motor, Senses and Atlas views.
+![The flyverse room console](docs/demo_ui.png)
+*The room console: body camera, small orbit view, both retinal mosaics, antennal inputs,
+and simultaneous population, motor and body readouts. `--brain-map` opens the soma map.
 [UI controls and display details](docs/ROOM_UI.md).*
 
 ## Run it
@@ -42,9 +42,9 @@ and the ray tracer run on custom Metal kernels (`flyverse/metal.py`): 0.8x real 
 Options: `--brain-map` (all 140k located somata in dorsal and lateral view, activity as highlights;
 `--map-every N`, `--map-no-blur`), `--trail-seconds` (decaying trail in the scene view), `--start x,y[,z]`
 | `floor`, `--wind-speed`, `--wind-dir`, `--load state.pt`, `--window WxH` (the window is resizable, the
-UI reflows above 1100x760 and scales below it), `--fast` (preset for Macs / slower GPUs;
+UI reflows above 1100x720 and scales below it), `--fast` (preset for Macs / slower GPUs;
 `--brain-dt`, `--optic-dt`, `--cam-scale`). `?` opens the controls guide; `1`–`4` select inspector
-tabs and `V` switches retinal colour/contrast. `--screenshot out/observatory.png` saves the final UI.
+views and `V` cycles retinal both/colour/contrast. `--screenshot out/console.png` saves the final UI.
 Save states are ~10 MB and resume bit-exactly.
 
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
@@ -194,7 +194,7 @@ flyverse/programs.py     hand-designed behaviour programs (anemotaxis, escape ga
 flyverse/cx.py           CompassSteering: a simulated central-complex stage that drives PFL3 inside the brain
 flyverse/screen.py       condition screens, ranking, ablation: which cells carry what
 flyverse/brainmap.py     soma projections for the --brain-map panel
-flyverse/room_ui.py      responsive observatory layout, controls and neural telemetry
+flyverse/room_ui.py      dense room console, controls and neural telemetry
 flyverse/env.py          vectorised RL environment
 scripts/room_demo.py     the interactive demo
 scripts/benchmark.py     one-shot calibration harness;  scripts/probe_*.py  one behaviour each

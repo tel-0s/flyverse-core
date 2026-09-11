@@ -13,7 +13,7 @@ import torch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 import room_demo as demo
 from flyverse.body import FlyState
-from flyverse.room_ui import RoomUI, Layout, canvas_size, fit_transform
+from flyverse.room_ui import RoomUI, DEFAULT_SIZE, canvas_size, fit_transform
 from flyverse.world import Sphere
 
 
@@ -55,7 +55,7 @@ class DisplaySim:
     def load_state(self,path): self.calls.append("load")
 
 
-class ObservatoryTests(unittest.TestCase):
+class ConsoleTests(unittest.TestCase):
     def setUp(self):
         self.environment = patch.dict(os.environ,{"SDL_VIDEODRIVER":"dummy","SDL_AUDIODRIVER":"dummy"})
         self.environment.start()
@@ -94,11 +94,14 @@ class ObservatoryTests(unittest.TestCase):
             if frame == 5: return [click("follow")]
             if frame == 6: return [key(pygame.K_v)]
             if frame == 7:
+                self.assertEqual(sim._ui.retina_mode,"colour")
+                return [key(pygame.K_v),click("help")]
+            if frame == 8:
                 self.assertEqual(sim._ui.retina_mode,"contrast")
-                return [click("help")]
-            if frame == 8: return [key(pygame.K_r)]  # must be consumed by the guide
-            if frame == 9: return [key(pygame.K_ESCAPE)]
+                return [key(pygame.K_r)]  # must be consumed by the guide
+            if frame == 9: return [key(pygame.K_ESCAPE),key(pygame.K_v)]
             if frame == 10:
+                self.assertEqual(sim._ui.retina_mode,"both")
                 self.assertEqual(sim.brain.t,10.)
                 self.assertNotIn("reset",sim.calls)
                 return [click("pause")]
@@ -138,11 +141,33 @@ class ObservatoryTests(unittest.TestCase):
         ui.draw(sim,surface,orbit,paused=True)
         self.assertEqual(sim.world.render_camera.call_count,calls+2)
 
+    def test_default_exposes_readouts_and_both_retinas_without_scrolling(self):
+        sim,ui,orbit = DisplaySim(),RoomUI(),demo.OrbitCam((0,0,.75))
+        sim.cmd['rates'] = {name:12.5 for name in ('fwdDN','MDN','opto_L','opto_R','wind_L','wind_R',
+                            'LH odour','DNa02_L','DNa02_R','legMN_L','legMN_R','MN9')}
+        sim.wcmd = {name:12.5 for name in ('gf','ttm','power','steer_L','steer_R','haltere','gf_threshold')}
+        surface = pygame.Surface(DEFAULT_SIZE)
+        readouts = {'central_brain','vnc_motor','v_cmd','energy','taste/feed','fwdDN','MN9','gf','haltere','gf_threshold'}
+        seen = set()
+        original = ui.text
+        def observe(target,value,*args,**kwargs):
+            rect = original(target,value,*args,**kwargs)
+            if value in readouts:
+                self.assertTrue(target.get_clip().contains(rect),str(value))
+                seen.add(value)
+            return rect
+        with patch.object(ui,'text',side_effect=observe), patch.object(ui,'_mosaic',wraps=ui._mosaic) as mosaics:
+            ui.draw(sim,surface,orbit)
+        self.assertEqual(seen,readouts)
+        self.assertEqual(mosaics.call_count,2)
+        self.assertEqual(ui.scroll_limit,0)
+        self.assertLess(ui.layout.scene_view.w*ui.layout.scene_view.h,DEFAULT_SIZE[0]*DEFAULT_SIZE[1]*.06)
+
     def test_paused_atlas_keeps_activity_and_all_targets_fit(self):
         sim,ui,orbit = DisplaySim(),RoomUI(),demo.OrbitCam((0,0,.75))
         bmap = SimpleNamespace(activity=Mock(return_value=np.linspace(0,1,20)),
             render=lambda _: (np.zeros((60,100,3),np.uint8),np.zeros((40,100,3),np.uint8)),top_types=lambda _: {})
-        for window in ((800,600),(1100,760),(1440,960),(1920,1080)):
+        for window in ((800,600),(1100,720),DEFAULT_SIZE,(1920,1080)):
             surface = pygame.Surface(canvas_size(window))
             ui.draw(sim,surface,orbit,paused=True,bmap=bmap)
             self.assertTrue(all(surface.get_rect().contains(hit.rect) for hit in ui.hits))
