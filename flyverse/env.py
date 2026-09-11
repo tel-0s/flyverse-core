@@ -47,6 +47,7 @@ class EnvParams:
     brain_dt_ms: float = 0.5
     cuda_graphs: bool = False
     weight_dtype: str = "float32"
+    sensory_cuda_graphs: bool | None = None  # None follows cuda_graphs; UI rendering is independent
 
 
 class FlyRoomEnv:
@@ -130,7 +131,9 @@ class FlyRoomEnv:
         dirs = np.stack([dx, dy, dz], axis=-1).reshape(-1, 3)                            # (B*n_col*k, 3)
         eye = np.stack([self.x, self.y, np.full(self.B, self.z + self.eye_h)], axis=1)   # (B, 3)
         org = np.repeat(eye, n_col * k, axis=0)
-        rad = self.world.trace(torch.from_numpy(np.ascontiguousarray(org, dtype=np.float32)), torch.from_numpy(dirs.astype(np.float32)))
+        capture = self.p.cuda_graphs if self.p.sensory_cuda_graphs is None else self.p.sensory_cuda_graphs
+        rad = self.world.trace(torch.from_numpy(np.ascontiguousarray(org, dtype=np.float32)), torch.from_numpy(dirs.astype(np.float32)),
+                               cuda_graphs=capture)
         rad = rad.view(self.B, n_col, k, 4)
         return (rad * self.wts_t[None, None, :, None]).sum(2)
 

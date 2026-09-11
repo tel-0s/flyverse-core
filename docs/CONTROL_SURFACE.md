@@ -138,7 +138,9 @@ batched controller cost, not rendering B independent viewpoints. `EnvParams` als
 
 For the actual interactive demo loop, `scripts/profile_room.py` includes drawing and presentation
 and can export a CPU/CUDA timeline. See [room-demo profiling](PERFORMANCE.md) for commands, the
-distinction between visible and headless runs, and validation of optic input hoisting.
+distinction between visible and headless runs, and validation of optic input hoisting and sensory
+ray capture. In the demo and RL environment, `cuda_graphs` also enables sensory ray capture;
+`--no-sensory-cuda-graphs` / `EnvParams(sensory_cuda_graphs=False)` disables that part independently.
 
 A local RTX 4090 measurement (PyTorch 2.10.0+cu128, B=1, 30 measured frames after 8 warmup frames,
 10 ms of simulated time per frame) gave these mean latencies. They are a development snapshot on

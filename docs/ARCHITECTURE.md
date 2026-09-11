@@ -90,6 +90,9 @@ current, synchronized measurements rather than the original 16.6 ms estimates. A
 2. **CUDA graphs** (`FlyBrain(cuda_graphs=True)`): capture optic and LIF kernels for a frame on
    fixed buffers, including registered Poisson RNG state. Cache by frame length and delay/optic
    phase, up to eight captures. Pulses expiring inside a frame use the eager path.
+   The demo and RL environment also capture sensory ray tracing on stable scene/ray buffers;
+   `World.move_sphere` updates captured geometry in place. Texture-noise constants are reused.
+   See `docs/PERFORMANCE.md` for independent sensory capture controls and CPU/CUDA traces.
 3. **Half-precision LIF weights** (`LIFParams(weight_dtype="float16")`): CUDA sparse matmul with
    half weights/transmitted spikes and a float32 output/accumulator. Optic and membrane state remain
    float32. Opt-in: rounding can change spikes, and speed gains are workload dependent.

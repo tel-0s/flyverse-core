@@ -193,6 +193,8 @@ def main():
         "gpu": torch.cuda.get_device_name(sim.fb.device) if sim.fb.device.type == "cuda" else None,
         "demo_args": demo_args, "sdl_driver": driver, "neurons": sim.c.n,
         "brain_dt_ms": sim.brain.p.dt, "optic_dt_ms": sim.optic.p.dt_ms,
+        "sensory_cuda_graphs": sim.sensory_cuda_graphs,
+        "ray_graphs_cached": len(getattr(sim.world, "_trace_graphs", {})),
         "warmup_frames": args.warmup, "measured_frames": len(frame_ms),
         "complete": len(frame_ms) == args.frames, "trace_instrumented": bool(args.trace),
         "frame_wall_ms": summarize(frame_ms),

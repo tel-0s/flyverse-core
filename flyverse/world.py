@@ -15,6 +15,7 @@ import torch
 from .device import default_device
 
 INF = 1e9
+_NOISE_CORNERS = [(x, y, z) for x in (0, 1) for y in (0, 1) for z in (0, 1)]
 
 
 def _hash3(i: torch.Tensor) -> torch.Tensor:
@@ -24,19 +25,21 @@ def _hash3(i: torch.Tensor) -> torch.Tensor:
     return (h % 65536).float() / 32768.0 - 1.0
 
 
-def value_noise(p: torch.Tensor, scale: float) -> torch.Tensor:
+def value_noise(p: torch.Tensor, scale: float, corners: torch.Tensor | None = None) -> torch.Tensor:
     """Trilinearly interpolated lattice noise in [-1, 1] at spatial period `scale` (metres), (M,)."""
     q = p / scale
     i0 = torch.floor(q).long(); f = q - i0.float()
     f = f * f * (3 - 2 * f)                                          # smoothstep
     out = torch.zeros(p.shape[0], device=p.device)
+    if corners is None:
+        corners = torch.tensor(_NOISE_CORNERS, device=p.device)
     for dx in (0, 1):
         wx = f[:, 0] if dx else 1 - f[:, 0]
         for dy in (0, 1):
             wy = f[:, 1] if dy else 1 - f[:, 1]
             for dz in (0, 1):
                 wz = f[:, 2] if dz else 1 - f[:, 2]
-                out += wx * wy * wz * _hash3(i0 + torch.tensor([dx, dy, dz], device=p.device))
+                out += wx * wy * wz * _hash3(i0 + corners[dx * 4 + dy * 2 + dz])
     return out
 
 
@@ -103,11 +106,26 @@ class World:
 
     # ---------------------------------------------------------------- dynamic objects
     def move_sphere(self, idx: int, center, radii=None) -> None:
-        """Move (and optionally resize) a sphere; the packed GPU tensors are refreshed on the next trace."""
+        """Move/resize a sphere in the existing packed buffers, including captured ray traces."""
         s = self.spheres[idx]
         s.center = tuple(float(v) for v in center)
         if radii is not None:
             s.radii = tuple(float(v) for v in radii)
+        if getattr(self, "_packed", False):
+            # Keep the addresses held by CUDA graphs stable. Packing on the next trace
+            # still handles pending invalidation or changes in scene topology/device.
+            if self._scene_shape == (len(self.spheres), len(self.boxes), len(self.planes)):
+                self._sc[idx].copy_(torch.tensor(s.center, dtype=torch.float32))
+                if radii is not None:
+                    self._sr[idx].copy_(torch.tensor(s.radii, dtype=torch.float32))
+
+    def invalidate(self) -> None:
+        """Repack after direct edits to geometry, materials or lighting on the next trace.
+
+        Moving spheres via move_sphere needs no invalidation. Changes in object counts
+        or device are detected automatically. Instances are used on one caller-managed
+        execution stream at a time, as with ordinary mutable torch tensors.
+        """
         self._packed = False
 
     # ---------------------------------------------------------------- packing
@@ -130,6 +148,9 @@ class World:
         self._lp = torch.tensor(self.light_pos, dtype=torch.float32, device=d)
         self._lc = torch.tensor(self.light_color, dtype=torch.float32, device=d)
         self._amb = torch.tensor(self.ambient, dtype=torch.float32, device=d)
+        self._noise_corners = torch.tensor(_NOISE_CORNERS, device=d)
+        self._scene_shape = (len(self.spheres), len(self.boxes), len(self.planes))
+        self._trace_graphs = {}
         self._packed = True
 
     # ---------------------------------------------------------------- intersection
@@ -185,11 +206,53 @@ class World:
         return best_t, best_n, best_id
 
     @torch.no_grad()
-    def trace(self, origins: torch.Tensor, dirs: torch.Tensor) -> torch.Tensor:
-        """Radiance (M, 4) for rays from origins (M,3) along unit dirs (M,3)."""
-        if not getattr(self, "_packed", False):
+    def trace(self, origins: torch.Tensor, dirs: torch.Tensor, *, cuda_graphs: bool = False) -> torch.Tensor:
+        """Radiance (M, 4) for rays from origins (M,3) along unit dirs (M,3).
+
+        CUDA graphs replay the same operations with new ray/scene data. At most two
+        layouts are cached; additional layouts use eager execution. Results own their
+        storage, so later traces (including UI cameras) do not overwrite earlier images.
+        """
+        device = torch.device(self.device)
+        if device.type == "cuda" and device.index is None:
+            device = torch.device("cuda", torch.cuda.current_device())
+        if cuda_graphs and device.type != "cuda":
+            raise ValueError("ray-tracing CUDA graphs require a CUDA device")
+        shape = (len(self.spheres), len(self.boxes), len(self.planes))
+        if (not getattr(self, "_packed", False) or self._sc.device != device
+                or self._scene_shape != shape):
             self._pack()
-        o = origins.to(self.device, torch.float32); d = dirs.to(self.device, torch.float32)
+        o = origins.to(device, torch.float32); d = dirs.to(device, torch.float32)
+        if cuda_graphs:
+            return self._graph_trace(o, d)
+        return self._trace(o, d)
+
+    def _graph_trace(self, o, d):
+        current = torch.cuda.current_stream(o.device)
+        key = (tuple(o.shape), tuple(d.shape), self.detail, current.cuda_stream)
+        if key not in self._trace_graphs:
+            if len(self._trace_graphs) >= 2:
+                return self._trace(o, d)
+            static_o = torch.empty(o.shape, dtype=o.dtype, device=o.device)
+            static_d = torch.empty(d.shape, dtype=d.dtype, device=d.device)
+            static_o.copy_(o); static_d.copy_(d)
+            stream = torch.cuda.Stream(device=o.device)
+            stream.wait_stream(current)
+            with torch.cuda.stream(stream):
+                self._trace(static_o, static_d)  # warm kernels and allocator outside capture
+            current.wait_stream(stream)
+            graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(graph, stream=stream):
+                output = self._trace(static_o, static_d)
+            current.wait_stream(stream)
+            self._trace_graphs[key] = (graph, static_o, static_d, output)
+        graph, static_o, static_d, output = self._trace_graphs[key]
+        static_o.copy_(o); static_d.copy_(d)
+        graph.replay()
+        return output.clone()
+
+    def _trace(self, o: torch.Tensor, d: torch.Tensor) -> torch.Tensor:
+        """Packed-scene tensor operations shared by eager execution and CUDA capture."""
         t, n, mid = self._intersect(o, d)
         hit = t < INF
         p = o + d * t[:, None]
@@ -219,7 +282,9 @@ class World:
         # fine, non-periodic detail at fly scale: value noise at 2 cm, 8 mm and 3 mm (weave, grain, fibres,
         # fruit-skin speckle). A fly 1 mm above a surface sees millimetre structure as degrees of texture.
         if self.detail > 0:
-            m = 1.0 + self.detail * (0.5 * value_noise(p, 0.02) + 0.3 * value_noise(p, 0.008) + 0.2 * value_noise(p, 0.003))
+            m = 1.0 + self.detail * (0.5 * value_noise(p, 0.02, self._noise_corners)
+                                   + 0.3 * value_noise(p, 0.008, self._noise_corners)
+                                   + 0.2 * value_noise(p, 0.003, self._noise_corners))
             refl = refl * m.clamp_min(0.1)[:, None]
         return refl
 

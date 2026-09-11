@@ -87,12 +87,14 @@ class OrbitCam:
 
 class Sim:
     def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0,
-                 wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32"):
+                 wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32",
+                 sensory_cuda_graphs=None):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
         self.trail = []                          # (brain time s, position) samples, for the scene view
         self.cam_scale = int(cam_scale)          # fly's-eye camera rendered at 1/cam_scale resolution, upscaled
+        self.sensory_cuda_graphs = cuda_graphs if sensory_cuda_graphs is None else sensory_cuda_graphs
         self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(dt=brain_dt, weight_dtype=weight_dtype),
                            optic_params=optic.OpticParams(dt_ms=optic_dt), cuda_graphs=cuda_graphs)
         self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain
@@ -133,7 +135,8 @@ class Sim:
     def column_radiance(self):
         d = self.fly.body_to_world(self.dirs_b.reshape(-1, 3))
         o = np.broadcast_to(self.fly.eye_pos, d.shape)
-        rad = self.world.trace(torch.from_numpy(np.ascontiguousarray(o)).float(), torch.from_numpy(d).float())
+        rad = self.world.trace(torch.from_numpy(np.ascontiguousarray(o)).float(), torch.from_numpy(d).float(),
+                               cuda_graphs=self.sensory_cuda_graphs)
         rad = rad.reshape(self.dirs_b.shape[0], self.dirs_b.shape[1], 4)
         return (rad * self.wts_t[None, :, None]).sum(1)
 
@@ -439,7 +442,9 @@ def main():
     ap.add_argument("--wing-at", type=float, default=-1, help="stimulate the flight DNs (DNg02_a, DNa08) at this brain time (s)")
     ap.add_argument("--fast", action="store_true", help="speed preset for slower GPUs (Apple MPS): brain dt 1 ms, optic dt 2 ms, half-res camera")
     ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
-    ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames on CUDA")
+    ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames and sensory ray tracing on CUDA")
+    ap.add_argument("--sensory-cuda-graphs", action=argparse.BooleanOptionalAction, default=None,
+                    help="override sensory ray capture independently (default: follows --cuda-graphs)")
     ap.add_argument("--weight-dtype", choices=["float32", "float16"], default="float32", help="LIF sparse weights; float16 requires CUDA")
     ap.add_argument("--optic-dt", type=float, default=None, help="optic-lobe substep (ms), default 1 (the RL env uses 2)")
     ap.add_argument("--cam-scale", type=int, default=None, help="fly's-eye camera downscale factor, default 1")
@@ -474,7 +479,8 @@ def main():
         v = [float(t) for t in args.start.split(",")]
         start = (v[0], v[1], v[2] if len(v) > 2 else 0.75)
     sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir,
-              cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype, **fast)
+              cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype,
+              sensory_cuda_graphs=args.sensory_cuda_graphs, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)
     if args.teleport:

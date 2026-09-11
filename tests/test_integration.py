@@ -78,3 +78,27 @@ class FullConnectomeTests(unittest.TestCase):
             torch.testing.assert_close(getattr(sim.brain, name).cpu(), expected["brain"][name], **tol)
         self.assertEqual(vars(sim.fly), pose)
         self.assertEqual(sim.cmd, command)
+
+    def test_sensory_capture_in_demo_and_batched_env(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+        from room_demo import Sim
+        from flyverse.env import FlyRoomEnv, EnvParams
+        # Neural capture is enabled in both controllers; only the ray backend differs.
+        options = dict(seed=3, brain_dt=1., optic_dt=2., cuda_graphs=True, weight_dtype="float16")
+        a = Sim(**options, sensory_cuda_graphs=False)
+        b = Sim(**options, sensory_cuda_graphs=True)
+        for frame in range(12):
+            if frame == 4:
+                a.start_loom(); b.start_loom()
+            a.step(); b.step()
+            torch.testing.assert_close(a.col_rad, b.col_rad, rtol=0, atol=0)
+            torch.testing.assert_close(a.brain.spikes, b.brain.spikes, rtol=0, atol=0)
+            self.assertEqual(a.cmd, b.cmd)
+            self.assertEqual(vars(a.fly), vars(b.fly))
+        self.assertEqual(len(b.world._trace_graphs), 1)
+        del a, b
+        env = FlyRoomEnv(batch=2, params=EnvParams(cuda_graphs=True, brain_dt_ms=1., weight_dtype="float16"))
+        env.reset()
+        captured = env._radiance()
+        env.p.sensory_cuda_graphs = False
+        torch.testing.assert_close(captured, env._radiance(), rtol=0, atol=0)
