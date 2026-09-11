@@ -7,3 +7,6 @@ out/
 .venv/
 build/
 *.egg-info/
+
+# infrastructure notes (public repo)
+docs/CLUSTER.md
