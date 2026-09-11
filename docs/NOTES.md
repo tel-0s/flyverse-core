@@ -317,6 +317,46 @@ and spike-frequency adaptation.
   brain model has no haltere input to provide. Before this, pitch and roll were pure consequences of
   the flight path (the fly dove at -82 deg after hops).
 
+## Session 6: food-finding -- wind, plumes, anemotaxis
+
+* **Why**: flies find fruit by odour-gated anemotaxis (surge upwind on an odour hit, cast crosswind
+  when it is lost; van Breugel & Dickinson 2014), not by gradient descent on an isotropic cloud.
+  That needs a directional plume and a wind cue.
+* `flyverse/air.py`: `Air` (wind vector with slow meander; Gaussian plume per fruit, sigma = 1.5 cm +
+  0.12 x downwind distance, plus a near-source term and a per-source puff fluctuation; vectorised over
+  positions: 64 flies' ORN rates in 4 ms), `BilateralOlfaction` (two antennae 1 mm apart; ORNs are
+  assigned to an antenna by the laterality of their PN targets: 708 left / 1,396 right / 535
+  bilateral), `WindSense` (JO-C/E neurons, sided the same way via their AMMC/WED targets, driven by
+  the backward/forward deflection of each antenna, which point forward-lateral at +-45 deg).
+* **Wind-direction descending neurons** (`scripts/probe_wind.py`, fly standing, wind from the front /
+  left / right): the JO -> AMMC/WED -> DN pathway is the strongest lateralised signal in the model.
+  DNp18 fires on the side the wind comes from (wind left: L - R = +60 Hz; wind right: -40), DNp33 on
+  the opposite side (-37 / +64), then DNge016, DNg99, DNge175, DNg05_a, DNp19 and DNpe017 (doomfly's
+  choice, which does carry a wind signal). The DN rates are identical with and without an odour plume:
+  the odour gate on upwind turning is not at the DN level in this model.
+* body.py: anemotaxis term `k_wind * gate * upwind`, upwind = 0.5 [(DNp18-group L - R) - (DNp33-group
+  L - R)]; gate = clip((mean PN rate - 10 Hz) / 15 Hz), held with a 1.5 s decay after the plume is lost
+  (the surge), plus a small forward bonus at full gate. The gate is the one behavioural assumption
+  (odour -> upwind) that the connectome model does not itself produce.
+* **First foraging run: two bugs found by instrumenting one run per second.** (1) The fly was spinning
+  at 50-70 deg/s: the optomotor term. DNp04's right side sits at 18-31 Hz against ~0 on the left even
+  in still air (the eye is asymmetric), so `-k_opto * (opto_L - opto_R)` was a constant left turn
+  that its own rotation response could not cancel. Fix: the term now uses the asymmetry minus its 2 s
+  running mean (only *changes* in rotation count). (2) The odour gate barely opened (0.06-0.17): it was
+  the mean over all 516 PNs, which hardly moves when four glomeruli respond. Fix: gate on the most
+  active glomerulus's mean PN rate ((max - 25 Hz) / 60 Hz). (3) The JO wind input at 100 Hz max pushed
+  the giant fibre over threshold (2-6 hops per 30 s); the GF does receive antennal mechanosensory
+  input in the animal. JO max rate lowered to 50 Hz. Wind sensing itself was right: the DNp18/DNp33
+  asymmetry flipped sign with the fly's heading relative to the wind (+47 Hz at 46 deg off the wind,
+  -30 at -94 deg).
+* **First fruit found by the brain's own signals.** With the three fixes, a fly started crosswind
+  turns into the wind (heading relative to wind -74 -> -1 deg in 8 s, gate ~0.95), walks upwind at
+  ~1.4 cm/s and reaches the blueberries on the plume axis (11 -> 0.8 cm in 11 s). `probe_foraging.py`,
+  3 seeds x 30 s from 12 / 7 / 9 cm: anemotaxis term ON -> closest approach 0 / 3 / 0 cm, tasting
+  0.5 / 0.1 / 0.7 s; OFF -> 4 / 2 / 3 cm, no tasting. What still spoils it: 8-10 giant-fibre hops per
+  30 s in two of the three runs (the escapes eventually carry the fly off the table), and the fly
+  overshoots after contact. Both are the next targets.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

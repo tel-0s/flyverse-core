@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from . import body, brain, connectome, olfaction, optic, retina, world
+from . import air, body, brain, connectome, optic, retina, world
 
 
 @dataclass
@@ -40,6 +40,7 @@ class EnvParams:
     pn_lag_frames: int = 50      # for obs="pn": the derivative is taken over this many frames (0.5 s)
     seed: int = 0
     spawn_radius: float = 0.0    # > 0: curriculum -- spawn within this distance (m) of a random fruit
+    wind_speed: float = 0.3      # m/s; the plume blows towards -x
     rays_per_ommatidium: int = 1 # 1 for training speed (the demo uses 7); the ray tracer dominates at large B
     optic_dt_ms: float = 2.0     # optic-lobe substep (the demo uses 1 ms)
 
@@ -60,7 +61,9 @@ class FlyRoomEnv:
         self.wts_t = torch.from_numpy(self.wts).float().to(self.world.device)
         taste = pd.read_csv(os.path.join(os.path.dirname(__file__), "data", "taste_grns.csv"))
         self.sweet = self.c.index_of(taste.bodyId[taste.taste == "sweet"].to_numpy())
-        self.olf = olfaction.Olfaction(self.c, [(name, cen, 1.0) for name, cen, rad in self.info["fruit"]])
+        self.air = air.Air([(name, cen, 1.0) for name, cen, rad in self.info["fruit"]], air.WindParams(speed=self.p.wind_speed), seed=self.p.seed)
+        self.olf = air.BilateralOlfaction(self.c, self.air)
+        self.windsense = air.WindSense(self.c, self.air)
         n = self.c.neurons
         if self.p.obs == "descending":
             self.obs_idx = self.c.select(superclass="descending_neuron")
@@ -154,9 +157,17 @@ class FlyRoomEnv:
     def _sense_and_think(self):
         rad = self._radiance()
         self.brain.drive = self.optic.step_frame(rad, self.brain.rate, self.p.frame_ms)
+        self.air.step(self.p.frame_ms / 1000)
         eye = np.stack([self.x, self.y, np.full(self.B, self.z + self.eye_h)], axis=1)
-        orn = np.stack([self.olf.rates(e) for e in eye])                                # (B, n_orn)
-        self.brain.set_poisson(self.olf.orn_idx, orn)
+        fwd = np.stack([np.cos(self.heading), np.sin(self.heading), np.zeros(self.B)], axis=1)
+        left = np.stack([-np.sin(self.heading), np.cos(self.heading), np.zeros(self.B)], axis=1)
+        self.brain.set_poisson(self.olf.orn_idx, self.olf.rates_batch(eye, left, fwd))
+        w = self.air.vector
+        wb_x = fwd @ w; wb_y = left @ w                                                  # wind in each body frame
+        c45 = np.cos(np.pi / 4)
+        dL = -(wb_x * c45 + wb_y * c45) / self.windsense.full_speed; dR = -(wb_x * c45 - wb_y * c45) / self.windsense.full_speed
+        rE, rC = self.windsense.rates_batch(dL, dR)
+        self.brain.set_poisson(self.windsense.joE, rE); self.brain.set_poisson(self.windsense.joC, rC)
         tasting = (self.fruit_dist() < 0.01).astype(np.float32)
         self.tasting = tasting
         self.brain.set_poisson(self.sweet, np.repeat(tasting[:, None] * 120.0, len(self.sweet), axis=1))

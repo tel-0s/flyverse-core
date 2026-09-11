@@ -26,7 +26,7 @@ import pandas as pd
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from flyverse import body, brain, brainmap, connectome, olfaction, optic, retina, world  # noqa: E402
+from flyverse import air, body, brain, brainmap, connectome, optic, retina, world  # noqa: E402
 
 FRAME_MS = 10.0          # brain time per frame (20 LIF steps at 0.5 ms)
 W, H = 1280, 760         # design size of the UI; the window is resizable and the UI is scaled to fit
@@ -86,7 +86,8 @@ class OrbitCam:
 
 
 class Sim:
-    def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0):
+    def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0,
+                 wind_speed=0.3, wind_dir=180.0):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
@@ -112,8 +113,12 @@ class Sim:
         # neurons (scripts/find_sweet_grns.py -> flyverse/data/taste_grns.csv)
         taste = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "flyverse", "data", "taste_grns.csv"))
         self.sweet = self.c.index_of(taste.bodyId[taste.taste == "sweet"].to_numpy())
-        # smell: every fruit is an odour source for the ORNs of its glomeruli (flyverse/olfaction.py)
-        self.olf = olfaction.Olfaction(self.c, [(name, cen, 1.0) for name, cen, rad in self.info["fruit"]])
+        # air: wind + a plume from every fruit; smelled bilaterally by the antennae, wind felt by the
+        # Johnston's organ (flyverse/air.py)
+        self.air = air.Air([(name, cen, 1.0) for name, cen, rad in self.info["fruit"]],
+                           air.WindParams(speed=wind_speed, direction_deg=wind_dir), seed=seed)
+        self.olf = air.BilateralOlfaction(self.c, self.air)
+        self.windsense = air.WindSense(self.c, self.air)
         self.reset_fly()
         self.superclasses = ["ol_intrinsic", "visual_projection", "cb_intrinsic", "descending_neuron",
                              "vnc_intrinsic", "vnc_motor", "cb_motor", "vnc_sensory"]
@@ -200,6 +205,7 @@ class Sim:
             "trail": self.trail, "spike_hist": self.spike_hist, "tasting": self.tasting,
             "pulses": {"wing_pulse": getattr(self, "wing_pulse", 0), "gf_pulse": getattr(self, "gf_pulse", 0)},
             "flight_hold": getattr(self.flight, "_power_hold", 0.0),
+            "air_t": self.air.t, "gate": getattr(self.loco, "_gate", 0.0),
         }
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         torch.save(state, path)
@@ -223,6 +229,7 @@ class Sim:
         if self.wing_pulse:
             self.wing_idx = self.c.select(type=["DNg02_a", "DNa08"])
         self.flight._power_hold = state["flight_hold"]
+        self.air.t = state.get("air_t", 0.0); self.loco._gate = state.get("gate", 0.0)
         self.col_rad = self.column_radiance()
         self.cmd = self.loco.readout(b, self.groups); self.wcmd = self.flight.readout(b, self.wings)
         print(f"loaded state at t={b.t / 1000:.2f}s <- {path}")
@@ -249,7 +256,9 @@ class Sim:
             self.gf_pulse -= 1
             if self.gf_pulse == 0:
                 self.brain.set_poisson(self.wings.gf, 0.0)
-        self.olf.apply(self.brain, self.fly.eye_pos)
+        self.air.step(FRAME_MS / 1000)
+        self.olf.apply(self.brain, self.fly)
+        self.windsense.apply(self.brain, self.fly)
         self.brain.set_poisson(self.sweet, 120.0 * self.tasting)
         self.brain.step(int(FRAME_MS / self.brain.p.dt))
         self.cmd = self.loco.readout(self.brain, self.groups)
@@ -317,8 +326,16 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
     blit_text(screen, font, f"scene [{'follow' if orbit.follow else 'orbit'} az {orbit.az:.0f} el {orbit.el:.0f} d {orbit.dist:.2f}]  hdg {np.rad2deg(fly.heading) % 360:.0f}  "
               f"{fly.speed * 100:.1f} cm/s  {nf[0]} {nf[1] * 100:.0f} cm" + ("  TASTING" if sim.tasting else ""), sx + 2, 312)
     mode = f"AIRBORNE z={fly.z:.2f} v=({fly.vx:+.2f},{fly.vy:+.2f},{fly.vz:+.2f})" if fly.airborne else ("on table" if abs(fly.z - sim.info["table_top_z"]) < 1e-3 else "on floor")
-    smell = "  ".join(sim.olf.summary().split("  ")[:3])
-    blit_text(screen, font, f"({fly.x:+.2f},{fly.y:+.2f}) {mode}  smell: {smell}"[:60], sx + 2, 328)
+    smell = "  ".join(sim.olf.summary().split("  ")[:2])
+    wind_from = (np.rad2deg(sim.air.direction) + 180) % 360
+    rel = (wind_from - np.rad2deg(fly.heading)) % 360
+    blit_text(screen, font, f"({fly.x:+.2f},{fly.y:+.2f}) {mode}  wind from {wind_from:.0f} ({rel:.0f} rel)  smell L/R: {smell}"[:62], sx + 2, 328)
+    # wind arrow in the scene view (points where the wind blows)
+    ax, ay = sx + sw - 40, sy + 30
+    dv = np.array([np.cos(sim.air.direction), np.sin(sim.air.direction)])
+    pygame.draw.line(screen, (150, 200, 255), (ax - 18 * dv[0], ay + 18 * dv[1]), (ax + 18 * dv[0], ay - 18 * dv[1]), 2)
+    pygame.draw.circle(screen, (150, 200, 255), (int(ax + 18 * dv[0]), int(ay - 18 * dv[1])), 4)
+    blit_text(screen, font, "wind", ax - 14, ay + 22, (150, 200, 255))
     # 3. hex mosaics: fly false colour and drive
     fc = world.to_fly_false_color(sim.col_rad, exposure=2.5).astype(int)
     cf = sim.optic.last["contrast"][0][:, 0] if "contrast" in sim.optic.last else np.zeros(sim.r.n_columns)
@@ -338,16 +355,16 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
     y = oy + 24
     for sc in sim.superclasses:
         rate = sim.brain.mean_rate(sim.sc_idx[sc])
-        pygame.draw.rect(screen, (70, 120, 200), (ox + 120, y, int(min(rate, 50) * 3), 12))
-        blit_text(screen, font, f"{sc[:18]:18s} {rate:5.1f} Hz", ox, y - 2); y += 16
+        pygame.draw.rect(screen, (70, 120, 200), (ox + 120, y, int(min(rate, 50) * 3), 11))
+        blit_text(screen, font, f"{sc[:18]:18s} {rate:5.1f} Hz", ox, y - 2); y += 14
     y += 8
     blit_text(screen, font, "motor readout (Hz)", ox, y); y += 18
     for k, val in sim.cmd["rates"].items():
-        pygame.draw.rect(screen, (220, 120, 60), (ox + 90, y, int(min(val, 80) * 2), 12))
-        blit_text(screen, font, f"{k:9s} {val:5.1f}", ox, y - 2); y += 16
+        pygame.draw.rect(screen, (220, 120, 60), (ox + 90, y, int(min(val, 80) * 2), 11))
+        blit_text(screen, font, f"{k:9s} {val:5.1f}", ox, y - 2); y += 14
     for k, val in sim.wcmd.items():
-        pygame.draw.rect(screen, (120, 160, 240), (ox + 90, y, int(min(val, 80) * 2), 12))
-        blit_text(screen, font, f"{k:9s} {val:5.1f}", ox, y - 2); y += 16
+        pygame.draw.rect(screen, (120, 160, 240), (ox + 90, y, int(min(val, 80) * 2), 11))
+        blit_text(screen, font, f"{k:9s} {val:5.1f}", ox, y - 2); y += 14
     y += 8
     blit_text(screen, font, f"speed cmd {sim.cmd['speed'] * 100:+.2f} cm/s  yaw {np.rad2deg(sim.cmd['yaw']):+.0f} deg/s  proboscis {sim.cmd['proboscis']:.2f}", ox, y); y += 22
     if len(sim.spike_hist) > 2:
@@ -412,6 +429,8 @@ def main():
     ap.add_argument("--map-every", type=int, default=4, help="brain map: sample the brain every N drawn frames (activity fades in between)")
     ap.add_argument("--map-no-blur", action="store_true", help="brain map: no fading between samples")
     ap.add_argument("--load", type=str, default="", help="resume from a saved state (.pt); F5/F9 quick-save/load, S timestamped save")
+    ap.add_argument("--wind-speed", type=float, default=0.3, help="m/s (0 = still air: no plume, no wind cue)")
+    ap.add_argument("--wind-dir", type=float, default=180.0, help="direction the wind blows towards, deg (180 = from the door at +x)")
     args = ap.parse_args()
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -433,7 +452,7 @@ def main():
     elif args.start:
         v = [float(t) for t in args.start.split(",")]
         start = (v[0], v[1], v[2] if len(v) > 2 else 0.75)
-    sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, **fast)
+    sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)
     if args.teleport:

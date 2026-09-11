@@ -32,10 +32,16 @@ class MotorGroups:
     turn_R: np.ndarray
     opto_L: np.ndarray
     opto_R: np.ndarray
+    wind_ipsi_L: np.ndarray     # DNp18 (+ DNge016, DNge175, DNg05_a, DNp19): fire on the side the wind comes from
+    wind_ipsi_R: np.ndarray
+    wind_contra_L: np.ndarray   # DNp33, DNg99: fire on the side away from the wind
+    wind_contra_R: np.ndarray
+    pn: np.ndarray              # antennal-lobe projection neurons: the odour signal that gates upwind turning
     leg_L: np.ndarray
     leg_R: np.ndarray
     proboscis: np.ndarray
     names: dict = field(default_factory=dict)
+    pn_glom: np.ndarray = None  # glomerulus id of each PN (the gate reads the most active glomerulus)
 
 
 def motor_groups(c: Connectome) -> MotorGroups:
@@ -47,10 +53,17 @@ def motor_groups(c: Connectome) -> MotorGroups:
         turn_R=c.select(type="DNa02", somaSide="R"),
         opto_L=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="L"),
         opto_R=c.select(type=["DNp04", "LPT27", "LPT30"], somaSide="R"),
+        wind_ipsi_L=c.select(type=["DNp18", "DNge016", "DNge175", "DNg05_a", "DNp19"], somaSide="L"),
+        wind_ipsi_R=c.select(type=["DNp18", "DNge016", "DNge175", "DNg05_a", "DNp19"], somaSide="R"),
+        wind_contra_L=c.select(type=["DNp33", "DNg99"], somaSide="L"),
+        wind_contra_R=c.select(type=["DNp33", "DNg99"], somaSide="R"),
+        pn=c.select(type="~_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN"),
         leg_L=c.select(superclass="vnc_motor", subclass=["fl", "ml", "hl"], somaSide="L"),
         leg_R=c.select(superclass="vnc_motor", subclass=["fl", "ml", "hl"], somaSide="R"),
         proboscis=c.select(type="MN9"),
     )
+    gl = np.array([t.split("_")[0] for t in c.neurons.type.to_numpy()[g.pn]])
+    g.pn_glom = np.unique(gl, return_inverse=True)[1]
     g.names = {"fwd_dn": fwd_types, "back_dn": ["MDN"], "turn": ["DNa02 L/R"], "opto": ["DNp04, LPT27, LPT30 L/R"], "leg": ["leg MNs L/R"], "proboscis": ["MN9"]}
     return g
 
@@ -106,6 +119,17 @@ class Locomotion:
     k_back: float = 0.02 / 40.0
     k_turn: float = np.deg2rad(200) / 40.0   # rad/s per Hz of DNa02 asymmetry
     k_opto: float = np.deg2rad(150) / 15.0   # rad/s per Hz of DNp04/LPT asymmetry (optomotor, stabilising)
+    opto_hp_tau_s: float = 2.0               # the optomotor term uses the asymmetry minus its 2 s running mean:
+                                             # DNp04's right side carries a chronic bias (asymmetric eye) that
+                                             # otherwise turns the stabilising term into a constant spin
+    # odour-gated anemotaxis (van Breugel & Dickinson 2014): the wind-direction DNs (DNp18 ipsilateral,
+    # DNp33 contralateral to the wind; scripts/probe_wind.py) steer the fly upwind, with a gain gated by
+    # the antennal lobe's odour signal; the gate decays over ~1.5 s after the plume is lost (the surge)
+    k_wind: float = np.deg2rad(120) / 40.0   # rad/s per Hz of wind-DN asymmetry at full gate
+    pn_base_hz: float = 25.0                 # gate = clip((most active glomerulus mean PN rate - base) / pn_gate_hz)
+    pn_gate_hz: float = 60.0
+    gate_tau_s: float = 1.5
+    wind_speed_bonus: float = 0.006          # m/s of extra forward drive at full gate (surge upwind)
     k_leg_turn: float = np.deg2rad(100) / 30.0
     max_speed: float = 0.03
     max_yaw: float = np.deg2rad(400)
@@ -120,14 +144,24 @@ class Locomotion:
         oL, oR = r(g.opto_L), r(g.opto_R)
         lL, lR = r(g.leg_L), r(g.leg_R)
         prob = r(g.proboscis)
+        wiL, wiR, wcL, wcR = r(g.wind_ipsi_L), r(g.wind_ipsi_R), r(g.wind_contra_L), r(g.wind_contra_R)
+        upwind = 0.5 * ((wiL - wiR) - (wcL - wcR))          # + = wind from the left = turn left to face it
+        asym = oL - oR
+        a_hp = np.exp(-0.01 / self.opto_hp_tau_s)
+        self._opto_bias = a_hp * getattr(self, "_opto_bias", asym) + (1 - a_hp) * asym
+        opto = asym - self._opto_bias
+        pn_rates = brain.rates(g.pn)
+        glom_mean = np.bincount(g.pn_glom, weights=pn_rates) / np.maximum(np.bincount(g.pn_glom), 1)
+        odour = float(np.clip((glom_mean.max() - self.pn_base_hz) / self.pn_gate_hz, 0.0, 1.0))
+        self._gate = max(odour, getattr(self, "_gate", 0.0) * np.exp(-0.01 / self.gate_tau_s))
         back_eff = max(back - self.mdn_threshold, 0.0) if np.isscalar(back) else np.maximum(back - self.mdn_threshold, 0.0)
-        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff
+        speed = self.baseline_speed + self.k_fwd * fwd + self.k_leg * 0.5 * (lL + lR) - self.k_back * back_eff + self.wind_speed_bonus * self._gate
         # convention: DNa02 drives ipsilateral turning (Rayshubskiy et al. 2020): right DNa02 -> turn right
-        yaw = -self.k_opto * (oL - oR) - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR)
+        yaw = -self.k_opto * opto - self.k_turn * (tR - tL) + self.k_leg_turn * (lL - lR) + self.k_wind * self._gate * upwind
         return {"speed": float(np.clip(speed, -self.max_speed, self.max_speed)),
                 "yaw": float(np.clip(yaw, -self.max_yaw, self.max_yaw)),
                 "proboscis": float(np.clip(prob / 30.0, 0, 1)),
-                "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": prob}}
+                "rates": {"fwdDN": fwd, "MDN": back, "opto_L": oL, "opto_R": oR, "wind_L": wiL, "wind_R": wiR, "gate x10": self._gate * 10, "DNa02_L": tL, "DNa02_R": tR, "legMN_L": lL, "legMN_R": lR, "MN9": prob}}
 
     def step(self, fly: FlyState, cmd: dict, dt_s: float, bounds: tuple) -> None:
         a = np.exp(-dt_s * 1000 / self.tau_ms)
