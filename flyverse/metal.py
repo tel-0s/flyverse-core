@@ -131,6 +131,154 @@ kernel void optic_substep(device float* v [[buffer(0)]], device float* adapt [[b
     float bb = bvec[i];
     dr[tid] = clamp(vv + bb, 0.0f, 1.0f) - bb;
 }
+// ---------------------------------------------------------------- ray tracer (world.World._trace)
+// One thread per ray; the same intersections, precedence (spheres, then boxes, then planes, strict-less
+// override), shading, shadow ray, patterns and value noise as the torch implementation.
+#define TRACE_INF 1e9f
+
+struct Scene {
+    device const float* sc; device const float* sr;       // (S, 3) ellipsoid centres, radii
+    device const float* blo; device const float* bhi;     // (Bx, 3) boxes
+    device const float* pp; device const float* pn;       // (P, 3) planes: point, unit normal
+    uint S; uint Bx; uint P;
+};
+
+static float intersect(thread const Scene& sc, float3 o, float3 d, thread float3& best_n, thread int& best_id, int miss_id) {
+    const float eps = 1e-4f;
+    float best_t = TRACE_INF; best_id = miss_id; best_n = float3(0.0f);
+    for (uint i = 0; i < sc.S; ++i) {
+        float3 c = float3(sc.sc[3*i], sc.sc[3*i+1], sc.sc[3*i+2]);
+        float3 r = float3(sc.sr[3*i], sc.sr[3*i+1], sc.sr[3*i+2]);
+        float3 oc = (o - c) / r; float3 dd = d / r;
+        float a = dot(dd, dd); float b = 2.0f * dot(oc, dd); float cc = dot(oc, oc) - 1.0f;
+        float disc = b * b - 4.0f * a * cc;
+        bool ok = disc > 0.0f;
+        float sq = sqrt(max(disc, 0.0f));
+        float t0 = (-b - sq) / (2.0f * a); float t1 = (-b + sq) / (2.0f * a);
+        float t = t0 > eps ? t0 : t1;
+        t = (ok && t > eps) ? t : TRACE_INF;
+        if (t < best_t) {
+            best_t = t; best_id = (int)i;
+            float3 pt = o + d * t;
+            float3 n = (pt - c) / (r * r);
+            best_n = n / max(length(n), 1e-9f);
+        }
+    }
+    for (uint i = 0; i < sc.Bx; ++i) {
+        float3 lo = float3(sc.blo[3*i], sc.blo[3*i+1], sc.blo[3*i+2]);
+        float3 hi = float3(sc.bhi[3*i], sc.bhi[3*i+1], sc.bhi[3*i+2]);
+        float3 dsafe = float3(fabs(d.x) < 1e-9f ? 1e-9f : d.x, fabs(d.y) < 1e-9f ? 1e-9f : d.y, fabs(d.z) < 1e-9f ? 1e-9f : d.z);
+        float3 inv = 1.0f / dsafe;
+        float3 tlo = (lo - o) * inv; float3 thi = (hi - o) * inv;
+        float3 tn = min(tlo, thi); float3 tf = max(tlo, thi);
+        int ax = 0; float t_enter = tn.x;
+        if (tn.y > t_enter) { t_enter = tn.y; ax = 1; }
+        if (tn.z > t_enter) { t_enter = tn.z; ax = 2; }
+        float t_exit = min(tf.x, min(tf.y, tf.z));
+        float t = (t_exit > t_enter && t_enter > eps) ? t_enter : TRACE_INF;
+        if (t < best_t) {
+            best_t = t; best_id = (int)(sc.S + i);
+            float dax = ax == 0 ? d.x : (ax == 1 ? d.y : d.z);
+            float sgn = -(dax > 0.0f ? 1.0f : (dax < 0.0f ? -1.0f : 0.0f));
+            best_n = float3(ax == 0 ? sgn : 0.0f, ax == 1 ? sgn : 0.0f, ax == 2 ? sgn : 0.0f);
+        }
+    }
+    for (uint i = 0; i < sc.P; ++i) {
+        float3 pt = float3(sc.pp[3*i], sc.pp[3*i+1], sc.pp[3*i+2]);
+        float3 n = float3(sc.pn[3*i], sc.pn[3*i+1], sc.pn[3*i+2]);
+        float denom = dot(d, n);
+        float t = dot(pt - o, n) / (fabs(denom) < 1e-9f ? 1e-9f : denom);
+        t = (t > eps && fabs(denom) > 1e-9f) ? t : TRACE_INF;
+        if (t < best_t) {
+            best_t = t; best_id = (int)(sc.S + sc.Bx + i);
+            best_n = dot(n, d) > 0.0f ? -n : n;
+        }
+    }
+    return best_t;
+}
+
+static float pymod(float x, float m) { float r = fmod(x, m); return r < 0.0f ? r + m : r; }
+
+static float hash3(long i0, long i1, long i2) {
+    const long M = 2147483647L;
+    long h = i0 * 374761393L + i1 * 668265263L + i2 * 2147483647L;
+    h = h % M; if (h < 0) h += M;
+    h = (h ^ (h >> 13)) * 1274126177L;
+    h = h % M; if (h < 0) h += M;
+    long r = h % 65536L; if (r < 0) r += 65536L;
+    return (float)r / 32768.0f - 1.0f;
+}
+
+static float value_noise(float3 p, float scale) {
+    float3 q = p / scale;
+    float3 fl = floor(q);
+    long i0 = (long)fl.x, i1 = (long)fl.y, i2 = (long)fl.z;
+    float3 f = q - fl;
+    f = f * f * (3.0f - 2.0f * f);
+    float out = 0.0f;
+    for (int dx = 0; dx < 2; ++dx) {
+        float wx = dx ? f.x : 1.0f - f.x;
+        for (int dy = 0; dy < 2; ++dy) {
+            float wy = dy ? f.y : 1.0f - f.y;
+            for (int dz = 0; dz < 2; ++dz) {
+                float wz = dz ? f.z : 1.0f - f.z;
+                out += wx * wy * wz * hash3(i0 + dx, i1 + dy, i2 + dz);
+            }
+        }
+    }
+    return out;
+}
+
+// light = [lp(3), lc(4), amb(4)]; mats: refl, refl2, emit (K, 4), pattern (K) int, pscale (K); miss id = K - 1
+kernel void trace_rays(device const float* o [[buffer(0)]], device const float* d [[buffer(1)]],
+                       device const float* sc [[buffer(2)]], device const float* sr [[buffer(3)]],
+                       device const float* blo [[buffer(4)]], device const float* bhi [[buffer(5)]],
+                       device const float* pp [[buffer(6)]], device const float* pn [[buffer(7)]],
+                       device const float* refl [[buffer(8)]], device const float* refl2 [[buffer(9)]],
+                       device const float* emit [[buffer(10)]], device const int* pattern [[buffer(11)]],
+                       device const float* pscale [[buffer(12)]], device const float* light [[buffer(13)]],
+                       device float* out [[buffer(14)]],
+                       constant uint& S [[buffer(15)]], constant uint& Bx [[buffer(16)]], constant uint& P [[buffer(17)]],
+                       constant uint& K [[buffer(18)]], constant uint& M [[buffer(19)]], constant float& detail [[buffer(20)]],
+                       uint tid [[thread_position_in_grid]]) {
+    if (tid >= M) return;
+    Scene scene = {sc, sr, blo, bhi, pp, pn, S, Bx, P};
+    float3 ro = float3(o[3*tid], o[3*tid+1], o[3*tid+2]);
+    float3 rd = float3(d[3*tid], d[3*tid+1], d[3*tid+2]);
+    float3 n; int mid;
+    float t = intersect(scene, ro, rd, n, mid, (int)K - 1);
+    if (!(t < TRACE_INF)) { out[4*tid] = 0.0f; out[4*tid+1] = 0.0f; out[4*tid+2] = 0.0f; out[4*tid+3] = 0.0f; return; }
+    float3 p = ro + rd * t;
+    float3 lp = float3(light[0], light[1], light[2]);
+    float3 to_l = lp - p;
+    float dist = length(to_l);
+    float3 l = to_l / max(dist, 1e-9f);
+    float lam = max(dot(n, l), 0.0f);
+    float3 n2; int id2;
+    float ts = intersect(scene, p + n * 1e-3f, l, n2, id2, (int)K - 1);
+    float lit = ts >= dist ? 1.0f : 0.0f;
+    float falloff = 4.0f / (1.0f + dist * dist);
+    // texture
+    int pat = pattern[mid]; float psc = pscale[mid];
+    float fx = floor(p.x / psc); float fy = floor(p.y / psc);
+    bool checks = pymod(fx + fy, 2.0f) == 1.0f;
+    float horiz = fabs(n.x) > 0.5f ? fy : fx;
+    bool stripes = pymod(horiz, 2.0f) == 1.0f;
+    bool planks = (pymod(fy, 2.0f) == 1.0f) || (pymod(fx + 3.0f * fy, 7.0f) == 0.0f);
+    bool second = pat == 1 ? checks : (pat == 2 ? stripes : (pat == 3 ? planks : false));
+    device const float* rf = second ? refl2 + 4 * mid : refl + 4 * mid;
+    float m = 1.0f;
+    if (detail > 0.0f) {
+        m = 1.0f + detail * (0.5f * value_noise(p, 0.02f) + 0.3f * value_noise(p, 0.008f) + 0.2f * value_noise(p, 0.003f));
+        m = max(m, 0.1f);
+    }
+    float shade = lam * lit * falloff;
+    for (int k = 0; k < 4; ++k) {
+        float r = rf[k];
+        if (detail > 0.0f) r = r * m;
+        out[4*tid + k] = r * (light[7 + k] + light[3 + k] * shade) + emit[4 * mid + k];
+    }
+}
 """
 
 _LIB = None
@@ -223,3 +371,20 @@ def optic_substep(v, adapt, dr, y, pr_in, spk_in, a, bvec, gain_rr: float, adapt
     B, n = v.shape
     args = [_c(t) for t in (v, adapt, dr, y, pr_in, spk_in, a, bvec)]
     lib().optic_substep(*args, float(gain_rr), float(adapt_gain), float(a_ad), n, B * n, threads=B * n, group_size=GROUP)
+
+
+def trace_rays(o, d, sc, sr, blo, bhi, pp, pn, refl, refl2, emit, pattern, pscale, light, detail: float) -> torch.Tensor:
+    """Radiance (M, 4) for rays o, d (M, 3) in the packed scene (world.World). Empty object classes pass a
+    dummy row with count 0."""
+    o = _c(o); d = _c(d)
+    M = o.shape[0]
+    out = torch.empty(M, 4, dtype=torch.float32, device=o.device)
+    if M == 0:
+        return out
+    def buf(t, n):
+        return _c(t) if n else torch.zeros(1, 3, dtype=torch.float32, device=o.device)
+    S, Bx, P = sc.shape[0], blo.shape[0], pp.shape[0]
+    lib().trace_rays(o, d, buf(sc, S), buf(sr, S), buf(blo, Bx), buf(bhi, Bx), buf(pp, P), buf(pn, P),
+                     _c(refl), _c(refl2), _c(emit), _c(pattern, torch.int32), _c(pscale), _c(light), out,
+                     S, Bx, P, refl.shape[0], M, float(detail), threads=M, group_size=GROUP)
+    return out

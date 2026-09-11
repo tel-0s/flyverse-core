@@ -753,3 +753,7 @@ SIMD-group CSR spmv, fused optic substep) through `torch.mps.compile_shader`. Fu
 0.15x -> 0.29x real time, `--fast` 0.24x -> 0.39x; numbers, validation and what is left in
 `docs/PERFORMANCE.md`. Spikes are identical to the torch path; continuous state agrees to ~1e-4
 (fast-math contraction). Next target on the Mac is the ray tracer (~10 ms of small launches per frame).
+
+Session 6, continued: the ray tracer as one Metal kernel plus a fix for a scene-repacking bug that hit every
+MPS trace (device `mps:0` != `mps`). Full-fidelity demo 0.29x -> 0.78x real time, `--fast` 0.39x -> 1.19x.
+The brain's own GPU time (~9 ms per 10 ms frame at full fidelity) is now the floor on the Mac.

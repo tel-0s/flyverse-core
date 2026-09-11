@@ -13,6 +13,7 @@ import numpy as np
 import torch
 
 from .device import default_device
+from . import metal
 
 INF = 1e9
 _NOISE_CORNERS = [(x, y, z) for x in (0, 1) for y in (0, 1) for z in (0, 1)]
@@ -149,6 +150,10 @@ class World:
         self._lc = torch.tensor(self.light_color, dtype=torch.float32, device=d)
         self._amb = torch.tensor(self.ambient, dtype=torch.float32, device=d)
         self._noise_corners = torch.tensor(_NOISE_CORNERS, device=d)
+        self._metal = metal.use(d)
+        if self._metal:   # flyverse/metal.py trace_rays reads these directly (move_sphere edits _sc/_sr in place)
+            self._pattern32 = self._pattern.to(torch.int32)
+            self._light = torch.cat([self._lp, self._lc, self._amb]).contiguous()
         self._scene_shape = (len(self.spheres), len(self.boxes), len(self.planes))
         self._trace_graphs = {}
         self._packed = True
@@ -216,6 +221,8 @@ class World:
         device = torch.device(self.device)
         if device.type == "cuda" and device.index is None:
             device = torch.device("cuda", torch.cuda.current_device())
+        elif device.type == "mps" and device.index is None:
+            device = torch.device("mps", 0)          # packed tensors report mps:0; unequal devices repacked every call
         if cuda_graphs and device.type != "cuda":
             raise ValueError("ray-tracing CUDA graphs require a CUDA device")
         shape = (len(self.spheres), len(self.boxes), len(self.planes))
@@ -225,6 +232,9 @@ class World:
         o = origins.to(device, torch.float32); d = dirs.to(device, torch.float32)
         if cuda_graphs:
             return self._graph_trace(o, d)
+        if self._metal:
+            return metal.trace_rays(o.contiguous(), d.contiguous(), self._sc, self._sr, self._blo, self._bhi, self._pp, self._pn,
+                                    self._refl, self._refl2, self._emit, self._pattern32, self._pscale, self._light, self.detail)
         return self._trace(o, d)
 
     def _graph_trace(self, o, d):

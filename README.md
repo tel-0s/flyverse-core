@@ -35,8 +35,8 @@ and replay each neural frame and the sensory ray tracing) gives 0.8x; `--dt-by-m
 (10.4 ms); `--fast --cuda-graphs` is 1.3x. Graphs match the eager spike train for ~130 frames and
 then diverge by a spike (chaos); fp16 and the coarser clock change spikes from the start, so the
 probes run eager. Numbers and behavioural checks in `docs/NOTES.md`. On an M-series Mac the brain
-runs on custom Metal kernels (`flyverse/metal.py`): 0.3x real time at full fidelity, 0.4x with `--fast`
-(`docs/PERFORMANCE.md`).
+and the ray tracer run on custom Metal kernels (`flyverse/metal.py`): 0.8x real time at full fidelity,
+1.2x with `--fast` (`docs/PERFORMANCE.md`).
 
 Options: `--brain-map` (all 140k located somata in dorsal and lateral view, activity as highlights;
 `--map-every N`, `--map-no-blur`), `--trail-seconds` (decaying trail in the scene view), `--start x,y[,z]`
@@ -48,9 +48,9 @@ Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome`
 `FLYVERSE_DATA`); only `body-annotations`, `body-neurotransmitters` and `connectome-weights` are used
 (1.1 GB). Torch backend: CUDA, else Apple MPS, else CPU (`FLYVERSE_DEVICE`); on MPS/CPU the synaptic
 input is an event-driven gather instead of the sparse matmul (`flyverse/device.py`). On MPS the gather,
-the LIF update and the optic lobe's sparse products are hand-written Metal kernels compiled at first use
-through `torch.mps.compile_shader` (`flyverse/metal.py`; `FLYVERSE_METAL=0` for plain torch). Spike
-trains match the torch path exactly; continuous state agrees to ~1e-4.
+the LIF update, the optic lobe's sparse products and the ray tracer are hand-written Metal kernels
+compiled at first use through `torch.mps.compile_shader` (`flyverse/metal.py`; `FLYVERSE_METAL=0` for
+plain torch). Spike trains match the torch path exactly; continuous state and radiance agree to ~1e-4.
 
 ## What is simulated
 
@@ -178,7 +178,7 @@ flyverse/retina.py       photoreceptor -> hex column -> viewing direction; spect
 flyverse/world.py        torch ray tracer: room, table, fruit, 4-channel light, fly-scale textures
 flyverse/optic.py        graded optic lobe + photoreceptor contrast stage + interface to the LIF
 flyverse/brain.py        whole-CNS LIF (torch sparse, batched)
-flyverse/metal.py        Metal kernels for the MPS backend: event scatter, fused LIF update, CSR spmv, optic substep
+flyverse/metal.py        Metal kernels for the MPS backend: event scatter, fused LIF update, CSR spmv, optic substep, ray tracer
 flyverse/air.py          wind, plumes, bilateral olfaction, Johnston's organ wind sense
 flyverse/regions.py      named brain modules, Connectome subsets, path-based paring
 flyverse/fly.py          FlyBrain: the control surface (senses in, MotorRates out, step / budget / state)

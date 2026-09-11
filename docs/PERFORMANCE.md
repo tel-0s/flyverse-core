@@ -199,3 +199,42 @@ What remains per frame at full fidelity: the brain's ~15 ms of GPU time (20 LIF 
 substeps; MPS only enqueues in `brain.frame`, so the wait appears in `brain.motor`), sensory ray tracing
 ~10 ms (hundreds of small torch ops; the same treatment would apply), senses ~2 ms, and drawing ~4 ms
 amortised over every fourth frame.
+
+### Ray tracer as one Metal kernel, and a repacking bug (September 11, 2026)
+
+`trace_rays` in `flyverse/metal.py` is `World._trace` as one thread per ray: the same sphere / box / plane
+tests in the same precedence (later classes override only on strictly smaller t, first index wins ties),
+the shadow ray, patterns and the three octaves of value noise with the 64-bit integer hash. `World.trace`
+uses it on MPS for the sensory rays and both display cameras; `move_sphere` still edits the packed
+buffers in place, and CUDA capture is untouched.
+
+While validating it, a pre-existing MPS bug surfaced: `trace` compared the packed tensors' device
+(`mps:0`) with `torch.device("mps")` (index None), found them unequal and **repacked the whole scene on
+every call** -- ~15 host-to-device uploads, ~3 ms, per sensory trace and per camera render, serialising
+the GPU queue behind them. The device is now normalised as it already was for CUDA. The torch tracer
+benefits too (480x300 camera: 55 -> 6.6 ms).
+
+| | torch on MPS | Metal |
+|---|---:|---:|
+| sensory trace, 10,262 rays | 4.31 ms | **0.59 ms** |
+| camera 480x300 | 6.6 ms (55 ms with the repack bug) | **4.6 ms** |
+| camera 120x75 (`--cam-scale 4`) | -- | 0.86 ms |
+
+Demo (`profile_room.py --headless --cam-scale 4 --trail-seconds 0`, 20 + 80 frames):
+
+| per 10 ms frame | torch on MPS | Metal brain + optic | + Metal tracer, repack fix |
+|---|---:|---:|---:|
+| full fidelity (LIF dt 0.5, optic dt 1) | 66.5 ms (0.15x) | 34.3 ms (0.29x) | **12.8 ms (0.78x)** |
+| `--fast` (LIF dt 1, optic dt 2) | 41.6 ms (0.24x) | 25.9 ms (0.39x) | **8.4 ms (1.19x)** |
+| full fidelity, full-resolution camera (`--cam-scale 1`) | | | 13.5 ms (0.74x) |
+
+The step from 34 to 13 ms is larger than the tracer's own saving because the repack uploads were also
+what every later `.cpu()` had to wait behind. What remains at full fidelity is the brain's own GPU time
+(~9 ms: 20 LIF steps, 10 optic substeps), seen as the wait in `brain.motor`; sensing, ray tracing and
+amortised drawing are ~1 ms each.
+
+Agreement with the torch tracer (`tests/test_metal.py`): bit-identical with `detail = 0`; with the
+surface noise on, radiance differs by at most 4.6e-5 on the sensory rays and 3.8e-4 on camera pixels
+(values 0.1-1) from fast-math contraction in the noise. `#pragma METAL fp contract(off)` was tried: it
+makes 99.8% of rays bit-exact (the rest is Metal's fast division / sqrt, and for the LIF the order of the
+atomic adds in the scatter) at twice the trace time, so the kernels keep fast-math.

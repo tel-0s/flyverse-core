@@ -6,7 +6,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
-from flyverse import metal
+from flyverse import metal, world
 from flyverse.brain import Brain, LIFParams
 from test_control import graph
 
@@ -110,6 +110,56 @@ class OpticKernelTests(unittest.TestCase):
         torch.testing.assert_close(vm, v_ref, rtol=1e-5, atol=1e-6)
         torch.testing.assert_close(am, adapt_ref, rtol=1e-5, atol=1e-6)
         torch.testing.assert_close(dr, dr_ref, rtol=1e-5, atol=1e-6)
+
+
+@unittest.skipUnless(HAVE, "Metal kernels need an MPS device")
+class TraceTests(unittest.TestCase):
+    def rays(self, n=2000, seed=0):
+        g = torch.Generator().manual_seed(seed)
+        o = torch.tensor([-0.49, 0.05, 0.7512]) + torch.randn(n, 3, generator=g) * torch.tensor([0.3, 0.3, 0.02])
+        d = torch.randn(n, 3, generator=g); d = d / d.norm(dim=1, keepdim=True)
+        return o, d
+
+    def both(self, w, o, d):
+        rm = w.trace(o, d); w._metal = False
+        try:
+            rt = w.trace(o, d)
+        finally:
+            w._metal = True
+        return rm, rt
+
+    def test_matches_torch_tracer(self):
+        w, info = world.make_room(0)
+        o, d = self.rays()
+        rm, rt = self.both(w, o, d)
+        self.assertEqual(rm.shape, (2000, 4))
+        self.assertGreater(float((rt > 0).float().mean()), 0.5)
+        torch.testing.assert_close(rm, rt, rtol=2e-3, atol=5e-4)        # fast-math rounding inside the value noise
+        w.detail = 0.0
+        rm, rt = self.both(w, o, d)
+        torch.testing.assert_close(rm, rt, rtol=0, atol=0)               # flat colours: identical
+
+    def test_moved_sphere_and_empty_classes(self):
+        w, info = world.make_room(0)
+        w.spheres.append(world.Sphere((9, 9, 9), (0.03, 0.03, 0.03), "black"))
+        o = torch.tensor([[-0.49, 0.05, 0.7512]] * 3); d = torch.tensor([[1.0, 0.0, 0.0]] * 3)
+        before = w.trace(o, d).clone()
+        w.move_sphere(len(w.spheres) - 1, (-0.3, 0.05, 0.7512))         # in-place edit of the packed buffers
+        after = w.trace(o, d)
+        self.assertGreater(float((before - after).abs().max()), 1e-3)
+        empty = world.World(planes=[world.Plane((1, 0, 0), (-1, 0, 0), "wall")])
+        rm, rt = self.both(empty, o, d)
+        torch.testing.assert_close(rm, rt, rtol=2e-3, atol=5e-4)
+        self.assertTrue(bool((world.World().trace(o, d) == 0).all()))    # nothing to hit
+
+    def test_camera_matches(self):
+        w, info = world.make_room(0)
+        im = w.render_camera((-0.49, 0.05, 0.7512), (1, 0, 0.05), (0, 0, 1), 64, 40, 110); w._metal = False
+        try:
+            it = w.render_camera((-0.49, 0.05, 0.7512), (1, 0, 0.05), (0, 0, 1), 64, 40, 110)
+        finally:
+            w._metal = True
+        torch.testing.assert_close(im, it, rtol=2e-3, atol=5e-4)
 
 
 if __name__ == "__main__":
