@@ -96,12 +96,19 @@ reach the legs and ones that do not.
 
 Flies find fruit by odour-gated anemotaxis: surge upwind on an odour hit, cast crosswind when it is
 lost. The room has wind and plumes, the fly has two antennae and a wind sense, and the brain's own
-wind-direction DNs (DNp18 / DNp33) steer it upwind with a gain gated by the antennal lobe's odour
-signal -- the gate is the one behavioural assumption the wiring does not supply itself. Starting
-7-12 cm downwind, the fly reaches fruit and feeds in 2 of 3 runs (`scripts/probe_foraging.py`).
+wind-direction DNs (DNp18 / DNp33) steer it upwind with a gain gated by an odour signal. The gate is
+the brain's too: a screen of every lateral-horn, mushroom-body-output and descending cell type at
+fruit and plume-free sites (with heading-matched controls) found six lateral-horn types
+(`body.LH_ODOUR_TYPES`, 14 cells) that fire ~23 Hz next to fruit and ~5 Hz away from it, whichever way
+the fly faces; the wind-facing types (WED, DNp18) fall out of the same screen as a control.
 An energy state closes the loop (`body.Metabolism`): hunger scales the upwind drive, feeding refills
-energy, satiety releases the fly from the fruit, and losing the plume triggers crosswind casting.
-`scripts/probe_sustain.py` runs the fly for minutes and counts meals.
+energy, satiety releases the fly from the fruit, losing the plume triggers crosswind casting, and a
+hungry fly without odour runs the documented offset response -- a downwind drift with local search --
+until it finds a plume again. Body-level assumptions (all named parameters of `body.Locomotion` /
+`Flight`): the gate threshold, the search program, contact-mediated table-edge behaviour, and
+escape habituation (the escape threshold rises with the giant fibre's recent activity, so a loom
+still fires it but a wall 10 cm from the eye does not keep it hopping).
+`scripts/probe_sustain.py` runs the fly for minutes and counts meals; the numbers are in the notes.
 
 ## RL on top of the brain
 

@@ -389,6 +389,82 @@ and spike-frequency adaptation.
   casting / feeding, with an energy bar and meal count. `scripts/probe_sustain.py` scores minutes of
   autonomy: meals, minimum energy, hops, path length, time in each mode.
 
+## Session 8: making the loop hold (sustain)
+
+The first 5-minute sustain run (energy 0.4, fruit 10 cm away) failed in an instructive way: first
+meal only at 125 s, 18 hops, and the fly ended on the floor. Each cause turned out to be a readout or
+body assumption, not the connectome:
+
+* **The odour gate was too slow.** With gate = (max-glomerulus PN rate - 25) / 60 the fly surged only
+  when almost on the fruit. Second version: max-glomerulus rate against a 10 s adapting baseline
+  ("onsets count, sustained odour fades"): first meal at 15 s instead of 125 s -- but on the floor,
+  2 m upwind of any plume, it read "odour" 70-95% of the time. Recording the per-glomerulus PN means
+  at four sites (30 s each, `scratchpad/record_pn.py`) showed why: the model's antennal lobe is
+  noisy. 90 of 625 PNs exceed 40 Hz in 20 s with 1 Hz ORN input; the strongest bursters (110-154 Hz)
+  are the 275 multiglomerular `M_` PNs (many GABAergic), which the gate had been treating as one
+  glomerulus; and 2-cell glomeruli (DC1, DA4m, VP1m ...) burst to 50-85 Hz for a second at a time. The
+  real odour code is a *sustained*, glomerulus-specific elevation: blueberry -> DM2 (4 PNs) 80 Hz;
+  apple, 8 cm downwind -> DM1 71, VA2 58, DM2 52 Hz. Candidate statistics were scored offline
+  (fraction of time gate > 0.6: want high next to fruit, ~0 on a plume-free spot):
+
+  | statistic | blueberry | apple | plume-free table | floor |
+  |---|---|---|---|---|
+  | adaptive max (shrunk, 0.3 s smooth, 10 s baseline) | 0% | 0% | 0% | 0% |
+  | per-glomerulus baseline, tau 30 s | 81% | 59% | 6% | 0% |
+  | **level: 1 s smooth, glomeruli >= 3 PNs, max - median, (x - 20) / 40** | **100%** | **100%** | **0%** | **0%** |
+  | top-3 mean - median | 100% | 0% | 0% | 0% |
+
+  The level statistic is now the gate (`Locomotion.pn_smooth_s`, `pn_min_cells`, `pn_base_hz`,
+  `pn_gate_hz`); uniglomerular PNs only (350 cells in 70 glomeruli, 46 with >= 3 PNs). No adaptation:
+  a sated fly stays near its food, which is what flies do; hunger scaling (x0.3 at zero hunger) and
+  satiety do the leaving.
+* **The table-edge "nudge" was a 720 deg/s spin.** `Locomotion.step` turned the fly by pi/2 * 8 rad/s
+  for every frame its next step lay outside the bounds. Pushed against the y-edge by the upwind
+  drive, the fly pirouetted at 720 deg/s for a minute at a time (the commanded yaw never exceeded
+  +-200 deg/s; the heading log gave it away), the rotating scene drove LPLC2 / LC4 (3,000-9,700 mV/s
+  into the GF -- a genuine expansion signal from the walls), the giant fibre fired 60-80 Hz every
+  second, the fly hopped off the table and then round the room (122 hops in 5 min), and the visual
+  storm even showed up in the PNs. Replaced by contact-mediated edge behaviour: slide along the
+  edge, turn towards the interior at 90 deg/s, heading wrapped. Corner-of-the-room check: 58 deg/s
+  mean turning instead of 600, and the fly walks out of the corner.
+* **Walls fire the giant fibre harder than a loom.** With the spin gone, a fly next to a wall (10 cm,
+  filling the eye, expanding with every turn) still had the GF at 57-72 Hz *sustained* -- more than
+  the 32-48 Hz peak of a 3 cm ball at 1 m/s. LPLC2 in the animal is inhibited by wide-field motion;
+  the rate model's LPLC2 is not, and no threshold separates the two. Time course does: the loom is a
+  burst from silence. `Flight.gf_habituation`: the escape threshold is `gf_hz` (30) plus the GF's 10 s
+  running mean. Loom from rest: threshold ~33-35, escape fires (4 of 5 looms; real flies escape a
+  similar fraction). Corner: 3-4 first-contact hops in 30 s instead of 11, then the threshold sits at
+  ~40 above the sustained drive. Raising the LC4/LPLC2 -> GF gain to x4 did not raise loom peaks
+  (32-48 Hz at x3 and x4: a ~100 ms burst can only carry so many spikes) and was reverted.
+* The five central-brain inputs that fire the GF during ordinary walking (input-weighted: SAD073,
+  GNG300, DNp70, CL367, PVLP010) are damped x0.3 (`DEFAULT_TYPE_PATH_GAIN`); walking GF peak 25-29 Hz.
+* **The brain supplies the gate after all.** The open question from session 7 was whether some central
+  population carries the odour signal cleanly enough to replace the hand-made PN statistic. Recording
+  the mean rate of every LH / MB-output / DN / WED type (3,245 types, 12,460 cells) at the fruit sites
+  and the plume-free ones, with heading-matched controls (the fly facing into vs away from the wind at
+  both kinds of site), and ranking by d' between the worst odour site and the best clean site:
+
+  | type (cells) | blueberry, into wind | apple | blueberry, away from wind | clean table, into wind | clean, away | floor |
+  |---|---|---|---|---|---|---|
+  | LHPD4d2_b (2) | 23.5 | 14.7 | 23.4 | 4.6 | 5.0 | 1.8 |
+  | LHPD4a2 (4) | 22.4 | 14.7 | 22.3 | 4.8 | 5.2 | 1.8 |
+  | LHAV3k1 (2) | 26.0 | 19.7 | 26.0 | 9.4 | 9.9 | 4.9 |
+  | LHAV3h1 (2) | 26.7 | 22.1 | 26.8 | 9.9 | 10.3 | 3.7 |
+  | LHPD5c1 (2) | 35.2 | 34.2 | 35.9 | 19.3 | 20.1 | 7.4 |
+  | LHAD1f2 (2) | 24.4 | 17.8 | 25.0 | 8.1 | 8.8 | 4.2 |
+  | WED080 (2) -- wind, not odour | 14.6 | 15.9 | 0.6 | 15.6 | 0.2 | 0.1 |
+  | DNp18 (2) -- wind, not odour | 26.6 | 27.7 | 11.0 | 26.9 | 9.4 | 8.2 |
+
+  Every one of the six lateral-horn types separates fruit from no-fruit 100% / 0% of the time at a
+  midpoint threshold, independent of heading; the LH is the innate-valence output of the olfactory
+  system, so this is the right place to find it. The wind-facing types (WED, DNp18, DNg05_a, DNge016)
+  fall out of the same screen as a control: identical with and without odour at the same heading,
+  which independently confirms the JO -> WED -> DNp18 wind-direction readout. `body.LH_ODOUR_TYPES`
+  (14 cells) is now the default odour source (`Locomotion.odour_source = "lh"`, gate = (1 s-smoothed
+  mean rate - 10) / 12); the PN level statistic remains as `odour_source = "pn"`.
+* `scripts/probe_sustain.py` scores minutes of autonomy: meals, minimum energy, hops, path length,
+  time in each mode. Numbers for the current defaults are below.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
