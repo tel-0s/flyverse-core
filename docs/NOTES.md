@@ -500,6 +500,41 @@ body assumption, not the connectome:
   `ablate` / `restore`. `scripts/screen_odour.py` reproduces the LH result; `scripts/screen_steering.py`
   asks whether any bilateral population's L - R asymmetry flips with wind side more under odour --
   i.e. whether the brain already computes the gated steering the program supplies.
+* **Does the brain already compute the gated steering? No -- and the screen says where it would.**
+  `scripts/screen_steering.py` (1,993 bilateral types by side, fruit vs plume-free site, wind on the
+  fly's left vs right, pose pinned, 30 s each). The wind-side signal is enormous and purely
+  mechanosensory: L - R flips by DNp33 -49 Hz, DNp18 +45, WED080 -41, DNge016 +30, DNg99 -19, DNp73
+  +18, DNp19 +17 -- and *identical* with and without odour (DNp18 +44.8 vs +44.2 Hz). The best odour x
+  wind-side interaction anywhere is d' 0.70 (DNge133, 2 cells at 4 Hz), i.e. nothing. The reference
+  rows are the finding: the central-complex steering output is silent in the full model -- PFL3
+  0.00 Hz, DNa02 0.01, LAL010 0.14 (the wind DNs and the LH odour population both fire; their
+  integration point does not). So the anemotaxis program is standing in for a specific silent
+  region, and that region -- not the body -- is where a simulated module belongs: a CX / LAL model
+  taking the wind-direction DNs and the LH odour signal, driving DNa02 by stimulation.
+* **The central complex is silent.** Census in the full model (fly 6 cm from the blueberries,
+  walking, 17 s; mean rate and fraction of cells above 1 Hz): EPG compass 0.01 Hz / 0%, PEN, PEG,
+  Delta7, PFL, PFN, PFR, hDelta, vDelta all 0.00 / 0%, ring neurons (ER) 0.08 / 2%, FB tangentials
+  0.22 / 3%, LAL 0.87 / 13% -- against LH 1.7 / 20%, MBON 4.3 / 46%, KC 1.0 / 19%, DNs 2.0 / 22%,
+  visual projection 0.7 / 11%. The model has no heading representation, so it has no goal steering
+  (PFL3 -> DNa02), whatever the wind DNs and the LH say. Whether the CX is input-starved (the ring
+  neurons' visual pathway MeTu -> AOTU -> TuBu -> ER) or cannot sustain its attractor under the
+  anti-runaway settings is the next experiment, and the natural place for the first swapped-in
+  module.
+* **Why the CX is silent, causally** (`FlyBrain.stimulate` at the blueberry site):
+  - the visual pathway to the compass dies before the ring neurons: MeTu 0.7 Hz -> TuBu 0.1 -> AOTU
+    0.1 -> ER 0.0. Driving all ER ring neurons at 40 Hz leaves EPG at 0.0 (they are GABAergic onto
+    EPG, so that is the expected sign, not a bug);
+  - the attractor does not sustain: driving a quarter of the EPG population at 60 Hz recruits Delta7
+    (11.6 Hz) and ExR (8.5) but PEN only 0.3 Hz, and 3 s after the pulse EPG is back to 0.4 -- the
+    EPG <-> PEN recurrence that makes the compass a ring attractor does not close under the current
+    synaptic scaling (candidates: the fan-in cap, conn_cap, and same-type damping on these dense,
+    stereotyped connections);
+  - the output works: PFL3-left at 80 Hz -> DNa02-right 22.6 Hz, DNa02-left 0.0 -- the contralateral
+    steering projection of the animal, intact down to the legs.
+  A swapped-in module therefore has a precise contract: supply the compass (heading -> EPG bump) and
+  the goal comparison, drive PFL3 L / R by stimulation, and the connectome does the rest. That, not a
+  body program, is the principled replacement for `AnemotaxisProgram`; alternatively, the two
+  synaptic questions above (TuBu / AOTU silence, EPG <-> PEN gain) are tractable with the benchmark.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
