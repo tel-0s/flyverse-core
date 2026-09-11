@@ -826,6 +826,34 @@ body assumption, not the connectome:
   turn towards the stronger side; turn less while the odour rises) -- a subsystem approximation
   that reads the sensor, meant for offloading the olfactory brain, composable as
   `--program anemotaxis+klinotaxis`.
+* **Tonic drive, and the balance read the right way round.** With compass adaptation off, Delta7 x2 and
+  a held Poisson background on every EPG (5 / 10 / 20 Hz through `FlyBrain.stimulate` -- a direct
+  `brain.set_poisson` is wiped when a pulse expires, which voided the first attempt), a driven wedge
+  still dies within 0.5 s, and the reason is visible in one column: **PEN is 0.0 Hz throughout**,
+  with EPG at 9-20 Hz and Delta7 at 33-58. EPG -> Delta7 is the circuit's strongest projection (+134
+  mV in total) and Delta7 -> PEN is -4.7 mV per pair, so Delta7 clamps PEN before EPG -> PEN can close
+  the loop: the inhibition is too strong relative to the recurrence, not too weak as the totals
+  suggested. The attractor's regime is a small grid -- EPG <-> PEN gain against Delta7 gain, no
+  adaptation, tonic background -- scored by wedge persistence versus the rest of the ring.
+* **LC10 with self-motion: still silent.** Heading oscillating +-20 deg at 0.5 Hz so the apple
+  sweeps the eye, 5 cm ahead-left / ahead-right / absent: LC10a 0.02 Hz in all three; LC10b 1.4-2.2
+  with or without the apple; nothing object-specific anywhere in the LC10 group, AOTU042 or TuTuA.
+  Since the stimulus is now the right kind, the question moves to the optic -> spiking interface:
+  spiking cells are driven by *changes* in optic-lobe rate through a uniform 100 mV output gain
+  spread over each cell's inputs, and a small sweeping object may move LC10a's Tm5Y / TmY21 inputs
+  by too little to matter where a loom moves LC4's T2 / TmY3 / Tm4 a lot (and gets a x3 pair gain).
+  Measured next: the drive LC10a actually receives, apple vs none.
+* **LC10: not a gain problem.** The drive LC10a receives from the optic lobe during the sweep is
+  identical with and without the apple (mean -0.02 vs -0.00 mV, peak 11.9 vs 11.9 -- brief 1 ms peaks
+  that a 20 ms membrane integrates to nothing), and so is its inputs' activity: |delta-rate| Tm5Y
+  0.194 vs 0.193, TmY21 0.207 vs 0.206, T2 / TmY3 / Tm4 / Tm20 the same. The whole textured room
+  sweeping the eye moves every Tm / TmY population by +-0.2 rate units; a 4 cm apple adds nothing
+  measurable on top. So the rate optic lobe carries no small-object signal at the level of LC10's
+  inputs -- the animal's object pathway rests on small-field selectivity (medulla / lobula surround
+  inhibition through Dm / Pm / Li interneurons) that the L2-normalised rate model evidently washes
+  out. An optic-lobe modelling thread, not a per-type gain; the second open model question beside
+  the compass, now with a precise statement of what is missing. In the meantime the last five
+  centimetres is `KlinotaxisProgram` (a sensor-side approximation, off by default).
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
