@@ -88,14 +88,14 @@ class OrbitCam:
 class Sim:
     def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0,
                  wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32",
-                 sensory_cuda_graphs=None, program="none", escape_gating=False):
+                 sensory_cuda_graphs=None, program="none", escape_gating=False, dt_by_module=None, prune_frozen=True):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
         self.trail = []                          # (brain time s, position) samples, for the scene view
         self.cam_scale = int(cam_scale)          # fly's-eye camera rendered at 1/cam_scale resolution, upscaled
         self.sensory_cuda_graphs = cuda_graphs if sensory_cuda_graphs is None else sensory_cuda_graphs
-        self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(dt=brain_dt, weight_dtype=weight_dtype),
+        self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(dt=brain_dt, weight_dtype=weight_dtype, dt_by_module=dt_by_module, prune_frozen=prune_frozen),
                            optic_params=optic.OpticParams(dt_ms=optic_dt), cuda_graphs=cuda_graphs)
         self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain
         self.groups, self.wings = self.fb.groups, self.fb.wings
@@ -447,6 +447,12 @@ def blit_text(screen, font, text, x, y, color=(220, 220, 220)):
     screen.blit(font.render(text, True, color), (x, y))
 
 
+def parse_dt_by_module(text):
+    if not text:
+        return None
+    return {k.strip(): float(v) for k, v in (item.split("=") for item in text.split(","))}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seconds", type=float, default=0, help="stop after this much brain time (0 = run until quit)")
@@ -459,6 +465,8 @@ def main():
     ap.add_argument("--wing-at", type=float, default=-1, help="stimulate the flight DNs (DNg02_a, DNa08) at this brain time (s)")
     ap.add_argument("--fast", action="store_true", help="speed preset for slower GPUs (Apple MPS): brain dt 1 ms, optic dt 2 ms, half-res camera")
     ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
+    ap.add_argument("--dt-by-module", default=None, help="per-module LIF clocks, e.g. vnc=1.0 or vnc=1.0,descending=1.0 (ms; multiples of --brain-dt)")
+    ap.add_argument("--no-prune", action="store_true", help="keep the optic-lobe synapses in the LIF matrix (they are zeros; for timing comparisons)")
     ap.add_argument("--program", default="none", choices=["none", "anemotaxis", "cx"],
                     help="hand-designed behaviour program between the brain and the body (flyverse/programs.py); default: none, the plain model")
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
@@ -500,6 +508,7 @@ def main():
         start = (v[0], v[1], v[2] if len(v) > 2 else 0.75)
     sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir,
               cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype, program=args.program, escape_gating=args.escape_gating,
+              dt_by_module=parse_dt_by_module(args.dt_by_module), prune_frozen=not args.no_prune,
               sensory_cuda_graphs=args.sensory_cuda_graphs, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)

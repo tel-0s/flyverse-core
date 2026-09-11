@@ -85,6 +85,14 @@ class LIFParams:
     # elsewhere (MPS/CPU sparse matmul is 5-30x slower than the gather).
     event_driven: bool | None = None
     weight_dtype: str = "float32"   # "float16" on CUDA; spike products accumulate into float32
+    # Per-module integration clocks {module: dt_ms} (regions.py names), each a multiple of dt and at most the
+    # synaptic delay. Neurons on a slow clock are integrated every k steps with dt_k = k dt; their synaptic
+    # input is the spikes accumulated since their last update, and their own spikes reach everyone through
+    # the delay buffer. E.g. {"vnc": 1.0} halves the VNC's share of the sparse matmul. FlyBrain resolves it.
+    dt_by_module: dict | None = None
+    # Drop the synapses from / onto frozen rate units (the optic lobe) from the LIF matrix. Exact: frozen
+    # neurons never spike, so those entries only cost time (~40% of the nnz in the full brain).
+    prune_frozen: bool = True
 
 
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
@@ -171,6 +179,8 @@ class Brain:
             raise ValueError("weight_dtype must be float32 or float16")
         if p.weight_dtype == "float16" and self.device.type != "cuda":
             raise ValueError("float16 sparse weights require CUDA")
+        self._W_cpu = W
+        self.K = 1; self._kvec = None; self._W_k = {}; self._acc = {}
         self.set_weights(W)
 
         self.gen = torch.Generator(device=self.device).manual_seed(seed)
@@ -225,16 +235,66 @@ class Brain:
             self.W = sparse_matrix(W, self.device, dtype=dtype)
             self._syn_input = torch.empty(self.n, self.B, dtype=torch.float32, device=self.device)
 
+    def _matmul_add(self, W, x: torch.Tensor) -> None:
+        if self.p.weight_dtype == "float16":
+            # cuSPARSE accepts half A/B with float C and compute type. Passing an
+            # fp32 out buffer avoids the overflow/rounding of a half-precision output.
+            torch.mm(W, x.T.to(torch.float16).contiguous(), out=self._syn_input)
+            self.g.add_(self._syn_input.T)
+        else:
+            self.g.add_((W @ x.T.contiguous()).T)                      # contiguous: 4x faster spmm
+
+    def prune(self, idx) -> None:
+        """Drop every synapse from and onto neurons `idx` (frozen rate units) from the LIF matrix."""
+        import scipy.sparse as sp
+        keep = np.ones(self.n, np.float32); keep[np.asarray(idx)] = 0.0
+        W = (sp.diags(keep) @ self._W_cpu @ sp.diags(keep)).tocsr(); W.eliminate_zeros()
+        self._W_cpu = W
+        self.set_weights(W)
+        if self._kvec is not None:
+            self._split_weights()
+
+    def set_clocks(self, multiplier) -> None:
+        """Integrate neuron i every multiplier[i] base steps (dt_i = multiplier[i] * dt). See LIFParams.dt_by_module."""
+        k = np.asarray(multiplier, dtype=np.int64)
+        if k.shape != (self.n,) or (k < 1).any():
+            raise ValueError("multiplier must be an (N,) array of positive integers")
+        if self.event_driven:
+            raise ValueError("per-module clocks need the sparse-matmul backend")
+        p = self.p
+        if int(k.max()) * p.dt > p.delay + 1e-9:
+            raise ValueError("the slowest clock must not exceed the synaptic delay")
+        self._kvec = k; self.K = int(np.lcm.reduce(np.unique(k)))
+        dev = self.device
+        kt = torch.from_numpy(k.astype(np.float32)).to(dev)
+        self._phase = []
+        for ph in range(self.K):
+            u = torch.from_numpy(((ph % k) == 0).astype(np.float32)).to(dev)
+            one = torch.ones_like(u)
+            coef = lambda tau: torch.where(u > 0, torch.exp(-p.dt * kt / tau), one)
+            self._phase.append({"u": u, "a_m": coef(p.tau_m), "a_s": coef(p.tau_syn), "a_r": coef(p.rate_tau),
+                                "a_ad": coef(p.adapt_tau) if p.adapt_jump > 0 else torch.zeros_like(u),
+                                "a_std": coef(p.std_tau) if self._std_on else one,
+                                "dt": u * kt * p.dt, "rate_gain": u * (1 - torch.exp(-p.dt * kt / p.rate_tau)) * 1000.0 / (kt * p.dt),
+                                "pois": u * kt})
+        self._split_weights()
+
+    def _split_weights(self) -> None:
+        import scipy.sparse as sp
+        dtype = torch.float16 if self.p.weight_dtype == "float16" else torch.float32
+        self._W_k = {}; self._acc = {}
+        for kk in np.unique(self._kvec):
+            rows = (self._kvec == kk).astype(np.float32)
+            Wk = (sp.diags(rows) @ self._W_cpu).tocsr(); Wk.eliminate_zeros()
+            self._W_k[int(kk)] = sparse_matrix(Wk, self.device, dtype=dtype)
+            if kk > 1:
+                self._acc[int(kk)] = torch.zeros(self.B, self.n, device=self.device)
+        self.W = None
+
     def _add_synaptic_input(self, x: torch.Tensor) -> None:
         """g += W @ x for transmitted spikes x (B, N); event-driven or one sparse matmul for all B brains."""
         if not self.event_driven:
-            if self.p.weight_dtype == "float16":
-                # cuSPARSE accepts half A/B with float C and compute type. Passing an
-                # fp32 out buffer avoids the overflow/rounding of a half-precision output.
-                torch.mm(self.W, x.T.to(torch.float16).contiguous(), out=self._syn_input)
-                self.g.add_(self._syn_input.T)
-            else:
-                self.g.add_((self.W @ x.T.contiguous()).T)              # contiguous: 4x faster spmm
+            self._matmul_add(self.W, x)
             return
         nz = torch.nonzero(x)                                           # (K, 2) [brain, pre]; syncs with host
         if nz.shape[0] == 0:
@@ -277,11 +337,16 @@ class Brain:
             t[sel] = 0.0
         self.res[sel] = 1.0
         self.spike_buf[:, sel] = 0.0
+        for acc in self._acc.values():
+            acc[sel] = 0.0
         self._rate_np_key = None
 
     # ------------------------------------------------------------------ dynamics
     @torch.no_grad()
     def step(self, n_steps: int = 1) -> None:
+        if self._kvec is not None:
+            self._step_clocked(n_steps)
+            return
         p = self.p
         for _ in range(n_steps):
             # synaptic input from spikes emitted `delay` ago: one sparse matmul for all B brains
@@ -317,6 +382,49 @@ class Brain:
             if self.record_activity:
                 self.spike_counts.add_(spikes)
             self.rate.mul_(self._a_r).add_(spikes * ((1 - self._a_r) * 1000.0 / p.dt))
+            self.t += p.dt
+            self.step_count += 1
+
+    @torch.no_grad()
+    def _step_clocked(self, n_steps: int) -> None:
+        """The step loop with per-neuron clocks: non-updating neurons get coefficient 1 / mask 0 this phase."""
+        p = self.p
+        for _ in range(n_steps):
+            c = self._phase[self.step_count % self.K]
+            x = self.spike_buf[self.buf_pos]
+            self.g.mul_(c["a_s"])
+            for kk, Wk in self._W_k.items():
+                if kk == 1:
+                    self._matmul_add(Wk, x)
+                else:
+                    acc = self._acc[kk]; acc.add_(x)
+                    if (self.step_count % kk) == 0:
+                        self._matmul_add(Wk, acc); acc.zero_()
+            target = p.v_rest + self.g + self.drive - self.adapt
+            torch.add(target, (self.v - target) * c["a_m"], out=self.v)
+            in_ref = self.refrac > 0
+            torch.where(in_ref, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
+            torch.clamp(self.refrac - c["dt"], min=0.0, out=self.refrac)
+            torch.mul((self.v >= p.v_th).float() * c["u"], self.active, out=self.spikes)
+            spikes = self.spikes
+            if self._poisson_on:
+                forced = (torch.rand(self.v.shape, generator=self.gen, device=self.device) < self.poisson_p * c["pois"]).float()
+                torch.maximum(spikes, forced, out=spikes)
+            fired = spikes > 0
+            torch.where(fired, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
+            torch.where(fired, torch.full_like(self.refrac, p.t_ref), self.refrac, out=self.refrac)
+            if p.adapt_jump > 0:
+                self.adapt.mul_(c["a_ad"]).add_(spikes, alpha=p.adapt_jump)
+            if self._std_on:
+                self.spike_buf[self.buf_pos] = spikes * self.res
+                torch.where(fired, self.res * (1 - self.std_u_vec), self.res, out=self.res)
+                torch.sub(1.0, (1.0 - self.res) * c["a_std"], out=self.res)
+            else:
+                self.spike_buf[self.buf_pos] = spikes
+            self.buf_pos = (self.buf_pos + 1) % self.n_delay
+            if self.record_activity:
+                self.spike_counts.add_(spikes)
+            self.rate.mul_(c["a_r"]).add_(spikes * c["rate_gain"])
             self.t += p.dt
             self.step_count += 1
 

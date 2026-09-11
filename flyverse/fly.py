@@ -54,6 +54,18 @@ class FlyBrain:
                 self.optic = optic.OpticLobe(self.c, self.retina, optic_params, device=self.device, batch=self.B)
                 self.optic.relax()
                 self.brain.freeze(self.optic.rate_idx)
+                if self.brain.p.prune_frozen:
+                    self.brain.prune(self.optic.rate_idx)
+        if self.brain.p.dt_by_module:
+            lab = regions.labels(self.c); k = np.ones(self.c.n, np.int64); dt = self.brain.p.dt
+            for mod, dt_mod in self.brain.p.dt_by_module.items():
+                if mod not in regions.MODULES:
+                    raise ValueError(f"unknown module {mod!r} in dt_by_module")
+                m = int(round(dt_mod / dt))
+                if abs(m * dt - dt_mod) > 1e-9 or m < 1:
+                    raise ValueError(f"dt_by_module[{mod!r}] = {dt_mod} is not a positive multiple of dt = {dt}")
+                k[lab == mod] = m
+            self.brain.set_clocks(k)
         self.olfaction = senses.Smell(self.c) if len(self.c.select(**{"class": "olfactory"})) else None
         self.wind_sense = senses.Wind(self.c) if len(self.c.select(type="~^JO-[CE]")) else None
         taste = senses.Taste(self.c)
@@ -187,7 +199,10 @@ class FlyBrain:
     def _graph_frame(self, steps):
         b, o = self.brain, self.optic
         optic_pending = o._pending_ms if o is not None else 0.0
-        key = (steps, b.buf_pos, b._poisson_on, self._radiance is not None, round(optic_pending, 9))
+        key = (steps, b.buf_pos, b.step_count % b.K, b._poisson_on, self._radiance is not None, round(optic_pending, 9))
+        if steps % b.K:
+            self._frame(steps)          # a frame that is not a whole number of clock periods is not capturable
+            return
         if key not in self._graphs:
             # Bound memory when a caller supplies arbitrarily many frame lengths.
             if len(self._graphs) >= 8:
@@ -195,6 +210,7 @@ class FlyBrain:
                 return
             names = self.BRAIN_TENSORS
             saved = {name: getattr(b, name).clone() for name in names}
+            acc_saved = {kk: t.clone() for kk, t in b._acc.items()}
             optical = {name: getattr(o, name).clone() for name in self.OPTIC_TENSORS} if o is not None else {}
             rng = b.gen.get_state()
             scalars = b.t, b.step_count, b.buf_pos
@@ -203,6 +219,8 @@ class FlyBrain:
             def restore():
                 for name, value in saved.items():
                     getattr(b, name).copy_(value)
+                for kk, value in acc_saved.items():
+                    b._acc[kk].copy_(value)
                 for name, value in optical.items():
                     getattr(o, name).copy_(value)
                 b.t, b.step_count, b.buf_pos = scalars
