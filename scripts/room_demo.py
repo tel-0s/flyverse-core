@@ -317,7 +317,8 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
     blit_text(screen, font, f"scene [{'follow' if orbit.follow else 'orbit'} az {orbit.az:.0f} el {orbit.el:.0f} d {orbit.dist:.2f}]  hdg {np.rad2deg(fly.heading) % 360:.0f}  "
               f"{fly.speed * 100:.1f} cm/s  {nf[0]} {nf[1] * 100:.0f} cm" + ("  TASTING" if sim.tasting else ""), sx + 2, 312)
     mode = f"AIRBORNE z={fly.z:.2f} v=({fly.vx:+.2f},{fly.vy:+.2f},{fly.vz:+.2f})" if fly.airborne else ("on table" if abs(fly.z - sim.info["table_top_z"]) < 1e-3 else "on floor")
-    blit_text(screen, font, f"({fly.x:+.2f},{fly.y:+.2f}) {mode}  smell: " + sim.olf.summary(), sx + 2, 328)
+    smell = "  ".join(sim.olf.summary().split("  ")[:3])
+    blit_text(screen, font, f"({fly.x:+.2f},{fly.y:+.2f}) {mode}  smell: {smell}"[:60], sx + 2, 328)
     # 3. hex mosaics: fly false colour and drive
     fc = world.to_fly_false_color(sim.col_rad, exposure=2.5).astype(int)
     cf = sim.optic.last["contrast"][0][:, 0] if "contrast" in sim.optic.last else np.zeros(sim.r.n_columns)
@@ -356,7 +357,8 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
         blit_text(screen, font, f"spikes/step (max {mx:.0f})", ox, y + 82)
     y += 105
     dt_wall = time.time() - sim.t_wall; sim.t_wall = time.time()
-    blit_text(screen, font, f"{1 / max(dt_wall, 1e-3):.0f} fps  ({FRAME_MS / max(dt_wall, 1e-3) / 1000:.2f}x real time)" + ("   PAUSED" if paused else ""), ox, y)
+    frames_drawn = sim.brain.t / FRAME_MS - getattr(sim, "_t_last_draw", 0.0); sim._t_last_draw = sim.brain.t / FRAME_MS
+    blit_text(screen, font, f"{1 / max(dt_wall, 1e-3):.0f} fps  ({frames_drawn * FRAME_MS / max(dt_wall, 1e-3) / 1000:.2f}x real time)" + ("   PAUSED" if paused else ""), ox, y)
     blit_text(screen, font, "SPACE pause  R reset  T apple  L loom  F giant fibre  W wing DNs  ESC", ox, y + 18)
     blit_text(screen, font, "arrows/drag orbit  +/- wheel zoom  C follow  HOME reset  F5/F9 save/load  S save", ox, y + 34)
     # 5. brain map (optional column): sampled every `map_every` drawn frames; between samples the shown
