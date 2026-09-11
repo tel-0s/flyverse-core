@@ -994,6 +994,17 @@ body assumption, not the connectome:
   -- ~90 deg/s at walking speed, the range the visual system operates in -- it is 18-23 Hz, below
   threshold on all six seeds. `FlyState.edge_len` 4 -> 20 mm. In the walking demo the change gives
   walking GF maxima 16 / 18 / 18 (were 34 / 17 / 25) and no hops in 60 s of wandering on the full table.
+* **The looming fork** (`docs/BENCHMARK_BATTERY.md` assays 2a / 2b / 3; `start_loom(speed, radius, final)`):
+  a 3 cm ball from 0.5 m at 2.0 / 1.0 / 0.5 / 0.25 / 0.12 m/s (l/v 15-250 ms), three seeds, peaks over
+  a 3 s pre-loom baseline with the peak's time relative to arrival at 3.5 cm. GF +37 / +41 / +31 / +36
+  / +27 Hz at +120 / +140 / +87 / +47 / +70 ms -- the same response at every rate, timed to the final
+  expansion; with takeoff enabled the body escapes (short mode) in 13 of 15 runs, at +30 to +150 ms.
+  Wing power +41 / +46 / +47 / +49 / +53 Hz at +490 / +457 / +113 / -923 / -1993 ms: larger and earlier
+  for slower looms, the long mode's wing-raise signature, but never a mode switch because the GF
+  fires anyway. Leg MNs +3.5-4.8 Hz throughout: no landing response. So the model's giant fibre
+  encodes final size (the LC4 side), not expansion rate (the LPLC2 side) -- consistent with LPLC2
+  sitting at 1-4 Hz throughout this session's measurements. The discriminating condition for
+  landing is an approach that stops short.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 

@@ -172,16 +172,20 @@ class Sim:
     def surface_z(self, x, y):
         return self.surfaces.support(x, y)
 
-    def start_loom(self):
-        self.loom_t = 0.0
+    def start_loom(self, speed=1.0, radius=0.03, final=0.035, start=0.5):
+        """A black ball approaches from the fly's left at `speed` m/s from `start` m to `final` m (l/v = radius / speed:
+        30 ms at the defaults, the fast loom; slower approaches probe the long-mode escape and the landing response)."""
+        self.loom_t = 0.0; self.loom_speed = speed; self.loom_final = final; self.loom_start = start
+        self.world.move_sphere(self.loom_idx, (9, 9, 9), (radius, radius, radius))
 
     def update_loom(self):
         if self.loom_t < 0:
             return
         self.loom_t += FRAME_MS / 1000
-        d = max(0.5 - 1.0 * self.loom_t, 0.035)
+        speed = getattr(self, "loom_speed", 1.0); final = getattr(self, "loom_final", 0.035); start = getattr(self, "loom_start", 0.5)
+        d = max(start - speed * self.loom_t, final)
         eye = self.fly.eye_pos
-        if self.loom_t > 0.8:
+        if self.loom_t > (start - final) / speed + 0.3:
             self.loom_t = -1.0; self.world.move_sphere(self.loom_idx, (9, 9, 9))
         else:
             self.world.move_sphere(self.loom_idx, eye + np.array([0.0, d, 0.01]))
