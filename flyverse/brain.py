@@ -43,6 +43,9 @@ class LIFParams:
     # 6 mV with the defaults, so runaway loops (KCs/PEN/PAM at 300 Hz) throttle themselves. 0 disables.
     adapt_jump: float = 1.5  # mV (was 0.3; raised when depression was switched off, see NOTES)
     adapt_tau: float = 200.0 # ms
+    # per-type adaptation jump {type_regex: mV}: the compass (EPG / PEN / PEG / Delta7) holds persistent
+    # activity in the animal and cannot with 1.5 mV / spike (NOTES, session 8). None = DEFAULT_ADAPT_BY_TYPE.
+    adapt_by_type: dict | None = None
     # short-term synaptic depression (Tsodyks-Markram style, per presynaptic neuron; not in Shiu et al.):
     # each spike uses a fraction `std_u` of the available resource x, which recovers with `std_tau`. At
     # rate R the steady resource is 1/(1 + u R tau): 20 Hz -> 0.45, 100 Hz -> 0.14, 300 Hz -> 0.05, which
@@ -107,6 +110,8 @@ DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0),
 
 DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0),          # benchmarked: specific, ipsilateral leg drive, no storms
                      (r"^visual_projection$", r"^descending_neuron$", 2.0)]   # LC4/LPLC2 -> GF etc.: loom escape margin (x3 re-ignites the AVLP network)
+
+DEFAULT_ADAPT_BY_TYPE: dict = {}      # filled in when the compass benchmark settles; {} = uniform adapt_jump
 
 DEFAULT_STD_U_BY_TYPE = {r"^ORN_": 0.2, r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2, r"(_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN|PN\d)": 0.2}
 
@@ -215,6 +220,16 @@ class Brain:
         self._a_s = math.exp(-p.dt / p.tau_syn)
         self._a_r = math.exp(-p.dt / p.rate_tau)
         self._a_ad = math.exp(-p.dt / p.adapt_tau) if p.adapt_jump > 0 else 0.0
+        adapt_map = DEFAULT_ADAPT_BY_TYPE if p.adapt_by_type is None else p.adapt_by_type
+        self.adapt_jump_vec = None
+        if adapt_map:
+            import re
+            types_ = c.neurons.type.fillna("").to_numpy()
+            aj = np.full(N, p.adapt_jump, dtype=np.float32)
+            for pat, jump in adapt_map.items():
+                aj[np.array([bool(re.match(pat, t_)) for t_ in types_])] = jump
+            self.adapt_jump_vec = torch.from_numpy(aj).to(dev)
+            self._a_ad = math.exp(-p.dt / p.adapt_tau)
         std_map = DEFAULT_STD_U_BY_TYPE if p.std_u_by_type is None else p.std_u_by_type
         u = np.full(N, p.std_u, dtype=np.float32)
         if std_map:
@@ -384,7 +399,9 @@ class Brain:
             fired = spikes > 0
             torch.where(fired, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
             torch.where(fired, torch.full_like(self.refrac, p.t_ref), self.refrac, out=self.refrac)
-            if p.adapt_jump > 0:
+            if self.adapt_jump_vec is not None:
+                self.adapt.mul_(self._a_ad).add_(spikes * self.adapt_jump_vec)
+            elif p.adapt_jump > 0:
                 self.adapt.mul_(self._a_ad).add_(spikes, alpha=p.adapt_jump)
 
             if self._std_on:
@@ -444,7 +461,9 @@ class Brain:
             fired = spikes > 0
             torch.where(fired, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
             torch.where(fired, torch.full_like(self.refrac, p.t_ref), self.refrac, out=self.refrac)
-            if p.adapt_jump > 0:
+            if self.adapt_jump_vec is not None:
+                self.adapt.mul_(c["a_ad"]).add_(spikes * self.adapt_jump_vec)
+            elif p.adapt_jump > 0:
                 self.adapt.mul_(c["a_ad"]).add_(spikes, alpha=p.adapt_jump)
             if self._std_on:
                 self.spike_buf[self.buf_pos] = spikes * self.res

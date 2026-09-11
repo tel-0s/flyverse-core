@@ -737,6 +737,49 @@ body assumption, not the connectome:
   across the VS / HS population and efference copies). So `k_opto` is 0 by default: the group and sign
   are recorded for whoever builds the separation; a stabilising reflex that fires on the fly's own
   walking is noise. The body program steers upwind correctly with it off.
+* **The compass circuit's weights, audited.** Effective strength under the model's rules (cap, path
+  gains, same-type damping, fan-in normalisation -- none of which bite here: the compass cells have
+  1.1-4.2k inputs, scale x1.00, and 10-30 synapses per pair, under the cap of 60), in mV per
+  presynaptic spike per pair, with the total if the whole presynaptic population fired once:
+  EPG -> PEN +5.0 (+81), PEN -> EPG +7.7 (+117), EPG -> PEG +3.5 (+74), PEG -> EPG +0.9 (+6), EPG ->
+  Delta7 +3.2 (+134), Delta7 -> EPG -2.9 (-29, only 506 pairs), Delta7 -> PEN -4.7 (-45), ER -> EPG -2.9
+  (-676 over 11,719 pairs), ExR -> EPG -1.7 (-26), EPG -> PFN +1.6 (+3), PFN -> hDelta +2.7 (+44),
+  hDelta -> PFL3 +5.8 (+117). Threshold is 7 mV from rest. So the recurrent excitation is not weak --
+  one PEN spike nearly fires an EPG -- and the restoring inhibition that confines a bump is: Delta7's
+  total is a quarter of the EPG <-> PEN loop's, and the ring neurons, the compass's shaping input in
+  the animal, are silent (0.08 Hz) because their own visual pathway is (TuBu 0.1, AOTU 0.1). That is
+  the silent-or-seizure bistability seen in the gain experiment, explained: nothing lights the
+  compass, and once lit nothing confines it. The experiment it prescribes: raise Delta7 -> EPG / PEN
+  to match the loop and ask whether a *localised* bump persists.
+* **A driven bump dies in 500 ms whatever Delta7 does.** Quarter of the EPG population driven at 60 Hz
+  for 2 s: during the drive 12 / 50 EPG fire (the driven ones), PEN 0.1-1.0 Hz, Delta7 8-12 Hz; 0.5 s
+  after the pulse EPG 0.1 Hz, PEN 0, Delta7 0.1 -- identical with Delta7 -> EPG / PEN x4, x8, and with
+  the ring-neuron inhibition cut to a quarter. PEN never fires during the drive despite +5 mV per EPG
+  spike, yet at EPG <-> PEN x4 the same loop ran at 300 Hz: the attractor's regime lies between
+  those two, and one global setting stands on it -- spike-frequency adaptation (1.5 mV per spike,
+  tau 200 ms, added in session 3 to tame runaway cliques) puts ~15 mV of hyperpolarisation on any
+  cell sustaining 50 Hz, which is what a compass bump is; the animal's EPG hold persistent activity
+  for tens of seconds. The next measurement is the bump with adaptation off.
+* **Without adaptation the compass wakes up.** Same pulse with `adapt_jump` 0 for the whole brain:
+  0.5 s after the pulse all 50 EPG are above 5 Hz (EPG 20.6 Hz, PEN 15.8, Delta7 22.5) -- the EPG <->
+  PEN recurrence closes -- as whole-ring activity that flickers (5 / 50 at 1 s, 1 / 50 at 2 s, 16 / 50
+  at 3 s) rather than a confined bump; with Delta7 -> EPG / PEN x4 as well, a *localised* 9-cell bump
+  at 0.5 s that fades by 1 s. The rest of the brain rose 2.3 -> 4 Hz over 5 s without adaptation, so
+  the attractor's regime is between Delta7 x1 and x4 with no adaptation in the compass.
+  `LIFParams.adapt_by_type` ({type regex: mV per spike}, like `std_u_by_type`) makes that a
+  per-population setting: the AVLP cliques that needed 1.5 mV / spike are not the compass, and the
+  animal's EPG hold their bump for tens of seconds.
+* **Compass-only adaptation off is not enough.** With `adapt_by_type = {"^(EPG|PEN|PEG|Delta7)": 0}`
+  and Delta7 -> EPG / PEN at x1, x1.5, x2, x3, the driven bump is gone 0.5 s after the pulse in every
+  case (a 9-cell flicker at 1 s for x1.5). So the persistence seen with adaptation off *globally* came
+  from outside the compass -- the whole brain's rate rose 2.3 -> 4 Hz and that background drove the
+  ring -- not from the EPG <-> PEN loop on its own. The compass in the animal rides on tonic drive
+  (ExR, PEN, and others). The thread's axes are now mapped: no adaptation in the compass, tonic
+  drive, Delta7 inhibition matched to the loop, and the recurrence gain; the pieces behave as
+  expected alone (recurrence x4 -> 300 Hz seizure; adaptation off + background -> whole-ring
+  activity; + Delta7 x4 -> a localised bump that fades in 1 s) and no combination tried so far gives
+  a stable localised bump. Left here, with `adapt_by_type` kept as a feature (empty default) and the
+  CX module as the working stand-in.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
