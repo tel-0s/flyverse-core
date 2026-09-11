@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import numpy as np
+import pandas as pd
 import pygame
 import torch
 
@@ -15,6 +16,8 @@ import room_demo as demo
 from flyverse.body import FlyState
 from flyverse.room_ui import RoomUI, DEFAULT_SIZE, canvas_size, fit_transform
 from flyverse.world import Sphere
+from flyverse.brainmap import BrainMap
+from flyverse.nt_readout import NTChannel, NTSnapshot
 
 
 class DisplaySim:
@@ -183,6 +186,71 @@ class ConsoleTests(unittest.TestCase):
         ui.handle_action("tab:atlas",sim)
         ui.draw(sim,surface,orbit,bmap=bmap)
         self.assertEqual(ui.tab,"atlas")
+
+    def test_live_nt_source_cadence_selection_and_removal(self):
+        sim,ui,orbit = DisplaySim(),RoomUI(),demo.OrbitCam((0,0,.75))
+        sim.c = SimpleNamespace(n=3,neurons=pd.DataFrame({'bodyId':[10,20,30]}))
+        ui.bmap = BrainMap(sim.c,locations={10:[0,0,0],20:[1,1,1],30:[2,2,2]})
+        ui.bmap.activity = Mock(side_effect=AssertionError("NT levels must not come from activity"))
+        channels = (NTChannel('dopamine','nM',0.,100.),NTChannel('serotonin','a.u.',0.,1.))
+        source = SimpleNamespace(readout=Mock(side_effect=lambda **_:NTSnapshot(sim.brain.t,np.array([30,10,999]),
+            channels,[[80.+sim.brain.t/10,.2+sim.brain.t/1000],[20.,.4],[90.,.8]])))
+        sim.fb = SimpleNamespace(nt_source=source)
+        sim.fb.neurotransmitters = lambda: sim.fb.nt_source.readout(batch_index=0) if sim.fb.nt_source else None
+        ui.handle_action('map:nt',sim)
+        surface = pygame.Surface(DEFAULT_SIZE)
+        ui.draw(sim,surface,orbit,paused=True)
+        self.assertEqual(source.readout.call_count,1)
+        np.testing.assert_allclose(ui._nt_values,[[20.,.4],[np.nan,np.nan],[80.,.2]])
+        self.assertEqual(ui._nt_stats[0],('50','80',2,2))  # foreign body ID 999 is excluded
+        original = ui._nt_images[0].copy()
+        for _ in range(3): ui.draw(sim,surface,orbit,paused=True)
+        self.assertEqual(source.readout.call_count,1)
+        ui.handle_action('nt_channel:serotonin',sim)
+        ui.draw(sim,surface,orbit,paused=True)
+        self.assertFalse(np.array_equal(original,ui._nt_images[0]))
+        self.assertEqual(source.readout.call_count,1)
+        selected = ui._nt_images[0].copy()
+        for _ in range(4):
+            sim.step(); ui.draw(sim,surface,orbit)
+        self.assertEqual(source.readout.call_count,2)
+        self.assertEqual(ui._nt_snapshot.time_ms,40.)
+        self.assertEqual(ui._nt_values[2,0],84.)
+        self.assertFalse(np.array_equal(selected,ui._nt_images[0]))
+        ui.handle_action('tab:regions',sim)
+        sim.step(); ui.draw(sim,surface,orbit)
+        self.assertEqual(source.readout.call_count,2)
+        ui.handle_action('tab:atlas',sim)
+        ui.draw(sim,surface,orbit,paused=True)
+        for window in ((1100,720),DEFAULT_SIZE,(1920,1080)):
+            ui.draw(sim,pygame.Surface(window),orbit,paused=True)
+            self.assertTrue(all(pygame.Rect((0,0),window).contains(h.rect) for h in ui.hits))
+            for i,a in enumerate(ui.hits):
+                self.assertFalse(any(a.rect.colliderect(b.rect) for b in ui.hits[i+1:]),a.action)
+        sim.fb.nt_source = None
+        ui.draw(sim,surface,orbit,paused=True)
+        self.assertIsNone(ui._nt_snapshot)
+        self.assertIsNone(ui._nt_values)
+        sim.fb.nt_source = SimpleNamespace(readout=Mock(side_effect=ValueError('invalid module sample')))
+        ui.draw(sim,surface,orbit,paused=True)
+        self.assertIsNone(ui._nt_snapshot)
+        self.assertEqual(ui._nt_error,'invalid module sample')
+
+    def test_nt_launch_without_module_remains_usable(self):
+        sim = DisplaySim()
+        bmap = SimpleNamespace()
+        frames = [0]
+        def events():
+            frames[0]+=1
+            if frames[0]==1: return []
+            self.assertEqual(sim._ui.map_mode,'nt')
+            self.assertIsNone(sim._ui._nt_snapshot)
+            return [pygame.event.Event(pygame.KEYDOWN,key=pygame.K_n),pygame.event.Event(pygame.QUIT)]
+        with patch.object(demo,'Sim',return_value=sim),patch.object(demo.brainmap,'BrainMap',return_value=bmap), \
+             patch.object(sys,'argv',['room_demo.py','--headless','--brain-map-mode','nt']), \
+             patch.object(pygame.event,'get',side_effect=events):
+            demo.main()
+        self.assertEqual(sim._ui.map_mode,'activity')
 
 
 if __name__ == "__main__":

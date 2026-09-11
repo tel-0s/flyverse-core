@@ -45,6 +45,8 @@ Options: `--brain-map` (all 140k located somata in dorsal and lateral view, acti
 UI reflows above 1100x720 and scales below it), `--fast` (preset for Macs / slower GPUs;
 `--brain-dt`, `--optic-dt`, `--cam-scale`). `?` opens the controls guide; `1`–`4` select inspector
 views and `V` cycles retinal both/colour/contrast. `--screenshot out/console.png` saves the final UI.
+`N` toggles the map to live NT levels; `--brain-map-mode nt` opens it at launch. This
+requires an optional readout source, not NT labels; see [the NT interface](docs/NT_READOUT.md).
 Save states are ~10 MB and resume bit-exactly.
 
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with

@@ -26,6 +26,9 @@ SAGE = (185, 219, 126)
 TEAL = (107, 201, 208)
 AMBER = (232, 179, 104)
 LILAC = (176, 157, 216)
+NT_COLORS = {"dopamine": (251,104,103), "serotonin": (231,128,200),
+             "octopamine": (99,165,250), "acetylcholine": TEAL,
+             "gaba": AMBER, "glutamate": LILAC, "histamine": SAGE}
 
 
 def canvas_size(window_size):
@@ -90,6 +93,14 @@ class RoomUI:
         self._eye_key = self._scene_key = None
         self._map_time = None
         self._map_count = 0
+        self.map_mode = "activity"
+        self.nt_channel = None
+        self._nt_snapshot = self._nt_values = None
+        self._nt_stats = []
+        self._nt_time = self._nt_source_key = None
+        self._nt_count = self._nt_revision = 0
+        self._nt_refresh = True
+        self._nt_error = None
 
     def font(self, size=14, weight="normal"):
         key = size, weight
@@ -156,18 +167,40 @@ class RoomUI:
             self.help_open = not self.help_open
         elif action.startswith("tab:"):
             tab = action.split(":", 1)[1]
-            if tab == "atlas" and self.bmap is None:
-                try:
-                    from .brainmap import BrainMap
-                    self.bmap = BrainMap(sim.c, sim.optic)
-                except (OSError, ValueError, KeyError) as exc:
-                    self.notify(f"Brain atlas unavailable: {exc}")
-                    return True
+            if tab == "atlas" and not self._load_map(sim):
+                return True
+            if tab == "atlas" and self.tab != "atlas":
+                self._nt_refresh = True
             self.tab = tab
+        elif action.startswith("map:"):
+            if not self._load_map(sim):
+                return True
+            mode = action.split(":",1)[1]
+            if mode == "toggle":
+                mode = "nt" if self.map_mode == "activity" else "activity"
+            if mode not in ("activity","nt"):
+                raise ValueError(f"unknown map mode: {mode}")
+            if self.map_mode == "nt" and mode == "activity" and self._map_time != sim.brain.t:
+                self._map_shown = None
+            self.tab, self.map_mode = "atlas", mode
+            self._nt_refresh = True
+            self.scroll["atlas"] = 0
+        elif action.startswith("nt_channel:"):
+            self.nt_channel = action.split(":",1)[1]
         elif action.startswith("retina:"):
             self.retina_mode = action.split(":", 1)[1]
         else:
             return False
+        return True
+
+    def _load_map(self, sim):
+        if self.bmap is None:
+            try:
+                from .brainmap import BrainMap
+                self.bmap = BrainMap(sim.c, getattr(sim,"optic",None))
+            except (OSError, ValueError, KeyError) as exc:
+                self.notify(f"Brain atlas unavailable: {exc}")
+                return False
         return True
 
     def wheel(self, pos, amount):
@@ -487,6 +520,8 @@ class RoomUI:
         if bmap is None:
             self.text(surface,"Select map to load soma positions.",(viewport.x,y),12,MUTED,width=viewport.w)
             return y+30
+        if self.map_mode == "nt":
+            return self._nt_map(sim,surface,viewport,y)
         # Rendering does not decay a paused map; hidden maps do not sample the brain.
         if self._map_time != sim.brain.t:
             every = max(1,int(getattr(sim,"map_every",4)))
@@ -523,6 +558,113 @@ class RoomUI:
         self.text(surface,"LIF: Hz/40; optic: |Δr|×2",(right.x,end_right+15),10,DIM,width=right.w)
         return max(end_left,end_right+37)
 
+    def _read_nt(self, sim):
+        """Only request a CPU readout at map cadence, or on an explicit refresh.
+
+        Source identity is the public attachment hook, not an NT implementation.
+        Replacing/detaching it also invalidates a paused display immediately.
+        """
+        fb = getattr(sim,"fb",None)
+        source_key = (id(fb),id(getattr(fb,"nt_source",fb)))
+        force = self._nt_refresh or source_key != self._nt_source_key
+        advanced = self._nt_time != sim.brain.t
+        if not force and not advanced:
+            return
+        every = max(1,int(getattr(sim,"map_every",4)))
+        if force or self._nt_count%every == 0 or (self._nt_time is not None and sim.brain.t < self._nt_time):
+            self._nt_snapshot = self._nt_values = None
+            self._nt_stats = []
+            self._nt_error = None
+            read = getattr(fb,"neurotransmitters",None)
+            try:
+                snapshot = read() if callable(read) else None
+                if snapshot is not None:
+                    from .nt_readout import NTSnapshot
+                    if not isinstance(snapshot,NTSnapshot):
+                        raise TypeError("NT readout must return NTSnapshot or None")
+                    self._nt_values = snapshot.aligned(self.bmap.body_ids)
+                    # Snapshots are immutable: scan each channel only when a new one arrives.
+                    for j in range(len(snapshot.channels)):
+                        values = self._nt_values[:,j]
+                        observed = np.isfinite(values)
+                        valid = values[observed]
+                        mean,peak = (f"{valid.mean(dtype=np.float64):.3g}",f"{valid.max():.3g}") if len(valid) else ("--","--")
+                        self._nt_stats.append((mean,peak,len(valid),int(observed[self.bmap.idx].sum())))
+                    self._nt_snapshot = snapshot
+                    names = [channel.name for channel in snapshot.channels]
+                    if self.nt_channel not in names:
+                        self.nt_channel = names[0] if names else None
+            except (ValueError,TypeError,RuntimeError) as exc:
+                self._nt_error = str(exc)
+            self._nt_revision+=1
+        self._nt_refresh = False
+        self._nt_time, self._nt_source_key = sim.brain.t, source_key
+        self._nt_count+=1
+
+    def _nt_map(self, sim, surface, viewport, y):
+        self._read_nt(sim)
+        snapshot = self._nt_snapshot
+        channel = next((c for c in snapshot.channels if c.name==self.nt_channel),None) if snapshot is not None else None
+        if channel is None:
+            self._rule(surface,pygame.Rect(viewport.x,y,viewport.w,22),"NT MODULE / READOUT UNAVAILABLE",AMBER)
+            message = self._nt_error or ("The source exposes no NT channels." if snapshot is not None else
+                                        "No live NT snapshot is available from this brain.")
+            self.text(surface,message,(viewport.x,y+32),12,MUTED,width=viewport.w)
+            self.text(surface,"Use neural activity, or attach an optional NTSource.",(viewport.x,y+58),11,DIM,width=viewport.w)
+            self.text(surface,"NT labels and spike rates are not concentration data.",(viewport.x,y+81),11,DIM,width=viewport.w)
+            return y+109
+        index = snapshot.channels.index(channel)
+        values = self._nt_values[:,index]
+        color = NT_COLORS.get(channel.name.strip().lower(),TEAL)
+        key = (id(self.bmap),self._nt_revision,channel.name)
+        if getattr(self,"_nt_render_key",None) != key:
+            self._nt_images = self.bmap.render_field(values,channel.display_min,channel.display_max,color)
+            self._nt_render_key = key
+        self.text(surface,f"{channel.name} / {channel.unit}",(viewport.x,y),13,color,width=viewport.w-155)
+        self.text(surface,f"tNT {snapshot.time_ms/1000:.3f}s",(viewport.right,y),11,DIM,right=True)
+        y+=29
+        width = (viewport.w-16)//2
+        bottom = y
+        for i,(title,image) in enumerate(zip(("DORSAL / BRAIN -> VNC","LATERAL / DORSAL UP"),self._nt_images)):
+            x = viewport.x+i*(width+16)
+            self.label(surface,title,(x,y),DIM,width=width)
+            height = round(image.shape[0]*width/image.shape[1])
+            self._image(surface,pygame.surfarray.make_surface(np.transpose(image,(1,0,2))),pygame.Rect(x,y+25,width,height))
+            bottom = max(bottom,y+25+height)
+        y = bottom+16
+        for x in range(viewport.w):
+            fraction = x/max(1,viewport.w-1)
+            rgb = tuple(round(a+fraction*(b-a)) for a,b in zip((21,37,43),color))
+            pygame.draw.line(surface,rgb,(viewport.x+x,y),(viewport.x+x,y+5))
+        self.text(surface,f"{channel.display_min:g} {channel.unit}",(viewport.x,y+10),11,DIM,width=viewport.w//2-8)
+        self.text(surface,f"{channel.display_max:g} {channel.unit}",(viewport.right,y+10),11,DIM,width=viewport.w//2-8,right=True)
+        y+=35
+        _,_,sampled,located = self._nt_stats[index]
+        self.text(surface,f"{sampled:,} sampled / {located:,} located; gray = no sample",
+                  (viewport.x,y),11,MUTED,width=viewport.w)
+        y+=27
+        self.label(surface,"CHANNEL",(viewport.x,y),DIM)
+        for text,x in (("MEAN",viewport.right-184),("MAX",viewport.right-88),("UNIT",viewport.right)):
+            self.text(surface,text,(x,y),11,DIM,right=True)
+        y+=22
+        for j,entry in enumerate(snapshot.channels):
+            row = pygame.Rect(viewport.x,y,viewport.w,24)
+            if entry.name == channel.name or (row.collidepoint(self.mouse) and not self.help_open):
+                pygame.draw.rect(surface,PANEL,row)
+            entry_color = NT_COLORS.get(entry.name.strip().lower(),TEAL)
+            pygame.draw.rect(surface,entry_color,(row.x+3,y+5,7,7))
+            self.text(surface,entry.name,(row.x+18,y),12,entry_color,width=viewport.w-300)
+            mean,peak = self._nt_stats[j][:2]
+            for text,x,width_ in ((mean,viewport.right-184,90),(peak,viewport.right-88,90),(entry.unit,viewport.right,82)):
+                self.text(surface,text,(x,y),12,TEXT,width=width_,right=True)
+            target = row.clip(viewport)
+            if target.h:
+                self.hits.append(Hit(target,"nt_channel:"+entry.name,"Select the live field to display"))
+            y+=24
+        self.text(surface,"Statistics: sampled neurons in the current connectome.",(viewport.x,y+10),10,DIM,width=viewport.w)
+        self.text(surface,"Pixel = mean level; fixed colour scale clips outside its range.",(viewport.x,y+27),10,DIM,width=viewport.w)
+        return y+43
+
     def _inspector(self, sim, surface):
         r = self.layout.inspector
         pygame.draw.line(surface,LINE,(r.x-8,r.y),(r.x-8,r.bottom))
@@ -530,7 +672,15 @@ class RoomUI:
             width = (r.w-12)//4
             self.button(surface,(r.x+i*(width+4),r.y-4,width,27),title,"tab:"+tab,
                         active=self.tab==tab,key=str(i+1))
-        viewport = self.layout.inspector_view
+        viewport = self.layout.inspector_view.copy()
+        if self.tab == "atlas":
+            width = (r.w-4)//2
+            for i,(mode,title) in enumerate((("activity","neural activity"),("nt","NT levels"))):
+                self.button(surface,(r.x+i*(width+4),r.y+31,width,23),title,"map:"+mode,
+                            active=self.map_mode==mode,key="N" if self.map_mode==mode else None,
+                            tip="N toggles neural activity / live neurotransmitter levels")
+            viewport.y+=29
+            viewport.h-=29
         old_clip = surface.get_clip(); surface.set_clip(viewport)
         start = viewport.y-self.scroll[self.tab]
         end = {"regions":self._overview,"motor":self._motors,"senses":self._senses,"atlas":self._atlas}[self.tab](sim,surface,viewport,start)
@@ -575,6 +725,7 @@ class RoomUI:
                     ("F  /  W","Giant fibre / flight DN stimulation"),("Drag  /  wheel","Orbit / zoom the room camera"),
                     ("Arrows  /  + −","Orbit / zoom with the keyboard"),("C  /  Home","Follow the fly / reset camera"),
                     ("1 / 2 / 3 / 4","Live / motor / senses / brain map"),("V","Retina: both / colour / contrast"),
+                    ("N","Map: neural activity / live NT levels"),
                     ("F5  /  F9  /  S","Quick-save / quick-load / timestamped save"),("?  /  Esc","Close this guide / exit when guide is closed")]
             y = card.y+92
             for key,label in rows:

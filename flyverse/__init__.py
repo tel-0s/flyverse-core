@@ -1,6 +1,6 @@
 """flyverse: put the MaleCNS v1.0 fly connectome into simulations, games and other strange places."""
 
-__all__ = ["FlyBrain", "MotorRates", "StepResult", "AsyncFlyBrain"]
+__all__ = ["FlyBrain", "MotorRates", "StepResult", "AsyncFlyBrain", "NTChannel", "NTSnapshot", "NTSource"]
 
 
 def __getattr__(name):
@@ -14,4 +14,7 @@ def __getattr__(name):
     if name == "AsyncFlyBrain":
         from .async_brain import AsyncFlyBrain
         return AsyncFlyBrain
+    if name in ("NTChannel", "NTSnapshot", "NTSource"):
+        from . import nt_readout
+        return getattr(nt_readout, name)
     raise AttributeError(name)

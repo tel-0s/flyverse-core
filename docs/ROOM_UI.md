@@ -35,6 +35,7 @@ save and load. Hover for a short explanation. Existing keyboard shortcuts still 
 | C / Home | Follow the fly / restore the overview camera |
 | 1 / 2 / 3 / 4 | Live telemetry / full motor list / all senses / brain map |
 | V | Cycle retinal both / false colour / R1–R6 contrast |
+| N | Brain map: neural activity / live NT levels |
 | F5 / F9 / S | Quick-save / quick-load / timestamped save |
 | ? or H | Controls guide; pauses and restores the previous playback state when closed |
 | Escape | Close the guide, or exit when it is closed |
@@ -52,6 +53,13 @@ Motor labels use the model's own keys; program gates and x10 diagnostics have no
 with population rates and the most active cell types below. `--brain-map` opens this
 view at launch; `4` selects it and `1` returns to live telemetry. Hidden maps do not
 sample the brain. The brain map never adds an extra column or hides the sensory views.
+
+**NT levels** displays live data from an optional `NTSource`, with per-channel units,
+fixed colour ranges, timestamps and mean/max readouts. Click a channel to select it.
+`--brain-map-mode nt` opens this view but does not enable NT dynamics. With no NT
+module/readout, it reports unavailable and the activity view still works. Labels and
+firing rates are never used as substitute concentrations. Integration details and
+missing-data semantics are in [NT_READOUT.md](NT_READOUT.md).
 
 ![The toggleable brain atlas](demo_ui_atlas.png)
 
@@ -93,6 +101,10 @@ the visible viewport, without scrolling, and draws both retinal mosaics.
 Real-connectome renders were inspected at 1100x720, 1360x820 and 1920x1080. Neural and
 body stepping are unchanged by the console revision; timings on the shared machine
 are not used as throughput benchmarks.
-The four UI tests pass. A live Windows run exported a 25-frame 1360x820 GIF, and the
+The six UI tests pass, including NT sampling/selection and launch without a module.
+Five NT contract/projection tests and eighteen control-surface tests pass. The NT
+layout was inspected with explicitly labelled synthetic levels at all three sizes;
+the existing activity projection remains pixel-identical on the full connectome.
+A live Windows run exported a 25-frame 1360x820 GIF, and the
 existing profiler completed a Windows-display smoke run with drawing, presentation
 and CUDA frame timing intact.

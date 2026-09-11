@@ -39,6 +39,14 @@ The **room demo** is then `World + Air + FlyBrain(all modules) + body.*` -- the 
 configuration -- and `env.FlyRoomEnv` is the batched version of the same wiring. Neither wires
 sensory neurons by hand any more (both did before; that duplication was the coupling).
 
+Optional live **neurotransmitter readouts** use `FlyBrain.nt_source` and
+`fb.neurotransmitters(batch_index=0)`. An `NTSource` publishes immutable CPU snapshots
+with body IDs, named channels, explicit units/ranges and a timestamp. With no source
+attached, the getter returns `None`. The room map uses a generic scalar-field projection and
+does not depend on an NT implementation or infer levels from neuron labels. The
+source's owner handles dynamics and checkpoints; the hook adds no stepping work.
+See `docs/NT_READOUT.md` for the contract and subset/missing-data semantics.
+
 ## Modules: running part of the brain
 
 `regions.py` names the parts of the connectome and builds a **`Connectome` subset** (induced

@@ -381,6 +381,8 @@ def main():
     ap.add_argument("--optic-dt", type=float, default=None, help="optic-lobe substep (ms), default 1 (the RL env uses 2)")
     ap.add_argument("--cam-scale", type=int, default=None, help="fly's-eye camera downscale factor, default 1")
     ap.add_argument("--brain-map", action="store_true", help="open the brain atlas with soma activity highlights")
+    ap.add_argument("--brain-map-mode", choices=("activity","nt"), default="activity",
+                    help="map layer (nt opens live levels from an optional NTSource; does not enable NT dynamics)")
     ap.add_argument("--window", type=str, default="", help="initial window size WxH (default: the design size)")
     ap.add_argument("--start", type=str, default="", help="start pose: 'x,y' (on the table), 'x,y,z', or 'floor'")
     ap.add_argument("--trail-seconds", type=float, default=20.0, help="how long the fly's trail persists in the scene view (0 = off)")
@@ -431,13 +433,16 @@ def main():
         sim.load_decoder(args.decoder)
     if args.teleport:
         sim.teleport_to_fruit()
-    bmap = brainmap.BrainMap(sim.c, sim.optic) if args.brain_map else None
+    bmap = brainmap.BrainMap(sim.c, sim.optic) if args.brain_map or args.brain_map_mode == "nt" else None
     sim.map_every, sim.map_no_blur = args.map_every, args.map_no_blur
     if args.load:
         sim.load_state(args.load)
     orbit = OrbitCam((0.0, 0.0, sim.info["table_top_z"]))
     sim._ui = ui
     ui.layout = Layout(canvas.get_size())
+    if bmap is not None:
+        ui.bmap, ui.tab = bmap, "atlas"
+        ui.map_mode = args.brain_map_mode
     frames = []
     paused = False
     dragging = False
@@ -508,7 +513,8 @@ def main():
     key_actions = {pygame.K_SPACE:"pause",pygame.K_r:"reset",pygame.K_t:"apple",pygame.K_l:"loom",
                    pygame.K_f:"escape",pygame.K_w:"flight",pygame.K_c:"follow",pygame.K_HOME:"home",
                    pygame.K_F5:"save",pygame.K_F9:"load",pygame.K_s:"save_timestamp",
-                   pygame.K_1:"tab:regions",pygame.K_2:"tab:motor",pygame.K_3:"tab:senses",pygame.K_4:"tab:atlas"}
+                   pygame.K_1:"tab:regions",pygame.K_2:"tab:motor",pygame.K_3:"tab:senses",pygame.K_4:"tab:atlas",
+                   pygame.K_n:"map:toggle"}
 
     while running:
         for ev in pygame.event.get():
