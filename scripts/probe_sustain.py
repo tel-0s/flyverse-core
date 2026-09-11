@@ -30,10 +30,13 @@ def main():
     ap.add_argument("--escape-gating", action="store_true")
     ap.add_argument("--fruit", default="all", choices=["all", "apple"])
     ap.add_argument("--fence", action="store_true")
+    ap.add_argument("--cuda-graphs", action="store_true"); ap.add_argument("--cuda-kernels", action="store_true")
+    ap.add_argument("--cuda-sparse", default="torch", choices=["torch", "warp"]); ap.add_argument("--event-driven", action="store_true")
     args = ap.parse_args()
     x, y = [float(v) for v in args.start.split(",")]
     sim = rd.Sim(args.seed, start=(x, y, 0.75), trail_seconds=0.0, program=args.program, escape_gating=args.escape_gating,
-                 fruit_set=args.fruit, fence=args.fence)
+                 fruit_set=args.fruit, fence=args.fence, cuda_graphs=args.cuda_graphs, cuda_kernels=args.cuda_kernels or None,
+                 cuda_sparse=args.cuda_sparse, event_driven=args.event_driven or None)
     print(f"program {args.program}, escape gating {args.escape_gating}, fruit {args.fruit}, fence {args.fence}")
     sim.fly.heading = np.random.default_rng(args.seed).uniform(-np.pi, np.pi)
     sim.metabolism.energy = args.energy

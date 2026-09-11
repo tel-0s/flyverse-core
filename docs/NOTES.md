@@ -854,6 +854,40 @@ body assumption, not the connectome:
   out. An optic-lobe modelling thread, not a per-type gain; the second open model question beside
   the compass, now with a precise statement of what is missing. In the meantime the last five
   centimetres is `KlinotaxisProgram` (a sensor-side approximation, off by default).
+* **The compass grid** (no compass adaptation, 10 Hz held background on every EPG, a 12-cell wedge
+  driven at +40 Hz for 2 s; cells above 22 Hz in the wedge vs the other 38, at 0.5 / 2 / 5 s after):
+  EPG <-> PEN x1.5 -- the ring stays at the background (EPG 10-13 Hz, PEN 1-5), wedge 0-3 / rest 2-10,
+  no bump; x2 -- the whole ring is self-sustaining *before* the pulse (EPG 57-74 Hz, PEN 51-76, Delta7
+  105-127), wedge 5-6 / rest 8-12 throughout; x3 -- 160-178 Hz whole-ring. Delta7 at x0.5 vs x1 barely
+  changes any row, and the rest of the brain stays at 1-4 Hz (the seizure does not spread: adaptation
+  elsewhere holds). So the transition from sub-threshold to whole-ring is sharp between x1.5 and x2
+  and nowhere in this grid is there a confined bump: the inhibition that should let only one wedge
+  win is weak relative to the recurrence at every gain tried. Last corner: x2 with Delta7 x2 / x4 / x8.
+* **... and the last corner:** with EPG <-> PEN x2 (self-sustaining ring), Delta7 x2 and x4 leave it
+  whole-ring at ~55 Hz with the driven wedge *less* active than the rest (4 / 12 vs 8-13 / 38), and x8
+  suppresses the ring back to the background (EPG 10-15 Hz) without favouring the wedge either.
+  Delta7's inhibition acts globally and never lets one wedge win. So: no confined, persistent bump in
+  any cell of (recurrence x1.5-3) x (Delta7 x0.5-8) x (no compass adaptation) x (10 Hz background). The
+  connectome has the wedge-specific Delta7 -> EPG structure the animal's attractor uses; under
+  uniform 0.275 mV synapses, the cap and the L1 fan-in scaling it does not produce winner-take-all.
+  The compass thread ends this session with that map; `cx.CompassSteering` stays the stand-in.
+* **Native backends, clean timing** (idle 4090, 300 frames of 10 ms, seed 0, full brain, B = 1):
+
+  | configuration | ms / frame | x real time |
+  |---|---|---|
+  | eager torch | 22.0 | 0.45 |
+  | `--cuda-graphs` | 15.8 | 0.63 |
+  | `--cuda-kernels --cuda-graphs` | 16.9 | 0.59 |
+  | `--cuda-kernels --cuda-graphs --cuda-sparse warp` | 13.9 | 0.72 |
+  | **`--cuda-kernels --cuda-graphs --event-driven --cuda-sparse warp`** | **8.0** | **1.24** |
+  | ... + `--dt-by-module vnc=1.0` (without events) | 13.5 | 0.74 |
+  | ... + `--weight-dtype float16` (without events) | 13.5 | 0.74 |
+  | `--fast --cuda-kernels --cuda-graphs --cuda-sparse warp` | 8.9 | 1.13 |
+
+  The native event traversal is the win (full dt, full brain, real time and a quarter); the fused
+  kernels alone are not faster than Torch graphs, and `--fast` buys nothing on top of events. Spike
+  trains diverge from eager after ~35 frames (atomic accumulation order; documented as non-bitwise).
+  The sustain runs below use the event configuration. `probe_sustain.py` takes the backend flags.
 * **Clean timing** (headless demo loop, 300 frames of 10 ms after 60 warm-up, one configuration at a
   time on an idle RTX 4090, B = 1, full brain):
 
