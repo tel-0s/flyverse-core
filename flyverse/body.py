@@ -85,6 +85,7 @@ class FlyState:
     vy: float = 0.0
     vz: float = 0.0
     air_time: float = 0.0
+    ground_time: float = 1e9  # seconds since the last landing (escape refractory)
 
     @property
     def forward(self) -> np.ndarray:
@@ -225,7 +226,7 @@ class Flight:
     orient_tau_ms: float = 120.0       # pitch/roll settle with this time constant (haltere-mediated stabilisation)
     takeoff_power_hz: float = 50.0     # sustained power-MN rate that launches a voluntary takeoff
     takeoff_hold_s: float = 0.3        # ... sustained for this long (a wingbeat command, not a flicker)
-    gf_hz: float = 20.0                # smoothed GF rate that counts as an escape spike
+    gf_hz: float = 30.0                # smoothed GF rate that counts as an escape (a burst, not one crosstalk spike)
     tau_ms: float = 40.0
 
     def readout(self, brain, wg: WingGroups) -> dict:
@@ -233,8 +234,12 @@ class Flight:
         return {"gf": r(wg.gf), "ttm": r(wg.ttm), "power": r(wg.power), "steer_L": r(wg.steer_L), "steer_R": r(wg.steer_R),
                 "haltere": r(wg.haltere)}
 
+    landing_refractory_s: float = 1.0  # no new escape within this time of landing (a jump-land-jump chain is not fly behaviour)
+
     def maybe_takeoff(self, fly: FlyState, w: dict, dt_s: float = 0.01) -> bool:
-        if w["gf"] >= self.gf_hz:          # the giant fibre spike is the escape trigger (TTMn follows it 1:1 in the animal)
+        fly.ground_time += dt_s
+        if w["gf"] >= self.gf_hz and fly.ground_time >= self.landing_refractory_s:
+            # the giant fibre spike is the escape trigger (TTMn follows it 1:1 in the animal)
             self.launch(fly, escape=True); return True
         # voluntary takeoff needs sustained wingbeat drive (0.1 s), not a transient
         self._power_hold = getattr(self, "_power_hold", 0.0) + dt_s if w["power"] >= self.takeoff_power_hz else 0.0
@@ -288,5 +293,6 @@ class Flight:
         if fly.z <= ground and fly.vz <= 0 and fly.air_time > 0.05:
             fly.z = ground; fly.airborne = False
             fly.pitch = 0.0; fly.roll = 0.0                            # landed on a flat surface
+            fly.ground_time = 0.0
             fly.speed = float(np.hypot(fly.vx, fly.vy)) * 0.2   # landing: most momentum lost
             fly.vx = fly.vy = fly.vz = 0.0

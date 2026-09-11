@@ -247,7 +247,7 @@ class Sim:
         self.brain.drive = self.optic.step_frame(self.col_rad, self.brain.rate, FRAME_MS)
         # taste: front legs touching fruit -> sweet GRNs fire (Poisson 120 Hz, Shiu-style)
         name, dist = self.nearest_fruit()
-        self.tasting = 1.0 if (dist < 0.01 and not self.fly.airborne) else 0.0
+        self.tasting = 1.0 if (dist < 0.015 and not self.fly.airborne) else 0.0
         if getattr(self, "wing_pulse", 0) > 0:
             self.wing_pulse -= 1
             if self.wing_pulse == 0:
@@ -269,7 +269,10 @@ class Sim:
         elif not self.flight.maybe_takeoff(self.fly, self.wcmd):
             on_table = abs(self.fly.z - self.info["table_top_z"]) < 1e-3
             bounds = (x0 + 0.02, x1 - 0.02, y0 + 0.02, y1 - 0.02) if on_table else (-1.95, 1.95, -1.95, 1.95)
-            self.loco.step(self.fly, self.decoder_cmd() if getattr(self, "decoder", False) else self.cmd, FRAME_MS / 1000, bounds)
+            cmd = self.decoder_cmd() if getattr(self, "decoder", False) else self.cmd
+            if self.tasting:                                   # a fly that is feeding stops walking
+                cmd = dict(cmd, speed=0.0, yaw=0.0)
+            self.loco.step(self.fly, cmd, FRAME_MS / 1000, bounds)
         self.update_loom()
         if self.trail_seconds > 0 and int(self.brain.t / FRAME_MS) % 5 == 0:      # 20 samples per second
             t_now = self.brain.t / 1000

@@ -74,6 +74,11 @@ class LIFParams:
     # settings, single DN pairs at 150 Hz no longer reach the leg motor neurons; the animal's DN->VNC
     # synapses are strong (DNp09 / MDN optogenetics walks the fly).
     path_gain: list = None
+    # Same, keyed on cell TYPE regexes: (pre_type_regex, post_type_regex, factor). Default: the direct
+    # LC4 / LPLC2 -> giant fibre synapses x3 (Ache et al. 2019: the GF's loom input is these two types;
+    # here it lets the escape threshold sit above the single GF spikes that central-brain crosstalk
+    # produces while a loom still gives a burst).
+    type_path_gain: list = None
     # Synaptic input as an event-driven gather over the outputs of the neurons that fired (cost ~ spikes x
     # fan-out, ~100x less than the full 24.6M-synapse spmm at a few % activity) or as one sparse matmul.
     # None = matmul on CUDA (cuSPARSE spmm is fast and the batched RL flies are dense in spikes), events
@@ -84,6 +89,8 @@ class LIFParams:
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
 # synapses; without it the AL's PN <-> cholinergic-LN loop runs at 300 Hz). Elsewhere depression is off
 # because it blocks descending commands.
+DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0)]
+
 DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0),          # benchmarked: specific, ipsilateral leg drive, no storms
                      (r"^visual_projection$", r"^descending_neuron$", 2.0)]   # LC4/LPLC2 -> GF etc.: loom escape margin (x3 re-ignites the AVLP network)
 
@@ -111,6 +118,15 @@ class Brain:
             Wc = W.tocoo()
             for pre_re, post_re, f in path_gain:
                 pre_m = np.array([bool(re.match(pre_re, t)) for t in sc]); post_m = np.array([bool(re.match(post_re, t)) for t in sc])
+                Wc.data[pre_m[Wc.col] & post_m[Wc.row]] *= np.float32(f)
+            W = Wc.tocsr()
+        type_path_gain = DEFAULT_TYPE_PATH_GAIN if p.type_path_gain is None else p.type_path_gain
+        if type_path_gain:
+            import re
+            ty = c.neurons.type.fillna("").to_numpy()
+            Wc = W.tocoo()
+            for pre_re, post_re, f in type_path_gain:
+                pre_m = np.array([bool(re.match(pre_re, t)) for t in ty]); post_m = np.array([bool(re.match(post_re, t)) for t in ty])
                 Wc.data[pre_m[Wc.col] & post_m[Wc.row]] *= np.float32(f)
             W = Wc.tocsr()
         if p.same_type_gain != 1.0:

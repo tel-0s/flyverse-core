@@ -356,6 +356,25 @@ and spike-frequency adaptation.
   0.5 / 0.1 / 0.7 s; OFF -> 4 / 2 / 3 cm, no tasting. What still spoils it: 8-10 giant-fibre hops per
   30 s in two of the three runs (the escapes eventually carry the fly off the table), and the fly
   overshoots after contact. Both are the next targets.
+* **The hops were not the wind.** GF input-weighted drivers during foraging: SAD073, GNG300, LPLC2,
+  DNp70, CL367 -- the same central-brain crosstalk as before, plus LPLC2 responding to the fruit itself
+  (an approached fruit *is* an expanding object). Single crosstalk spikes vs a loom burst: the escape
+  threshold went from 20 to 30 Hz of smoothed GF rate (>= 3 spikes in ~100 ms), the LC4 / LPLC2 -> GF
+  synapses got a x3 type-level gain (`LIFParams.type_path_gain`; Ache et al. 2019) and LC4 / LPLC2 a
+  and a fly that is tasting stops walking (tasting reach 1.5 cm). Foraging then: 0 hops in 5 of 6
+  runs, and the flies that reach fruit stay on it (17-21 s of tasting).
+* **Loom-detector gain is context dependent.** Raising LC4 / LPLC2's optic-lobe drive x1.5 fixed the
+  loom in the bare loom probe but, with smell and wind on, put the GF at 20-55 Hz from the first
+  half-second and produced 95 hops per 30 s (a jump-land-jump chain across the room). Tested in the
+  full demo context (5 s walking + loom, 2 seeds): x1.0 / 30 Hz -> exactly one hop per run, the loom's
+  (GF 35-46 on the loom vs <= 24 walking); x1.25 -> 3-4 spurious hops. Kept x1.0. Also added a 1 s
+  post-landing escape refractory (`Flight.landing_refractory_s`) so a trigger cannot chain.
+* **Foraging, final numbers for this session** (`probe_foraging.py`, 3 seeds x 30 s, start 7-12 cm
+  downwind of fruit): anemotaxis term ON -> fruit reached and fed on in 2 of 3 runs (20.4 s and 17.4 s
+  of tasting, closest approach 1 / 3 / 1 cm), 0 hops in all three; OFF -> 1 of 3 (by baseline
+  walking), 8 hops in one run. The fly finds food by turning into the wind when it smells it, using
+  DNp18 / DNp33 for the wind direction and its antennal lobe for the odour -- with the gate between
+  them supplied by the body.
 
 ## Batched brains and the RL environment
 

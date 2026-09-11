@@ -83,7 +83,11 @@ DEFAULT_BASELINE_BY_TYPE = {t: 0.0 for t in T4T5}
 DEFAULT_PAIR_GAIN = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0), (r"^(Tm4|Tm9|CT1|TmY15)$", r"^T5[abcd]$", 5.0),
                      # T4/T5 outputs x4: rectified, strongly inhibited DS units respond weakly to natural
                      # scenes; this restores drive to LPi / HS / VS / LPLC and the descending neurons
-                     (r"^T[45][abcd]$", r".*", 2.0)]
+                     (r"^T[45][abcd]$", r".*", 2.0),
+                     # the loom detectors LC4 / LPLC2 keep x1 optic-lobe drive: in the full sensory context
+                     # (smell + wind on) x1.25 already gives 3-4 spontaneous GF escapes per 5 s of walking;
+                     # the loom margin comes from the x3 LC4/LPLC2 -> GF synapses in brain.py instead
+                     (r".*", r"^(LC4|LPLC2)$", 1.0)]
 
 
 def _csr(D: sp.spmatrix, device) -> torch.Tensor:

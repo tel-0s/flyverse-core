@@ -168,7 +168,7 @@ class FlyRoomEnv:
         dL = -(wb_x * c45 + wb_y * c45) / self.windsense.full_speed; dR = -(wb_x * c45 - wb_y * c45) / self.windsense.full_speed
         rE, rC = self.windsense.rates_batch(dL, dR)
         self.brain.set_poisson(self.windsense.joE, rE); self.brain.set_poisson(self.windsense.joC, rC)
-        tasting = (self.fruit_dist() < 0.01).astype(np.float32)
+        tasting = (self.fruit_dist() < 0.015).astype(np.float32)
         self.tasting = tasting
         self.brain.set_poisson(self.sweet, np.repeat(tasting[:, None] * 120.0, len(self.sweet), axis=1))
         self.brain.step(int(self.p.frame_ms / self.brain.p.dt))

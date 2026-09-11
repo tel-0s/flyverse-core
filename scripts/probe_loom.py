@@ -27,6 +27,8 @@ def main():
     ap.add_argument("--norm-ref", type=float, default=5000.0)
     ap.add_argument("--norm-alpha", type=float, default=1.0)
     ap.add_argument("--out-norm", default="l1")
+    ap.add_argument("--lc-gain", type=float, default=None, help="optic-lobe drive gain on LC4/LPLC2 (default from optic.py)")
+    ap.add_argument("--gf-hz", type=float, default=None, help="escape threshold on the smoothed GF rate")
     ap.add_argument("--gain-out", type=float, default=80.0)
     args = ap.parse_args()
     c = connectome.load(verbose=False)
@@ -37,10 +39,15 @@ def main():
     loom_idx = len(w.spheres) - 1
     dirs_b, wts = r.ray_directions()
     wts_t = torch.from_numpy(wts).float().to(w.device)
-    ol = optic.OpticLobe(c, r, optic.OpticParams(gain_out_mv=args.gain_out, out_norm=args.out_norm)); ol.relax()
+    op = optic.OpticParams(gain_out_mv=args.gain_out, out_norm=args.out_norm)
+    if args.lc_gain is not None:
+        op.pair_gain = [g for g in optic.DEFAULT_PAIR_GAIN if "LC4" not in g[1]] + [(r".*", r"^(LC4|LPLC2)$", args.lc_gain)]
+    ol = optic.OpticLobe(c, r, op); ol.relax()
     rt = types[ol.rate_idx]
     b = brain.Brain(c, brain.LIFParams(input_norm_alpha=args.norm_alpha, input_norm_ref=args.norm_ref)); b.freeze(ol.rate_idx)
     wg = body.wing_groups(c); flight = body.Flight()
+    if args.gf_hz is not None:
+        flight.gf_hz = args.gf_hz
     print("wing groups:", {k: len(v) for k, v in vars(wg).items()})
     fly = body.FlyState(x=-0.3, y=0.0, z=info["table_top_z"], heading=0.0)
 
