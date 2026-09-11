@@ -61,6 +61,8 @@ class FlyState:
     y: float = 0.0
     z: float = 0.75           # height of the walking surface
     heading: float = 0.0      # rad, 0 = +x, positive = counter-clockwise (left)
+    pitch: float = 0.0        # rad, positive = nose up (free in flight, 0 on flat surfaces)
+    roll: float = 0.0         # rad, positive = right wing down (banking)
     speed: float = 0.0        # m/s
     yaw_rate: float = 0.0     # rad/s
     proboscis: float = 0.0    # 0..1
@@ -73,15 +75,23 @@ class FlyState:
 
     @property
     def forward(self) -> np.ndarray:
-        return np.array([np.cos(self.heading), np.sin(self.heading), 0.0])
+        cp = np.cos(self.pitch)
+        return np.array([cp * np.cos(self.heading), cp * np.sin(self.heading), np.sin(self.pitch)])
 
     @property
     def left(self) -> np.ndarray:
-        return np.array([-np.sin(self.heading), np.cos(self.heading), 0.0])
+        f = self.forward
+        l0 = np.array([-np.sin(self.heading), np.cos(self.heading), 0.0])
+        u0 = np.cross(f, l0)
+        return np.cos(self.roll) * l0 + np.sin(self.roll) * u0
+
+    @property
+    def up(self) -> np.ndarray:
+        return np.cross(self.forward, self.left)
 
     def body_to_world(self, dirs_body: np.ndarray) -> np.ndarray:
         """(…, 3) body-frame directions (x fwd, y left, z up) -> world frame."""
-        R = np.stack([self.forward, self.left, np.array([0, 0, 1.0])], axis=1)   # columns = body axes
+        R = np.stack([self.forward, self.left, self.up], axis=1)   # columns = body axes (full 3-D orientation)
         return dirs_body @ R.T
 
     @property
@@ -162,6 +172,9 @@ class Flight:
     """Airborne dynamics. Takeoff = a giant-fibre spike (escape jump: ballistic hop, wings may or may not
     engage) or sustained wing-power motor neuron activity (voluntary takeoff). In the air, thrust and lift
     come from the power MNs, yaw from steering-MN asymmetry; without wingbeat the fly falls and lands."""
+    # In the air the body has all three rotational degrees of freedom: yaw from the steering-MN
+    # asymmetry, pitch from the flight path (climb/dive), roll = banking into the turn. On flat
+    # surfaces pitch and roll are 0.
     jump_speed: float = 0.6            # m/s initial escape-jump velocity (Drosophila jumps ~0.5-1 m/s)
     jump_pitch_deg: float = 45.0
     k_thrust: float = 0.8 / 60.0       # m/s of airspeed per Hz of mean power-MN rate (60 Hz -> 0.8 m/s)
@@ -171,6 +184,8 @@ class Flight:
     drag: float = 2.5                  # 1/s
     k_yaw: float = np.deg2rad(600) / 30.0
     max_yaw: float = np.deg2rad(900)
+    bank_per_yaw: float = 0.12         # rad of roll per rad/s of yaw rate (banked turns), clipped to 60 deg
+    orient_tau_ms: float = 60.0        # pitch/roll follow the flight path with this time constant
     takeoff_power_hz: float = 50.0     # sustained power-MN rate that launches a voluntary takeoff
     takeoff_hold_s: float = 0.3        # ... sustained for this long (a wingbeat command, not a flicker)
     gf_hz: float = 20.0                # smoothed GF rate that counts as an escape spike
@@ -215,6 +230,13 @@ class Flight:
         fly.vx += ax * dt_s; fly.vy += ay * dt_s; fly.vz += az * dt_s
         fly.x += fly.vx * dt_s; fly.y += fly.vy * dt_s; fly.z += fly.vz * dt_s
         fly.air_time += dt_s
+        # free orientation in the air: nose along the flight path, wings banked into the turn
+        ao = np.exp(-dt_s * 1000 / self.orient_tau_ms)
+        horiz = float(np.hypot(fly.vx, fly.vy))
+        pitch_t = float(np.arctan2(fly.vz, max(horiz, 0.05)))
+        roll_t = float(np.clip(-self.bank_per_yaw * fly.yaw_rate, -np.deg2rad(60), np.deg2rad(60)))
+        fly.pitch = ao * fly.pitch + (1 - ao) * pitch_t
+        fly.roll = ao * fly.roll + (1 - ao) * roll_t
         x0, x1, y0, y1, z1 = room
         if not (x0 < fly.x < x1):   # walls: land on the wall = stop, drop to the floor below
             fly.x = np.clip(fly.x, x0 + 0.01, x1 - 0.01); fly.vx = 0.0
@@ -225,5 +247,6 @@ class Flight:
         ground = surface_z(fly.x, fly.y)
         if fly.z <= ground and fly.vz <= 0 and fly.air_time > 0.05:
             fly.z = ground; fly.airborne = False
+            fly.pitch = 0.0; fly.roll = 0.0                            # landed on a flat surface
             fly.speed = float(np.hypot(fly.vx, fly.vy)) * 0.2   # landing: most momentum lost
             fly.vx = fly.vy = fly.vz = 0.0

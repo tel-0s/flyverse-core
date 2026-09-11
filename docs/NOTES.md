@@ -286,6 +286,23 @@ and spike-frequency adaptation.
   on the same observation does. Next: fitness = tasted frames with several spawns per policy, the
   "pn3" feature, and PPO on Linux via PufferLib.
 
+## Demo UI (session 5)
+
+* The UI is drawn on a fixed design canvas (1280 x 760, + 330 for the brain map) and scaled uniformly
+  into a resizable window (`pygame.transform.smoothscale`, letterboxed); mouse events are mapped back
+  through the same transform. GIFs capture the canvas.
+* Scene view: `OrbitCam` (azimuth / elevation / distance around a target; `C` follows the fly). The
+  view is re-rendered only when the camera key changes (3 ms at 480 x 300).
+* `flyverse/brainmap.py`: 140,024 of the 167,106 neurons have a `somaLocation`; they are binned once
+  into dorsal (z across, x down) and lateral (z across, y down) pixel grids at the 0.5-99.5 percentile
+  extents; per frame the activity vector (spiking: rate / 40; optic-lobe units: |dr| x 2) is summed per
+  pixel with `np.bincount` and divided by sqrt(count) so dense regions do not wash out. Type means for
+  the "most active types" list are a bincount over type codes (a pandas groupby here cost 50 ms/frame).
+* Body: `FlyState` has `pitch` and `roll`; `forward/left/up` give the full frame and `body_to_world`
+  uses it, so the retina rays and the fly's-eye camera roll and pitch with the body. In flight the nose
+  follows the velocity vector (climb/dive) and the wings bank into the turn (0.12 rad per rad/s of
+  yaw, clipped at 60 deg); landing zeroes both. Trail: 20 samples/s, faded over `--trail-seconds`.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

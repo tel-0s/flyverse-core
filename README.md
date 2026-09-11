@@ -19,7 +19,13 @@ python scripts/probe_motion.py         #   drifting gratings: T4/T5 direction se
 
 Demo keys: SPACE pause, R reset, T teleport to the apple (taste), L loom a black ball at the fly
 (escape jump), F stimulate the giant fibre directly, W stimulate the flight DNs (DNg02_a/DNa08 -> a
-2-3 s powered flight), ESC quit.
+2-3 s powered flight), ESC quit. Scene camera: arrow keys / mouse drag orbit, +/- or wheel zoom, C
+follows the fly, HOME resets. The window is resizable (the UI keeps its layout and scales to fit).
+Options: `--brain-map` (every soma in dorsal and lateral view, activity as highlights), `--trail-seconds`
+(decaying trail of the fly in the scene view), `--start x,y[,z]` or `--start floor` (where the fly
+begins; R returns there), `--window 1920x1080`. The fly has a full 3-D body frame: pitch and roll are
+free in flight (nose along the flight path, banking into turns) and the fly's-eye camera and retina
+follow it; on flat surfaces pitch and roll are zero.
 
 `scripts/screen_dns.py` stimulates every descending-neuron type in its own copy of the brain (batched)
 and records what the VNC does -- the model's measured motor map. It recovers known pathways: DNg02 ->
