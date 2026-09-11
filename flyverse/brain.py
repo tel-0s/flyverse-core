@@ -84,6 +84,7 @@ class LIFParams:
     # None = matmul on CUDA (cuSPARSE spmm is fast and the batched RL flies are dense in spikes), events
     # elsewhere (MPS/CPU sparse matmul is 5-30x slower than the gather).
     event_driven: bool | None = None
+    weight_dtype: str = "float32"   # "float16" on CUDA; spike products accumulate into float32
 
 
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
@@ -101,6 +102,39 @@ DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0),          # benchma
 DEFAULT_STD_U_BY_TYPE = {r"^ORN_": 0.2, r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2, r"(_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN|PN\d)": 0.2}
 
 
+def _shaped_weights(c: Connectome, p: LIFParams):
+    """Apply the calibrated connection rules before fan-in normalization."""
+    W = c.W.tocsr()
+    if p.conn_cap > 0:
+        W = W.copy()
+        W.data = np.sign(W.data) * np.minimum(np.abs(W.data), np.float32(p.conn_cap))
+    path_gain = DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain
+    if path_gain:
+        import re
+        sc = c.neurons.superclass.fillna("").to_numpy()
+        Wc = W.tocoo()
+        for pre_re, post_re, f in path_gain:
+            pre_m = np.array([bool(re.match(pre_re, t)) for t in sc]); post_m = np.array([bool(re.match(post_re, t)) for t in sc])
+            Wc.data[pre_m[Wc.col] & post_m[Wc.row]] *= np.float32(f)
+        W = Wc.tocsr()
+    type_path_gain = DEFAULT_TYPE_PATH_GAIN if p.type_path_gain is None else p.type_path_gain
+    if type_path_gain:
+        import re
+        ty = c.neurons.type.fillna("").to_numpy()
+        Wc = W.tocoo()
+        for pre_re, post_re, f in type_path_gain:
+            pre_m = np.array([bool(re.match(pre_re, t)) for t in ty]); post_m = np.array([bool(re.match(post_re, t)) for t in ty])
+            Wc.data[pre_m[Wc.col] & post_m[Wc.row]] *= np.float32(f)
+        W = Wc.tocsr()
+    if p.same_type_gain != 1.0:
+        types = c.neurons.type.fillna("").to_numpy()
+        Wc = W.tocoo()
+        same = (types[Wc.row] == types[Wc.col]) & (types[Wc.row] != "")
+        Wc.data[same] *= np.float32(p.same_type_gain)
+        W = Wc.tocsr()
+    return W
+
+
 class Brain:
     def __init__(self, c: Connectome, params: LIFParams | None = None, device: str | None = None,
                  seed: int = 0, batch: int = 1):
@@ -111,42 +145,32 @@ class Brain:
         self.B = int(batch)
         p = self.p
 
-        W = c.W.tocsr()
-        if p.conn_cap > 0:
-            W = W.copy()
-            W.data = np.sign(W.data) * np.minimum(np.abs(W.data), np.float32(p.conn_cap))
-        path_gain = DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain
-        if path_gain:
-            import re
-            sc = c.neurons.superclass.fillna("").to_numpy()
-            Wc = W.tocoo()
-            for pre_re, post_re, f in path_gain:
-                pre_m = np.array([bool(re.match(pre_re, t)) for t in sc]); post_m = np.array([bool(re.match(post_re, t)) for t in sc])
-                Wc.data[pre_m[Wc.col] & post_m[Wc.row]] *= np.float32(f)
-            W = Wc.tocsr()
-        type_path_gain = DEFAULT_TYPE_PATH_GAIN if p.type_path_gain is None else p.type_path_gain
-        if type_path_gain:
-            import re
-            ty = c.neurons.type.fillna("").to_numpy()
-            Wc = W.tocoo()
-            for pre_re, post_re, f in type_path_gain:
-                pre_m = np.array([bool(re.match(pre_re, t)) for t in ty]); post_m = np.array([bool(re.match(post_re, t)) for t in ty])
-                Wc.data[pre_m[Wc.col] & post_m[Wc.row]] *= np.float32(f)
-            W = Wc.tocsr()
-        if p.same_type_gain != 1.0:
-            types = c.neurons.type.fillna("").to_numpy()
-            Wc = W.tocoo()
-            same = (types[Wc.row] == types[Wc.col]) & (types[Wc.row] != "")
-            Wc.data[same] *= np.float32(p.same_type_gain)
-            W = Wc.tocsr()
+        if self.B < 1 or not math.isfinite(p.dt) or p.dt <= 0:
+            raise ValueError("batch must be positive and dt must be positive and finite")
+
+        W = _shaped_weights(c, p)
         if p.input_norm_alpha > 0:
-            tot = np.asarray(abs(W).sum(axis=1)).ravel()
+            ref = c.reference
+            key = repr((p.conn_cap, DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain,
+                        DEFAULT_TYPE_PATH_GAIN if p.type_path_gain is None else p.type_path_gain,
+                        p.same_type_gain))
+            if ref is c:
+                tot = np.asarray(abs(W).sum(axis=1)).ravel()
+                ref._norm_cache[key] = tot
+            else:
+                if key not in ref._norm_cache:
+                    ref._norm_cache[key] = np.asarray(abs(_shaped_weights(ref, p)).sum(axis=1)).ravel()
+                tot = ref._norm_cache[key][ref.index_of(c.neurons.bodyId)]
             scale = np.clip((p.input_norm_ref / np.maximum(tot, 1.0)) ** p.input_norm_alpha, 0.02, 1.0).astype(np.float32)
             import scipy.sparse as sp
             W = (sp.diags(scale) @ W).tocsr()
             self.input_scale = scale
         W = W.copy(); W.data = W.data * np.float32(p.w_syn)
         self.event_driven = (self.device.type != "cuda") if p.event_driven is None else bool(p.event_driven)
+        if p.weight_dtype not in ("float32", "float16"):
+            raise ValueError("weight_dtype must be float32 or float16")
+        if p.weight_dtype == "float16" and self.device.type != "cuda":
+            raise ValueError("float16 sparse weights require CUDA")
         self.set_weights(W)
 
         self.gen = torch.Generator(device=self.device).manual_seed(seed)
@@ -158,6 +182,8 @@ class Brain:
         self.poisson_p = torch.zeros(B, N, device=dev)       # per-step spike prob for forced neurons
         self.rate = torch.zeros(B, N, device=dev)            # running rate estimate (Hz)
         self.spikes = torch.zeros(B, N, device=dev)          # spikes this step (0/1)
+        self.spike_counts = torch.zeros(B, N, device=dev)
+        self.record_activity = False
         self.adapt = torch.zeros(B, N, device=dev)           # adaptation current (mV)
         self.res = torch.ones(B, N, device=dev)              # synaptic resource x (STD)
         self.active = torch.ones(N, device=dev)              # 0 = frozen (simulated elsewhere)
@@ -192,14 +218,23 @@ class Brain:
             self.W = None
             self._out_ptr = torch.from_numpy(Wc.indptr.astype(np.int64)).to(self.device)
             self._out_post = torch.from_numpy(Wc.indices.astype(np.int64)).to(self.device)
-            self._out_w = torch.from_numpy(Wc.data.astype(np.float32)).to(self.device)
+            dtype = torch.float16 if self.p.weight_dtype == "float16" else torch.float32
+            self._out_w = torch.from_numpy(Wc.data.astype(np.float32)).to(self.device, dtype)
         else:
-            self.W = sparse_matrix(W, self.device)
+            dtype = torch.float16 if self.p.weight_dtype == "float16" else torch.float32
+            self.W = sparse_matrix(W, self.device, dtype=dtype)
+            self._syn_input = torch.empty(self.n, self.B, dtype=torch.float32, device=self.device)
 
     def _add_synaptic_input(self, x: torch.Tensor) -> None:
         """g += W @ x for transmitted spikes x (B, N); event-driven or one sparse matmul for all B brains."""
         if not self.event_driven:
-            self.g.add_((self.W @ x.T.contiguous()).T)                  # contiguous: 4x faster spmm
+            if self.p.weight_dtype == "float16":
+                # cuSPARSE accepts half A/B with float C and compute type. Passing an
+                # fp32 out buffer avoids the overflow/rounding of a half-precision output.
+                torch.mm(self.W, x.T.to(torch.float16).contiguous(), out=self._syn_input)
+                self.g.add_(self._syn_input.T)
+            else:
+                self.g.add_((self.W @ x.T.contiguous()).T)              # contiguous: 4x faster spmm
             return
         nz = torch.nonzero(x)                                           # (K, 2) [brain, pre]; syncs with host
         if nz.shape[0] == 0:
@@ -238,7 +273,7 @@ class Brain:
         """Reset the state of brains `rows` (all if None) to rest."""
         sel = slice(None) if rows is None else torch.as_tensor(np.asarray(rows), device=self.device, dtype=torch.long)
         self.v[sel] = self.p.v_rest
-        for t in (self.g, self.refrac, self.drive, self.poisson_p, self.rate, self.spikes, self.adapt):
+        for t in (self.g, self.refrac, self.drive, self.poisson_p, self.rate, self.spikes, self.adapt, self.spike_counts):
             t[sel] = 0.0
         self.res[sel] = 1.0
         self.spike_buf[:, sel] = 0.0
@@ -255,30 +290,32 @@ class Brain:
 
             # membrane (exponential Euler with g and drive held constant over the step)
             target = p.v_rest + self.g + self.drive - self.adapt
-            self.v = target + (self.v - target) * self._a_m
+            torch.add(target, (self.v - target) * self._a_m, out=self.v)
             in_ref = self.refrac > 0
-            self.v = torch.where(in_ref, torch.full_like(self.v, p.v_reset), self.v)
-            self.refrac = torch.clamp(self.refrac - p.dt, min=0.0)
+            torch.where(in_ref, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
+            torch.clamp(self.refrac - p.dt, min=0.0, out=self.refrac)
 
-            spikes = (self.v >= p.v_th).float() * self.active
+            torch.mul((self.v >= p.v_th).float(), self.active, out=self.spikes)
+            spikes = self.spikes
             if self._poisson_on:
                 forced = (torch.rand(self.v.shape, generator=self.gen, device=self.device) < self.poisson_p).float()
-                spikes = torch.maximum(spikes, forced)
+                torch.maximum(spikes, forced, out=spikes)
             fired = spikes > 0
-            self.v = torch.where(fired, torch.full_like(self.v, p.v_reset), self.v)
-            self.refrac = torch.where(fired, torch.full_like(self.refrac, p.t_ref), self.refrac)
+            torch.where(fired, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
+            torch.where(fired, torch.full_like(self.refrac, p.t_ref), self.refrac, out=self.refrac)
             if p.adapt_jump > 0:
                 self.adapt.mul_(self._a_ad).add_(spikes, alpha=p.adapt_jump)
 
             if self._std_on:
                 # transmit with the currently available resource, then deplete and recover
                 self.spike_buf[self.buf_pos] = spikes * self.res
-                self.res = torch.where(fired, self.res * (1 - self.std_u_vec), self.res)
-                self.res = 1.0 - (1.0 - self.res) * self._a_std
+                torch.where(fired, self.res * (1 - self.std_u_vec), self.res, out=self.res)
+                torch.sub(1.0, (1.0 - self.res) * self._a_std, out=self.res)
             else:
                 self.spike_buf[self.buf_pos] = spikes
             self.buf_pos = (self.buf_pos + 1) % self.n_delay
-            self.spikes = spikes
+            if self.record_activity:
+                self.spike_counts.add_(spikes)
             self.rate.mul_(self._a_r).add_(spikes * ((1 - self._a_r) * 1000.0 / p.dt))
             self.t += p.dt
             self.step_count += 1

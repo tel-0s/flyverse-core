@@ -99,6 +99,9 @@ class OpticLobe:
         self.c, self.r, self.p = c, retina, params or OpticParams()
         self.B = int(batch)
         self.device = resolve(device)
+        if not np.isfinite(self.p.dt_ms) or self.p.dt_ms <= 0:
+            raise ValueError("optic dt_ms must be positive and finite")
+        self._pending_ms = 0.0
         nrn = c.neurons
         types = nrn.type.fillna("").to_numpy()
         is_pr = nrn.type.isin(PHOTORECEPTOR_TYPES).to_numpy()
@@ -109,10 +112,10 @@ class OpticLobe:
         self.n_rate, self.n_pr, self.n_spk = len(self.rate_idx), len(self.pr_idx), len(self.spk_idx)
 
         W = c.W.tocsr()                                   # (post, pre) signed counts
-        tot = np.asarray(abs(W).sum(axis=1)).ravel()
+        tot = c.neurons.in_syn.to_numpy()
         Wn = (sp.diags(1.0 / np.maximum(tot, 1.0)) @ W).tocsr()      # L1: fractions of total input
         if self.p.norm == "l2":
-            l2 = np.sqrt(np.asarray(W.multiply(W).sum(axis=1)).ravel())
+            l2 = c.neurons.in_syn_l2.to_numpy()
             Wn_ol = (sp.diags(1.0 / np.maximum(l2, 1.0)) @ W).tocsr()
         else:
             Wn_ol = Wn
@@ -158,8 +161,11 @@ class OpticLobe:
 
         self.v = torch.zeros(self.B, self.n_rate, device=self.device)
         self.adapt = torch.zeros(self.B, self.n_rate, device=self.device)
+        self.delta_rate = torch.zeros(self.B, self.n_rate, device=self.device)
         self.r0 = None
         self.last = {}
+        self.diagnostics = True
+        self.contrast = torch.zeros(self.B, n_col * 5, device=self.device)
         tau_map = DEFAULT_TAU_BY_TYPE if self.p.tau_by_type is None else self.p.tau_by_type
         tau = np.array([tau_map.get(t, self.p.tau_ms) for t in types[self.rate_idx]], dtype=np.float32)
         self._a = torch.from_numpy(np.exp(-self.p.dt_ms / tau)).to(self.device)             # (n_rate,)
@@ -178,15 +184,17 @@ class OpticLobe:
         I_pr = (rad[:, self.pr_column_t, :] * self.sens[None]).sum(-1)                     # (B, n_pr)
         I = (self.avg @ I_pr.T.contiguous()).T                                                            # (B, n_col*5)
         fresh = self._fresh[:, None]
-        self.I_lp = torch.where(fresh, I, self.I_lp)
-        self.I_mean = torch.where(fresh, I, self.I_mean)
+        torch.where(fresh, I, self.I_lp, out=self.I_lp)
+        torch.where(fresh, I, self.I_mean, out=self.I_mean)
         self._fresh[:] = False
         a_lp = float(np.exp(-dt_ms / p.tau_lp_ms)); a_ad = float(np.exp(-dt_ms / p.tau_adapt_ms))
-        self.I_lp = a_lp * self.I_lp + (1 - a_lp) * I
-        self.I_mean = a_ad * self.I_mean + (1 - a_ad) * self.I_lp
+        torch.add(a_lp * self.I_lp, (1 - a_lp) * I, out=self.I_lp)
+        torch.add(a_ad * self.I_mean, (1 - a_ad) * self.I_lp, out=self.I_mean)
         contrast = ((self.I_lp - self.I_mean) / (self.I_mean + p.eps)).clamp(-1.0, p.contrast_clip)
-        contrast = torch.where(self.has_t[None], contrast, torch.zeros_like(contrast))
-        self.last["contrast"] = contrast.view(self.B, -1, 5).cpu().numpy()                  # (B, n_col, 5)
+        torch.where(self.has_t[None], contrast, torch.zeros_like(contrast), out=self.contrast)
+        contrast = self.contrast
+        if self.diagnostics:
+            self.last["contrast"] = self.contrast.view(self.B, -1, 5).cpu().numpy()                  # (B, n_col, 5)
         return contrast[:, self.pr_cell_t]                                                   # (B, n_pr)
 
     # ------------------------------------------------------------------ rate dynamics
@@ -200,8 +208,8 @@ class OpticLobe:
         inp = p.gain_rr * (self.W_rr @ dr.T.contiguous()).T + p.gain_in * (self.W_rp @ a_pr.T.contiguous()).T - p.adapt_gain * self.adapt
         if s_spk is not None:
             inp = inp + p.gain_fb * (self.W_rs @ s_spk.T.contiguous()).T
-        self.v = inp + (self.v - inp) * self._a[None]
-        self.adapt = dr + (self.adapt - dr) * self._a_ad
+        torch.add(inp, (self.v - inp) * self._a[None], out=self.v)
+        torch.add(dr, (self.adapt - dr) * self._a_ad, out=self.adapt)
 
     def relax(self, ms: float = 0.0) -> None:
         """Rest state: by construction every unit sits at the operating point (kept for API symmetry)."""
@@ -218,9 +226,13 @@ class OpticLobe:
         if spk_rate_hz.dim() == 1:
             spk_rate_hz = spk_rate_hz[None]
         s = (spk_rate_hz[:, self.spk_idx_t] / 100.0).clamp(0, 3)
-        for _ in range(max(1, int(round(frame_ms / self.p.dt_ms)))):
+        total = self._pending_ms + frame_ms
+        steps = int(np.floor((total + 1e-9) / self.p.dt_ms))
+        self._pending_ms = max(0.0, total - steps * self.p.dt_ms)
+        for _ in range(steps):
             self._substep(a_pr, s)
-        dr = self.rates() - self.r0
+        torch.sub(self.rates(), self.r0, out=self.delta_rate)
+        dr = self.delta_rate
         drive = torch.zeros(self.B, self.c.n, device=self.device)
         drive[:, self.spk_idx_t] = (self.p.gain_out_mv * (self.W_sr @ dr.T.contiguous()).T).clamp(-self.p.drive_clip_mv, self.p.drive_clip_mv)
         self.last["dr"] = dr
@@ -229,6 +241,7 @@ class OpticLobe:
     def reset(self, rows=None) -> None:
         if rows is None:
             self._fresh[:] = True; self.v.zero_(); self.adapt.zero_()
+            self._pending_ms = 0.0
         else:
             sel = torch.as_tensor(np.asarray(rows), device=self.device, dtype=torch.long)
             self._fresh[sel] = True; self.v[sel] = 0.0; self.adapt[sel] = 0.0

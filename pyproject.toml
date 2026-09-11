@@ -7,3 +7,6 @@ dependencies = ["numpy", "pandas", "pyarrow", "scipy", "torch", "pygame", "image
 
 [tool.setuptools]
 packages = ["flyverse"]
+
+[tool.setuptools.package-data]
+flyverse = ["data/*.csv"]

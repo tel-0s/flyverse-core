@@ -22,11 +22,11 @@ import sys
 import time
 
 import numpy as np
-import pandas as pd
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from flyverse import air, body, brain, brainmap, connectome, optic, retina, world  # noqa: E402
+from flyverse import air, body, brain, brainmap, optic, world  # noqa: E402
+from flyverse.fly import FlyBrain  # noqa: E402
 
 FRAME_MS = 10.0          # brain time per frame (20 LIF steps at 0.5 ms)
 W, H = 1280, 760         # design size of the UI; the window is resizable and the UI is scaled to fit
@@ -87,21 +87,17 @@ class OrbitCam:
 
 class Sim:
     def __init__(self, seed=0, brain_dt=0.5, optic_dt=1.0, cam_scale=1, start=None, trail_seconds=20.0,
-                 wind_speed=0.3, wind_dir=180.0):
+                 wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32"):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
         self.trail = []                          # (brain time s, position) samples, for the scene view
         self.cam_scale = int(cam_scale)          # fly's-eye camera rendered at 1/cam_scale resolution, upscaled
-        self.c = connectome.load(verbose=False)
-        self.r = retina.build_retina(self.c)
-        self.optic = optic.OpticLobe(self.c, self.r, optic.OpticParams(dt_ms=optic_dt))
-        self.optic.relax()
-        self.brain = brain.Brain(self.c, brain.LIFParams(dt=brain_dt), seed=seed)
-        self.brain.freeze(self.optic.rate_idx)     # optic-lobe neurons are rate units, not LIF
-        self.groups = body.motor_groups(self.c)
+        self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(dt=brain_dt, weight_dtype=weight_dtype),
+                           optic_params=optic.OpticParams(dt_ms=optic_dt), cuda_graphs=cuda_graphs)
+        self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain
+        self.groups, self.wings = self.fb.groups, self.fb.wings
         self.loco = body.Locomotion()
-        self.wings = body.wing_groups(self.c)
         self.flight = body.Flight()
         self.world, self.info = world.make_room(seed)
         self.world.spheres.append(world.Sphere((9, 9, 9), (0.03, 0.03, 0.03), "black"))   # looming ball (L key)
@@ -109,16 +105,11 @@ class Sim:
         self.loom_t = -1.0
         self.dirs_b, self.wts = self.r.ray_directions()
         self.wts_t = torch.from_numpy(self.wts).float().to(self.world.device)
-        # sweet taste: labellar sugar GRNs identified by connectivity to the known sweet second-order
-        # neurons (scripts/find_sweet_grns.py -> flyverse/data/taste_grns.csv)
-        taste = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "flyverse", "data", "taste_grns.csv"))
-        self.sweet = self.c.index_of(taste.bodyId[taste.taste == "sweet"].to_numpy())
         # air: wind + a plume from every fruit; smelled bilaterally by the antennae, wind felt by the
         # Johnston's organ (flyverse/air.py)
         self.air = air.Air([(name, cen, 1.0) for name, cen, rad in self.info["fruit"]],
                            air.WindParams(speed=wind_speed, direction_deg=wind_dir), seed=seed)
-        self.olf = air.BilateralOlfaction(self.c, self.air)
-        self.windsense = air.WindSense(self.c, self.air)
+        self.smell_values = ({}, {})
         self.reset_fly()
         self.superclasses = ["ol_intrinsic", "visual_projection", "cb_intrinsic", "descending_neuron",
                              "vnc_intrinsic", "vnc_motor", "cb_motor", "vnc_sensory"]
@@ -178,14 +169,11 @@ class Sim:
 
     def stimulate_wing_dns(self, ms=1000.0):
         """Drive the flight DNs the screen found (DNg02_a, DNa08: wingbeat) at 120 Hz for `ms`."""
-        idx = self.c.select(type=["DNg02_a", "DNa08"])
-        self.brain.set_poisson(idx, 120.0)
-        self.wing_pulse = int(ms / FRAME_MS); self.wing_idx = idx
+        self.fb.stimulate({"type": ["DNg02_a", "DNa08"]}, 120.0, ms)
 
     def stimulate_gf(self):
         """Like a giant-fibre optogenetic pulse: 200 Hz for 30 ms."""
-        self.brain.set_poisson(self.wings.gf, 200.0)
-        self.gf_pulse = 3
+        self.fb.stimulate({"type": "DNp01"}, 200.0, 30.0)
 
     # ------------------------------------------------------------------ save / load
     BRAIN_TENSORS = ("v", "g", "refrac", "drive", "poisson_p", "rate", "spikes", "adapt", "res", "spike_buf")
@@ -196,10 +184,11 @@ class Sim:
         import dataclasses
         b, o = self.brain, self.optic
         state = {
-            "brain": {k: getattr(b, k).detach().cpu() for k in self.BRAIN_TENSORS},
-            "brain_scalars": {"buf_pos": b.buf_pos, "t": b.t, "step_count": b.step_count, "_poisson_on": b._poisson_on},
-            "rng": b.gen.get_state(),
-            "optic": {k: getattr(o, k).detach().cpu() for k in self.OPTIC_TENSORS},
+            "controller": self.fb.state_dict(),
+            "locomotion": {k: v for k, v in vars(self.loco).items() if k != "metabolism"},
+            "flight": vars(self.flight).copy(),
+            "cmd": self.cmd, "wcmd": self.wcmd, "feeding": getattr(self, "feeding", False),
+            "air_phase": self.air.phase.copy(),
             "fly": dataclasses.asdict(self.fly),
             "loom_t": self.loom_t, "loom_center": self.world.spheres[self.loom_idx].center,
             "trail": self.trail, "spike_hist": self.spike_hist, "tasting": self.tasting,
@@ -215,26 +204,48 @@ class Sim:
     def load_state(self, path):
         state = torch.load(path, map_location="cpu", weights_only=False)
         b, o = self.brain, self.optic
-        for k in self.BRAIN_TENSORS:
-            getattr(b, k).copy_(state["brain"][k].to(b.device))
-        for k, v in state["brain_scalars"].items():
-            setattr(b, k, v)
-        b._rate_np_key = None
-        b.gen.set_state(state["rng"])
-        for k in self.OPTIC_TENSORS:
-            getattr(o, k).copy_(state["optic"][k].to(o.device))
+        if "controller" in state:
+            self.fb.load_state_dict(state["controller"])
+            self.loco.__dict__.update(state["locomotion"])
+            self.flight.__dict__.update(state["flight"])
+            self.air.phase = state["air_phase"].copy()
+        else:
+            for k in self.BRAIN_TENSORS:
+                getattr(b, k).copy_(state["brain"][k].to(b.device))
+            for k, v in state["brain_scalars"].items():
+                setattr(b, k, v)
+            b._rate_np_key = None
+            b.gen.set_state(state["rng"])
+            for k in self.OPTIC_TENSORS:
+                getattr(o, k).copy_(state["optic"][k].to(o.device))
+            self.fb._base_poisson.copy_(b.poisson_p)
+            self.fb._inputs_on = {"legacy": b._poisson_on}
         self.fly = body.FlyState(**state["fly"])
         self.loom_t = state["loom_t"]; self.world.move_sphere(self.loom_idx, state["loom_center"])
         self.trail = state["trail"]; self.spike_hist = state["spike_hist"]; self.tasting = state["tasting"]
         self.wing_pulse = state["pulses"]["wing_pulse"]; self.gf_pulse = state["pulses"]["gf_pulse"]
         if self.wing_pulse:
             self.wing_idx = self.c.select(type=["DNg02_a", "DNa08"])
+        if "controller" not in state:
+            # Old saves counted frames before applying the pulse, hence N-1 remaining frames.
+            for count, selection, hz in ((self.wing_pulse, {"type": ["DNg02_a", "DNa08"]}, 120.0),
+                                         (self.gf_pulse, {"type": "DNp01"}, 200.0)):
+                if count:
+                    idx = self.c.select(**selection)
+                    self.fb._base_poisson[:, b._idx(idx)] = 0.0
+                    b.set_poisson(idx, 0.0)
+                    if count > 1:
+                        self.fb.stimulate(selection, hz, (count - 1) * FRAME_MS)
         self.flight._power_hold = state["flight_hold"]
         self.air.t = state.get("air_t", 0.0); self.loco._gate = state.get("gate", 0.0)
         if "metabolism" in state:
             self.loco.metabolism = body.Metabolism(**state["metabolism"])
         self.col_rad = self.column_radiance()
-        self.cmd = self.loco.readout(b, self.groups); self.wcmd = self.flight.readout(b, self.wings)
+        if "cmd" in state:
+            self.cmd, self.wcmd = state["cmd"], state["wcmd"]
+            self.feeding = state["feeding"]
+        else:
+            self.cmd = self.loco.readout(self.fb.motor()); self.wcmd = self.flight.readout(self.fb.motor())
         print(f"loaded state at t={b.t / 1000:.2f}s <- {path}")
 
     def nearest_fruit(self):
@@ -247,27 +258,19 @@ class Sim:
 
     def step(self):
         self.col_rad = self.column_radiance()
-        self.brain.drive = self.optic.step_frame(self.col_rad, self.brain.rate, FRAME_MS)
+        self.fb.vision(self.col_rad)
         # taste: front legs touching fruit -> sweet GRNs fire (Poisson 120 Hz, Shiu-style)
         name, dist = self.nearest_fruit()
         self.tasting = 1.0 if (dist < 0.015 and not self.fly.airborne) else 0.0
-        if getattr(self, "wing_pulse", 0) > 0:
-            self.wing_pulse -= 1
-            if self.wing_pulse == 0:
-                self.brain.set_poisson(self.wing_idx, 0.0)
-        if getattr(self, "gf_pulse", 0) > 0:
-            self.gf_pulse -= 1
-            if self.gf_pulse == 0:
-                self.brain.set_poisson(self.wings.gf, 0.0)
         self.air.step(FRAME_MS / 1000)
-        self.olf.apply(self.brain, self.fly)
-        self.windsense.apply(self.brain, self.fly)
-        # sugar GRNs fire while the labellum is on fruit; a sated fly's response is the same (satiety acts
-        # downstream in the animal too), it just does not stop to feed
-        self.brain.set_poisson(self.sweet, 120.0 * self.tasting)
-        self.brain.step(int(FRAME_MS / self.brain.p.dt))
-        self.cmd = self.loco.readout(self.brain, self.groups)
-        self.wcmd = self.flight.readout(self.brain, self.wings)
+        self.smell_values = self.air.antennae(self.fly.eye_pos, self.fly.left, self.fly.forward)
+        self.fb.smell(*self.smell_values)
+        self.fb.wind(*self.air.deflections(self.fly.forward, self.fly.left))
+        self.fb.taste(self.tasting)
+        self.fb.step(FRAME_MS)
+        motor = self.fb.motor()
+        self.cmd = self.loco.readout(motor, dt_s=FRAME_MS / 1000)
+        self.wcmd = self.flight.readout(motor)
         x0, x1, y0, y1 = self.info["table_extent"]
         if self.fly.airborne:
             self.feeding = False
@@ -337,7 +340,9 @@ def draw(sim: Sim, screen, font, orbit: OrbitCam, paused: bool, bmap=None):
     blit_text(screen, font, f"scene [{'follow' if orbit.follow else 'orbit'} az {orbit.az:.0f} el {orbit.el:.0f} d {orbit.dist:.2f}]  hdg {np.rad2deg(fly.heading) % 360:.0f}  "
               f"{fly.speed * 100:.1f} cm/s  {nf[0]} {nf[1] * 100:.0f} cm" + ("  TASTING" if sim.tasting else ""), sx + 2, 312)
     mode = f"AIRBORNE z={fly.z:.2f} v=({fly.vx:+.2f},{fly.vy:+.2f},{fly.vz:+.2f})" if fly.airborne else ("on table" if abs(fly.z - sim.info["table_top_z"]) < 1e-3 else "on floor")
-    smell = "  ".join(sim.olf.summary().split("  ")[:2])
+    cL, cR = sim.smell_values
+    gloms = sorted(cL, key=lambda g: -float(cL[g][0] + cR[g][0]))[:2]
+    smell = "  ".join(f"{g}={cL[g][0]:.2f}/{cR[g][0]:.2f}" for g in gloms)
     wind_from = (np.rad2deg(sim.air.direction) + 180) % 360
     rel = (wind_from - np.rad2deg(fly.heading)) % 360
     blit_text(screen, font, f"({fly.x:+.2f},{fly.y:+.2f}) {mode}  wind from {wind_from:.0f} ({rel:.0f} rel)  smell L/R: {smell}"[:62], sx + 2, 328)
@@ -434,6 +439,8 @@ def main():
     ap.add_argument("--wing-at", type=float, default=-1, help="stimulate the flight DNs (DNg02_a, DNa08) at this brain time (s)")
     ap.add_argument("--fast", action="store_true", help="speed preset for slower GPUs (Apple MPS): brain dt 1 ms, optic dt 2 ms, half-res camera")
     ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
+    ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames on CUDA")
+    ap.add_argument("--weight-dtype", choices=["float32", "float16"], default="float32", help="LIF sparse weights; float16 requires CUDA")
     ap.add_argument("--optic-dt", type=float, default=None, help="optic-lobe substep (ms), default 1 (the RL env uses 2)")
     ap.add_argument("--cam-scale", type=int, default=None, help="fly's-eye camera downscale factor, default 1")
     ap.add_argument("--brain-map", action="store_true", help="show every soma with activity highlights (extra column)")
@@ -466,7 +473,8 @@ def main():
     elif args.start:
         v = [float(t) for t in args.start.split(",")]
         start = (v[0], v[1], v[2] if len(v) > 2 else 0.75)
-    sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir, **fast)
+    sim = Sim(args.seed, start=start, trail_seconds=args.trail_seconds, wind_speed=args.wind_speed, wind_dir=args.wind_dir,
+              cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)
     if args.teleport:

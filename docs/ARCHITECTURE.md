@@ -2,8 +2,9 @@
 
 Goal: the connectome model should plug into anything -- the picnic-table demo, an RL environment,
 a game with a fixed update tick, an interpretability notebook -- through one small surface, and it
-should be possible to run only the parts of the brain a simulation needs. This document is the
-design; `docs/NOTES.md` has the measurements that motivated it.
+should be possible to run only the parts of the brain a simulation needs. This document describes
+the implementation; `docs/NOTES.md` has the measurements that motivated it. See
+`docs/CONTROL_SURFACE.md` for API examples, timing and validation details.
 
 ## The three layers
 
@@ -44,52 +45,68 @@ selectors, motor groups -- works on any `Connectome`, so a subset needs no speci
 | module | contents | needed for |
 |---|---|---|
 | `optic` | photoreceptors + 89k `ol_intrinsic` (rate model) | vision |
-| `visual_projection` | LC / LPLC / LPT / MeTu / ... | vision -> central brain |
+| `visual_projection` | LC / LPLC / LPT / MeTu / ... + visual centrifugal cells | vision -> central brain |
 | `antennal_lobe` | ORNs, AL local neurons, PNs | smell |
 | `mushroom_body` | KCs, MBONs, DANs, APL / DPM | learning-related readouts |
-| `gustatory` | GRNs + the sweet second-order set | taste |
+| `gustatory` | GRNs + sweet second-order interneurons + central-brain motor cells | taste and proboscis |
 | `mechanosensory` | JO neurons, AMMC / WED interneurons | wind, sound |
-| `central` | the rest of `cb_intrinsic` (LH, CX, LAL, AVLP, GNG, ...) | everything |
+| `central` | the rest of `cb_intrinsic` (LH, CX, LAL, AVLP, GNG, ...) and unclassified cells | everything |
 | `descending` | DNs | any motor output |
 | `vnc` | VNC intrinsic + motor + sensory + ascending | leg / wing motor neurons |
 
 `FlyBrain(modules=[...])` composes them; a sense whose neurons are not in the subset is simply
-absent (`fb.vision` raises). Two things make subsets behave like the full model: the fan-in cap
-uses each neuron's **full-connectome** synapse count (stored on the neuron table at compile time),
-and the `DEFAULT_PATH_GAIN` / `TYPE_PATH_GAIN` rules apply by name, so a DN -> VNC synapse has the
-same strength whether or not the optic lobe is loaded. Neurons that are dropped contribute nothing;
-`regions.pare()` can also keep only neurons on paths between chosen sources and sinks (BFS both
-ways on the boolean adjacency, optional hop limit), which is the graph-theoretic form of the
-"automated model paring" an RL environment can later do with activity statistics
-(`FlyBrain.activity_mask(min_hz)` accumulates them).
+absent (`fb.vision` raises; `available_senses` lists the remaining senses). Labels form an exhaustive,
+disjoint partition; DNs stay in `descending` even when they participate in taste pathways.
 
-Cost scales with synapses kept: the full CNS is 25.6M edges; optic + VP + descending + VNC (the
-"vision-to-legs" fly) is ~14M; AL + MB + LH + descending + VNC (the "nose" fly) ~5M.
+Subsets preserve **effective weights**, not the activity of a full brain. The full neuron table stores
+`in_syn` (sum of absolute signed synapse counts, excluding sign-zero modulation) and `in_syn_l2` for
+optic normalization. LIF fan-in uses the full graph **after** connection caps, pathway gains and
+same-type damping, preserving the previous calibration even with custom `LIFParams`. The original
+graph is shared on CPU and its normalization totals are cached by parameter configuration. Retained
+DN -> VNC synapses therefore keep their strength when other modules are removed. Retinal viewing
+directions and sensory laterality also derive from the original graph. Dropped neurons contribute nothing;
+`regions.pare()` can also keep only neurons on paths between chosen sources and sinks (BFS both
+ways on nonzero adjacency, optional total hop limit), which is the graph-theoretic form of the
+"automated model paring" an RL environment can later do with activity statistics
+(`FlyBrain.activity_mask(min_hz)` accumulates LIF spike counts; graded vision cells are conservatively
+retained because their activity is not measured in spike Hz). With recurrent cycles, `pare` retains
+neurons on directed walks, rather than enumerating simple paths.
+
+Cost depends on retained edges, batch size and kernel overhead. The full CNS has 25.6M stored edges.
+Optic + visual projection + descending + VNC has 124,137 neurons and 16.0M edges.
+The broad nose configuration (AL + MB + **all central** + descending + VNC) has 53,446 neurons and
+11.0M edges; the earlier ~5M estimate assumed LH alone, which is not a separate module. Use `pare`
+for narrower pathways. Saving a subset also saves its original normalization graph; GPU work shrinks,
+but CPU reference memory and serialized size need not shrink proportionally.
 
 ## Performance
 
-Measured per frame (16.6 ms of fly time, B = 1, RTX 4090) before this work: LIF 33 steps x
-(spmm + ~15 elementwise kernels) ~ 10 ms, optic lobe 16 steps ~ 3 ms, ray tracing ~1.5 ms, readouts
-(one device->host copy) < 0.5 ms. Since `(B, N)` state is 71k floats, the LIF is launch-bound, not
-bandwidth-bound; the levers, in order of expected gain:
+The demo advances **10 ms** per frame: 20 LIF steps at dt 0.5 ms and 10 optic steps at dt 1 ms.
+The 71k figure describes the non-optic population; the current full `Brain` still allocates state
+for all 167,106 neurons, masking optic neurons from spiking. Use `scripts/profile_brain.py` for
+current, synchronized measurements rather than the original 16.6 ms estimates. Available levers:
 
-1. **Subsets** (above): fewer synapses, linearly.
-2. **CUDA-graph capture of a whole frame** (`torch.cuda.CUDAGraph`): the 33-step loop is a fixed
-   sequence of kernels on fixed buffers; replaying it removes ~500 launches of Python + driver
-   overhead. Same for the optic lobe.
-3. **Half-precision weights** for the sparse matmul (fp16 values, fp32 accumulate): halves the
-   bytes of the one bandwidth-bound kernel.
-4. **Event-driven synaptic input on CUDA** at low activity (already the path on MPS / CPU).
+1. **Subsets** (above): fewer neurons and synapses on the device.
+2. **CUDA graphs** (`FlyBrain(cuda_graphs=True)`): capture optic and LIF kernels for a frame on
+   fixed buffers, including registered Poisson RNG state. Cache by frame length and delay/optic
+   phase, up to eight captures. Pulses expiring inside a frame use the eager path.
+3. **Half-precision LIF weights** (`LIFParams(weight_dtype="float16")`): CUDA sparse matmul with
+   half weights/transmitted spikes and a float32 output/accumulator. Optic and membrane state remain
+   float32. Opt-in: rounding can change spikes, and speed gains are workload dependent.
+4. **Event-driven synaptic input on CUDA** (`LIFParams(event_driven=True)`): the existing gather
+   backend is also usable on CUDA, but its dynamic host synchronization prevents graph capture.
+   It remains the default on MPS/CPU; current CUDA measurements favor sparse matmul.
 5. **Coarser dt** where the benchmark allows (1 ms instead of 0.5).
 
 For hosts with a fixed update tick, `FlyBrain.step_budget(wall_ms)` runs as many LIF steps as fit
-in the budget and reports the resulting time dilation (a slow-motion fly rather than a dropped
-frame), and `AsyncFlyBrain` runs the brain on its own thread / CUDA stream: the game pushes the
-latest sensory frame and reads the latest `MotorRates`, never blocking on the GPU.
+in a measured best-effort budget and reports actual simulated time, completed steps and time dilation.
+It synchronizes GPU work, adapts chunk length, and can overrun during warmup or contention.
+`AsyncFlyBrain` owns the controller on its own thread / CUDA stream: the game submits CPU sensor
+frames and reads a published CPU `MotorRates` snapshot without waiting for GPU work.
 
 ## Status
 
 - [x] design
-- [ ] `Connectome.subset`, `in_syn` on the neuron table, `regions.py`
-- [ ] `senses.py`, `fly.FlyBrain`, `MotorRates`; demo and env rebuilt on it; probes unchanged
-- [ ] profile script, CUDA graphs, fp16 spmm, step budget / async wrapper
+- [x] `Connectome.subset`, normalization metadata on the neuron table, `regions.py`
+- [x] `senses.py`, `fly.FlyBrain`, `MotorRates`; demo and env rebuilt on it; probes unchanged
+- [x] profile script, CUDA graphs, fp16 spmm, step budget / async wrapper

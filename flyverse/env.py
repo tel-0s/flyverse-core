@@ -17,14 +17,14 @@ this with pufferlib.emulation / vector and PuffeRL. Frame = 10 ms of brain time;
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
 import numpy as np
-import pandas as pd
 import torch
 
-from . import air, body, brain, connectome, optic, retina, world
+from . import air, optic, retina, world
+from .fly import FlyBrain
+from .brain import LIFParams
 
 
 @dataclass
@@ -43,6 +43,10 @@ class EnvParams:
     wind_speed: float = 0.3      # m/s; the plume blows towards -x
     rays_per_ommatidium: int = 1 # 1 for training speed (the demo uses 7); the ray tracer dominates at large B
     optic_dt_ms: float = 2.0     # optic-lobe substep (the demo uses 1 ms)
+    modules: tuple[str, ...] | None = None
+    brain_dt_ms: float = 0.5
+    cuda_graphs: bool = False
+    weight_dtype: str = "float32"
 
 
 class FlyRoomEnv:
@@ -50,20 +54,18 @@ class FlyRoomEnv:
         self.B = int(batch)
         self.p = params or EnvParams()
         self.rng = np.random.default_rng(self.p.seed)
-        self.c = connectome.load(verbose=False)
-        self.r = retina.build_retina(self.c, retina.EyeGeometry(rays_per_ommatidium=self.p.rays_per_ommatidium))
-        self.optic = optic.OpticLobe(self.c, self.r, optic.OpticParams(dt_ms=self.p.optic_dt_ms), batch=self.B, device=device)
-        self.optic.relax()
-        self.brain = brain.Brain(self.c, seed=self.p.seed, batch=self.B, device=device)
-        self.brain.freeze(self.optic.rate_idx)
+        self.fb = FlyBrain(seed=self.p.seed, batch=self.B, device=device,
+                           modules=self.p.modules, cuda_graphs=self.p.cuda_graphs,
+                           lif_params=LIFParams(dt=self.p.brain_dt_ms, weight_dtype=self.p.weight_dtype),
+                           optic_params=optic.OpticParams(dt_ms=self.p.optic_dt_ms),
+                           eye_geometry=retina.EyeGeometry(rays_per_ommatidium=self.p.rays_per_ommatidium))
+        self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain
         self.world, self.info = world.make_room(self.p.seed)
-        self.dirs_b, self.wts = self.r.ray_directions()
-        self.wts_t = torch.from_numpy(self.wts).float().to(self.world.device)
-        taste = pd.read_csv(os.path.join(os.path.dirname(__file__), "data", "taste_grns.csv"))
-        self.sweet = self.c.index_of(taste.bodyId[taste.taste == "sweet"].to_numpy())
+        self.world.device = self.fb.device
+        if self.optic is not None:
+            self.dirs_b, self.wts = self.r.ray_directions()
+            self.wts_t = torch.from_numpy(self.wts).float().to(self.world.device)
         self.air = air.Air([(name, cen, 1.0) for name, cen, rad in self.info["fruit"]], air.WindParams(speed=self.p.wind_speed), seed=self.p.seed)
-        self.olf = air.BilateralOlfaction(self.c, self.air)
-        self.windsense = air.WindSense(self.c, self.air)
         n = self.c.neurons
         if self.p.obs == "descending":
             self.obs_idx = self.c.select(superclass="descending_neuron")
@@ -73,6 +75,8 @@ class FlyRoomEnv:
             # projection neurons grouped by glomerulus (type prefix before '_'): the odour code the mushroom
             # body and lateral horn read. obs = [glomerulus means now, means now - means `lag` frames ago]
             pn = self.c.select(type="~_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN")
+            if not len(pn):
+                raise ValueError("selected modules have no PN observations")
             glom = np.array([t.split("_")[0] for t in n.type.to_numpy()[pn]])
             self.pn_gloms = sorted(set(glom))
             gid = np.array([self.pn_gloms.index(g) for g in glom])
@@ -86,6 +90,8 @@ class FlyRoomEnv:
             raise ValueError(self.p.obs)
         self.obs_idx_t = torch.as_tensor(self.obs_idx, device=self.brain.device)
         self.n_obs = {"pn": 2, "pn3": 3}.get(self.p.obs, 0) * len(self.pn_gloms) if self.p.obs in ("pn", "pn3") else len(self.obs_idx)
+        if self.n_obs == 0:
+            raise ValueError("selected modules have no neurons for the requested observations")
         self.fruit_xy = np.array([[cen[0], cen[1]] for _, cen, _ in self.info["fruit"]])
         self.fruit_r = np.array([rad for _, _, rad in self.info["fruit"]])
         self.x0, self.x1, self.y0, self.y1 = self.info["table_extent"]
@@ -145,8 +151,7 @@ class FlyRoomEnv:
         self._place(np.arange(self.B))
         if same_start:
             self.x[:] = self.x[0]; self.y[:] = self.y[0]; self.heading[:] = self.heading[0]
-        self.brain.reset()
-        self.optic.reset()
+        self.fb.reset()
         self.t_frames = 0
         if self.p.obs in ("pn", "pn3"):
             self.pn_hist = []
@@ -155,23 +160,21 @@ class FlyRoomEnv:
         return self._obs()
 
     def _sense_and_think(self):
-        rad = self._radiance()
-        self.brain.drive = self.optic.step_frame(rad, self.brain.rate, self.p.frame_ms)
+        if self.optic is not None:
+            self.fb.vision(self._radiance())
         self.air.step(self.p.frame_ms / 1000)
         eye = np.stack([self.x, self.y, np.full(self.B, self.z + self.eye_h)], axis=1)
         fwd = np.stack([np.cos(self.heading), np.sin(self.heading), np.zeros(self.B)], axis=1)
         left = np.stack([-np.sin(self.heading), np.cos(self.heading), np.zeros(self.B)], axis=1)
-        self.brain.set_poisson(self.olf.orn_idx, self.olf.rates_batch(eye, left, fwd))
-        w = self.air.vector
-        wb_x = fwd @ w; wb_y = left @ w                                                  # wind in each body frame
-        c45 = np.cos(np.pi / 4)
-        dL = -(wb_x * c45 + wb_y * c45) / self.windsense.full_speed; dR = -(wb_x * c45 - wb_y * c45) / self.windsense.full_speed
-        rE, rC = self.windsense.rates_batch(dL, dR)
-        self.brain.set_poisson(self.windsense.joE, rE); self.brain.set_poisson(self.windsense.joC, rC)
+        if "smell" in self.fb.available_senses:
+            self.fb.smell(*self.air.antennae(eye, left, fwd))
+        if "wind" in self.fb.available_senses:
+            self.fb.wind(*self.air.deflections(fwd, left))
         tasting = (self.fruit_dist() < 0.015).astype(np.float32)
         self.tasting = tasting
-        self.brain.set_poisson(self.sweet, np.repeat(tasting[:, None] * 120.0, len(self.sweet), axis=1))
-        self.brain.step(int(self.p.frame_ms / self.brain.p.dt))
+        if "taste" in self.fb.available_senses:
+            self.fb.taste(tasting)
+        self.fb.step(self.p.frame_ms)
 
     def step(self, action: np.ndarray):
         action = np.clip(np.asarray(action, dtype=np.float64), -1, 1).reshape(self.B, 2)

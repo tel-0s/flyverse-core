@@ -105,105 +105,66 @@ class Air:
         c = self.concentration_batch(np.asarray(pos, float)[None])[0]
         return {g: float(v) for g, v in zip(self.gloms, c)}
 
+    def antennae(self, eye, left, forward, antenna_sep=0.001):
+        """Physical concentrations at two antennae, keyed by glomerulus, for one or B poses."""
+        eye, left, forward = (np.atleast_2d(x) for x in (eye, left, forward))
+        pL = eye + left * antenna_sep / 2 + forward * 0.0005
+        pR = eye - left * antenna_sep / 2 + forward * 0.0005
+        cL, cR = self.concentration_batch(pL), self.concentration_batch(pR)
+        return ({g: cL[:, i] for i, g in enumerate(self.gloms)},
+                {g: cR[:, i] for i, g in enumerate(self.gloms)})
 
-# ------------------------------------------------------------------------------------------ senses
-def _laterality(c, pre_idx, post_idx_L, post_idx_R):
-    Wabs = abs(c.W).tocsr()
-    sL = np.asarray(Wabs[post_idx_L][:, pre_idx].sum(axis=0)).ravel()
-    sR = np.asarray(Wabs[post_idx_R][:, pre_idx].sum(axis=0)).ravel()
-    return (sL - sR) / np.maximum(sL + sR, 1.0)
+    def deflections(self, forward, left, full_speed=0.5):
+        """Normalized backward antennal deflections; no neuron identities are involved."""
+        fwd, left = np.atleast_2d(forward), np.atleast_2d(left)
+        wx, wy = fwd @ self.vector, left @ self.vector
+        c45 = np.cos(np.pi / 4)
+        return -(wx * c45 + wy * c45) / full_speed, -(wx * c45 - wy * c45) / full_speed
 
 
-class BilateralOlfaction:
-    """ORN Poisson rates from the plume sampled at each antenna."""
+# Compatibility adapters for the existing probes. New environments use Air.antennae /
+# Air.deflections and FlyBrain; all neural encoding lives in senses.py.
+from .senses import Smell, Wind, laterality as _laterality
 
-    def __init__(self, c, air: Air, base_hz: float = 1.0, max_hz: float = 150.0, half_conc: float = 0.5,
-                 antenna_sep: float = 0.001, side_threshold: float = 0.2):
-        self.c, self.air = c, air
-        self.base_hz, self.max_hz, self.half_conc, self.antenna_sep = base_hz, max_hz, half_conc, antenna_sep
-        n = c.neurons
-        self.orn_idx = np.flatnonzero((n["class"] == "olfactory").to_numpy())
-        self.glom = np.array([t.replace("ORN_", "") for t in n.type.fillna("").to_numpy()[self.orn_idx]])
-        pn = c.select(type="~_l2PN|_adPN|_lPN|_lvPN|_ilPN|_ivPN|_vPN")
-        side = n.somaSide.to_numpy(dtype=object)
-        lat = _laterality(c, self.orn_idx, pn[side[pn] == "L"], pn[side[pn] == "R"])
-        self.side = np.where(lat > side_threshold, 1, np.where(lat < -side_threshold, -1, 0))   # +1 left antenna, -1 right, 0 both
-        self.last = {}
 
-    def _orn_matrix(self):
-        """(n_orn, n_glom) 0/1 map from the air's glomerulus list to ORNs (built lazily: sources may change)."""
-        gl = self.air.gloms
-        if getattr(self, "_mat_key", None) != tuple(gl):
-            gid = {g: i for i, g in enumerate(gl)}
-            M = np.zeros((len(self.orn_idx), len(gl)))
-            for i, g in enumerate(self.glom):
-                if g in gid:
-                    M[i, gid[g]] = 1.0
-            self._M = M; self._mat_key = tuple(gl)
-        return self._M
+class BilateralOlfaction(Smell):
+    def __init__(self, c, air: Air, base_hz=1.0, max_hz=150.0, half_conc=0.5,
+                 antenna_sep=0.001, side_threshold=0.2):
+        super().__init__(c, base_hz, max_hz, half_conc, side_threshold)
+        self.air, self.antenna_sep, self.last = air, antenna_sep, {}
 
-    def rates_batch(self, eye: np.ndarray, left: np.ndarray, forward: np.ndarray) -> np.ndarray:
-        """(B, 3) eye positions, body left/forward vectors -> (B, n_orn) Poisson rates."""
-        pL = eye + left * self.antenna_sep / 2 + forward * 0.0005
-        pR = eye - left * self.antenna_sep / 2 + forward * 0.0005
-        M = self._orn_matrix()
-        gL = self.air.concentration_batch(pL); gR = self.air.concentration_batch(pR)     # (B, n_glom)
-        cL = gL @ M.T; cR = gR @ M.T                                                       # (B, n_orn)
-        c = np.where(self.side[None] > 0, cL, np.where(self.side[None] < 0, cR, 0.5 * (cL + cR)))
-        self.last = {"cL": dict(zip(self.air.gloms, gL[0])), "cR": dict(zip(self.air.gloms, gR[0]))}
-        return self.base_hz + self.max_hz * c / (c + self.half_conc)
+    def rates_batch(self, eye, left, forward):
+        cL, cR = self.air.antennae(eye, left, forward, self.antenna_sep)
+        self.last = {"cL": {g: float(v[0]) for g, v in cL.items()},
+                     "cR": {g: float(v[0]) for g, v in cR.items()}}
+        return super().rates(cL, cR, len(eye))
 
-    def rates(self, fly) -> np.ndarray:
+    def rates(self, fly):
         return self.rates_batch(fly.eye_pos[None], fly.left[None], fly.forward[None])[0]
 
-    def apply(self, brain, fly) -> None:
+    def apply(self, brain, fly):
         brain.set_poisson(self.orn_idx, self.rates(fly))
 
-    def summary(self) -> str:
+    def summary(self):
         cL, cR = self.last.get("cL", {}), self.last.get("cR", {})
         gl = sorted(set(cL) | set(cR), key=lambda g: -(cL.get(g, 0) + cR.get(g, 0)))[:3]
         return "  ".join(f"{g}={cL.get(g, 0):.2f}/{cR.get(g, 0):.2f}" for g in gl if cL.get(g, 0) + cR.get(g, 0) > 0.02)
 
 
-class WindSense:
-    """Johnston's organ C/E neurons driven by wind-induced antennal deflection, per side."""
-
-    def __init__(self, c, air: Air, max_hz: float = 50.0, base_hz: float = 2.0, full_speed: float = 0.5):
-        self.c, self.air, self.max_hz, self.base_hz, self.full_speed = c, air, max_hz, base_hz, full_speed
-        n = c.neurons
-        t = n.type.fillna("")
-        self.joC = np.flatnonzero(t.str.match(r"^JO-C").to_numpy())
-        self.joE = np.flatnonzero(t.str.match(r"^JO-E").to_numpy())
-        side = n.somaSide.to_numpy(dtype=object)
-        targets = np.flatnonzero((n.superclass == "cb_intrinsic").to_numpy())
-        tL, tR = targets[side[targets] == "L"], targets[side[targets] == "R"]
-        self.sideC = np.sign(_laterality(c, self.joC, tL, tR))
-        self.sideE = np.sign(_laterality(c, self.joE, tL, tR))
-        self.last = {}
+class WindSense(Wind):
+    def __init__(self, c, air: Air, max_hz=50.0, base_hz=2.0, full_speed=0.5):
+        super().__init__(c, max_hz, base_hz)
+        self.air, self.full_speed, self.last = air, full_speed, {}
 
     def deflections(self, fly):
-        """Backward deflection (+) of the left and right antenna from the wind, in body frame."""
-        w = self.air.vector
-        R = np.stack([fly.forward, fly.left, fly.up], axis=1)
-        wb = R.T @ w                                                        # wind in body frame
-        aL = np.array([np.cos(np.pi / 4), np.sin(np.pi / 4)]); aR = np.array([np.cos(np.pi / 4), -np.sin(np.pi / 4)])
-        # wind blowing against an antenna's axis pushes it back: backward deflection = -(w . axis)
-        dL = -float(wb[:2] @ aL) / self.full_speed
-        dR = -float(wb[:2] @ aR) / self.full_speed
-        return dL, dR
+        dL, dR = self.air.deflections(fly.forward, fly.left, self.full_speed)
+        return float(dL[0]), float(dR[0])
 
-    def rates_batch(self, dL: np.ndarray, dR: np.ndarray):
-        """(B,) backward deflections per side -> ((B, nE), (B, nC)) Poisson rates."""
-        def rate(d):
-            return self.base_hz + self.max_hz * np.clip(d, 0, 1)
-        dL, dR = dL[:, None], dR[:, None]
-        rE = np.where(self.sideE[None] > 0, rate(dL), np.where(self.sideE[None] < 0, rate(dR), rate(0.5 * (dL + dR))))
-        rC = np.where(self.sideC[None] > 0, rate(-dL), np.where(self.sideC[None] < 0, rate(-dR), rate(-0.5 * (dL + dR))))
-        return rE, rC
+    def rates_batch(self, dL, dR):
+        return super().rates(dL, dR, len(dL))
 
-    def apply(self, brain, fly) -> None:
+    def apply(self, brain, fly):
         dL, dR = self.deflections(fly)
         rE, rC = self.rates_batch(np.array([dL]), np.array([dR]))
-        brain.set_poisson(self.joE, rE[0])
-        brain.set_poisson(self.joC, rC[0])
+        brain.set_poisson(self.joE, rE[0]); brain.set_poisson(self.joC, rC[0])
         self.last = {"dL": dL, "dR": dR}
