@@ -164,3 +164,38 @@ Local artifacts are in the ignored `out/` directory: `optic_before_ui.json`,
 `optic_after_ui.json`, the corresponding `*_headless.json` reports, and four
 `optic_{before,after}_{ui,headless}.trace.json` timelines. The separate `*_trace.json`
 reports contain instrumented timings. Preserve these labels when comparing results.
+
+## Apple MPS: Metal kernels (September 11, 2026)
+
+Measured on an M-series Mac, torch 2.14.0, full connectome, seed 0, `profile_room.py --headless
+--cam-scale 4 --trail-seconds 0`, 20 warmup + 80 measured frames. CUDA graphs, fp16 weights and
+per-module clocks are unavailable on MPS; the optic input hoisting and `prune_frozen` apply.
+
+| per 10 ms frame | torch on MPS | Metal kernels |
+|---|---:|---:|
+| full fidelity (LIF dt 0.5, optic dt 1): frame wall | 66.5 ms (0.15x) | **34.3 ms (0.29x)** |
+| `--fast` (LIF dt 1, optic dt 2): frame wall | 41.6 ms (0.24x) | **25.9 ms (0.39x)** |
+| LIF step (event-driven, ~10-60 spikes/step) | 0.76 ms + host sync | 0.12 ms |
+| optic `step_frame`, 10 substeps | 38.0 ms | 7.2 ms |
+| optic recurrence W_rr @ dr (8.8M nnz) | 3.57 ms (COO spmm) | 0.61 ms (SIMD-group CSR) |
+
+Why: torch's MPS backend has ~40 us per launch and no graph capture, so a LIF step was ~20 launches plus
+the `nonzero` host sync of the event-driven gather, and its COO sparse kernel runs ~5x off memory
+bandwidth on the optic lobe's skewed row lengths (median 69, max 11,421 synapses per row).
+`flyverse/metal.py` compiles five kernels through `torch.mps.compile_shader`: `event_scatter` (one SIMD
+group per presynaptic neuron, early exit when silent, float atomics into g; no host sync, any batch
+size), `lif_update` (the whole state update in one pass; Poisson draws still come from the torch
+generator, so seeds and saved RNG state are unchanged), `csr_spmv` (one SIMD group per row, `simd_sum`),
+`optic_dr` and `optic_substep`. A LIF step is three launches; an optic substep is two.
+
+Validation (`tests/test_metal.py`, plus a full-connectome comparison): over 150 ms with 13.6k active
+neurons, deterministic or Poisson drive, B = 1 and B = 3, the Metal and torch backends produce identical
+spike counts per neuron (37,834 and 57,696 spikes in the two runs); v, g and rates differ by at most
+1.5e-4 (Metal compiles with fast-math and may contract multiply-adds). Optic drive differs by 1.4e-5 of
+35 mV. The headless demo's loom escape is unchanged in both presets. The kernels read raw storage, so the
+wrappers reject non-contiguous tensors (a view with a storage offset, such as a delay-buffer slot, is fine).
+
+What remains per frame at full fidelity: the brain's ~15 ms of GPU time (20 LIF steps + 10 optic
+substeps; MPS only enqueues in `brain.frame`, so the wait appears in `brain.motor`), sensory ray tracing
+~10 ms (hundreds of small torch ops; the same treatment would apply), senses ~2 ms, and drawing ~4 ms
+amortised over every fourth frame.

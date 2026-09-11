@@ -103,6 +103,11 @@ current, synchronized measurements rather than the original 16.6 ms estimates. A
    backend is also usable on CUDA, but its dynamic host synchronization prevents graph capture.
    It remains the default on MPS/CPU; current CUDA measurements favor sparse matmul.
 5. **Coarser dt** where the benchmark allows (1 ms instead of 0.5).
+6. **Metal kernels on MPS** (`flyverse/metal.py`, automatic on a Mac; `Brain(metal_kernels=...)`,
+   `OpticLobe(metal_kernels=...)`, `FLYVERSE_METAL=0` disables): the event-driven scatter, the LIF update,
+   the optic lobe's CSR products and its substep as a few launches per step instead of ~20 torch ops plus
+   a host sync. This is the MPS counterpart of CUDA graphs: it removes launch overhead, not arithmetic.
+   See `docs/PERFORMANCE.md`.
 
 For hosts with a fixed update tick, `FlyBrain.step_budget(wall_ms)` runs as many LIF steps as fit
 in a measured best-effort budget and reports actual simulated time, completed steps and time dilation.

@@ -38,6 +38,7 @@ import torch
 from .connectome import Connectome, PHOTORECEPTOR_TYPES
 from .retina import Retina
 from .device import resolve, sparse_matrix
+from . import metal
 
 FAMILY_OF_TYPE = {"R1-R6": 0, "R7p": 1, "R7y": 2, "R7d": 1, "R7_unclear": 2, "R8p": 3, "R8y": 4,
                   "R8d": 1, "R8_unclear": 4, "R7R8_unclear": 2}
@@ -90,15 +91,28 @@ DEFAULT_PAIR_GAIN = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0), (r"^(Tm4|Tm9|C
                      (r".*", r"^(LC4|LPLC2)$", 1.0)]
 
 
-def _csr(D: sp.spmatrix, device) -> torch.Tensor:
+def _csr(D: sp.spmatrix, device, use_metal: bool = False):
+    if use_metal:
+        return metal.MetalCSR(D, device)
     return sparse_matrix(D.astype(np.float32), device)
 
 
+def _mv(M, x: torch.Tensor) -> torch.Tensor:
+    """(B, rows) = M @ x for x (B, cols), M a torch sparse matrix or a MetalCSR."""
+    if isinstance(M, metal.MetalCSR):
+        return M.matvec(x)
+    return (M @ x.T.contiguous()).T
+
+
 class OpticLobe:
-    def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1):
+    def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1,
+                 metal_kernels: bool | None = None):
+        """metal_kernels: custom Metal kernels for the sparse products and the substep (flyverse/metal.py);
+        None = automatically on MPS when available."""
         self.c, self.r, self.p = c, retina, params or OpticParams()
         self.B = int(batch)
         self.device = resolve(device)
+        self.metal = metal.use(self.device, metal_kernels)
         if not np.isfinite(self.p.dt_ms) or self.p.dt_ms <= 0:
             raise ValueError("optic dt_ms must be positive and finite")
         self._pending_ms = 0.0
@@ -133,10 +147,10 @@ class OpticLobe:
             return M.tocsr()
 
         rt = types[self.rate_idx]
-        self.W_rr = _csr(apply_pair_gain(Wn_ol[self.rate_idx][:, self.rate_idx], rt, rt), self.device)
-        self.W_rp = _csr(Wn_ol[self.rate_idx][:, self.pr_idx], self.device)
-        self.W_rs = _csr(Wn_ol[self.rate_idx][:, self.spk_idx], self.device)
-        self.W_sr = _csr(apply_pair_gain((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], rt, types[self.spk_idx]), self.device)
+        self.W_rr = _csr(apply_pair_gain(Wn_ol[self.rate_idx][:, self.rate_idx], rt, rt), self.device, self.metal)
+        self.W_rp = _csr(Wn_ol[self.rate_idx][:, self.pr_idx], self.device, self.metal)
+        self.W_rs = _csr(Wn_ol[self.rate_idx][:, self.spk_idx], self.device, self.metal)
+        self.W_sr = _csr(apply_pair_gain((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], rt, types[self.spk_idx]), self.device, self.metal)
         self.rate_idx_t = torch.as_tensor(self.rate_idx, device=self.device)
         self.spk_idx_t = torch.as_tensor(self.spk_idx, device=self.device)
 
@@ -150,7 +164,7 @@ class OpticLobe:
         np.add.at(cnt, (retina.pr_column, self.pr_family), 1.0)
         rows = retina.pr_column * 5 + self.pr_family
         A = sp.csr_matrix((1.0 / cnt[retina.pr_column, self.pr_family], (rows, np.arange(self.n_pr))), shape=(n_col * 5, self.n_pr))
-        self.avg = _csr(A, self.device)
+        self.avg = _csr(A, self.device, self.metal)
         self.sens = torch.from_numpy(retina.pr_sens).to(self.device)                       # (n_pr, 4)
         self.pr_column_t = torch.as_tensor(retina.pr_column, device=self.device)
         self.pr_cell_t = torch.as_tensor(rows, device=self.device)                          # (n_pr,) -> col*5+fam
@@ -162,6 +176,7 @@ class OpticLobe:
         self.v = torch.zeros(self.B, self.n_rate, device=self.device)
         self.adapt = torch.zeros(self.B, self.n_rate, device=self.device)
         self.delta_rate = torch.zeros(self.B, self.n_rate, device=self.device)
+        self._dr = torch.zeros(self.B, self.n_rate, device=self.device)                   # metal substeps: current dr
         self.r0 = None
         self.last = {}
         self.diagnostics = True
@@ -182,7 +197,7 @@ class OpticLobe:
         if rad.dim() == 2:
             rad = rad[None]
         I_pr = (rad[:, self.pr_column_t, :] * self.sens[None]).sum(-1)                     # (B, n_pr)
-        I = (self.avg @ I_pr.T.contiguous()).T                                                            # (B, n_col*5)
+        I = _mv(self.avg, I_pr)                                                               # (B, n_col*5)
         fresh = self._fresh[:, None]
         torch.where(fresh, I, self.I_lp, out=self.I_lp)
         torch.where(fresh, I, self.I_mean, out=self.I_mean)
@@ -206,7 +221,7 @@ class OpticLobe:
         p = self.p
         dr = self.rates() - self.b_vec[None]                                                 # (B, n_rate)
         # Keep the addition order: combining the held inputs would change rounding.
-        inp = p.gain_rr * (self.W_rr @ dr.T.contiguous()).T + pr_input - p.adapt_gain * self.adapt
+        inp = p.gain_rr * _mv(self.W_rr, dr) + pr_input - p.adapt_gain * self.adapt
         inp = inp + spk_input
         torch.add(inp, (self.v - inp) * self._a[None], out=self.v)
         torch.add(dr, (self.adapt - dr) * self._a_ad, out=self.adapt)
@@ -232,14 +247,21 @@ class OpticLobe:
         if steps:
             # Photoreceptor activity and spiking feedback are held for this frame.
             # Only the recurrent optic product changes between substeps.
-            pr_input = self.p.gain_in * (self.W_rp @ a_pr.T.contiguous()).T
-            spk_input = self.p.gain_fb * (self.W_rs @ s.T.contiguous()).T
-            for _ in range(steps):
-                self._substep(pr_input, spk_input)
+            pr_input = self.p.gain_in * _mv(self.W_rp, a_pr)
+            spk_input = self.p.gain_fb * _mv(self.W_rs, s)
+            if self.metal:
+                p = self.p
+                metal.optic_dr(self.v, self.b_vec, self._dr)
+                for _ in range(steps):
+                    metal.optic_substep(self.v, self.adapt, self._dr, self.W_rr.matvec(self._dr), pr_input.contiguous(),
+                                        spk_input.contiguous(), self._a, self.b_vec, p.gain_rr, p.adapt_gain, self._a_ad)
+            else:
+                for _ in range(steps):
+                    self._substep(pr_input, spk_input)
         torch.sub(self.rates(), self.r0, out=self.delta_rate)
         dr = self.delta_rate
         drive = torch.zeros(self.B, self.c.n, device=self.device)
-        drive[:, self.spk_idx_t] = (self.p.gain_out_mv * (self.W_sr @ dr.T.contiguous()).T).clamp(-self.p.drive_clip_mv, self.p.drive_clip_mv)
+        drive[:, self.spk_idx_t] = (self.p.gain_out_mv * _mv(self.W_sr, dr)).clamp(-self.p.drive_clip_mv, self.p.drive_clip_mv)
         self.last["dr"] = dr
         return drive
 

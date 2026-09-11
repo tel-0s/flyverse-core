@@ -745,3 +745,11 @@ the sparse matmul cost is nearly flat in B) rather than running many brains in p
   model or engineering trade-offs: prune the smallest normalised optic-lobe weights, overlap the pygame
   drawing with the next frame's GPU work (MPS is asynchronous until a `.cpu()`), or a fused Metal kernel
   for the LIF update (the 10 elementwise ops per step cost ~0.3 ms in launches).
+
+## Metal kernels for the Mac (session 6)
+
+The MPS analogue of the CUDA-graph work: `flyverse/metal.py` (event scatter, fused LIF update,
+SIMD-group CSR spmv, fused optic substep) through `torch.mps.compile_shader`. Full-fidelity demo
+0.15x -> 0.29x real time, `--fast` 0.24x -> 0.39x; numbers, validation and what is left in
+`docs/PERFORMANCE.md`. Spikes are identical to the torch path; continuous state agrees to ~1e-4
+(fast-math contraction). Next target on the Mac is the ray tracer (~10 ms of small launches per frame).

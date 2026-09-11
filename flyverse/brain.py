@@ -23,6 +23,7 @@ import torch
 
 from .connectome import Connectome
 from .device import resolve, sparse_matrix
+from . import metal
 
 
 @dataclass
@@ -145,7 +146,9 @@ def _shaped_weights(c: Connectome, p: LIFParams):
 
 class Brain:
     def __init__(self, c: Connectome, params: LIFParams | None = None, device: str | None = None,
-                 seed: int = 0, batch: int = 1):
+                 seed: int = 0, batch: int = 1, metal_kernels: bool | None = None):
+        """metal_kernels: use the custom Metal kernels (flyverse/metal.py) for the event-driven synaptic input
+        and the LIF update; None = automatically on MPS when available."""
         self.c = c
         self.p = params or LIFParams()
         self.device = resolve(device)
@@ -175,6 +178,9 @@ class Brain:
             self.input_scale = scale
         W = W.copy(); W.data = W.data * np.float32(p.w_syn)
         self.event_driven = (self.device.type != "cuda") if p.event_driven is None else bool(p.event_driven)
+        self.metal = metal.use(self.device, metal_kernels) and self.event_driven and p.weight_dtype == "float32"
+        if metal_kernels and not self.metal:
+            raise ValueError("Metal kernels need the event-driven backend with float32 weights")
         if p.weight_dtype not in ("float32", "float16"):
             raise ValueError("weight_dtype must be float32 or float16")
         if p.weight_dtype == "float16" and self.device.type != "cuda":
@@ -219,15 +225,19 @@ class Brain:
         self.std_u_vec = torch.from_numpy(u).to(dev)
         self._std_on = bool((u > 0).any())
         self._a_std = math.exp(-p.dt / p.std_tau) if self._std_on else 1.0
+        if self.metal:   # coefficients for metal.lif_update, see SOURCE
+            self._P = torch.tensor([p.v_rest, p.v_reset, p.v_th, self._a_m, p.dt, p.t_ref, p.adapt_jump, self._a_ad,
+                                    self._a_std, self._a_r, (1 - self._a_r) * 1000.0 / p.dt], dtype=torch.float32, device=dev)
 
     def set_weights(self, W) -> None:
         """Install a (post, pre) scipy sparse matrix of synaptic weights in mV (already scaled by w_syn)."""
         import scipy.sparse as sp
         if self.event_driven:
-            Wc = sp.csc_matrix(W)                                      # pre-major: outputs of each neuron
+            Wc = sp.csc_matrix(W); Wc.sum_duplicates(); Wc.sort_indices()   # pre-major: outputs of each neuron
             self.W = None
-            self._out_ptr = torch.from_numpy(Wc.indptr.astype(np.int64)).to(self.device)
-            self._out_post = torch.from_numpy(Wc.indices.astype(np.int64)).to(self.device)
+            itype = torch.int32 if self.metal else torch.int64
+            self._out_ptr = torch.from_numpy(Wc.indptr.astype(np.int64)).to(self.device, itype)
+            self._out_post = torch.from_numpy(Wc.indices.astype(np.int64)).to(self.device, itype)
             dtype = torch.float16 if self.p.weight_dtype == "float16" else torch.float32
             self._out_w = torch.from_numpy(Wc.data.astype(np.float32)).to(self.device, dtype)
         else:
@@ -296,6 +306,9 @@ class Brain:
         if not self.event_driven:
             self._matmul_add(self.W, x)
             return
+        if self.metal:
+            metal.event_scatter(self._out_ptr, self._out_post, self._out_w, x, self.g)
+            return
         nz = torch.nonzero(x)                                           # (K, 2) [brain, pre]; syncs with host
         if nz.shape[0] == 0:
             return
@@ -347,6 +360,9 @@ class Brain:
         if self._kvec is not None:
             self._step_clocked(n_steps)
             return
+        if self.metal:
+            self._step_metal(n_steps)
+            return
         p = self.p
         for _ in range(n_steps):
             # synaptic input from spikes emitted `delay` ago: one sparse matmul for all B brains
@@ -382,6 +398,21 @@ class Brain:
             if self.record_activity:
                 self.spike_counts.add_(spikes)
             self.rate.mul_(self._a_r).add_(spikes * ((1 - self._a_r) * 1000.0 / p.dt))
+            self.t += p.dt
+            self.step_count += 1
+
+    @torch.no_grad()
+    def _step_metal(self, n_steps: int) -> None:
+        """The step loop as three launches: synaptic scatter, Poisson draws (torch generator), fused update."""
+        p = self.p
+        flags = (1 if self._poisson_on else 0) | (2 if self._std_on else 0) | (4 if self.record_activity else 0) | (8 if p.adapt_jump > 0 else 0)
+        for _ in range(n_steps):
+            self.g.mul_(self._a_s)
+            self._add_synaptic_input(self.spike_buf[self.buf_pos])
+            rnd = torch.rand(self.v.shape, generator=self.gen, device=self.device) if self._poisson_on else self.poisson_p
+            metal.lif_update(self.v, self.g, self.drive, self.adapt, self.refrac, self.active, self.poisson_p, rnd, self.res,
+                             self.std_u_vec, self.spikes, self.spike_buf[self.buf_pos], self.rate, self.spike_counts, self._P, flags)
+            self.buf_pos = (self.buf_pos + 1) % self.n_delay
             self.t += p.dt
             self.step_count += 1
 
