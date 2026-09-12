@@ -40,16 +40,21 @@ def add_options(ap):
     ap.add_argument('--receptor-net-rule',choices=('class','abs','nonmda'),default='abs',help="with --receptor-model sign")
 
 
-def patch_receptor(model,net_rule):
+def patch_receptor(model,net_rule,table=None):
     """Make every brain.LIFParams built from here on (BatchSim's included) carry the requested receptor model
-    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'default' leaves the class untouched."""
-    if model=='default': return
+    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'default' with no table leaves the class untouched.
+    `table` is a LIFParams.receptor_table path (a receptors_by_type.csv other than the shipped one, e.g. the hold
+    tables of scripts/build_hold_tables.py); it is applied whenever the receptor stage is on, so --receptor-table
+    works with --receptor-model default as well as sign."""
+    if model=='default' and table is None: return
     from flyverse import brain
     L = brain.LIFParams
     def make(**kw):
         p = L(**kw)
-        p.receptor_model = None if model=='off' else model
-        p.receptor_net_rule = net_rule
+        if model!='default':
+            p.receptor_model = None if model=='off' else model
+            p.receptor_net_rule = net_rule
+        if table is not None and p.receptor_model is not None: p.receptor_table = table
         return p
     brain.LIFParams = make
 
@@ -59,6 +64,17 @@ def sim_options(args):
                 escape_gating=args.escape_gating,brain_dt=args.brain_dt,optic_dt=args.optic_dt,
                 cuda_graphs=args.cuda_graphs,cuda_kernels=args.cuda_kernels,event_driven=args.event_driven,
                 cuda_sparse=args.cuda_sparse,weight_dtype=args.weight_dtype,device=args.device)
+
+
+def _lif_dump(lp):
+    """The resolved LIFParams (every field, JSON-safe) so an arm's identity lives in the JSON rather than in prose."""
+    import dataclasses
+    out={}
+    for f in dataclasses.fields(lp):
+        v=getattr(lp,f.name)
+        try: json.dumps(v); out[f.name]=v
+        except TypeError: out[f.name]=repr(v)
+    return out
 
 
 def main():
@@ -73,6 +89,10 @@ def main():
     ap.add_argument('--gf-hz',type=float,default=None,
                     help="override every row's body.Flight.gf_hz before the loop (1e9 disables the GF escape route, leaving the "
                          "voluntary wing-power route as the only take-off; default: leave Flight.gf_hz, 33 Hz)")
+    ap.add_argument('--receptor-table',default=None,metavar='PATH',
+                    help='LIFParams.receptor_table: a receptors_by_type.csv other than flyverse/data/receptors_by_type.csv '
+                         '(e.g. out/receptors_holdBrain.csv from scripts/build_hold_tables.py); no effect with '
+                         '--receptor-model off, which switches the receptor stage off')
     ap.add_argument('--json',default='out/batch_sustain.json')
     ap.add_argument('--save',default='',help='save the final batched checkpoint')
     ap.add_argument('--load',default='',help='resume a matching batched checkpoint')
@@ -80,18 +100,23 @@ def main():
     if not np.isfinite([args.minutes,args.energy,args.log_every]).all() or args.minutes<=0 or args.log_every<=0 or not 0<=args.energy<=1:
         ap.error('minutes/log-every must be positive; energy must be in [0,1]')
     if args.gf_hz is not None and not args.gf_hz>0: ap.error('--gf-hz must be positive')
+    if args.receptor_table is not None:
+        if not Path(args.receptor_table).is_file(): ap.error(f'--receptor-table {args.receptor_table}: no such file')
+        if args.receptor_model=='off': ap.error('--receptor-table has no effect with --receptor-model off (the receptor stage is off)')
     try:
         start = tuple(float(v) for v in args.start.split(','))
         if len(start)==2: start += (.75,)
         if len(start)!=3: raise ValueError()
         seeds = [int(s) for s in args.seeds.split(',')] if args.seeds else None
     except ValueError: ap.error('invalid --start or --seeds')
-    patch_receptor(args.receptor_model,args.receptor_net_rule)
+    patch_receptor(args.receptor_model,args.receptor_net_rule,args.receptor_table)
     sim = BatchSim(args.batch,seeds=seeds,start=start,**sim_options(args))
     lp = sim.fb.brain.p
     receptor_info = dict(model=lp.receptor_model,net_rule=lp.receptor_net_rule if lp.receptor_model else None,
+                         table=lp.receptor_table if lp.receptor_model else None,
                          fast_sign_changed_entries=int((sim.fb.receptor.fast_sign!=np.sign(sim.c.W.data)).sum()) if sim.fb.receptor is not None else 0)
-    print(f'receptor model {receptor_info["model"]} ({receptor_info["net_rule"]}); fast sign changed on {receptor_info["fast_sign_changed_entries"]:,} of {sim.c.W.nnz:,} entries',flush=True)
+    print(f'receptor model {receptor_info["model"]} ({receptor_info["net_rule"]}) table {receptor_info["table"] or "flyverse/data/receptors_by_type.csv"}; '
+          f'fast sign changed on {receptor_info["fast_sign_changed_entries"]:,} of {sim.c.W.nnz:,} entries',flush=True)
     if args.load: sim.load_state(args.load)
     else:
         for seed,fly,m in zip(sim.seeds,sim.flies,sim.metabolisms):
@@ -141,6 +166,7 @@ def main():
     result = dict(batch=sim.B,brain_seed=args.seed,frames=count,simulated_s=count*sim.FRAME_MS/1000,fly_s=fly_s,
                   wall_s=elapsed,aggregate_fly_s_per_wall_s=fly_s/elapsed,
                   options=vars(args),receptor=receptor_info,
+                  lif=_lif_dump(lp),device=str(sim.fb.device),cache_sum_abs_W=float(abs(sim.c.W).sum()),
                   flight=dict(gf_hz=float(flight.gf_hz),takeoff_power_hz=float(flight.takeoff_power_hz),takeoff_hold_s=float(flight.takeoff_hold_s),
                               landing_refractory_s=float(flight.landing_refractory_s)),
                   hops_total=int(hops.sum()),hops_escape_total=int(escape.sum()),hops_voluntary_total=int(voluntary.sum()),

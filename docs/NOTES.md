@@ -855,6 +855,11 @@ body assumption, not the connectome:
   out. An optic-lobe modelling thread, not a per-type gain; the second open model question beside
   the compass, now with a precise statement of what is missing. In the meantime the last five
   centimetres is `KlinotaxisProgram` (a sensor-side approximation, off by default).
+  [2026-09-12, dynamics round 1: the per-type drives are now measured in the deterministic lobe
+  (`gain_fb 0`, where the none-vs-none null is 1e-9-3e-7 mV): **LC11 +0.046 mV and LC10a +0.080
+  against LPLC2's +0.54 and a 7 mV criterion** -- so the gap is ~10x on the LC cells that should
+  carry the object, not a scaling nudge. The figure is already gone one stage earlier, at T2 / T3 /
+  Tm5Y / TmY21, by ON/OFF cancellation, and is then diluted by l1 pooling at LC10 / LC11.]
 * **The compass grid** (no compass adaptation, 10 Hz held background on every EPG, a 12-cell wedge
   driven at +40 Hz for 2 s; cells above 22 Hz in the wedge vs the other 38, at 0.5 / 2 / 5 s after):
   EPG <-> PEN x1.5 -- the ring stays at the background (EPG 10-13 Hz, PEN 1-5), wedge 0-3 / rest 2-10,
@@ -1084,7 +1089,13 @@ sampled; several "capture" rows were really persistence because the seed's spont
 driven wedges; and the whole loop hinges on four ExR4 / ExR6 cells (predicted glutamate) whose fast-vs-modulatory
 role in the animal is unknown. The bump has not yet been run with sensory input, shown to move with a PEN L / R
 asymmetry, or shown to reach PFN -> hDelta -> PFL3 (structurally PFN gets EPG +2.8 vs Delta7 -13.5 mV per cell with
-every nodulus input but IbSpsP inhibitory) -- these are the next experiments.
+every nodulus input but IbSpsP inhibitory) -- these are the next experiments. [2026-09-12, answered in dynamics
+round 1: all three. With full senses the bump persists for the whole 38 s free window in 192/192 flies (12 gain runs, 11 configurations) at all
+three operating points (219-261 Hz), but it is pinned to 5-7 attractor sites and tracks neither heading nor
+anything else. A 1 s unilateral 40 Hz PEN drive moves it +0.038 +- 0.018 wedges with GLNO silent and
++0.301 +- 0.036 with GLNO relabelled GABA (6/6 seeds, sign-flip p 0.031) -- an elastic deflection that relaxes
+when the drive stops, not an integrated heading update. PFN stays at 0.59-0.78 Hz and hDelta at 1.47-1.86 Hz
+under a 220-260 Hz bump, so PFN -> hDelta -> PFL3 is NO. See "Session 10, dynamics round 1".]
 
 **NT signs** (`docs/audits/nt_audit.md`, `scripts/audit_nt.py`, byte-reproducible on CPU): sign 0 silences 2.2 % of
 synapses (unknown 0.7 %, DA / OA / 5-HT 0.5 % each), landing on the mushroom body (9.8 % of input, 12.5 % of output)
@@ -1130,10 +1141,20 @@ therefore depended on the seed's heading (session 9's two "ball not seen" seeds)
 `fly.left`; the free-walking loom numbers above predate the fix and should be re-measured.
 
 **Critic's follow-ups, in order**: run the two compass settings through the full suite with senses (does a 200 Hz
-bump spin the walking fly through PFL3 -> DNa02?); PEN L / R shift and the PFN / hDelta / PFL3 readout; the GLNO sign;
+bump spin the walking fly through PFL3 -> DNa02? [2026-09-12, answered in dynamics round 1: **no**. The bump sets a
+static PFL3 L-R offset of 2.09-3.31 Hz -- a fixed anatomical gradient the gains scale rather than create, the
+shipped control reproducing the same phase at 0.19 Hz -- DNa02 follows at 0.08-0.24 Hz against a within-fly
+temporal sd of 1.0-1.3 Hz, and the yaw first harmonic is 0.006-0.021 rad/s = 0.3-1.2 deg/s against a heading
+circular sd of 20-31 deg. Statistically detectable at the two higher gains, behaviourally nothing.]); PEN L / R
+shift and the PFN / hDelta / PFL3 readout; the GLNO sign;
 T2 / T3 as ON-OFF units (their inputs sum Mi1 / Tm3 (figure z -8) and Tm1 / Tm2 / Tm4 (+3 to +5) linearly and cancel
 the object exactly where NOTES 9 loses it; T3 is 21 % of LC11's input) via a rectified baseline in `optic.py`, scored
-with `probe_figure_ground.py` and the sweeping-ball assay; the self-motion GF assays that decided LPi x4 and
+with `probe_figure_ground.py` and the sweeping-ball assay [2026-09-12, answered in dynamics round 1: the
+cancellation is **confirmed structurally** -- T3 sums Mi1 22.5 % + Tm3 8.2 %, lowered by the dark object, against
+Tm1 16.0 % + Tm4 6.7 %, raised, through excitatory synapses of equal weight, a linear estimate of -0.0004 against
+its own -0.0011 -- but a rectified baseline is not the fix: round 3's `--rectify-t2t3` runs already left LC11 and
+LC10a at the null (FAIL in 4 of 4, `docs/audits/object_sweep.md` section 2). The levers left are
+physiology parameters, not a rectification]; the self-motion GF assays that decided LPi x4 and
 edge_len 20 mm added to the suite, and the optic layer's own hand-crafted measures (five pair gains, gain_out, L1
 normalisation, drive clip) audited the way the LIF's were; the odour gate at the 40 cm foraging start (channel 12.5 Hz
 against a 13 Hz gate) and cross-channel specificity; an NT-rescue counterfactual through the LIF sections.
@@ -1349,10 +1370,144 @@ source of spontaneous turning. In the animal that comes from central-complex / L
 projection through PFL3 to DNa02, plus exploratory state), which is exactly what the session-10 dynamics round is
 measuring (does a bump produce a PFL3 / DNa02 asymmetry in the room). Under the project rule the options are: leave
 the plain fly straight and state it (the honest default); a compass module with documented gains as a swappable
-stop-gap if the dynamics round shows the bump steers; or a noise-driven turning term, which would be hand-crafting
+stop-gap if the dynamics round shows the bump steers [2026-09-12: **closed negatively** in dynamics round 1 -- the
+bump does not steer (yaw first harmonic 0.3-1.2 deg/s against a 20-31 deg heading sd), does not track heading
+(circ corr -0.11 to +0.11) and is pinned to 5-7 attractor sites, so the compass gains stay experiment overrides
+and the plain fly stays straight by default]; or a noise-driven turning term, which would be hand-crafting
 and is not proposed. A benchmark assay for spontaneous turning (yaw-rate SD / straightness of the plain fly in the
 room, against free-walking Drosophila turn statistics) is added to the battery as a known gap so this cannot slip
 through the suite again -- none of the 29 existing checks scores it.
+
+## Session 10, dynamics round 1 (2026-09-12)
+
+Five threads (compass-room, compass-shift, optic-audit, takeoff-hold, feeding-horizon), five Opus skeptics,
+~60 cluster jobs, 0 failed. **No model default changed**: `git diff -- flyverse/` is empty at 305f507, and the
+compass gains (gE / gD) and the drain scales were experiment overrides, stated as such. Audits:
+`docs/audits/compass_room.md` and `cx_shift.md` (both still stubs -- see the process lessons; R2-0 fills them),
+`optic_measures.md`, `feeding_horizon.md`, `receptor_integration.md` G.5.
+
+**The compass bump survives the senses and does nothing with them.** At all three GLNO-sign-robust operating
+points the ring attractor lives the whole 38 s free window in 192/192 flies over 12 gain runs (bump 219-220 Hz at
+gE 2 / gD 15, 231 at 2.25 / 25, 259-261 at 2.5 / 25; the shipped control dies within 0.1 s, PEN 0.0 Hz, 0/80
+flies in 5 control runs) -- but it does not track heading (circ corr(centre, heading) -0.11 to +0.11 per run),
+does not steer (yaw first harmonic 0.006-0.021 rad/s = 0.3-1.2 deg/s against a heading circular sd of
+20-31 deg), and leaves PFN at 0.59-0.78 Hz and hDelta at 1.47-1.86 Hz under a 220-260 Hz bump, so **PFN ->
+hDelta -> PFL3 is answered NO**. It is also pinned: the realised centre snaps to 5-7 attractor sites out of 16
+wedges ({1.5, 3.9, 8.4, 10.6, 13.2} at gE 2/15, identical to 0.1 wedge across seeds and programs) and then
+freezes (centre circular sd 0.02-0.09 wedges over 38 s, 0 jumps). PFL3's L-R offset is a fixed anatomical
+gradient that the gains scale rather than create (amplitude 2.09-3.31 Hz, phase 12.3-12.9 wedges, r2 0.72-0.80,
+p 0.018-0.042 with the bump position as the unit and duplicate tile pairs collapsed, n = 8; the shipped control
+reproduces the same phase at 0.19 Hz), and DNa02 follows it at 0.08-0.24 Hz against a within-fly temporal sd of
+1.0-1.3 Hz. `out/cxroom_orig/`, `out/cxvfy/verify_table.md`.
+
+**PEN has no signed rotation input in this connectome, and the one silent link is an elastic lever.** GLNO
+(4 cells, sign 0) is 19.4 % of PEN's raw input, fully contralateral, and is itself fed by PEN 37 % / PS196_b
+19 % / EPG 8 % with 8 optic synapses -- efference-copy territory; LNO1 / LNO2 / LNOa / SpsP make 0-13 synapses
+onto PEN. Relabelling GLNO GABA (both EM predictions are inhibitory and disagree, Glu 0.505 vs gaba at conf
+0.30-0.33, and `NT_SIGN` maps both to -1, so the arm is a what-if that a glutamate arm would reproduce) opens a
+one-sided lever: a 40 Hz 1 s unilateral PEN drive shifts the bump +0.301 +- 0.036 wedges against
++0.038 +- 0.018 with GLNO silent, 6/6 seeds, sign-flip p 0.031, R-minus-none null in both (+0.015 / -0.009).
+The deflection is **elastic**, relaxing to or past its start once the drive stops (onset->end -0.07 to -0.14
+wedges at seeds 0-2). Imposed visual rotation at 90 deg/s moves the bump 0.00 +- 0.01 wedges/s against a
+4.0 w/s ideal while HSN / HSE / Nod1 / DNp20 flip at d' -2.5 to -4.5 in the same runs: **no visual route to
+PEN**. The efferent route the structure points at is untested -- the rig teleports the fly (R2-1).
+`out/verify_cx_shift_shift.md`, `out/vcx_*_s345.json`.
+
+**Where the small object is lost, named at last.** The static-apple figure is carried by the lamina (L1 z
++18.4, L2 +12.0), the medulla (Mi1 -8.8, Tm3 -6.8, Tm20 +5.3, Tm4 +4.8, Tm1 +4.5) and T4c/d / LPLC2, and it is
+gone at the inputs of LC10 / LC11 (Tm5Y +0.2, TmY21 -0.6, TmY13 +2.2, T2 +2.7, T3 -1.0; none carries in 3/3
+seeds) by sign-correct **ON/OFF cancellation through excitatory convergence** (T3 sums Mi1 22.5 % + Tm3 8.2 %,
+lowered by the dark object, against Tm1 16.0 % + Tm4 6.7 %, raised: linear estimate -0.0004 against its own
+-0.0011; T2 the same with a residual +2.7; Tm5Y is dilution instead -- one carrying input, Tm20 at 14 %), then
+by **l1 pooling at the LC cells** (LC11 +0.046 mV and LC10a +0.080 against LPLC2's +0.54 and a 7 mV criterion,
+in the deterministic lobe). No hand-crafted optic measure sits on those edges and none of the 16 ablations
+makes them carry. `gain_fb = 0` is the deterministic null (every none-vs-none statistic falls to 1e-9-3e-7 mV,
+five to seven orders under the shipped 0.06 mV null), and in that lobe the small-field types do pass a
+single-cell signal of the medulla's size (best-cell |dev| diff T2 0.066, Tm5Y 0.072, TmY21 0.062, TmY5a 0.084
+against Mi4 0.047, Tm3 0.104) -- a signal, not a retinotopic population figure and not a drive. The levers left
+are **physiology parameters** (the receptor table's slow classes: GABA-B mid on T2 / high on T3, mGluR on T2;
+a per-type output normalisation at LC10 / LC11), not data. Two bounds the skeptic added: the stage pipeline is
+**not reproducible at fixed seed** (baseline seed 0 rerun: median |dz| 0.36-0.49, max 5.2-7.6, 15 of 234 apple
+carry-threshold flips), so every per-type z is +-1.5 and the replicate unit is runs, not seeds; and LPLC2's
+object null under the shipped gains is z +1.2 (rank-sum p 0.07, n 3 vs 5) where round 3 had +5.4, because the
+null rose 0.139 -> 0.238 mV while the ball arm did not move. `out/optic_audit/`, `out/optic_verify/`,
+`docs/audits/optic_measures.md`.
+
+**The room take-off cost is optic-side.** Round 5's hold pair in the room (3 brain seeds x 16 flies x 300 s per
+arm, 9 jobs, 0 failed) plus the skeptic's 4th matched batch at a fresh seed / env block gives, over 4 batches
+of 19,200 fly-s per arm: shipped 75 hops = 27 escape + 48 voluntary, optic side (`holdBrain`, 44,463 medulla
+entries) 59 = 19 + 40, Brain side (`holdOptic`, 3,832 entries) 8 = 8 + 0, off 11 = 11 + 0. The **Brain side
+carries none of it** (vs off: hops U 1980 p 0.59, 0 voluntary) and the optic side **most of it** -- 75 % of the
+hop excess, 83 % voluntary, 95 % of the GF-median shift, having read 92 / 106 / 103 % on three batches, so
+these shares are not measured to better than a factor ~1.5. The escape route alone cannot be attributed at this
+exposure (holdBrain vs off escape U 2300, p 0.095) and dose is uncontrolled (the optic half is 95 % of the
+changed |W|). The halves do **not** cancel in the room as they do in `walk.GF_max` (4.6 / 12.5 / 13.3 / 5.0 Hz
+pinned against a monotone room ordering off ~ Brain side << optic side ~ default), so the pinned walk section
+is not a proxy for the room's escape route. Off with the GF damping retired is the same denominator as off with
+it (0.486 vs 0.625 per 1,000 fly-s, p 0.58; off now has 0 voluntary take-offs in 52,800 fly-s over 11
+batches), so the record's excess statements survive on the correct denominator. And 0 of the 48,295 changed
+entries land on DNp01, MN9, LC4, LPLC2 or any motor superclass: the cost is an upstream medulla state change
+reaching an untouched loom / wing-power pathway. `out/d1_*.json`, `out/sk_d1_*_4.json`,
+`docs/audits/receptor_integration.md` G.5.
+
+**Feeding cannot rank models, at any horizon or drain tested.** `meals` is identically equal to `contacts`
+fly-for-fly in 12/12 runs (the metabolic re-feed channel contributes exactly zero; `meals` is an arrival
+counter thresholded at 1.5 cm on the ground), 0.13-0.50 meals per fly per arm (0.06-0.50 per run), default vs
+off p 0.40-0.78 everywhere, and the cumulative arrival curve saturates (0.03 added in the second five minutes).
+Starvation is not the limit: at drain-scale 0.5 / 0.25 no fly reaches energy 0 and arrivals are unchanged, an
+empty tank *raises* walking speed 12-15 % (hunger is the model's only motivational gain and it saturates), and
+`batch_body._metabolism` has no death, immobilisation or episode end. The audit's one positive -- the default
+nearer the fruit on closest approach in 3 of 3 cells, stratified p 0.016 -- **failed replication**: two new
+cells, one reversed (U 145, p 0.53) and one null, 5 of 6 runs, sign test p 0.22. Its negative tail is entirely
+airborne (a walking fly sits at z = 0.75, so the surface distance cannot go below 0) and it is confounded with
+hops (Spearman rho -0.25 to -0.75 within arm). The drain's direction on food-finding is unresolved (3 of 4
+seed-matched drain 1.0 -> 0.5 transitions raise meals). The mechanism is the **cx program's terminal
+approach**: the plume is Gaussian downwind only (`air.py:104`), upwind of the source only the isotropic near
+field remains, the rule is "steer upwind" with nothing that uses a concentration change to stop or reverse,
+81.2 % of flies end past the apple going upwind (median final x 0.415, 16.5 cm past it), and the
+closest-approach median is 2.3-7.2 cm against a 3.8 cm capture radius. `body.py` is untouched and stays so.
+`out/feedh_*.json`, `out/skfeed_*.json`, `docs/audits/feeding_horizon.md`.
+
+**Hand-crafted measures.** `walk.power_max`'s 50 Hz bound (`scripts/benchmark.py:85`) is **still owed**
+(handover item 4): it fails under 13 of 16 optic ablations (51.5-198.8 Hz), is non-monotone in `gain_out`
+(80 / 100 / 120 = 63.8 / 48.5 / 51.7) and **anti-correlates** with the room take-off rate across the four hold
+arms (off 95.5-97.1 Hz FAIL is the quietest room arm; the default 48.5 PASS the noisiest), so nothing may be
+tuned to it and no round-4/5 verdict resting on it may be quoted until it is re-derived or de-scored; and
+`scripts/retire_measures.py:245` references `brain` without importing it, so the script cannot even be
+imported. `DEFAULT_PAIR_GAIN[1]` (Tm4 / Tm9 / CT1 / TmY15 -> T5 x5) is **data-contradicted** -- 78,877 of its
+101,619 edges are Tm4 / Tm9 -> T5 acetylcholine (Nern 2025 validated, nAChR-alpha5 on T5) against 22,742 GABA
+edges -- but it is not retirable (loom 29-36 Hz and T5 DSI 0.15 without it), so it is **re-labelled a T5 drive
+gain** and documented as a stop-gap. `OpticParams.drive_clip_mv = 35` is a retirement candidate (11/11 without
+it) pending 3 independent draws. `DEFAULT_PAIR_GAIN[4]` (`.* -> LC4|LPLC2 x1`) is a literal no-op and is
+retirable now, with no behaviour change.
+
+**Process lessons.** Two threads reported finished batches as "still running" because `cluster_run.py --fetch
+out/` failed on a 152 MB scratch `cache_*` directory inside the run's `out/` -- the jobs had completed, every
+number was in the threads' own shipped console logs, and both audit documents shipped as stubs. Fetch a **named
+subdirectory** (`--fetch out/<name>/`) or a file glob, and read the console log's `<n> job(s), 0 failed` line
+before writing a status section. Run JSON headers must carry the resolved `LIFParams`, `type_path_gain` and the
+**realised** device (`options.device` records the request and is `None`), so that an arm identifies itself
+without run-dir md5s and prose -- md5s are not portable anyway (CRLF here vs LF on the cluster). And ship every
+generator: the feeding thread's stratified / Fisher statistic, the LC10 / LC11 pooling arithmetic and three of
+the take-off thread's logs have no script behind them.
+
+**Round 2, in order, each one submission.** R2-0 (CPU, first): fetch the `cx_shift` originals into their
+reserved paths and fill `cx_shift.md` sections 2-4 and `compass_room.md` sections 4-6 from data that already
+landed, and fix the `retire_measures.py` import. R2-1 compass: the efferent rotation arm (the fly turning
+itself instead of being teleported), GLNO silent vs GABA, with the teleport arm as the visual control, plus a
+CPU test of whether the 5-7 pinned sites are the wedges of maximal recurrent weight. R2-2 object: make the
+stage map an instrument first (three same-seed draws, `gain_fb 0` as the null), then the two data-backed arms
+-- slow GABA-B on T2 / T3, and a per-type output normalisation at LC10 / LC11. R2-3 take-off: split the optic
+side by transmitter (`holdOpticHis` vs `holdOpticGlu`) with a random 3,832-entry dose control, all five arms in
+one submission at matched env seeds. R2-4 `walk.power_max`: three draws each of baseline / no_dn_vnc_gain /
+no_path_gain / no_drive_clip under the shipped gains, then de-score or re-derive the referent (the drive-clip
+retirement rides along). R2-5 feeding: re-instrument rather than replicate -- a ground-only closest approach
+and `first_contact_s`, `--fruit all` (2.28 ideal encounters per fly per 5 min), the `--drain-scale 0` hunger
+clamp as the ranking assay, and `cx+klinotaxis` as the terminal-approach test. R2-6 reporting: the quantifier
+corrections into `receptor_integration.md` G.5, `optic_measures.md` and `feeding_horizon.md`, and the five
+skeptic verdicts verbatim into `receptor_verification.md`.
+
+The interpretability-toolkit workflow (`flyverse/interp/`) was launched immediately after this round.
 
 ## Batched brains and the RL environment
 
