@@ -1376,3 +1376,524 @@ it appears (A.5 above, NOTES, NT_INTEGRATION).
   "pooled 32 v 32" is 16 flies measured twice. Off reference over 4 batches: 0.57 per 1,000 fly-s. Wall 17-43 min.
 * The round-1 "full" ceiling is >= 2,330 hops per 1,000 fly-s (31-35 in 15 s). `out/r4_sustain_energy.log` and
   `out/r4_hopcheck_power.log` are reproduced by `scripts/skeptic_sustain_energy_power.py`.
+
+## Round 5: the take-off check
+
+Round-4 item 3 and the sustain skeptic's corrections above: the room take-off excess (74 vs 11 hops over 48 flies x 5 min)
+was counted on an instrument that could not tell a GF escape jump on room optic flow (GF >= `Flight.gf_hz` 33) from a
+voluntary take-off (wing power >= 50 Hz held 0.3 s), and the proposed hop check's reference (off 0.76 / default 5.14 per
+1,000 fly-s) was calibrated on both routes while the instrument it named counts one. This section makes the split
+first-class, re-measures both routes over three brain RNGs with the escape route live and disabled, derives a
+voluntary-only reference, and ships the scored section. **Status at the time of writing: the instrument is built and
+verified; the 14-job cluster batch (R5.1) is submitted and running; its numbers, the derived references and the
+pass / gap / fail verdict are filled in by `scripts/r5_fetch_and_report.sh` once the batch lands (R5.2-R5.5 below carry the
+protocol and the provisional entries, not results).**
+
+### R5.0 Instrument (built, verified on the CPU)
+
+* `flyverse/batch_body.py`: `BatchBody.step()` already computed the two launch masks (`escape`, `voluntary`) it hands to
+  `body.Flight.launch`; it now also accumulates them per row (`hops_escape`, `hops_voluntary`, int64) and keeps the last
+  step's masks (`launched_escape`, `launched_voluntary`). No dynamics change: the masks, the thresholds
+  (`gf_threshold` from the wing command, `takeoff_power_hz` 50, `takeoff_hold_s` 0.3, `landing_refractory_s` 1) and the
+  launch calls are the ones that were there; the diff is 8 added lines. `flyverse/batch_sim.py` exposes the counters
+  (`BatchSim.hops_escape` / `hops_voluntary`, 12 added lines) and zeroes them for the rows a `reset` selects; they are
+  measurement bookkeeping, not checkpoint state (a resumed run counts from the resume, as `batch_sustain`'s `hops`
+  always did; `state_dict` version unchanged).
+* Verification, CPU only: `scripts/check_hop_route_bookkeeping.py` drives a 9-row `BatchBody` as `tests/test_batch_sim.py`
+  does (random motor samples, a forced GF burst of 80 Hz on row 6 at steps 0 and 200, forced wing power 60 Hz on row 7 whose
+  hold starts at 0.29 s) next to a copy stepped with the scalar `Flight.maybe_takeoff` / `Flight.step` / `Locomotion.step`,
+  400 steps, both fence settings: every fly state equal to the reference (tolerance 2e-12), airborne transitions
+  `[0,0,0,0,0,0,2,1,0]` = escape `[0,0,0,0,0,0,2,0,0]` + voluntary `[0,0,0,0,0,0,0,1,0]` on both settings (the second row-6
+  escape is the one after the 1 s landing refractory). `tests/test_batch_sim.py`: 8 passed, 4 GPU-opt-in skipped, 200
+  subtests, on the CPU (`CUDA_VISIBLE_DEVICES=""`).
+* `scripts/batch_sustain.py`: per-fly rows carry `hops` (airborne transitions, unchanged), `hops_escape`, `hops_voluntary`,
+  `gf_max_walk_hz` (the row's maximum GF over frames it began on the ground -- the quantity the flight model compares with
+  `gf_hz`), `gf_max_hz`, `power_max_hz`, `airborne_frac`; the header carries `flight` (gf_hz, takeoff_power_hz,
+  takeoff_hold_s, landing_refractory_s), `fly_s`, the totals, the two rates per 1,000 fly-s, `gf_max_walk_median_hz` and
+  `rows_gf_at_threshold`. New `--gf-hz` overrides every row's `Flight.gf_hz` before the loop (1e9 = voluntary route only,
+  `benchmark.sec_walk_gf`'s trick; recorded in `options.gf_hz` and `flight.gf_hz`); it lives in `main()`, not
+  `add_options`, so `scripts/probe_hop_route.py` (which defines its own `--gf-hz`) is untouched. The progress line prints
+  the running escape / voluntary totals; the script warns if the split ever disagrees with the transition count. Local CPU
+  smoke (`--batch 2 --seeds 0,1 --minutes 0.002 --energy 0.9 --device cpu`, `out/r5_smoke_default.json`,
+  `out/r5_smoke_off_nogf.json` with `--receptor-model off --gf-hz 1e9`): headers `sign (abs); 48,295` / `None (None); 0`,
+  `flight.gf_hz` 33 / 1e9, the new keys present.
+* `scripts/benchmark.py`: opt-in section `hops` (letter j). `select_sections` excludes it from `all` and `new`
+  (`OPTIONAL = ["hops"]`) and drops it under `--fast` with a printed note (no fast variant: 960 fly-s cannot separate the
+  two rates, S.3). `sec_hops` builds `BatchSim(16, c=ctx.c, seed=0, seeds=0..15, start=(-0.15,0.15,0.75), program="cx",
+  fruit_set="apple", fence=True)` under `ctx.patched_params()` (so `--receptor-model off` reaches it as
+  `receptor_model=None`; the section records the LIFParams' `receptor` beside the JSON header), native flags
+  `cuda_kernels + cuda_graphs + event_driven + cuda_sparse="torch"` (batches need the torch CSR path), batch_sustain's
+  per-seed headings and `energy = 0.9`, `--hops-minutes` (2.5 = 2,400 fly-s) x `--hops-batch` (16). It reports
+  `hops.voluntary_per_1000_fly_s`, `hops.escape_per_1000_fly_s` and `hops.walk_gf_max_median_hz`, and stores per-row
+  counts, the walking-GF maxima, the launch list (row, t, route) and `route_split_consistent`. Section selection checked:
+  `all` -> 14 sections without hops, `new` -> 9 without hops, `hops` / `j` -> hops, `j` + `--fast` -> skipped with the
+  note, `walk_gf,hops` -> both. Smoke (`--sections hops --eager --hops-minutes 0.002 --hops-batch 2`,
+  `out/r5_hops_smoke_{default,off}.json`): table printed with three checks, JSON `config.receptor.model` sign / None,
+  `sections.hops.receptor` `{sign, abs}` / `{None, abs}`. **Process note:** that 6-second smoke ran on the desktop GPU
+  because `--eager` lets the demo path pick CUDA when present -- a breach of the "no GPU work on this desktop" rule
+  (two smokes, out/r5_hops_smoke_{default,off}.json, 2 flies x 0.12 s each); every later local run was forced to the CPU.
+* `scripts/compare_sustain_runs.py`: the split metrics and rates per 1,000 fly-s per batch and pooled, the walking-GF
+  tail (median, rows at the threshold, per-batch medians), Mann-Whitney asymptotic p at full precision and 3 significant
+  digits; the exact p is printed only when the pooled data carry no ties (never, for counts) and reads `n/a (ties)`
+  otherwise; `--ref-proposal` (references from condition B with a Poisson pass / fail table for a 2,400 fly-s section at
+  candidate bounds 0.5-10 per 1,000 fly-s) and `--benchmark-json` (re-score a `hops` section against the `REFERENCES`
+  now in `benchmark.py`; the measured values do not depend on the bounds a run was scored with). Round-4 JSONs (no split
+  keys) still work: hops 74 vs 11, U 1914.5, p_asym 1.35387e-09 reproduce.
+
+### R5.1 The batch (landed: 14 jobs, 0 failed, 92.0 min; run dir r5-hops-218d81; NOTE: submitted at 03:25 local, before the 03:33 GF-damping retirement, so every number in it describes the DAMPED-gains default)
+
+`scripts/r5_cluster_batch.sh` -> `python scripts/cluster_run.py --name r5-hops --minutes 150 <14 commands> --fetch out/`,
+run dir `/mnt/beegfs/neurome/runs/r5-hops-218d81`, 14 jobs submitted 2026-09-12 10:25:37-49 UTC, all `running` on node2
+from 10:25:47-49 (ids 147e2d7a1adf, bfbdcbc8efa8, 0f34ad6c03f6, 0064f5540a4a, 8055a2d7b028, cdc99c887aed, d3a57084e189,
+2fa47639c38b, 5c4160d8f842, c8fcdcb7506e, df24f1b39154, 88e6fa4ac4a1, 197bed82262d, a548f1c0e669 = jobs 0-13 in the order
+below). Shipped local files: the six edited / new files only (out/ is git-ignored). Every job's stdout header was read
+from the run directory 3 min in: all 12 sustain jobs print `BatchSim B=16 neurons=167,106 device=cuda`, the default jobs
+`receptor model sign (abs); fast sign changed on 48,295 of 25,578,600 entries`, the off jobs `None (None); 0`, the live
+jobs `escape at GF >= 33 Hz`, the `--gf-hz 1e9` jobs `escape at GF >= 1e+09 Hz`; the two benchmark jobs print
+`receptor model sign (abs; flag --receptor-model default)` / `None (the presynaptic-sign rule; flag --receptor-model off)`.
+Console of the submitting session: `out/r5_cluster.log` (block-buffered; complete only if that session outlived the batch).
+
+| job | command (all: `python -c 'import torch; assert torch.cuda.is_available()' && ... > out/<name>.txt; cat out/<name>.txt`) | output |
+|---|---|---|
+| 0-2 | `batch_sustain.py --batch 16 --minutes 5 --energy 0.9 --program cx --fruit apple --fence --cuda-graphs --cuda-kernels --event-driven --cuda-sparse torch --seed k --seeds <16k..16k+15>` | `out/r5_sustain_default_live_{1,2,3}.json` |
+| 3-5 | same `--gf-hz 1e9` | `out/r5_sustain_default_nogf_{1,2,3}.json` |
+| 6-8 | same `--receptor-model off` | `out/r5_sustain_off_live_{1,2,3}.json` |
+| 9-11 | same `--receptor-model off --gf-hz 1e9` | `out/r5_sustain_off_nogf_{1,2,3}.json` |
+| 12 | `benchmark.py --sections hops --json out/r5_hops_default.json` | `out/r5_hops_default.json` |
+| 13 | `benchmark.py --sections hops --receptor-model off --json out/r5_hops_off.json` | `out/r5_hops_off.json` |
+
+Completion: `bash scripts/r5_fetch_and_report.sh > out/r5_hops_report.log` fetches the run directory (`scp` of
+`<runs>/r5-hops-218d81/out/.`), echoes every job's device / receptor / final lines, and prints the six comparisons
+(live default vs off with `--ref-proposal`; nogf default vs off with `--ref-proposal`; default live vs nogf; off live vs
+nogf; the two benchmark JSONs re-scored against the current `REFERENCES`; the identical-seed check of batch 1 against the
+round-4 seed-0 runs 21 / 17 / 24 default and 1 / 0 / 2 off).
+
+### R5.2 Escape and voluntary rates per condition -- MEASURED (out/r5_hops_report.log, recounted in out/r5_close_recount.log): live route, 3 brain RNGs x 16 flies x 300 s = 14,400 fly-s per arm: pre-retirement default 75 hops = 31 escape + 44 voluntary (per batch 25 / 25 / 25) = 5.208 / 2.153 / 3.056 per 1,000 fly-s; off 9 = 9 + 0 (3 / 4 / 2) = 0.625 / 0.625 / 0.000; Mann-Whitney 48 v 48 voluntary U 1896 p 3.98e-11, escape U 1502.5 p 1.61e-03. Escape route disabled (--gf-hz 1e9): default 30 voluntary (10 / 15 / 5) vs off 0 (0 / 0 / 0), U 1728 p 2.42e-08 -- off makes 0 voluntary take-offs in 6 of 6 batches (28,800 fly-s). (Originally written as PENDING, from R5.1, `compare_sustain_runs.py` blocks A-D)
+
+Per batch and pooled (48 v 48) counts, rates per 1,000 fly-s, Mann-Whitney U with the asymptotic p to 3 significant
+digits (no exact p: counts are tied); the voluntary rate compared between the live and the `--gf-hz 1e9` arms of the same
+condition (a voluntary take-off that the live arm records as an escape because the GF crossed 33 Hz during the power hold
+would show as a live-arm deficit).
+
+### R5.3 The walking-GF tail -- MEASURED: per-fly walking-GF maximum median 32.25 Hz (default; per batch 32.96 / 32.82 / 31.16) vs 27.20 (off; 27.22 / 26.83 / 27.99), rows at or above the 33 Hz escape threshold 22/48 vs 8/48, U 1991 p 8.04e-10. In the --gf-hz 1e9 arm the recorded 'rows >= threshold' degenerates (threshold 1e9); against a fixed 33 Hz it is 24/48 vs 6/48, and the GF maxima are shifted up because no fly leaves the ground by an escape. (Originally PENDING, block A)
+
+Per-row `gf_max_walk_hz`: median, rows at or above 33 Hz, per-batch medians, Mann-Whitney default vs off (round 4, one
+seed: 33.04 vs 28.51 Hz, 8/16 vs 2/16 rows, U 214, p 1.27e-03).
+
+### R5.4 The shipped references -- RE-DERIVED from R5.2 / R5.3 (benchmark.py): voluntary reference 0.0 (bound < 1.0, gap-style: the shipped default is a KNOWN GAP in substance, P(pass per 2,400 fly-s draw) ~ 0.10 at 2.2 per 1,000 fly-s); escape reference 0.63 (bound < 10, storm guard); walking-GF median reference 27.2 (bound < 33, can FAIL; a 150 s section reads 2-3 Hz below the 300 s value). The note ranges first shipped ('2.2-2.9', '0.5 / 2.8', '26.7-28.5 / 30.6-33.2') were written before the batch and matched no file; replaced. (Originally PROVISIONAL until R5.2)
+
+`benchmark.py` ships three `Ref` entries for the section (session "10"). The bounds below are the ones in the file at
+submission time, set from the round-4 single-seed route runs (`out/sk4_route_*.json`: default voluntary 2.08, escape
+2.08; off 0.00 / 0.42 per 1,000 fly-s; GF medians 33.0 / 28.5) and to be replaced by the pooled off values of R5.2 with
+the Poisson table of `--ref-proposal` (the benchmark JSONs are then re-scored with block E; the run-time status column
+in `out/r5_hops_*.json` reflects the provisional bounds):
+
+* `hops.voluntary_per_1000_fly_s`: `Ref(0.0, "<", 1.0, gap=True)` -- reference voluntary-only (off), bound 1.0 (<= 2 hops
+  in the 2,400 fly-s section); `gap=True` so the shipped default prints KNOWN GAP, not FAIL, while it exceeds it.
+* `hops.escape_per_1000_fly_s`: `Ref(0.5, "<", 10.0)` -- reported separately; the bound is a storm guard (round-1 `full`
+  >= 2,330), both models expected to pass.
+* `hops.walk_gf_max_median_hz`: `Ref(28.0, "<", 33.0, gap=True)` -- the escape threshold; the default's median sits at
+  it in 1 of 7 default batches on file (33.0 was the round-4 single-seed probe; the pooled live median is 32.25, the scored 150 s section 30.1-31.4), so the entry is a plain PASS/FAIL check at 33 Hz rather than gap-style.
+
+### R5.5 What this settles and leaves open
+
+Settled now: the split is first-class in the batched room (R5.0), the flight-model thresholds are untouched, and the
+scored section exists and runs end to end (smoke) -- the round-3 critic's "add a check" and the round-4 skeptic's
+"voluntary-only reference, escape rate separate" are both implemented. Pending the batch: the rates, the references, the
+seed-0 reproduction of the round-4 totals, and the decision whether the shipped default passes, gaps or fails.
+
+## Round 5: default after the GF-damping decision
+
+Round-4 item 4 and the round-4 critic's follow-up 3 -- adopt or decline the GF x0.3 retirement, linked to the hop cost --
+are settled in `docs/audits/anti_runaway.md` "Round 5: GF damping adoption" (structure, tests, the suite table, the room
+batches, the caveats). This section records what the default is after that decision and the numbers it rests on, so that
+the receptor thread's evidence statement (round 4 above, "Where the default stands") reads against the shipped model.
+
+### D.1 The default after this task
+
+* `LIFParams.receptor_model = 'sign'`, `receptor_net_rule = 'abs'`, contested-flip table: unchanged (48,295 entries, 30,916
+  glutamate flips onto iGluR targets, 17,379 two-source histamine silencings).
+* `brain.DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0)]`: **the GF x0.3 input damping is retired.** The
+  previous list is `brain.GF_DAMPED_TYPE_PATH_GAIN`; `LIFParams(type_path_gain=brain.GF_DAMPED_TYPE_PATH_GAIN)` reproduces
+  the round-3 / round-4 default byte for byte (md5 `f0d145d1bb81b446ebc51f89ded7bd4b`, the round-3 pin), the shipped default
+  hashes `0e30e4a80cb607d4a168d1b08ebd6a40`, and `receptor_model=None` on the new gains `fcb5bec2a6c492196a622e31cdb24fc6`
+  (`scripts/r5_adopt_structure.py`; pinned in `tests/test_receptor_model.py`). The two defaults differ on 21 entries, all
+  onto DNp01 (SAD073 8, CL367 4, DNp70 4, GNG300 3, PVLP010 2 edges; 842 shaped |W| restored, 674 of it inhibitory); the
+  receptor lookup matches none of them, so the receptor model and the gain change are independent.
+* Everything else (`DEFAULT_PATH_GAIN`, `optic.DEFAULT_PAIR_GAIN` with LPi x4, the AL LN override, `TYPE_NT_OVERRIDE`, the
+  anti-runaway measures) is as in round 4.
+
+### D.2 What the shipped default scores (every number from the files named; generators `scripts/r5_adopt_report.py`, `scripts/compare_sustain_runs.py`)
+
+**Suite** (`benchmark.py --seeds 0,1,2`, no flags, batch `r5-adopt-fb3608`, `out/r5_adopt_default_{1,2,3}.json`):
+**27 PASS / 0 FAIL / 2 KNOWN GAP in 4 of 4** (the skeptic's out/r5_skeptic_default_4.json added); `walk.power_max` 48.4805 (< 50) in 4/4 and in 14/14 draws of this
+configuration across three batches (round 4's `no_gf_damping` x10 + these), the FAIL of the round-4 default (79.47) gone;
+no check worse in status than the round-4 default (`out/r4_default_{1,2,3}.json`) or than off (`out/r4_off_{1,2,3}.json`,
+26/1/2 x2, 24/3/2 x1). Bit-identical to round 4's `no_gf_damping` on every bit-stable check: taste 10.93, KC_active 816,
+PN 7.86, Shiu 139.90 / 0.82, calibrated 5.52 / 0.00, `walk.GF_max` 4.63, `power_sustained` 20.11. Moved by the
+retirement: `walk.power_max` 79.47 -> 48.48, `walk.power_sustained` 37.89 -> 20.11, `loom.GF_peak` 50.4-50.9 -> 47.22
+(off 38-41), `motion.min_dsi` 0.233 -> 0.241-0.246 (off 0.17). Smallest PASS margins: `motion.min_dsi` 0.141,
+`bitter.calibrated_sugar_bitter` 1.00 Hz, `walk.power_max` 1.52 Hz, `odour.apple_channel_clean` 1.57 Hz. The receptor
+default's measured advantages over off (demo loom escapes 3/3 vs 0-1/3 at 45-60 vs 32-34 Hz, taste, Shiu, legacy loom GF,
+direction selectivity) and its measured cost (KC_active 816 vs 1426) are unchanged by the retirement. The round-4
+sentence "the default is not worse than off on the suite and equal to off's best tally" becomes **"27/0/2 in 3/3, one
+tally better than off's best (26/1/2), with no check worse in status"** -- the improvement is the GF-damping retirement's,
+not the receptor model's (off with the damping retired was not run; round 4's `walk.power_max` non-monotonicity says the
+two changes need not add).
+
+**Room take-offs** (`batch_sustain.py --batch 16 --minutes 5 --energy 0.9`, cx / apple / fence, live escape route, brain
+seeds 0, 1, 2 x environment seeds 0-47; shipped default `out/r5_adopt_sustain_live_{1,2,3}.json`, pre-retirement default
+`out/r5_sustain_default_live_{1,2,3}.json` and off `out/r5_sustain_off_live_{1,2,3}.json` from the instrument task's batch
+`r5-hops-218d81`; `out/r5_adopt_report.log`):
+
+| per 1,000 fly-s (14,400 fly-s each) | shipped default | pre-retirement default | off | shipped vs pre-retirement U / p2 / p(shipped <) / p(shipped >) | shipped vs off U / p2 |
+|---|---|---|---|---|---|
+| take-offs, both routes | **3.89** (56 = 19 / 21 / 16) | 5.21 (75 = 25 / 25 / 25) | 0.63 (9 = 3 / 4 / 2) | 926 / 0.087 / 0.044 / 0.957 | 1786.5 / 1.7e-07 |
+| escape route (GF >= 33 Hz on room optic flow) | **1.67** (24 = 7 / 11 / 6) | 2.15 (31 = 12 / 11 / 8) | 0.63 (9) | 1064 / 0.47 / 0.23 / 0.77 | 1423 / 0.012 |
+| voluntary route (wing power >= 50 Hz for 0.3 s) | **2.22** (32 = 12 / 10 / 10) | 3.06 (44 = 13 / 14 / 17) | 0.00 (0) | 942 / 0.099 / 0.049 / 0.951 | 1656 / 3.2e-07 |
+| walking-GF max per row, median (rows >= 33 Hz) | 31.90 Hz (19/48) | 32.25 Hz (22/48) | 27.20 Hz (8/48) | 934 / 0.11 / 0.056 / 0.945 | 1846 / 3.7e-07 |
+
+The retirement takes the take-off rates down in both routes (point estimates 0.73-0.77x, lower in 3 of 3 seed-matched
+batches for the total and the voluntary route, 2 of 3 for escapes) and removes roughly a quarter to a half of the excess over (a point estimate inside identical-seed rerun scatter -- the shipped default's seed-0 batch gives 19 hops in one run and 11 in another, U 182.5, p2 0.029 -- against an off arm that was run under the DAMPED gains) off; it does
+not close it. **The room take-off excess remains the receptor default's one cost the suite does not score:** 6.2x off in
+take-offs (p 1.7e-07), 32 voluntary take-offs where off makes 0, a walking-GF tail at the escape threshold in 19 of 48
+rows vs off's 8. The round-4 statement "~40 % of the excess are GF escape jumps from a higher walking-GF tail" now reads,
+on the split instrument: escapes are 43 % of the shipped default's take-offs (24 of 56; pre-retirement 31 of 75, 41 %),
+and the tail (median 31.9 vs 27.2 Hz) is the receptor model's, not the damping's (the retirement moved it by 0.35 Hz,
+p 0.11).
+
+**The `hops` section** (`benchmark.py --sections hops`, 2,400 fly-s, one draw per arm; `out/r5_adopt_hops.json`,
+`r5_hops_default.json`, `r5_hops_off.json`; bounds as shipped by the instrument task, `Ref(0.0, "<", 1.0, gap)` /
+`Ref(0.5, "<", 10.0)` / `Ref(28.0, "<", 33.0, gap)`): shipped default 3 take-offs = 2 escape + 1 voluntary -> voluntary
+0.42 PASS (gap closed), escape 0.83 PASS, GF median 29.27 PASS (gap closed), 3/0/0; pre-retirement 7 = 4 + 3 -> 1.25
+KNOWN GAP / 1.67 / 30.11, 2/0/1; off 1 = 1 + 0 -> 0.00 / 0.42 / 25.74, 3/0/0. **The shipped default's voluntary "PASS
+(gap closed)" is a one-draw result that the 300-s room batches contradict** (2.22 per 1,000 fly-s over 14,400 fly-s, 2.2x
+the bound; a section at that rate expects 5.3 voluntary take-offs, P(X <= 1) = 0.031), and the pre-retirement draw is low
+by the same token (7 observed vs 12.5 expected from its room rate, P = 0.070) -- either two low draws (joint ~1e-3) or
+a take-off rate that is not stationary over the 300 s (the section samples the first 150 s, energy 0.9 -> ~0.1; the flies
+reach energy 0 at 150-180 s). The section's owner should settle that before its references are read as calibrated; the
+status of the voluntary entry for the shipped default is KNOWN GAP in substance.
+
+### D.3 What this settles and leaves open
+
+Settled: the GF-damping retirement is adopted on its own evidence (suite 27/0/2 x3, take-offs not worse in either route),
+the receptor default stays, and the two changes are structurally independent (0 DNp01 input edges in the receptor
+lookup). The link the round-4 critic asked to test -- does restoring inhibition onto DNp01 lower the walking-GF tail that
+fires the 33 Hz escape? -- is answered weakly: it lowers `walk.power_max` by 31 Hz and the take-off rates by about a
+quarter, and leaves the GF tail where it was.
+
+Open, carried to the dynamics questions: (1) the room take-off excess of the receptor default (3.89 vs 0.63 per 1,000
+fly-s; voluntary 2.22 vs 0) -- neither the KC / DN1 holds (round 4) nor the DNp01 inhibition (here) account for it;
+(2) the `hops` section's stationarity (D.2) and the reading of its references, which are the instrument task's; (3) off
+with the damping retired was not run, so "27/0/2 vs 26/1/2" is a statement about the shipped default, not about the
+receptor model's contribution; (4) `default + pair_gain_lpi_x2` remains the untested combination of round 4.
+
+## Round 5: Brain-side vs optic-side attribution
+
+Round-4 item 2 closed negatively -- neither the KC flips nor the DN1-clock flips carry `taste.MN9` 5.85 -> 10.93 or
+`smell.KC_active` 1426 -> 816 -- and left one hypothesis standing: "the taste rise is most plausibly a
+fan-in-normalisation effect of the 171,111 optic-side synapses inside the Brain (untested)" (round-4 re-score section;
+`receptor_verification.md` round-4 critic, follow-up 7). This section tests it two ways: a **hold pair** that splits the
+default's 48,295 changed entries by the side of the brain they land on, run on the GPU, and the **fan-in normalisation
+itself**, computed on the CPU. The hypothesis is refuted on both. The by-product is an attribution table: every check
+whose value differs between the default and off is assigned to a side.
+
+### E.0 The two tables (`scripts/build_hold_tables.py`, extended; `--verify` on the local `TYPE_NT_OVERRIDE` cache)
+
+Each table is `flyverse/data/receptors_by_type.csv` with one group of rows set back to the presynaptic prior --
+`fast_sign_abs = NT_SIGN[transmitter]` (glutamate and histamine -1: no +1 flip, no silencing), `fast_gain_class_abs =
+none`, `fast_net_abs = 'held'` -- so the held targets keep NT_SIGN while every other entry of the default stays. The
+side is read off the table's own `superclass` column (optic = `ol_intrinsic` / `ol_sensory`); the 28 synthetic
+`<nt=...>` / `<superclass=...>` rows are in neither side (`receptor_signs` reads them only under `nt_class_fallback`,
+off everywhere here). Only rows that actually differ from the prior are touched, so the diff is minimal and the KC /
+DN1 tables of round 4 are reproduced byte for byte by the extended builder (md5 `95bf26f5c78ec4964fba0d1c1fbfccfd`,
+`3ac8523efb800c6789d6d76c07233cfd`).
+
+Verification against `connectome.receptor_signs(c, table_path=..., net_rule='abs')` on the shipped cache
+(25,578,600 stored entries, sum |W| 121,460,584; `out/r5_attr_verify.log`):
+
+| table | rows held | md5 | entries changed vs `sign(W.data)` | vs the default | changed \|W\| |
+|---|---|---|---|---|---|
+| `flyverse/data/receptors_by_type.csv` (shipped) | -- | `0381a446107e6050e75cc87b16d7f830` | **48,295** | -- | 179,944 |
+| `out/receptors_holdBrain.csv` | 187 (11 glutamate, 176 histamine) | `d902daf5c7efd94cfedaade7a2f135f3` | **44,463** (optic only) | -3,832, 0 new | 171,111 |
+| `out/receptors_holdOptic.csv` | 48 (3 glutamate, 45 histamine) | `c3baf4293f508bb39d2d42f4b87163dc` | **3,832** (Brain only) | -44,463, 0 new | 8,833 |
+| `out/receptors_holdBrainGlu.csv` | 11 (glutamate) | `2e1b53f2026fb077dab06b806aaf2d1f` | 44,586 | -3,709, 0 new | 171,393 |
+| `out/receptors_holdBrainHis.csv` | 176 (histamine) | `6fadd62df4d3e1a4121b9d08310ed565` | 48,172 | -123, 0 new | 179,662 |
+
+44,463 + 3,832 = 48,295 exactly, with no entry changed by both tables and none changed by neither, so the pair is a
+partition of the default's effect. The default's changed entries by postsynaptic superclass reproduce the round-4
+critic's split exactly: `ol_intrinsic` 44,463 entries / 171,111 syn, `cb_intrinsic` 3,720 / 8,571,
+`visual_centrifugal` 65 / 134, `visual_projection` 29 / 81, `descending_neuron` 18 / 47, `ol_sensory` 0. The last two
+tables split the Brain side by transmitter and are used on the CPU in E.4: the Brain side's glutamate rows are
+**exactly** the KC and DN1 groups (3,709 entries / 8,551 syn = 2,834 + 875), so `holdBrainGlu` is round 4's `holdKC`
+and `holdDN1` applied together -- a condition round 4 never ran -- and `holdBrainHis` holds exactly the 123 entries /
+282 syn the round-4 critic was left with.
+
+### E.1 The batch
+
+One batch, six jobs, run dir `/mnt/beegfs/neurome/runs/r5-attr-6aa260`, **6 jobs, 0 failed, 3.4 min**
+(`scripts/r5_attr_batch.sh`, console log `out/r5_attr_cluster.log`); every job rebuilds the two tables in its own run
+copy (`out/` is not shipped; `build_hold_tables.write_atomic` keeps concurrent jobs of one run directory from tearing
+the file -- the in-job md5s equal the local ones) and then runs
+
+    python scripts/benchmark.py --sections rest,taste,smell,walk,bitter,motion --seeds 0,1,2 \
+        --receptor-model sign --receptor-net-rule abs [--receptor-table out/receptors_hold{Brain,Optic}.csv]
+
+`holdBrain` x2, `holdOptic` x2 **plus a `default` and an `off` anchor in the same batch**. The anchors are not
+redundant: the shipped default changed in this round (`anti_runaway.md` "Round 5: GF damping adoption", section D.1
+above), so the round-4 endpoints (`walk.power_max` default 79.47 / off 73.18) were measured under different gains and
+cannot anchor the walk rows. `--receptor-model sign --receptor-net-rule abs` is passed explicitly because
+`--receptor-model default` returns before `--receptor-table` is applied (round-4 verification, `verify:rescore`
+KEY CLAIM 4).
+
+Provenance. `config.device` is `NVIDIA B200` in all 12 JSONs (no CPU fallback). The run copy's `flyverse/brain.py`
+md5 `9caf67b228a211434f8524d8685eed3b` equals the working tree's, i.e. the post-adoption default
+`DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0)]` with the GF x0.3 damping retired; `scripts/benchmark.py`
+md5 `062680bfc24d6060082e05919878872c`; the receptor table `0381a446107e6050e75cc87b16d7f830`. Each arm's JSON header
+records the condition independently of the flag: `fast_sign_changed_entries` 48,295 (default) / 44,463 (holdBrain) /
+3,832 (holdOptic) / `model: null` (off), with the table path.
+
+**A second, identical batch ran by accident** (the launcher was started twice; run dir `r5-attr-05bc30`, same six
+commands, 6 jobs, all exitcode 0). Rather than discard it, it is used as an independent replicate: the fetched
+`out/r5_attr_*.json` are md5-verified against `r5-attr-6aa260` and the second run's JSONs are in
+`out/r5_attr_dup/` (md5-verified against `r5-attr-05bc30`), its per-job logs in `out/r5_attr_dup_cluster.log`. Every
+number below is quoted over **both** run directories: 4 draws per hold arm, 2 per anchor. (The duplicate's
+`cluster_run` console log was overwritten by the second launch and is not recoverable; the per-job logs are.)
+
+### E.2 The attribution table (`scripts/r5_attr_report.py`; `out/r5_attr_table.md`, `out/r5_attr_report.log`)
+
+All draws of both run directories. `holdBrain` applies the optic side only, `holdOptic` the Brain side only.
+
+| check | criterion | default x2 | holdBrain x4 (optic 44,463 only) | holdOptic x4 (Brain 3,832 only) | off x2 | carried by |
+|---|---|---|---|---|---|---|
+| `rest.spikes_per_step` | < 5 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | no difference |
+| `taste.MN9_hz` | > 2 | **10.9342** | **5.8455** | **10.9342** | **5.8455** | **Brain, 100 %** |
+| `smell.PN_hz` | < 100 | 7.8612 | 11.1877 | 7.8612 | 11.1877 | **Brain, 100 %** |
+| `smell.KC_active` | > 0 | **816** | **1426** | **816** | **1426** | **Brain, 100 %** |
+| `walk.GF_max_hz` | < 38 | 4.6292 | 12.5174 | 13.3109 | 4.9641 | neither: both holds 2.5-2.9x *above* both endpoints |
+| `walk.power_max_hz` | < 50 | 48.4805 P | 47.0012 P | 64.9147 **F** | 97.1014 / 95.5416 **F** | optic 103 %, Brain 66 % (non-additive) |
+| `walk.power_sustained_hz` | < 50 | 20.1091 P | 21.3426 P | 33.5072 P | 50.5960 / 49.1802 **F** | optic 96 %, Brain 55 % (non-additive) |
+| `loom.GF_peak_hz` | >= 20 | 43.5929 / 46.4969 | 50.0089 / 50.0089 / 51.2904 / 60.0354 | 31.7754 x3 / 32.0792 | 29.0034 / 27.9926 | optic 130-191 %, Brain 20-22 % |
+| `loom.escape_cm` | notnone | 3.50 | 3.50 | 3.50 | 3.50 | no difference |
+| `rotate.DNp20_flip_hz` | < -2 | -41.8507 / -39.8623 | -26.1967 / -31.5105 / -41.6825 / -42.6848 | -26.3840 / -26.7702 / -29.0932 / -31.4699 | -30.0512 / -30.6196 | not attributable (the holdBrain draws span every condition) |
+| `motion.min_dsi` | >= 0.1 | 0.2411 | 0.2411 x2 / 0.2460 x2 | **0.1863** | **0.1863** | **optic, 100-109 %; Brain exactly 0** |
+| `motion.correct_directions` | == 8 | 8 | 8 | 8 | 8 | no difference |
+| `bitter.calibrated_sugar_MN9_hz` | > 2 | 5.5184 | 4.5659 | 5.5184 | 4.5659 | **Brain, 100 %** |
+| `bitter.calibrated_sugar_bitter_MN9_hz` | < 1 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | no difference |
+| `bitter.shiu_sugar_MN9_hz` | > 50 | **139.8985** | **123.5394** | **139.8985** | **123.5394** | **Brain, 100 %** |
+| `bitter.shiu_sugar_bitter_MN9_hz` | < 10 | 0.8178 | 2.1243 | 0.8178 | 2.1243 | **Brain, 100 %** |
+
+Percentages are `(hold - off) / (default - off)` on the condition means. Subset tallies over these 16 checks (**not**
+the 29-check suite): default 16 PASS, `holdBrain` 16 PASS, `holdOptic` 15 PASS / 1 FAIL (`walk.power_max` 64.91),
+off 14 PASS / 2 FAIL in the primary run dir; 15 / 1 in the duplicate run dir and in the skeptic's (walk.power_sustained 49.18 and 49.61 PASS there; only walk.power_max fails in 3 of 3: 97.10 / 95.54 / 96.46).
+
+**Scatter.** Nine of the sixteen checks are bit-identical across all 12 draws within their condition, so the
+100 %-Brain and 0 %-Brain attributions carry no scatter at all: `taste.MN9` 10.9342 in 4 of 4 `holdOptic` draws and
+5.8455 in 4 of 4 `holdBrain` draws; likewise `smell.PN_hz`, `smell.KC_active`, both calibrated-sugar checks, both Shiu
+checks, `motion.min_dsi` under `holdOptic` / off, and the three `walk.*` values (`sec_walk` and `sec_motion` draw no
+RNG). The endpoints also reproduce the existing corpus exactly: taste 10.9342 / 5.8455, `KC_active` 816 / 1426, PN
+7.8612 / 11.1877, Shiu 139.8985 / 123.5394 and calibrated 5.5184 / 4.5659 are the round-4 values (11 default / 7 off
+draws there), and the default's `walk.power_max` 48.4805, `power_sustained` 20.1091 and `GF_max` 4.6292 are round 4's
+`no_gf_damping` and round 5's `r5_adopt_default` values (13/13 draws). The two checks that scatter --
+`loom.GF_peak_hz` (spread 10.0 Hz within `holdBrain`) and `rotate.DNp20_flip_hz` (16.5 Hz within `holdBrain`) -- are
+the two that round 4's verification already flagged as scattering; `rotate.DNp20` is therefore not attributed here,
+and `loom.GF_peak` is attributed only as a direction (the four `holdOptic` draws, 31.78-32.08, sit 3.4 Hz above off's
+28.0-29.0 while the four `holdBrain` draws, 50.0-60.0, sit 5-15 Hz *above* the default's 43.6-46.5).
+
+**The answers to the seven questions asked.**
+
+1. `taste.MN9` 5.85 -> 10.93: **the Brain side, all of it.** The 3,832 Brain-side entries alone give 10.9342 in 4 of 4
+   draws; the 44,463 optic-side entries alone give 5.8455 in 4 of 4. The fan-in hypothesis is dead (E.3).
+2. `smell.KC_active` 1426 -> 816 and `smell.PN_hz` 11.19 -> 7.86: **the Brain side, all of it** (816 / 7.8612 under
+   `holdOptic` x4, 1426 / 11.1877 under `holdBrain` x4). This also explains round 4's puzzle -- `holdKC` 1155 and
+   `holdDN1` 1109 both sat between 816 and 1426 because each held only part of one side.
+3. Shiu sugar 123.54 -> 139.90 (and sugar+bitter 2.12 -> 0.82, calibrated 4.57 -> 5.52): **the Brain side, all of it.**
+   Round 4's "DN1 carries 65 % of Shiu" is a statement about one group inside that side.
+4. `walk.power_max` and `walk.power_sustained`: **both sides, non-additively.** Under the shipped gains off now FAILS
+   at 95.54-97.10 and 49.18-50.60; the optic side alone recovers 103 % / 96 % of the way to the default and the Brain
+   side alone 66 % / 55 %, summing to 169 % / 151 %. `holdOptic` is the one arm here that fails a check the default
+   passes.
+5. `loom.GF_peak`: **mostly the optic side** (123-179 % of the gap over three run dirs, overshooting the default; Brain-only 22-41 %) with a small Brain-side
+   contribution (20-22 %).
+6. `motion.min_dsi` 0.1863 -> 0.2411: **the optic side, all of it.** The Brain side moves it by exactly 0.0000 (0.1863
+   bit-identical in 4 of 4 `holdOptic` draws and 2 of 2 off draws) -- as it must, since T4/T5 direction selectivity is
+   built from `ol_intrinsic` input.
+7. `walk.GF_max`: **neither side, and not monotone.** Default 4.6292 and off 4.9641 are 0.33 Hz apart, but *either*
+   half of the receptor signs on its own puts the walking giant-fibre maximum at 12.52 (optic only) or 13.31 Hz
+   (Brain only) -- 2.5-2.9x both endpoints, 22-25x the default-off difference, bit-identical in 4 of 4 draws each. The
+   two sides' effects on the GF drive cancel; any partial application of the receptor signs breaks that cancellation.
+
+### E.3 The fan-in hypothesis, tested directly (`scripts/build_hold_tables.py --fanin`, CPU; `out/r5_fanin.log`, `out/r5_fanin.json`, `out/r5_fanin_types.csv`)
+
+The hypothesis was that the optic-side entries reach the Brain-only sections through
+`Brain.__init__`'s fan-in normalisation, `tot = abs(shaped W).sum(axis=1)`,
+`input_scale = clip((input_norm_ref / max(tot, 1)) ** input_norm_alpha, 0.02, 1.0)` (shipped `LIFParams`:
+`input_norm_alpha` 1.0, `input_norm_ref` 5,000, `conn_cap` 60). Two facts kill it.
+
+**(a) A sign flip cannot move a fan-in sum at all.** `brain._shaped_weights` sets
+`W.data = abs(W.data) * receptor.fast_factor(gain)` and `_receptor_gain` is `None` under `receptor_model='sign'`, so
+`|W.data|` is `|W_raw|` times `|fast_sign| in {0, 1}`: only an entry silenced to `fast_sign = 0` changes a row sum. Of
+the default's 48,295 changed entries the 30,916 glutamate flips are weight-preserving and only the 17,379 histamine
+silencings can move anything. Measured (sum of `tot` over the 166,383 cells with non-zero fan-in): off
+115,282,448 -> default 115,198,976, a drop of 83,473 (int64; the float32 row-sum arithmetic cannot resolve single synapses) = the silenced |W|, of which the optic side accounts for 83,192
+(`holdBrain` 115,199,256) and the Brain side for 280 (`holdOptic` 115,282,168); the two add to the whole exactly.
+
+**(b) The optic side moves the row sums of 10,411 cells and the `input_scale` of none of them.** Because the scale is
+clipped at 1.0 and every cell whose row sum the optic side moves has `tot < input_norm_ref = 5,000`, its scale is
+1.000000 before and after. Across the whole graph the scale moves on **7 of 166,383 cells** under the default -- and
+all 7 are Brain-side: `holdOptic` (Brain entries only) reproduces all 7, `holdBrain` (optic entries only) reproduces
+**0**.
+
+| cell | superclass | silenced input entries | `tot` off -> default | `input_scale` off -> default |
+|---|---|---|---|---|
+| 10011 OA-AL2i1 | visual_centrifugal | 1 | 11,003 -> 11,002 | 0.454422 -> 0.454463 |
+| 10110 OA-VUMa1 | cb_intrinsic | 1 | 8,551 -> 8,550 | 0.584727 -> 0.584795 |
+| 10269 OA-AL2i2 | visual_centrifugal | 1 | 6,022 -> 6,021 | 0.830289 -> 0.830427 |
+| 10447 DNge138 | descending_neuron | 3 | 5,819 -> 5,809 | 0.859254 -> 0.860733 |
+| 10898 AVLP476 | cb_intrinsic | 1 | 6,889 -> 6,885 | 0.725795 -> 0.726216 |
+| 11466 DNge149 | descending_neuron | 4 | 5,918 -> 5,900 | 0.844880 -> **0.847458** (+0.31 %, the largest move in the graph) |
+| 12151 DNge138 | descending_neuron | 2 | 5,017 -> 5,013 | 0.996612 -> 0.997407 |
+
+**And nothing in the taste pathway moves.** Taking `sec_taste`'s own populations (sweet labellar-bristle / taste-peg
+GRNs, their postsynaptic partners, MN9, MN9's presynaptic partners):
+
+| population | cells | input entries | changed entries (default) | of those, Brain-side | cells whose `input_scale` moves |
+|---|---|---|---|---|---|
+| driven sweet GRNs | 144 | 4,067 | 0 | 0 | 0 |
+| sweet second order | 1,220 | 275,076 | 13 (20 syn) | 13 | 0 |
+| MN9 | 2 | 415 | **0** | 0 | **0** (`tot` 1,727.55 and scale 1.000000 in all four conditions) |
+| MN9's presynaptic partners | 350 | 121,587 | 4 (18 syn) | 4 | 1 (DNge149, +0.0026) |
+
+So the hypothesis is refuted twice over: the side it named moves zero fan-in scales, and MN9's own fan-in is
+bit-identical under all four tables while its rate doubles. **`taste.MN9` 5.85 -> 10.93 is not a fan-in-normalisation
+effect; it is carried by the Brain side's 3,832 sign changes as a dynamical effect.**
+
+### E.4 Which Brain-side entries, then? A double dissociation on the CPU (`scripts/r5_attr_taste_cpu.py`; `out/r5_attr_taste_cpu.log`, `.json`)
+
+`sec_taste` and `sec_smell` build `brain.Brain` on the whole connectome with no optic lobe and no rate freeze, so they
+run in 13 s on this desktop's CPU and more hold tables can be afforded than one cluster batch allows. The Brain side's
+3,832 entries split cleanly by transmitter: the **3,709 glutamate flips are exactly the KC and DN1 groups** (2,834 +
+875; 8,551 syn) and the other **123 are histamine silencings** (282 syn) -- so `holdBrainGlu` is round 4's `holdKC`
+and `holdDN1` held *together*, which round 4 never ran, and `holdBrainHis` holds exactly the residual the round-4
+critic was left with. Both protocols verbatim (sweet labellar-bristle / taste-peg GRNs at 100 Hz for 600 ms; the apple
+plume at the benchmark's coordinates for 800 ms), three brain seeds, `device='cpu'`:
+
+| condition | entries applied | `taste.MN9_hz` per seed 0 / 1 / 2 | `smell.KC_active` | `smell.PN_hz` |
+|---|---|---|---|---|
+| off | 0 | 1.554839 / 4.341760 / 2.309808 | 1079 / 427 / 1178 | 11.5126 / 2.4370 / 4.9003 |
+| default | 48,295 | 5.090923 / 4.315772 / 2.360074 | 486 / 412 / 543 | 3.6941 / 2.9017 / 4.2780 |
+| `holdBrain` (optic 44,463 only) | 44,463 | **= off, every digit** | **= off** | **= off** |
+| `holdOptic` (Brain 3,832 only) | 3,832 | **= default, every digit** | **= default** | **= default** |
+| `holdBrainGlu` (holds KC+DN1; leaves the 123 silencings + optic) | 44,586 | **= default** | **= off** | **= off** |
+| `holdBrainHis` (holds the 123; leaves KC+DN1 + optic) | 48,172 | **= off** | **= default** | **= default** |
+| `holdKC` | 45,461 | = default | 1225 / 464 / 1006 | 9.9661 / 2.9307 / 8.1874 |
+| `holdDN1` | 47,420 | = default | 525 / 433 / 540 | 3.9050 / 2.4012 / 4.2898 |
+
+The dissociation is exact, in both directions, at all three seeds (`MN9_hz`, `GNG175_hz` and `frac_active` compared
+together for taste; `PN_hz`, `KC_hz` and `KC_active` for smell):
+
+* **`taste.MN9` depends on the 123 Brain-side histamine silencings and on nothing else in the receptor model.** Holding
+  the 44,463 optic entries, the 2,834 KC flips, the 875 DN1 flips or all 3,709 glutamate flips together leaves every
+  taste number bit-identical to the *default*; holding the 123 silencings alone makes them bit-identical to *off*.
+  Round 4's "neither KC nor DN1 carries taste" is confirmed and completed: the carrier is the group the round-4 critic
+  dismissed -- "the taste doubling cannot be carried by those 282 synapses of visual histamine silencing under any
+  drive" is **refuted**; those 282 synapses are the whole of it. Their targets are 62 entries onto OA-AL2i3, 25 onto
+  TmY14, 5 DNge138, 4 each onto s-LNv / DNge150 / VP5+Z_adPN / DNge149, 3 OA-VUMa2 and 12 single entries (AVLP476,
+  DNg104, OA-AL2i1 / 2 / 4, OA-VUMa1, OA-VPM4, DNge152 x2, DNg34 x2, PPM1202), presynaptically R8p / R8_unclear / R8y /
+  HBeyelet: photoreceptor and eyelet histamine onto octopaminergic (OA-AL2i, OA-VUMa, OA-VPM4) and gnathal descending
+  (DNge138 / DNge149 / DNge150) cells, six of whose types are in the sugar -> MN9 pathway.
+* **`smell.KC_active` / `PN_hz` depend on the 3,709 KC + DN1 glutamate flips and on nothing else** -- the mirror image
+  (`holdBrainGlu` = off, `holdBrainHis` = default, both bit-exact). Within that group the KC flips carry most of it
+  (`holdKC` 1225 / 464 / 1006, near off's 1079 / 427 / 1178) and the DN1 flips little (`holdDN1` 525 / 433 / 540, near
+  the default's 486 / 412 / 543), and the two are not additive -- which is why round 4's single holds both landed
+  between 816 and 1426 on the GPU.
+
+Caveat on magnitudes. CPU Poisson draws are not the CUDA ones, so these absolute rates are not the suite's: the CPU
+default-minus-off difference in `MN9_hz` is +1.19 Hz on the mean of three seeds and -0.03 Hz at seed 1, against the
+GPU's bit-stable +5.09 Hz (10.9342 vs 5.8455 in 4 of 4 `holdOptic` / `holdBrain` draws here and in 11 / 7 draws in
+round 4). What the CPU measures is not the size of the effect but **which entries the section's dynamics depend on at
+all**, and that it measures exactly: bit-identity in both directions at three seeds, reproduced by an independent
+rerun of the four deciding conditions at seed 0 (`out/r5_attr_taste_cpu_rerun.log`: off 1.5548 / 1079, default
+5.0909 / 486, `holdBrainGlu` 5.0909 / 1079, `holdBrainHis` 1.5548 / 486 -- every digit of the first run). The 2-job
+GPU confirmation is owed and cheap -- `benchmark.py --sections taste,smell,bitter --seeds 0,1,2 --receptor-model sign --receptor-net-rule
+abs --receptor-table out/receptors_hold{BrainGlu,BrainHis}.csv` -- and would also settle which subgroup carries Shiu
+sugar, which this section did not run (round 4: `holdDN1` 129.27 against the 123.54 -> 139.90 range, i.e. DN1 carries
+65 % of Shiu and KC none, so Shiu's carrier is not taste's).
+
+### E.5 Two things the batch settles in passing
+
+**Off with the GF damping retired** -- listed as open in D.3 item (3) -- for these six sections: `walk.power_max`
+97.1014 / 95.5416 **FAIL** and `walk.power_sustained` 50.5960 / 49.1802 **FAIL**, against the shipped default's
+48.4805 / 20.1091 PASS. The retirement and the receptor model therefore interact strongly and in opposite directions on
+that check: with the damping in force the default was 6.3 Hz *worse* than off (79.47 vs 73.18, both FAIL, round 4);
+with it retired the default is **47.8 Hz better** than off (48.48 PASS vs 96.32 FAIL). Round 4's "the receptor default
+does not repair `walk.power_max`" is a statement about the pre-retirement gains only, and its "6.3 Hz worse than off"
+should not be carried forward without that condition. Two draws, six sections, no full-suite tally.
+
+**The Shiu arm needs no fan-in argument at all.** `sec_bitter`'s `shiu` setting is
+`LIFParams(adapt_jump=0, conn_cap=0, same_type_gain=1, input_norm_alpha=0, path_gain=[], type_path_gain=[])` and
+`Brain.__init__` applies the fan-in normalisation only `if p.input_norm_alpha > 0`, so that arm runs with **no fan-in
+normalisation in the model**; `bitter.shiu_sugar_MN9_hz` nevertheless moves 123.5394 -> 139.8985 and is 100 %
+Brain-side in 4 of 4 draws. That is a second, code-level refutation of the fan-in hypothesis, independent of E.3.
+
+### E.6 What this settles and what it leaves open
+
+Settled.
+
+1. **The fan-in-normalisation hypothesis is dead.** A sign flip cannot move a fan-in sum (only the 17,379 histamine
+   silencings can, by 83,473 (int64; the float32 row-sum arithmetic cannot resolve single synapses) |W| in total), the optic side moves 10,411 row sums and **zero** `input_scale` values
+   (every affected cell sits below `input_norm_ref` = 5,000, where the scale is clipped at 1.0), the scale moves on 7
+   of 166,383 cells in the whole graph and all 7 moves are Brain-side, the largest is +0.31 %, MN9's own fan-in is
+   bit-identical under all four tables, and the Shiu arm has the normalisation switched off entirely.
+2. **Every check that separates the default from off is attributed to a side** (E.2): taste, both smell checks and all
+   three sugar checks to the Brain side (100 %, bit-exact); `motion.min_dsi` to the optic side (100 %, the Brain side
+   moving it by exactly 0); `loom.GF_peak` mostly optic (123-179 % vs 22-41 % over three run dirs); `walk.power_max` / `power_sustained` to
+   both sides non-additively (103 % + 66 %, 96 % + 55 %); `walk.GF_max` to neither -- the two sides cancel there and
+   either half alone raises the walking GF maximum 2.5-2.9x.
+3. **Round-4 item 2 is closed positively** (E.4, CPU): the taste rise is the 123 Brain-side histamine silencings (282
+   synapses onto octopaminergic and gnathal descending cells), the smell change is the 3,709 KC / DN1 glutamate flips,
+   and neither group touches the other's section -- a double dissociation, bit-exact in both directions at three
+   seeds. Round 4 could not see it because both of its holds were inside the glutamate group.
+
+Open.
+
+1. The E.4 subgroup split is CPU-measured; the 2-job GPU confirmation (`holdBrainGlu` / `holdBrainHis` on
+   `taste,smell,bitter`) is owed, and with it the subgroup that carries Shiu sugar.
+2. `walk.GF_max`'s non-monotonicity (4.63 default / 12.52 optic-only / 13.31 Brain-only / 4.96 off) is the
+   walking-GF tail the room take-off cost rides on (D.2). Nothing here explains why the two sides cancel; it is the
+   same kind of regime boundary round 4 found in the LPi scan, and it says a *partial* receptor model is worse for the
+   giant fibre than either endpoint.
+3. `rotate.DNp20_flip_hz` cannot be attributed at this sample size (the four `holdBrain` draws span -26.20 to -42.68,
+   wider than the default-to-off contrast).
+4. Why photoreceptor / eyelet histamine onto OA-AL2i3, OA-VUMa and the DNge14x cells doubles the sugar-driven MN9 rate
+   is a dynamics question (an octopaminergic gain on the gustatory motor pathway), not a receptor-data one -- the
+   silencings are two-source calls and stand.
+
+Files: `scripts/build_hold_tables.py` (the `Brain` / `Optic` / `BrainGlu` / `BrainHis` groups, `--verify`, `--fanin`),
+`scripts/r5_attr_batch.sh`, `scripts/r5_attr_report.py`, `scripts/r5_attr_taste_cpu.py`;
+`out/receptors_hold{Brain,Optic,BrainGlu,BrainHis}.csv`, `out/r5_attr_verify.log`,
+`out/r5_attr_{default_1,holdBrain_1,holdBrain_2,holdOptic_1,holdOptic_2,off_1}.{json,txt}` (run dir
+`r5-attr-6aa260`) and `out/r5_attr_dup/*.json` (run dir `r5-attr-05bc30`), `out/r5_attr_cluster.log`, `out/r5_attr_dup_cluster.log`,
+`out/r5_attr_table.md`, `out/r5_attr_report.log`, `out/r5_fanin.{log,json}`, `out/r5_fanin_types.csv`,
+`out/r5_attr_taste_cpu.{log,json}`, `out/r5_attr_taste_cpu_rerun.log`. Every table re-derives with the same md5 in two
+runs (including round 4's `holdKC` / `holdDN1`), the `--fanin` log is identical between two runs, and the test suite is
+80 passed / 29 skipped / 200 subtests after the builder change.
+
+### Corrections (closing-round verification)
+
+* Attribution (E.*): the CPU double dissociation establishes what taste DEPENDS on (the 123 Brain-side histamine
+  silencings, 282 synapses onto OA-AL2i3, TmY14, DNge138/149/150, ...), not the SIZE of the GPU's +5.09 Hz rise: the
+  CPU default-minus-off is +3.54 / -0.03 / +0.05 Hz at seeds 0 / 1 / 2, and -1.44 / +0.18 / -5.65 with
+  input_norm_alpha = 0. The fan-in refutation's decisive test is the skeptic's alpha = 0 taste run
+  (`scripts/skeptic_attr_fanin_test.py`, out/sk_attr_fanin.log: the dissociation survives bit-exactly with the
+  normalisation off); the Shiu alpha = 0 argument does not transfer to taste because Shiu's carrier is DN1, not
+  taste's. "Brain side" = postsynaptic superclass outside the optic lobe: 94 of the 123 silenced entries land on
+  visual centrifugal / projection cells. The 2-job GPU confirmation of holdBrainGlu / holdBrainHis on taste, smell,
+  bitter is still owed (tables exist).
+* Instrument (R5.*): the pre-retirement seed-0 voluntary rate is 2.92 per 1,000 fly-s (14 / 4,800), the escape rate
+  2.08; section-to-section scatter of the 150 s hops section at identical settings is a factor ~2.7 (7 vs 17 hops,
+  3 vs 6), so any verdict on the voluntary entry needs >= 3 draws; the "non-stationary rate" worry is not supported
+  (launches start at 20 s, 8 of 17 in the first 75 s).
+* Adoption (D.*): the hops section's "PASS (gap closed)" for the shipped default was one low draw (3 hops); a rerun
+  gives 6 = 1 + 5 -> 2.08 KNOWN GAP. `retire_measures.py` now has a `gf_damped` configuration that restores the
+  damping, so its `no_gf_damping` ablation is no longer a no-op against the baseline.

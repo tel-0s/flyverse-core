@@ -541,3 +541,216 @@ baseline and was not run as a separate configuration; the x4 column of the scan 
   `off` silently scored the previous model after the round-4 benchmark fix: now `default` (LIFParams' own) with `off`
   = None explicitly.
 * The three round-4 "replicates" replicate GPU nondeterminism only for walk.* (`sec_walk` draws no RNG).
+
+## Round 5: GF damping adoption
+
+Round 4's verdict on the GF input damping ("retire it ... adopt it alone, with a suite run, as section 2 prescribes -- and
+not in the same change as anything below") is executed here: the `(SAD073|GNG300|DNp70|CL367|PVLP010 -> DNp01, 0.3)` entry
+is removed from `brain.DEFAULT_TYPE_PATH_GAIN`, and the edited default is scored on the suite (x3) and on the room
+take-off protocol (3 brain RNGs x 16 flies x 5 min, live escape route) against the pre-retirement default and off.
+**Decision: the retirement is kept.** Both halves of the criterion hold -- no check worse in status than the
+pre-retirement default in 3/3 and `walk.power_max` PASS in 3/3 (27 / 0 / 2 x3, 48.48 Hz against the 50 Hz bound) -- and
+the take-off rates are not worse in either route (escape 1.67 vs 2.15, voluntary 2.22 vs 3.06 per 1,000 fly-s; the
+one-sided p that the edited default hops *more* is 0.77 / 0.95). The excess over off (measured under the damped gains) shrinks by a point estimate inside rerun scatter, 27-32 % but does not go
+away: 56 vs 75 hops in 14,400 fly-s (two-sided p 0.087), still 6.2x off's 9 (p 1.7e-07). Nothing else in `flyverse/`
+changed; `pair_gain_lpi_x2` and the AL LN override were not touched (the rule is one measure at a time).
+
+### What changed in the code (`flyverse/brain.py` lines 221-233; nothing else in `flyverse/`)
+
+`DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0)]` -- the loom gain alone. The previous two-entry list is kept
+as `brain.GF_DAMPED_TYPE_PATH_GAIN`, so `LIFParams(type_path_gain=brain.GF_DAMPED_TYPE_PATH_GAIN)` is the round-3 / round-4
+default, and `scripts/retire_measures.py`'s configurations keep a meaning relative to the new default: `baseline` and
+`no_gf_damping` (`[LOOM_GF]`, line 244) are now the same weights as the shipped default, `gf_damping_dnp70` (line 245) is
+the default plus a x0.3 on DNp70 -> DNp01 alone, and the pre-retirement default is reachable only through
+`GF_DAMPED_TYPE_PATH_GAIN` (`retire_measures.py` was not edited; its `GF_DAMP` constant, line 61, still names the entry, and
+a "restore the damping" configuration would be `{"type_path_gain": brain.GF_DAMPED_TYPE_PATH_GAIN}`). `scripts/cx_wedge.py`,
+`cx_wedge_verify.py`, `benchmark.py` (config header) and `retire_measures.py` read `brain.DEFAULT_TYPE_PATH_GAIN` by name
+and follow the change; the compass scripts extend the list, so their ring gains are unaffected.
+
+Structure on the local adopted cache (`scripts/r5_adopt_structure.py` -> `out/r5_adopt_structure.json`, `.log`; CPU):
+
+| quantity | value |
+|---|---|
+| entries that differ, new default vs previous default | 21, all onto DNp01, previous / new ratio 0.3 exactly (float32 0.30000001) |
+| by presynaptic type (edges; shaped \|W\| new / previous, i.e. after the 60-synapse cap) | SAD073 gaba 8; 480 / 144 -- CL367 gaba 4; 240 / 72 -- DNp70 acetylcholine 4; 240 / 72 -- GNG300 gaba 3; 123 / 36.9 -- PVLP010 glutamate 2; 120 / 36 |
+| shaped \|W\| restored onto DNp01 | 1,203 - 361 = 842, of which inhibitory 963 - 289 = 674 (the round-4 "4,315 \|W\| / 2,899 inhibitory" are the raw pre-cap synapse counts; most of the 21 edges sit at the 60-synapse cap, so the shaped change is smaller than the raw one) |
+| DNp01 shaped input, new / previous | 1,455 edges both; \|W\| 83,046 / 82,204; inhibitory \|W\| 9,289 (11.19 %) / 8,615 (10.48 %) |
+| md5 of `_shaped_weights` (sorted CSR data + indices + indptr) | new default `0e30e4a80cb607d4a168d1b08ebd6a40`; `type_path_gain=GF_DAMPED_TYPE_PATH_GAIN` `f0d145d1bb81b446ebc51f89ded7bd4b` = the round-3 pinned hash of the previous default, byte for byte; `receptor_model=None` `fcb5bec2a6c492196a622e31cdb24fc6` (new gains) / `2e276b30b6117c1f62688b01775eda6b` (previous gains = the pre-round-3 pin) |
+| the receptor lookup's part | none: it matches 0 of DNp01's 1,455 input edges (round 4), so `sign` vs `None` differs by the same 48,295 entries under either list, and the 21 entries differ identically under `None` |
+
+Tests (`tests/test_receptor_model.py`, class `CachedConnectomeTests`): `test_default_type_gains_have_no_gf_damping` (no
+entry onto DNp01 with a factor below 1, none of the five types matches any entry, the two lists are exactly the ones above)
+and `test_gf_damped_type_gains_reproduce_the_previous_weights` (the two defaults differ on exactly 21 entries, all onto
+DNp01 from those five types, by the factor 0.3; on the adopted cache the previous list reproduces `f0d145d1...` and, with
+`receptor_model=None`, `2e276b30...`); the round-3 hash test now pins the new default's pair (`0e30e4a8...` /
+`fcb5bec2...`) and the same 48,295 / 30,916 / 17,379 sign-vs-None counts. `python -m pytest tests/ -q` on the CPU
+(`CUDA_VISIBLE_DEVICES=""`): 80 passed, 29 skipped, 200 subtests (40.9 s).
+
+### The batch (`scripts/r5_adopt_batch.sh`; run dir `/mnt/beegfs/neurome/runs/r5-adopt-fb3608`)
+
+One cluster call, 7 jobs, 0 failed, 49.0 min wall (`out/r5_adopt_cluster.log`), submitted 2026-09-12 10:33 UTC while the
+instrument task's 14-job batch `r5-hops-218d81` (submitted 10:25) was running on the same node. `cluster_run.py` ships the
+working-tree diff, so the jobs ran the edited `brain.py` (line 221 of the run directory's copy read over ssh before the jobs
+started) with the round-5 instrument files. Headers read back from every job: the suite jobs `receptor model sign (abs;
+flag --receptor-model default); fast sign changed on 48,295 of 25,578,600 entries`, NVIDIA B200; the room jobs
+`BatchSim B=16 neurons=167,106 device=cuda`, `escape at GF >= 33 Hz`. Jobs 0-2: `benchmark.py --seeds 0,1,2` (no flags) ->
+`out/r5_adopt_default_{1,2,3}.json` (418 / 418 / 430 s; `config.type_path_gain` = the one-entry list). Jobs 3-5:
+`batch_sustain.py --batch 16 --minutes 5 --energy 0.9 --program cx --fruit apple --fence --cuda-graphs --cuda-kernels
+--event-driven --cuda-sparse torch --seed k --seeds <16k..16k+15>`, k = 0, 1, 2 -> `out/r5_adopt_sustain_live_{1,2,3}.json`
+(2,890 / 2,901 / 2,898 s). Job 6: `benchmark.py --sections hops` -> `out/r5_adopt_hops.json` (1,759 s). The comparison arms
+were not re-run: the pre-retirement room arm is the instrument batch's `out/r5_sustain_default_live_{1,2,3}.json` (the
+identical command and seeds under the previous list) and its off arm `out/r5_sustain_off_live_{1,2,3}.json`; the
+pre-retirement suite runs are round 4's `out/r4_default_{1,2,3}.json`; the `hops` section of the previous default / off is
+`out/r5_hops_default.json` / `out/r5_hops_off.json`. Tables: `scripts/r5_adopt_report.py` -> `out/r5_adopt_report.log`,
+`.json` (CPU; the suite half alone in `out/r5_adopt_report_suite.log`).
+
+### The suite: edited default x3 vs the pre-retirement default x3 vs off x3
+
+| check | criterion | edited default x3 (`r5_adopt_default`) | pre-retirement default x3 (`r4_default`) | off x3 (`r4_off`) | r4 `no_gf_damping` x3 |
+|---|---|---|---|---|---|
+| **walk.power_max_hz** | < 50 | **48.48 P / 48.48 P / 48.48 P** | 79.47 F x3 | 73.18 F x3 | 48.48 P x3 |
+| walk.power_sustained_hz | < 50 | 20.11 x3 | 37.89 x3 | 31.44 / 31.58 / 31.44 | 20.11 x3 |
+| walk.GF_max_hz | < 38 | 4.63 x3 | 4.61 x3 | 4.63 x3 | 4.63 x3 |
+| walk_gf.p99_hz | < 38 | 15.81 / 20.50 / 19.76 | 22.28 / 18.31 / 20.35 | 22.52 / 23.59 / 17.81 | 24.79 / 20.22 / 25.02 |
+| loom.GF_peak_hz | >= 20 | 47.22 x3 | 50.38 / 50.38 / 50.86 | 40.13 / 38.16 / 40.83 | 47.22 x3 |
+| loom_escape.GF_peak_hz | >= 33 | 48.01 / 59.70 / 45.42 | 49.39 / 49.92 / 52.95 | 32.26 F / 34.47 / 33.95 | 47.39 / 49.61 / 48.85 |
+| loom_escape.escapes | >= 1 | 3 x3 | 3 x3 | 0 F / 1 / 1 | 3 x3 |
+| motion.min_dsi | >= 0.1 | 0.246 / 0.246 / 0.241 | 0.233 x3 | 0.168-0.172 | 0.241 x3 |
+| rotate.DNp20_flip_hz | < -2 | -36.56 / -32.21 / -35.71 | -32.24 / -34.04 / -31.90 | -16.89 / -32.09 / -27.55 | -35.38 / -32.49 / -34.91 |
+| rotation.group_flip_hz | <= -3 | -10.17 / -9.46 / -9.25 | -9.61 / -10.18 / -10.39 | -7.15 / -7.08 / -7.06 | -9.75 / -9.19 / -9.89 |
+| odour.apple_channel_clean_hz | <= 6 | 4.43 / 4.34 / 4.27 | 4.28 / 4.63 / 4.47 | 4.42 / 4.36 / 4.36 | 4.50 / 4.35 / 4.33 |
+| taste.MN9 / smell.PN / smell.KC_active | > 2 / < 100 / > 0 | 10.93 / 7.86 / 816 x3 | same | 5.85 / 11.19 / 1426 | same as edited |
+| bitter shiu_sugar / shiu_sugar_bitter / calibrated_sugar | > 50 / < 10 / > 2 | 139.90 / 0.82 / 5.52 x3 | same | 123.54 / 2.12 / 4.57 | same as edited |
+| rest, dn.*, loom.escape_cm, motion.correct_directions, wind.*, odour.apple_8cm, calibrated_sugar_bitter | | all PASS, inside the round-4 ranges | | | |
+| object.LC10a_flip_hz, compass.wedge_cells_persisting | gap | KNOWN GAP x3 | KNOWN GAP x3 | KNOWN GAP x3 | KNOWN GAP x3 |
+| **pass / fail / known gap** | | **27 / 0 / 2 x3** | 26 / 1 / 2 x3 | 24/3/2, 26/1/2, 26/1/2 | 27 / 0 / 2 x3 |
+
+**Criterion (a), no check worse in status than the pre-retirement default in 3/3: holds** -- the list of (check, run)
+pairs where an edited-default status ranks below any pre-retirement status is empty; the one status change is
+`walk.power_max` FAIL -> PASS in 3/3. **Criterion (b), `walk.power_max` PASS in 3/3: holds**, 48.48052978515625 in all
+three -- bit-identical to the ten round-4 `no_gf_damping` draws (14/14 now), against a bound of 50 and a largest observed
+baseline walk-section excursion of 0.63 Hz (round-4 corrections). The walk / smell / taste / Shiu values are bit-identical
+to the round-4 `no_gf_damping` runs (`walk.GF_max` 4.629162311553955, `power_sustained` 20.109053071339925, taste
+10.93417739868164, KC 816, PN 7.861156463623047, Shiu 139.89849777221679): the edited default is the configuration round 4
+measured, reached through `brain.py` instead of `retire_measures.py`. Smallest PASS margins (min over the three runs):
+`motion.min_dsi` 0.141, `bitter.calibrated_sugar_bitter` 1.00 Hz, `walk.power_max` 1.519 Hz, `odour.apple_channel_clean`
+1.571 Hz, `loom_escape.escapes` 2. Value shifts vs the pre-retirement default beyond the replicate scatter: `walk.power_max`
+-30.98 Hz, `walk.power_sustained` -17.78 Hz, `loom.GF_peak` 50.4-50.9 -> 47.22 (the round-4 default's own full-suite draws
+span 46.80-54.27), `motion.min_dsi` 0.233 -> 0.241-0.246; everything else inside the round-4 ranges (`loom_escape.GF_peak`
+45.4-59.7 vs 49.4-52.9; `walk_gf.p99` 15.8-20.5 vs 18.3-22.3).
+
+### Take-offs: edited default vs the pre-retirement default vs off (live escape route, 3 brain RNGs x 16 flies x 300 s)
+
+Per batch (brain seed 0 / 1 / 2, environment seeds 0-15 / 16-31 / 32-47), hops = escape + voluntary; the per-fly vectors
+are in `out/r5_adopt_report.log`.
+
+| arm | batch 1 | batch 2 | batch 3 | pooled 48 flies, 14,400 fly-s | per 1,000 fly-s all / escape / voluntary | walking-GF median (rows >= 33 Hz) |
+|---|---|---|---|---|---|---|
+| edited default (`r5_adopt_sustain_live`) | 19 = 7 + 12 | 21 = 11 + 10 | 16 = 6 + 10 | **56 = 24 + 32** | **3.89 / 1.67 / 2.22** | 31.90 Hz (19/48); per batch 31.15 / 33.32 / 31.22 |
+| pre-retirement default (`r5_sustain_default_live`) | 25 = 12 + 13 | 25 = 11 + 14 | 25 = 8 + 17 | 75 = 31 + 44 | 5.21 / 2.15 / 3.06 | 32.25 Hz (22/48); 32.96 / 32.82 / 31.16 |
+| off (`r5_sustain_off_live`) | 3 = 3 + 0 | 4 = 4 + 0 | 2 = 2 + 0 | 9 = 9 + 0 | 0.63 / 0.63 / 0.00 | 27.20 Hz (8/48); 27.22 / 26.83 / 27.99 |
+| round-4 pre-retirement default (`r4_sustain_default`, no split) | 21 | 26 | 27 | 74 | 5.14 | -- |
+
+Mann-Whitney over flies (asymptotic; counts are tied so no exact p), pooled 48 v 48, with both one-sided alternatives:
+
+| contrast | metric | U | p two-sided | p(edited < other) | p(edited > other) |
+|---|---|---|---|---|---|
+| edited vs pre-retirement | hops | 926.0 | 0.087 | 0.044 | 0.957 |
+| | escape | 1064.0 | 0.47 | 0.23 | 0.77 |
+| | voluntary | 942.0 | 0.099 | 0.049 | 0.951 |
+| | walking-GF max per row | 934.0 | 0.11 | 0.056 | 0.945 |
+| edited vs off | hops | 1786.5 | 1.7e-07 | 1 | 8.3e-08 |
+| | escape | 1423.0 | 0.012 | 0.994 | 0.0058 |
+| | voluntary | 1656.0 | 3.2e-07 | 1 | 1.6e-07 |
+| | walking-GF max per row | 1846.0 | 3.7e-07 | 1 | 1.9e-07 |
+| pre-retirement vs off (the instrument task's contrast, for reference) | hops | 1974.0 | 6.6e-11 | -- | -- |
+
+Per batch, edited vs pre-retirement (seed-matched): hops 19 / 21 / 16 vs 25 / 25 / 25 (two-sided p 0.29 / 0.53 / 0.20,
+lower in 3 of 3); voluntary 12 / 10 / 10 vs 13 / 14 / 17 (p 0.76 / 0.45 / 0.13, lower in 3 of 3); escape 7 / 11 / 6 vs
+12 / 11 / 8 (p 0.43 / 0.90 / 0.53, lower in 2 of 3, equal in 1); walking-GF median 31.15 / 33.32 / 31.22 vs 32.96 / 32.82 /
+31.16 (rows at the threshold 6 / 9 / 4 vs 8 / 8 / 6 of 16). Edited vs off per batch: hops p 2.7e-04 / 4.1e-03 / 1.4e-02,
+voluntary 12 / 10 / 10 vs 0 / 0 / 0 (p 1.6e-03 / 1.6e-03 / 1.8e-02), escape 7 / 11 / 6 vs 3 / 4 / 2 (p 0.23 / 0.047 / 0.33).
+Meals / energy / path are not the question here; for the record, edited default meals 3 / 2 / 3 vs pre-retirement 1 / 2 / 0
+vs off 1 / 5 / 4.
+
+**Reading.** (1) The take-off rates are **not worse** than the pre-retirement default's in either route: every point
+estimate is lower (all 0.75x, escape 0.77x, voluntary 0.73x) and the one-sided "edited hops more" p is 0.77 (escape) /
+0.95 (voluntary) / 0.96 (all). (2) The excess **shrinks but survives**: of the pre-retirement excess over off (4.58 per
+1,000 fly-s all; 1.53 escape; 3.06 voluntary) the retirement removes roughly a quarter to a half (point estimates 29 % / 32 % / 27 %, which move to 41 / 50 / 36 % when the shipped default's identical-seed rerun is substituted) -- 56 vs 75 hops, lower in 3 of 3
+batches, two-sided p 0.087 (one-sided 0.044); against off the edited default is still 6.2x (56 vs 9, p 1.7e-07), takes off
+by the voluntary route 32 times where off does 0, and its walking-GF tail (median 31.9 vs 27.2 Hz, 19/48 vs 8/48 rows at
+the 33 Hz escape threshold, p 3.7e-07) is barely moved from the pre-retirement 32.25 Hz / 22/48 (p 0.11). Restoring the
+842 shaped |W| of inhibition onto DNp01 therefore lowers the walking wing-power peak by 31 Hz in `sec_walk` but takes
+only about a quarter of the room take-off excess with it: the link the round-4 critic wanted tested ("whether restoring
+inhibition onto DNp01 lowers the walking-GF tail that fires the 33 Hz escape") is weak -- the GF tail is a property of
+the receptor default's drive onto the GF that the five damped inputs do not control, and the voluntary route (wing power
+>= 50 Hz held 0.3 s, a different readout from `walk.power_max`'s per-frame MN mean) stays 2.2 per 1,000 fly-s. (3) The
+seed-0 reproduction of round 4 holds for the pre-retirement arm (25 hops here vs 21 / 17 / 24 in the three round-4
+seed-0 draws; off 3 vs 1 / 0 / 2), so the two batches are comparable; the round-4 room runs give the same picture against
+the edited default (56 vs 74, U 969, p 0.17; `out/r5_adopt_vs_r4_sustain.log`).
+
+### The `hops` section on the edited default (one draw each; `out/r5_adopt_hops.json`, `r5_hops_default.json`, `r5_hops_off.json`)
+
+16 flies x 150 s = 2,400 fly-s, brain seed 0, environment seeds 0-15, scored against the bounds in `benchmark.py` at run
+time (`Ref(0.0, "<", 1.0, gap)` voluntary, `Ref(0.5, "<", 10.0)` escape, `Ref(28.0, "<", 33.0, gap)` GF median):
+
+| arm | hops | voluntary per 1,000 fly-s | escape per 1,000 fly-s | walking-GF median | section tally |
+|---|---|---|---|---|---|
+| edited default | 3 = 2 escape + 1 voluntary | 0.42 PASS (gap closed) | 0.83 PASS | 29.27 PASS (gap closed) | 3 / 0 / 0 |
+| pre-retirement default | 7 = 4 + 3 | 1.25 KNOWN GAP | 1.67 PASS | 30.11 PASS (gap closed) | 2 / 0 / 1 |
+| off | 1 = 1 + 0 | 0.00 PASS (gap closed) | 0.42 PASS | 25.74 PASS (gap closed) | 3 / 0 / 0 |
+
+The edited default's "PASS (gap closed)" on the voluntary entry is a single 2,400 fly-s draw and **must not be read as the
+gap closing**: the 300-s room batches above put its voluntary rate at 2.22 per 1,000 fly-s (32 in 14,400), 2.2x the
+bound, and a section at that rate expects 5.3 voluntary hops, not 1 (Poisson P(X <= 1) = 0.031). The same shortfall
+appears in the pre-retirement draw (7 hops observed against 12.5 expected from its room rate, P(X <= 7) = 0.070;
+voluntary 3 vs 7.3, P = 0.066), while off's 1 vs 1.5 is unremarkable -- so either both draws are low by chance (joint
+probability ~1e-3) or the take-off rate is not stationary over the 300 s and the section's first 150 s (energy 0.9 ->
+~0.1; the flies reach energy 0 at 150-180 s) under-samples the 300-s room rate. That is a question for the section's
+owner (the instrument task's R5.4 references are derived from the 300-s off batches); it does not affect the decision here,
+which rests on the room batches. Launch times in the three draws: edited 51.6 s (voluntary), 106.9, 121.9 (escape);
+pre-retirement 13.4, 74.0, 79.0, 88.6, 102.3, 136.0, 149.1 s; off 125.2 s.
+
+### Per measure: the GF input damping is retired
+
+* **GF input damping x0.3 (five inputs, `LIFParams.type_path_gain`) -- retired; the retirement is kept.** It clears the
+  rule of this document (a replacement -- here, nothing -- that passes in 3/3 with a status margin): 27 / 0 / 2 in 3/3
+  on the shipped code path, `walk.power_max` 48.4805 in 14/14 draws over three batches (+1.52 Hz against a 50 Hz bound
+  and a largest observed baseline excursion of 0.63 Hz), no check worse in status, and the additional condition set for
+  this adoption -- the room take-off rates not worse than the pre-retirement default's -- holds in both routes with the
+  point estimates a quarter to a half lower, inside rerun scatter. Costs on record, unchanged from round 4: `loom.GF_peak` 50.4-50.9 -> 47.2 and
+  `loom_escape.GF_peak` 49-53 -> 45-60 (3 escapes in 3/3; bounds 20 / 33). What the adoption does **not** buy: the room
+  take-off excess of the receptor default stays (3.89 vs off's 0.63 per 1,000 fly-s; voluntary 2.22 vs 0), and the
+  `hops` section's voluntary entry stays a KNOWN GAP in substance even where a 2,400 fly-s draw passes it.
+* The other two verdicts of round 4 stand: LPi x4 cannot be retired (x2 not adopted -- and `no_gf_damping +
+  pair_gain_lpi_x2` remains untested, now as "default + pair_gain_lpi_x2"); the AL LN override cannot be retired. The
+  `walk.power_max` bound stays at the hand-set 50 Hz (its note: 22 Hz at DN -> VNC x3, 50 at x6); the round-4 critic
+  asked for that to be decided before anything is tuned to sit under it -- this adoption is a removal, not a tuning,
+  and the check's value did not move between round 4 and here, so the bound question is left where it was.
+
+### Caveats
+
+(1) The pre-retirement and off room arms were run by the instrument task's batch, 8 min earlier on the same node with the
+same command and seeds; the only difference between `r5_sustain_default_live_k` and `r5_adopt_sustain_live_k` is the
+`brain.py` line (verified in both run directories), but the room JSONs record `receptor` and not `type_path_gain`, so
+the arm labels rest on the run directories, not on the files. (2) The batched rollout is not deterministic (round 4:
+17-24 hops in identical-seed reruns of the pre-retirement seed-0 batch, 0-2 for off), so the 19-hop difference (56 vs 75)
+is ~2-3 rerun scatters wide and its two-sided p is 0.087; "shrinks by about a quarter" is a point estimate with that
+uncertainty, and "not worse" is the robust statement. (3) Three room replicates per arm and one `hops` draw per arm; the
+`hops` section's stationarity question above is open. (4) The suite's `walk.*` values are bit-reproducible here (3/3 and
+14/14 across scripts), but round 4 showed the baseline's walk section can move by 0.63 Hz between draws, so the
+`walk.power_max` margin is 1.52 Hz against that, not against zero.
+
+### Corrections (closing-round verification)
+
+* The shipped default's room take-off count at identical seeds scatters 19 -> 11 (7+12 -> 3+8) between two runs of the
+  same command (U 182.5, p2 0.029), a larger separation than the retirement contrast itself (p2 0.087); the
+  load-bearing statements are "not worse in either route" and "still 6.2x off (voluntary 32 vs 0)".
+* The off arm used for the "excess" denominator carries the damping (it predates the retirement); off with the damping
+  retired was run on six Brain-only sections only: walk.power_max 95.5-97.1 FAIL 3/3, walk.power_sustained 50.60 FAIL /
+  49.18 PASS / 49.61 PASS. Under the shipped gains the receptor model is therefore ~48 Hz better than off on
+  walk.power_max, where under the damped gains it was 6.3 Hz worse.
+* The round-4 LPi scan (x1 / x2 / x3 / x4) and the AL LN verdict were measured under the damped gains only and must
+  be re-scanned under the shipped default before "x2 is the only passing point" is quoted again.
+* `retire_measures.py`: `baseline` and `no_gf_damping` are now the same weights; the new `gf_damped` configuration
+  restores the damping for future ablations.

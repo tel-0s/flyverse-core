@@ -218,11 +218,18 @@ def _slow_spec(p: LIFParams) -> SlowSpec | None:
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
 # synapses; without it the AL's PN <-> cholinergic-LN loop runs at 300 Hz). Elsewhere depression is off
 # because it blocks descending commands.
-DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0),
-                          # the central-brain inputs that fire the GF during ordinary walking / feeding in
-                          # this model (input-weighted: SAD073, GNG300, DNp70, CL367, PVLP010) are damped;
-                          # the animal's GF is notoriously hard to fire except by looms and mechanical shocks
-                          (r"^(SAD073|GNG300|DNp70|CL367|PVLP010)$", r"^DNp01$", 0.3)]
+DEFAULT_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0)]     # loom escape margin (with the x2 pathway gain: x6 in total)
+
+# The default until receptor round 5 (docs/audits/anti_runaway.md "Round 5: GF damping adoption"): the central-brain inputs
+# that fired the GF during ordinary walking / feeding in this model (input-weighted: SAD073, GNG300, DNp70, CL367,
+# PVLP010) were damped x0.3 on the argument that the animal's GF is hard to fire except by looms and mechanical shocks.
+# Four of the five are inhibitory (SAD073 / GNG300 / CL367 GABA, PVLP010 glutamate; 2,899 of the 4,315 |W|), so the
+# damping removed inhibition from DNp01; its ablation turned walk.power_max 79.47 FAIL into 48.48 PASS in 10/10 draws
+# (round 4) and it was retired in round 5.  Kept as a named list so LIFParams(type_path_gain=GF_DAMPED_TYPE_PATH_GAIN)
+# reproduces the previous weights byte for byte (tests/test_receptor_model.py) and scripts/retire_measures.py's
+# no_gf_damping / gf_damping_dnp70 configurations keep their meaning relative to it.
+GF_DAMPED_TYPE_PATH_GAIN = [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0),
+                            (r"^(SAD073|GNG300|DNp70|CL367|PVLP010)$", r"^DNp01$", 0.3)]
 
 DEFAULT_PATH_GAIN = [(r"^descending_neuron$", r"^vnc_", 3.0),          # benchmarked: specific, ipsilateral leg drive, no storms
                      (r"^visual_projection$", r"^descending_neuron$", 2.0)]   # LC4/LPLC2 -> GF etc.: loom escape margin (x3 re-ignites the AVLP network)

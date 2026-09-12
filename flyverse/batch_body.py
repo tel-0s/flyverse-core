@@ -46,6 +46,12 @@ class BatchBody:
         self.surfaces = BatchSurfaces(surfaces)
         self.fence = fence  # (x0,x1,y0,y1,z), or None for full surface physics
         self.feeding = np.zeros(self.B,dtype=bool)
+        # Launch-route bookkeeping, read-only for the dynamics: cumulative take-offs per row by the GF escape route
+        # (gf >= gf_threshold after the landing refractory) and by the voluntary route (wing power >= takeoff_power_hz
+        # held for takeoff_hold_s), and the same split for the most recent step. Every airborne transition step()
+        # produces is one of the two, so hops_escape + hops_voluntary equals the count of false->true airborne edges.
+        self.hops_escape = np.zeros(self.B,dtype=np.int64); self.hops_voluntary = np.zeros(self.B,dtype=np.int64)
+        self.launched_escape = np.zeros(self.B,dtype=bool); self.launched_voluntary = np.zeros(self.B,dtype=bool)
 
     def readout(self, motor, dt_s):
         # Scalar MotorRates.row promotes float32 neural samples to Python doubles.
@@ -81,6 +87,8 @@ class BatchBody:
         hold = np.where(~airborne&~escape,np.where(power>=attr(self.flights,"takeoff_power_hz"),hold+dt_s,0.),hold)
         voluntary = ~airborne&~escape&(hold>=attr(self.flights,"takeoff_hold_s"))
         launch = escape|voluntary
+        self.launched_escape[:],self.launched_voluntary[:] = escape,voluntary
+        self.hops_escape += escape; self.hops_voluntary += voluntary
         for i in np.flatnonzero(~airborne):
             self.flies[i].ground_time = float(ground_time[i])
             self.flights[i]._power_hold = 0. if voluntary[i] else float(hold[i])

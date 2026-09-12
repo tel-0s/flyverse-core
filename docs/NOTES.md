@@ -1115,7 +1115,8 @@ odour gate), a soft cap 120(1-exp(-n/120)) breaks nothing; same-type damping x0.
 removed but KC rates rise 2.9 -> 12 Hz and loom GF doubles, and the per-type list passes only without margin; fan-in
 scaling is needed (walking GF p99 58 Hz without it), (5000/total)^0.5 passes; AL depression is needed (odour gate 92 Hz
 without it); DN -> VNC x3 breaks nothing when removed but the DN motor maps collapse 4x; **the GF x0.3 input damping
-breaks nothing when removed** and four of its five targets are inhibitory, so it goes. Adoptions are one at a time
+breaks nothing when removed** and four of its five targets are inhibitory, so it goes (retracted in round 3 of the receptor
+integration, reinstated in round 4 under the corrected benchmark, adopted in round 5 -- see session 10). Adoptions are one at a time
 with a suite run each (`all_replacements` together breaks walking GF p99).
 
 **Three bugs found by the study, fixed here**: (1) `brain._shaped_weights` with `conn_cap 0` aliased the shared
@@ -1281,6 +1282,50 @@ dopamine signs -- parked; neither KC nor DN1 flips carry the taste rise (fan-in 
 one causal reading; no decision reversed. The receptor data are exhausted -- six sources, 25.7 % of the weight
 decided, the object-pathway types unprofiled everywhere, the ring inert -- so after the closing round the thread
 hands over to the dynamics questions.
+
+## Session 10: receptor-expression integration, round 5 (closed)
+
+The closing round (7 agents; Opus skeptics) built the take-off instrument, adopted the GF-damping retirement and
+settled the attribution. The plan is closed; `docs/NT_INTEGRATION.md` section 7 carries the outcome and the handover.
+
+**The default model now.** Synapse signs from the presynaptic transmitter, corrected per postsynaptic type by the
+receptor-expression table where six transcriptomic sources decide it (`receptor_model 'sign'` / `abs`, 48,295 entries =
+0.15 % of the weight; `None` restores the presynaptic rule byte for byte); the GF x0.3 input damping retired
+(`DEFAULT_TYPE_PATH_GAIN` keeps LC4/LPLC2 -> DNp01 x3; `GF_DAMPED_TYPE_PATH_GAIN` restores it); `TYPE_NT_OVERRIDE`
+for TmY14 / Mi19 / aMe8. Four weight md5s pinned in the tests. Suite 27/0/2 in 4 of 4 draws (walk.power_max 48.5 Hz
+against the hand-set 50 Hz bound, in 14/14 draws) -- the tally gain is the retirement's, and the two changes
+interact: off with the damping retired fails walk.power_max at 95-97 Hz, so under the shipped gains the receptor
+model is ~48 Hz better than off on that check where under the damped gains it was 6 Hz worse.
+
+**The take-off cost is now scored and split.** Every hop in the batched room records its route; `benchmark.py
+--sections hops` (opt-in) scores voluntary and escape rates and the walking-GF median. Shipped default 56 = 24
+escape + 32 voluntary vs pre-retirement 75 = 31 + 44 vs presynaptic model 9 = 9 + 0 over 14,400 fly-s each; off
+never takes off voluntarily (0 in 28,800 fly-s). The retirement is not worse in either route and trims the excess
+by a quarter to a half (inside rerun scatter: the same seed gives 19 hops in one run and 11 in another), but the
+excess over off survives at 6x with an unmoved walking-GF tail (median 31.9 vs 27.2 Hz; 19/48 vs 8/48 flies at the
+33 Hz escape threshold). The shipped default's voluntary entry is a KNOWN GAP in substance. Neither the KC / DN1
+holds (round 4) nor the DNp01 inhibition (round 5) accounts for it, and walk.GF_max shows the two halves of the
+receptor signs cancel (either half alone raises the walking GF 2.5-2.9x) -- a dynamics question the sustain / RL
+work inherits, with the room hold pair as the first experiment.
+
+**Attribution closed.** Taste, smell and the sugar checks are Brain-side (bit-exact in three run dirs), direction
+selectivity optic, the legacy loom mostly optic, walk.power_max both sides non-additively; fan-in normalisation is
+refuted (the dissociation survives with the normalisation off); the CPU double dissociation names 123 histamine
+silencings (282 synapses onto OA-AL2i3 / TmY14 / DNge14x) as what taste depends on and the 3,709 KC + DN1 glutamate
+flips as what smell depends on -- dependence, not magnitude.
+
+**Verification:** instrument mostly sound (its PENDING sections were filled from the landed batch; two of its three
+reference values re-derived; a gap-style entry that could never fail made a plain check), adoption sound (a "gap
+closed" reading was one low draw), attribution mostly sound (a PASS reported as FAIL; float32 counts; the decisive
+alpha = 0 test was the skeptic's). No decision reversed. The session-9 "GF damping goes" is now adopted, on evidence
+that survived a retraction and a reinstatement.
+
+**Handover.** The receptor data are exhausted (six sources, 26 % of the weight decided; PEN, GLNO, PFL3, hDelta, the
+object-pathway types, DNp04 / LPT unprofiled everywhere; the ring inert; 95 of 99 unknown-NT types unreachable). The
+threads that continue are dynamics: compass with senses / PEN L-R / PFL3 readout from the GLNO-sign-robust operating
+points; medulla -> lobula small-field wiring; a feeding-capable metabolism; the walk.power_max bound (re-derive its
+referent under the shipped gains before tuning anything to sit under it); the take-off cost. First commands for each
+are in the round-5 verification record. No round 6 of receptor work.
 
 ## Batched brains and the RL environment
 

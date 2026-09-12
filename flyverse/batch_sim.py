@@ -131,6 +131,16 @@ class BatchSim:
     @property
     def feeding(self): return self.body.feeding
 
+    @property
+    def hops_escape(self):
+        """Per-row count of take-offs by the GF escape route (batch_body.BatchBody.hops_escape); not part of the checkpoint."""
+        return self.body.hops_escape
+
+    @property
+    def hops_voluntary(self):
+        """Per-row count of take-offs by the voluntary wing-power route (batch_body.BatchBody.hops_voluntary)."""
+        return self.body.hops_voluntary
+
     def _rows(self, rows):
         if rows is None: return np.arange(self.B)
         rows = np.atleast_1d(np.asarray(rows))
@@ -236,6 +246,8 @@ class BatchSim:
             self.gatings[i] = programs.EscapeGating() if self._gating_initial[i] is not None else None
             _load_program(self.gatings[i],self._gating_initial[i])
         self.body.feeding[selected] = False; self.tasting[selected] = 0.
+        self.body.hops_escape[selected] = 0; self.body.hops_voluntary[selected] = 0
+        self.body.launched_escape[selected] = False; self.body.launched_voluntary[selected] = False
         self.episode_frames[selected] = 0; self.loom_t[selected] = -1.
         self.world.move_sphere(self.loom_idx,(9,9,9),(.03,)*3,rows=selected)
         self._program_pulses.clear()
