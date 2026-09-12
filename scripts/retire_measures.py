@@ -48,11 +48,13 @@ import subprocess
 import sys
 import time
 
+
 import numpy as np
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from flyverse import brain  # noqa: E402
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 DN_VNC = (r"^descending_neuron$", r"^vnc_", 3.0)

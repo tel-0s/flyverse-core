@@ -153,9 +153,14 @@ names), the rate model makes sign flips cheap to score, and both open model defi
    PEN (21.9 % unknown input), ExR, ring neurons, Kenyon cells and DANs (assay 7, hunger), the
    octopaminergic visual-centrifugal cells (17.6 % silenced output; arousal / flight modulation of
    the optic lobe). Lower confidence, flagged as such.
-8. **Retire stop-gaps that the data replaces.** Each of `DEFAULT_PAIR_GAIN`, the GF-input
-   damping, and the AL LN override is re-tested with the receptor model on; anything the data
-   reproduces is removed from the defaults (the anti-runaway retirement audit gives the procedure).
+8. **Retire stop-gaps that the data replaces.** Each of `DEFAULT_PAIR_GAIN` and the AL LN override
+   is re-tested with the receptor model on; anything the data reproduces is removed from the
+   defaults (the anti-runaway retirement audit gives the procedure). The GF-input damping was the
+   third item here and is **done**: retired in round 5 (`DEFAULT_TYPE_PATH_GAIN` keeps only
+   LC4 / LPLC2 -> DNp01 x3; `GF_DAMPED_TYPE_PATH_GAIN` restores it), so it is no longer a stop-gap
+   to re-test. Of what remains, dynamics round 1 found `DEFAULT_PAIR_GAIN[4]` a literal no-op
+   (retirable now), `DEFAULT_PAIR_GAIN[1]` data-contradicted but load-bearing (re-labelled, not
+   retired), and both the LPi x4 and drive-clip decisions blocked on the `walk.power_max` bound.
 
 Deliverables: `flyverse/data/receptors_by_type.csv`, `flyverse/data/nt_by_type_transcriptome.csv`,
 `flyverse/data/type_map.csv`, `scripts/build_type_map.py`, `scripts/build_receptor_table.py`,
@@ -377,16 +382,66 @@ contested-flip table (48,295 entries = 0.148 % of |W|; `None` restores the presy
 (the round-3/4 default), receptor None on the shipped gains fcb5bec2, None on the damped gains 2e276b30
 (pre-round-3) -- all pinned in `tests/test_receptor_model.py`. Suite 27/0/2 (walk.power_max 48.5 vs a hand-set 50 Hz
 bound); costs: KC_active 816 vs 1426, and the room take-off excess (voluntary 2.2 + escape 1.7 vs 0 + 0.6 per 1,000
-fly-s), which neither the KC / DN1 holds nor the DNp01 inhibition accounts for.
+fly-s), which neither the KC / DN1 holds nor the DNp01 inhibition accounts for. **Dynamics round 1 (2026-09-12)
+changed no default**: `git diff -- flyverse/` is empty at 305f507, and every gain it used -- the compass gE / gD
+operating points, the GLNO=gaba relabel, the feeding drain scales -- was an experiment override, stated as such in
+its own audit. The weight md5s above therefore still describe the shipped model.
 
-**Handover (the receptor data are exhausted: six sources, 26 % of |W| decided; PEN / GLNO / PFL3 / hDelta / Tm5Y /
-TmY21 / LC11 / DNp04 / LPT unprofiled everywhere; the ring inert; 95 of 99 unknown-NT types unreachable).** The
-closing critic's list, each with its first command, is in `docs/audits/receptor_verification.md` (round 5,
-"Handover"): (1) compass with senses / PEN L-R shift / PFN -> hDelta -> PFL3 readout, from the GLNO-sign-robust
-operating points (gE 2 / gD 15, 2.25 / 25, 2.5 / 25; the receptor default is irrelevant on the ring); (2) medulla ->
-lobula small-field wiring / dynamics, re-establishing the object-sweep null under the shipped gains first; (3) a
-feeding-capable metabolism (the present drain empties a 0.9 tank by t = 170-180 s; meals cannot rank models);
-(4) the walk.power_max bound (hand-set, two-regime, non-monotone in every scan; re-derive its referent under the
-shipped gains before anything else is tuned to sit under it; re-scan LPi x2 and the AL LN override there); (5) the
-take-off cost, inherited by the sustain / RL work (the room hold pair -- Brain-side vs optic-side signs -- is the
-first experiment). Do not start a round 6 of receptor work.
+**Handover, updated after dynamics round 1 (2026-09-12)** (the receptor data are exhausted: six sources, 26 % of
+|W| decided; PEN / GLNO / PFL3 / hDelta / Tm5Y / TmY21 / LC11 / DNp04 / LPT unprofiled everywhere; the ring inert;
+95 of 99 unknown-NT types unreachable). The round-5 list, each item with its first command, is in
+`docs/audits/receptor_verification.md` (round 5, "Handover"); five threads ran it, and none of them moved a
+default. Where each item now stands:
+
+1. **Compass -- measured, and negative.** The bump survives full senses at all three GLNO-sign-robust operating
+   points (gE 2 / gD 15, 2.25 / 25, 2.5 / 25): 38.0 s in 192/192 flies over 12 gain runs at 219-261 Hz, against a
+   shipped control that dies within 0.1 s. It does **not** track heading (|circ corr(centre, heading)| <= 0.11),
+   does **not** steer (yaw first harmonic 0.3-1.2 deg/s), and leaves PFN at 0.6-0.8 Hz and hDelta at 1.5-1.9 Hz,
+   so **PFN -> hDelta -> PFL3 is answered NO**; the bump is pinned to 5-7 attractor sites out of 16 wedges. PEN
+   has no signed rotation input in MaleCNS (GLNO is silent, fully contralateral and efference-fed; LNO / SpsP
+   make 0-13 synapses onto PEN), and relabelling GLNO GABA gives an **elastic** +0.30 against +0.04 wedge L-only
+   deflection (6/6 seeds, p 0.031). Visual rotation at 90 deg/s moves the bump 0.00 +- 0.01 w/s against a 4.0 w/s
+   ideal. Next: the efferent rotation route (R2-1), which the rig never tested. `out/cxroom_orig/`, `out/cxvfy/`,
+   `out/verify_cx_shift_shift.md`, `out/vcx_*_s345.json`; `docs/audits/compass_room.md`, `cx_shift.md` (both
+   still stubs; R2-0 fills them from data that already landed).
+2. **Object -- the stage is named.** The figure is lost by ON/OFF cancellation at T2 / T3 / Tm5Y / TmY21 and then
+   by l1 pooling at LC10 / LC11 (LC11 +0.046 mV, LC10a +0.080 against LPLC2's +0.54 and a 7 mV criterion). No
+   hand-crafted optic measure sits on those edges and none of 16 ablations moves it; the LPLC2 object null under
+   the shipped gains is now z +1.2 (rank-sum p 0.07) against round 3's +5.4, because the null rose, not the ball
+   arm. `gain_fb = 0` is the deterministic null (small-field single-cell signal T2 0.066 against Mi4 0.047,
+   reproduced to 0.000e+00 on an independent cluster run), and the stage pipeline is **not** reproducible at
+   fixed seed, so every per-type z is +-1.5. The levers left are physiology parameters (slow GABA-B on T2 / T3,
+   a per-type output normalisation at the LC cells), not data. `out/optic_audit/`, `out/optic_verify/`;
+   `docs/audits/optic_measures.md`.
+3. **Feeding -- cannot rank models, and the reason is not the metabolism.** Neither horizon nor drain makes meals
+   countable: `meals` is identically equal to `contacts` in 12/12 runs, 0.13-0.50 per fly, p 0.4-0.8 everywhere.
+   Starvation is not the limit. The closest-approach separation the audit proposed as a replacement **did not
+   replicate** (5 of 6 runs, sign test p 0.22) and its negative tail is airborne; the drain's direction on
+   food-finding is unresolved. The mechanism is the **terminal approach of the `cx` program** (plume Gaussian
+   downwind only, no concentration-change rule, 81 % of flies ending upwind of the apple, closest approach
+   2.3-7.2 cm against a 3.8 cm capture radius). `body.py` was untouched and stays so. `out/feedh_*.json`,
+   `out/skfeed_*.json`; `docs/audits/feeding_horizon.md`.
+4. **`walk.power_max` -- STILL OWED**, and now blocking three verdicts (LPi x4, the drive clip, the AL LN
+   override). It fails under 13 of 16 optic ablations (51.5-198.8 Hz), is non-monotone in `gain_out`
+   (80 / 100 / 120 = 63.8 / 48.5 / 51.7) and **anti-correlates** with the room take-off rate across the four hold
+   arms, so it is not a take-off predictor and nothing may be tuned to it. `scripts/retire_measures.py:245`
+   references `brain` without importing it, so handover item 4's own first command cannot run until its owner
+   adds the import. `out/optic_audit/`; `docs/audits/optic_measures.md`, `anti_runaway.md`.
+5. **Take-off -- optic-side.** Over 4 matched batches (19,200 fly-s per arm) the optic side of the receptor signs
+   (44,463 medulla entries) carries **most** of the cost -- 75 % of the hop excess, 83 % voluntary, 95 % of the
+   GF-median shift, having read 92-106 % on three batches -- and the Brain side (3,832 entries) **none** of it.
+   The two halves do not cancel in the room as they do in `walk.GF_max`, so the pinned walk section is not a
+   proxy; off with the damping retired is the same denominator as off with it (0.486 vs 0.625 per 1,000 fly-s;
+   0 voluntary take-offs in 52,800 fly-s over 11 batches); and 0 of the 48,295 changed entries land on the
+   take-off pathway. Unresolved: the escape route alone (p 0.09 over 4 batches) and dose. Next: `holdOpticHis` /
+   `holdOpticGlu` with a dose control, all arms in one submission (R2-3). `out/d1_*.json`, `out/sk_d1_*_4.json`;
+   `docs/audits/receptor_integration.md` G.5.
+6. **Optic stop-gaps -- one re-labelled, one candidate for retirement.** `DEFAULT_PAIR_GAIN[1]`
+   (Tm4 / Tm9 / CT1 / TmY15 -> T5 x5) is data-contradicted: 78,877 of its 101,619 edges are Tm4 / Tm9 -> T5
+   **acetylcholine** against 22,742 GABA, so it is a drive gain on T5's main excitation, not delayed inhibition.
+   It is load-bearing (loom 29-36 Hz, T5 DSI 0.15 without it) and stays, **re-labelled and documented as a
+   stop-gap**. `OpticParams.drive_clip_mv = 35` is a retirement candidate (11/11 checks without it) pending 3
+   independent draws, and `DEFAULT_PAIR_GAIN[4]` is a literal no-op that can go now. `out/optic_audit/`;
+   `docs/audits/optic_measures.md`.
+
+Do not start a round 6 of receptor work.

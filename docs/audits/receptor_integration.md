@@ -1897,3 +1897,269 @@ runs (including round 4's `holdKC` / `holdDN1`), the `--fanin` log is identical 
 * Adoption (D.*): the hops section's "PASS (gap closed)" for the shipped default was one low draw (3 hops); a rerun
   gives 6 = 1 + 5 -> 2.08 KNOWN GAP. `retire_measures.py` now has a `gf_damped` configuration that restores the
   damping, so its `no_gf_damping` ablation is no longer a no-op against the baseline.
+
+## Dynamics round 1: the room hold pair
+
+The receptor plan closed with one cost unaccounted for: the shipped default takes off in the room 3.889 times per
+1,000 fly-s against off's 0.625 (voluntary 2.222 vs 0.000, escape 1.667 vs 0.625; walking-GF median 31.90 vs 27.20 Hz,
+19/48 vs 8/48 rows at the 33 Hz escape threshold), and neither the KC / DN1-clock holds nor the DNp01 inhibition
+accounts for it (`receptor_verification.md` round 5, Handover item 5). Two things were wrong with that statement as
+evidence: the off arm on record was run under the **damped** gains (`brain.py` md5 `5f04ee4e...` in run dir
+`r5-hops-218d81`), so the room contrast crossed a default change; and the one attribution result that bears on
+take-offs -- `walk.GF_max` in the pinned walk section, where **either half of the receptor signs alone raises the
+walking GF 2.5-2.9x while both together cancel** -- was never checked in the room. This section runs the hold pair
+in the room and adds the missing denominator (off under the shipped gains). It is a dynamics measurement on the
+shipped default: no gain override anywhere, `LIFParams` untouched except for the receptor table the hold arms select.
+
+**Result: the optic side carries most of the room take-off cost and the walking-GF tail (75-100 % of the hop excess
+over four matched batches); the Brain side carries none of it; the halves do not cancel in the room as they do in
+`walk.GF_max`; and off with the damping retired is the same denominator as off with it (0.486 vs 0.625 per 1,000
+fly-s, 0 voluntary take-offs in both).** The asymmetry is the honest headline: *the Brain side carries none of it* is
+a tight, replicated bound, *the optic side carries most of it* the matching weak one (G.5).
+
+### G.0 What the two tables change, and what they do not touch (CPU, read-only; `out/d1_hold_structure.log`, `out/d1_hold_weights.log`)
+
+The tables are round 5's, rebuilt byte for byte by `scripts/build_hold_tables.py --groups Brain,Optic`
+(`out/receptors_holdBrain.csv` md5 `d902daf5c7efd94cfedaade7a2f135f3`, 187 rows held; `out/receptors_holdOptic.csv`
+`c3baf4293f508bb39d2d42f4b87163dc`, 48 rows held), both locally and inside the run directory. `holdBrain` holds the
+Brain-side rows at the presynaptic prior, so the **optic-side signs act alone**; `holdOptic` holds the optic-side rows,
+so the **Brain-side signs act alone**. Against `sign(W.data)` on the shipped cache (25,578,600 stored entries, sum |W|
+121,460,584; `--verify` in job 0 and the same counts locally):
+
+| arm | entries changed | changed \|W\| | flips -1 -> +1 | silencings -1 -> 0 | `_shaped_weights` md5 |
+|---|---|---|---|---|---|
+| shipped default (both sides) | 48,295 | 179,944 | 30,916 (96,471) | 17,379 (83,473) | `0e30e4a80cb607d4a168d1b08ebd6a40` |
+| `holdBrain` = optic side alone | 44,463 | 171,111 | 27,207 (87,920) | 17,256 (83,191) | `022894e72a0a702ceb6e0c9ccad48df1` |
+| `holdOptic` = Brain side alone | 3,832 | 8,833 | 3,709 (8,551) | 123 (282) | `40fd50c7aa887a62dca585ebaca3c0dd` |
+| off (`receptor_model=None`) | 0 | 0 | -- | -- | `fcb5bec2a6c492196a622e31cdb24fc6` |
+
+44,463 + 3,832 = 48,295 with **0 entries changed by both tables and 0 by neither** -- the pair is an exact partition of
+the default's effect, verified on the shaped weights as well as on the signs (the two `None` / default md5s are the
+values pinned in `tests/test_receptor_model.py`). Where the changes land: the optic side is the medulla, entirely
+`ol_intrinsic` -- T1 21,157 entries / 62,361 \|W\|, Dm9 5,981 / 25,467, Mi15 2,507 / 20,666, Mi4 1,818 / 20,024, Mi1
+1,601 / 13,013, Dm2 2,643 / 12,682, Mi9 1,841 / 5,946, then L4 / C3 / L5 / Tm29 / T2 (presynaptically Dm6, R8y,
+R8_unclear, R8p, Dm19, Dm8a/b). The Brain side is the mushroom body and the clock -- KCg-m 2,137 / 3,906, DN1pB 277 /
+1,535, DN1pA 395 / 1,100, DN1a 203 / 898, KCa'b'-ap2 371 / 498, KCg-s1 68 / 273, KCa'b'-ap1 216 / 272, OA-AL2i3 62 /
+131, TmY14 25 / 63 (presynaptically MBON05 1,123 entries / 2,752 \|W\|, MBON01, MBON03, LHMB1, MBON30, SLP\*).
+
+**Neither side changes a single entry on the take-off pathway.** Counting input entries of the cells the two routes run
+through: DNp01 (the giant fibre) 1,455 input entries, **0 changed**; MN9 415, 0; LC4 63,315, 0; LPLC2 102,690, 0; and 0
+on each of the five formerly damped inputs (DNp70 3,196, SAD073 2,258, GNG300 1,573, CL367 1,461, PVLP010 3,299). The
+most motor-adjacent changes in the whole default are 18 descending-neuron silencings worth 47 \|W\| -- DNge149 (4
+entries), DNge138 (5), DNge150 (4), DNge152 (2), DNg34 (2), DNg104 (1), all `-1 -> 0` from IN27X004 / AN27X004 /
+AN27X008 / GNG043 -- and they sit on the **Brain** side, i.e. in the arm that turns out to carry nothing. So whatever
+the room cost is, it is not a sign change on the take-off pathway; it is an upstream state change.
+
+### G.1 The batch
+
+One cluster batch, 9 jobs, 0 failed, 92.0 min wall (run dir `<cluster-fs>/neurome/runs/d1-hold-8ed117`; launcher
+`out/d1_hold_batch.sh`, console log `out/d1_hold_cluster.log`, per-job logs `out/d1_hold_joblogs/`). Each job:
+
+    python scripts/build_hold_tables.py --groups Brain,Optic [--verify] &&
+    python scripts/batch_sustain.py --batch 16 --minutes 5 --energy 0.9 --program cx --fruit apple --fence \
+        --cuda-graphs --cuda-kernels --event-driven --cuda-sparse torch \
+        [--receptor-model sign --receptor-net-rule abs --receptor-table out/receptors_hold{Brain,Optic}.csv | --receptor-model off] \
+        --seed k --seeds <16 environment seeds> --json out/d1_<arm>_<k+1>.json
+
+with brain seeds 0 / 1 / 2 against environment seeds 0-15 / 16-31 / 32-47 -- the protocol, seeds and flags of the
+shipped-default arm `out/r5_adopt_sustain_live_{1,2,3}.json`, which is therefore the reference here and was not
+re-run. `out/` is git-ignored and not shipped, so every hold job rebuilds its own tables (atomic writes; the in-job
+md5s equal the local ones). Results: `out/d1_{holdBrain,holdOptic,off}_{1,2,3}.json` + `.txt`, md5-verified against
+the run directory after the fetch (9/9 match), exit code 0 in 9/9, `device=cuda` (B200) in 9/9, `gf_hz` 33 in 9/9,
+and the JSON header's `fast_sign_changed_entries` reads 44,463 / 3,832 / 0 -- the condition is recorded independently
+of the flag. Wall 5,404-5,423 s per job (two off jobs 2,890 s), 0.89-1.66 aggregate fly-s per wall-s under heavy
+contention (39 jobs from four tasks were on the cluster).
+
+Provenance against the two run directories this section compares with: `d1-hold-8ed117` has `flyverse/brain.py`
+`9caf67b228a211434f8524d8685eed3b` (the shipped gains: `DEFAULT_TYPE_PATH_GAIN` = LC4/LPLC2 -> DNp01 x3 only),
+`body.py` `1dcb3a8137dac7cb0d77bde356404f08`, `batch_body.py` `1e8be4ee0ab955af5ffb88f144d9a7f8`, `batch_sim.py`
+`bfae1359a34c2bc7939a37d3c5582f12`, `flyverse/data/receptors_by_type.csv` `0381a446107e6050e75cc87b16d7f830`.
+`r5-adopt-fb3608` (the shipped-default arm) is **byte-identical on all four code files**; `r5-hops-218d81` (the off arm
+on record) differs only in `brain.py` (`5f04ee4e...` = the damped gains). The room JSONs still do not record
+`type_path_gain`, so those md5s are the arm labels (`anti_runaway.md` caveat (1)).
+
+`scripts/batch_sustain.py` gained the `--receptor-table` pass-through this section needed (+17 / -4 lines):
+`patch_receptor(model, net_rule, table=None)` sets `LIFParams.receptor_table` whenever the receptor stage is on, so
+the flag also works with `--receptor-model default` (the gap round 4 found in `benchmark.py`, whose `_apply_receptor`
+returns before the table under `default`); it is refused with `--receptor-model off` (where it would be a silent
+no-op) and with a missing file; and it lives in `main()`, not `add_options`, following `--gf-hz`'s precedent (R5.0), so
+`scripts/probe_hop_route.py` and `scripts/profile_batch.py`, which import `add_options` / `patch_receptor`, are
+untouched. The JSON header's `receptor` block now carries `table` beside `model` / `net_rule` /
+`fast_sign_changed_entries`. Smoke-tested on the CPU before submission (`--batch 2 --minutes 0.02 --device cpu`
+with `out/receptors_holdBrain.csv`: header `sign (abs) table out/receptors_holdBrain.csv; fast sign changed on 44,463`).
+
+### G.2 The four arms in the room (3 batches x 16 flies x 300 s = 14,400 fly-s each; `out/d1_hold_compare.log`)
+
+| arm | hops | escape | voluntary | per 1,000 fly-s | escape | voluntary | walking-GF median | rows >= 33 Hz |
+|---|---|---|---|---|---|---|---|---|
+| shipped default (both sides) | 56 | 24 | 32 | 3.889 | 1.667 | 2.222 | 31.90 | 19/48 |
+| `holdBrain` = **optic side alone** | 52 | 18 | 34 | 3.611 | 1.250 | 2.361 | 32.08 | 17/48 |
+| `holdOptic` = **Brain side alone** | 5 | 5 | 0 | 0.347 | 0.347 | 0.000 | 27.04 | 5/48 |
+| off, shipped gains (new) | 7 | 7 | 0 | 0.486 | 0.486 | 0.000 | 26.53 | 6/48 |
+| off, damped gains (on record) | 9 | 9 | 0 | 0.625 | 0.625 | 0.000 | 27.20 | 8/48 |
+
+Per batch (brain seed 0 / 1 / 2), hops = escape + voluntary, then the batch's walking-GF median and rows at 33 Hz:
+
+* shipped: 19 (7+12), 21 (11+10), 16 (6+10) | 31.15 / 33.32 / 31.22 Hz | 6, 9, 4 of 16
+* `holdBrain`: 14 (4+10), 22 (8+14), 16 (6+10) | 31.15 / 33.01 / 31.77 Hz | 4, 8, 5 of 16
+* `holdOptic`: 1 (1+0), 4 (4+0), 0 (0+0) | 27.10 / 27.14 / 26.75 Hz | 1, 4, 0 of 16
+* off (shipped gains): 3 (3+0), 3 (3+0), 1 (1+0) | 26.82 / 28.20 / 26.18 Hz | 2, 3, 1 of 16
+* off (damped gains): 3 (3+0), 4 (4+0), 2 (2+0) | 27.22 / 26.83 / 27.99 Hz | 3, 3, 2 of 16
+
+Kruskal-Wallis across the three batches of an arm is n.s. for every count metric (`holdBrain` hops H 2.998 p 0.223,
+voluntary p 0.676; shipped hops p 0.686), so the three brain RNGs behave as replicates of one rate, and the
+`hops`-count route split agreed with the airborne-transition count in 9/9 jobs (no `WARNING` line).
+
+### G.3 Pooled Mann-Whitney (two-sided, asymptotic, 48 rows per arm; exact p is `n/a (ties)` for counts)
+
+| pair | hops | escape | voluntary | walking-GF max |
+|---|---|---|---|---|
+| `holdBrain` vs shipped | U 1118.5, p **0.800** | U 1079.0, p **0.532** | U 1222.0, p **0.577** | U 1225.0, p **0.595** |
+| `holdOptic` vs shipped | U 459.0, p 5.55e-09 | U 806.0, p 7.91e-04 | U 648.0, p 3.19e-07 | U 379.0, p 1.51e-08 |
+| off (shipped gains) vs shipped | U 487.5, p 2.86e-08 | U 837.0, p 2.62e-03 | U 648.0, p 3.19e-07 | U 394.0, p 2.85e-08 |
+| `holdBrain` vs off (shipped) | U 1871.5, p 2.98e-09 | U 1410.5, p 1.08e-02 | U 1776.0, p 4.28e-09 | U 1974.0, p 1.75e-09 |
+| `holdOptic` vs off (shipped) | U 1125.5, p **0.730** | U 1125.5, p **0.730** | U 1152.0, p **1.000** | U 1179.0, p **0.846** |
+| `holdBrain` vs `holdOptic` | U 1904.5, p 4.22e-10 | U 1442.5, p 3.56e-03 | U 1776.0, p 4.28e-09 | U 1991.0, p 8.04e-10 |
+| off (shipped) vs off (damped) | U 1105.0, p **0.578** | U 1105.0, p **0.578** | U 1152.0, p **1.000** | U 991.0, p **0.240** |
+
+The optic-side arm is statistically indistinguishable from the full default on all four measures and separated from
+off on all four; the Brain-side arm is the mirror image. As rates with exact Poisson 95 % intervals and as the share
+of the default's excess over off that an arm reproduces:
+
+| measure | optic side alone | Brain side alone |
+|---|---|---|
+| hops | 3.611 [2.697, 4.735] vs shipped 3.889 [2.938, 5.050]; count ratio 0.93x [0.64, 1.35] | 0.347 [0.113, 0.810]; ratio 0.089x [0.033, 0.205] |
+| escape | 1.250 [0.741, 1.976] vs 1.667 [1.068, 2.480]; 0.75x [0.40, 1.37] | 0.347; 0.21x [0.07, 0.51] |
+| voluntary | 2.361 [1.635, 3.299] vs 2.222 [1.520, 3.137]; 1.06x [0.66, 1.72] | 0.000 [0.000, 0.256]; 0.00x [0.00, 0.08] |
+| share of the excess over off (shipped gains) | hops 92 %, escape 65 %, voluntary 106 %, GF-median shift 103 % | hops -4 %, escape -12 %, voluntary 0 %, GF shift 10 % |
+
+The one number below 90 % is the escape route's 65 % (18 vs 24 hops), and it is not a difference: p 0.53 pooled, and
+the escape counts per batch (4, 8, 6 vs 7, 11, 6) sit inside the rerun scatter on record for this protocol -- two
+identical-seed runs of the shipped default's seed-0 batch give 19 and 11 hops (7+12 and 3+8;
+`out/r5_adopt_sustain_live_1.json` vs `out/r5_skeptic_sustain_live_4.json`), so a single batch measures itself to
+about a factor 1.7 and the optic-side seed-0 batch (14 = 4+10) lies between them.
+
+### G.4 The room does not behave like `walk.GF_max` (recount of the round-5 suite JSONs: `out/d1_walk_gfmax_recount.log`)
+
+The pinned walk section, same weights, same shipped gains, over the three round-5 run directories (5 draws per hold
+arm, 3 per anchor; every arm's value bit-identical across draws):
+
+| arm | `walk.GF_max_hz` | `walk.power_max_hz` | `walk.power_sustained_hz` |
+|---|---|---|---|
+| off | 4.964 | 95.542 / 97.101 / 96.457 FAIL | 49.180 / 50.596 / 49.614 |
+| shipped default | 4.629 | 48.481 PASS | 20.109 |
+| optic side alone (`holdBrain`) | **12.517** | 47.001 PASS | 21.343 |
+| Brain side alone (`holdOptic`) | **13.311** | 64.915 FAIL | 33.507 |
+
+That is the cancellation the handover quoted: each half alone puts the pinned walking GF at 2.5-2.9x either endpoint,
+and the two together return it to the endpoint. **The room shows no trace of it.** In the room the optic half alone
+reproduces the default (32.08 vs 31.90 Hz median, 17/48 vs 19/48 rows at threshold) and the Brain half alone
+reproduces off (27.04 vs 26.53 Hz, 5/48 vs 6/48); the ordering is monotone in the optic half and flat in the Brain
+half. So `walk.GF_max` is not a proxy for the room's escape route, and the two quantities are not even on the same
+scale (pinned 4.6-13.3 Hz over one fly's walking window against 26-32 Hz for the median over 48 flies of each fly's
+300 s maximum while on the ground). Two further readings of that table are worth carrying:
+
+* `walk.power_sustained_hz` is the pinned analogue of the voluntary route's own criterion (>= 50 Hz held 0.3 s), and
+  **off sits at 49.2-50.6 Hz on it** -- straddling the threshold -- while the shipped default sits at 20.1. Read as a
+  prediction for the room it is simply wrong: off makes 0 voluntary take-offs in 14,400 fly-s under the shipped
+  gains (0 in 43,200 fly-s over all 9 off batches now on file), and the default, whose pinned value is 2.5x lower,
+  makes 32. Whatever the voluntary route rides on in the room is not the pinned section's wing-power level.
+* the Brain-side arm is the only arm that fails `walk.power_max` while being at off's take-off rate in the room
+  (64.9 Hz, `holdOptic`), and off fails it hardest (95.5-97.1) while being the quietest room arm. The hand-set 50 Hz
+  bound (Handover item 4) therefore anti-correlates with the room take-off rate across these four arms; nothing
+  should be tuned to it on the grounds that it predicts spurious take-offs.
+
+### G.5 Answer, and what it does not settle
+
+1. **Which side carries the excess: the optic side, most of it.** 44,463 entries / 171,111 \|W\| of medulla sign
+   changes (95 % of the default's changed weight; T1, Dm9, Mi15, Mi4, Mi1, Dm2, Mi9 ...) reproduce the shipped
+   default's take-off rate in both routes and its walking-GF tail (3.611 vs 3.889 per 1,000 fly-s, voluntary 2.361 vs
+   2.222, median 32.08 vs 31.90 Hz; p 0.53-0.80 on every measure). A **4th matched batch** puts a number on how well
+   that is measured. The closing skeptic ran all four arms in ONE submission at a brain seed / env block no batch here
+   used (brain seed 3, env 48-63; 5 jobs, 0 failed, 56.2 min, run dir `<cluster-fs>/neurome/runs/sk-d1-hold-f691cf`,
+   `scripts/sk_d1_hold_verify.sh`, console `out/sk_d1_hold_cluster.log`, results
+   `out/sk_d1_{shipped,holdBrain,holdOptic,off}_4.json`): shipped 19 = 3 escape + 16 voluntary (GF med 31.56), optic
+   side 7 = 1 + 6 (30.29), Brain side 3 = 3 + 0 (25.95), off 4 = 4 + 0 (27.76) -- there the optic side is 0.37x the
+   default on hops (binomial p 0.029). Pooled over the four matched batches per arm (19,200 fly-s each;
+   `out/sk_d1_hold_pool.log`): shipped 75 = 27 + 48, optic side 59 = 19 + 40, Brain side 8 = 8 + 0, off 11 = 11 + 0,
+   and the shares of the default's excess over off move from 92 / 65 / 106 / 103 % to **hops 75 %, escape 50 %,
+   voluntary 83 %, GF-median shift 95 %**. Three-batch shares are single-batch-noise-dominated point estimates that
+   moved 17-20 points on one added replicate, and they move the other way too: including the 4th shipped-default batch
+   already on record (`out/r5_skeptic_sustain_live_4.json`, 11 hops at batch 1's seed / env) gives 104 / 83 / 113 %.
+   So the supported statement is **most of it, indistinguishable from all of it at this exposure** -- these shares are
+   not measured to better than a factor ~1.5 by three or four batches -- not *all of it*.
+
+   The Brain side's bound is the strong half. The 3,832 Brain-side entries (KCg-m, the DN1 clock, OA-AL2i3, TmY14,
+   and the 18 descending-neuron silencings) reproduce off (0.347 vs 0.486 per 1,000 fly-s, 0 voluntary, 27.04 vs
+   26.53 Hz; p 0.73-1.00 against off), at **<= 0.21x the default on hops** (4-batch count ratio 0.107x, Jeffreys 95 %
+   CI [0.049, 0.210]) and 0.000x on voluntary ([0.000, 0.053]); and off itself now makes **0 voluntary take-offs in
+   52,800 fly-s over 11 batches** (`out/d1_off_{1,2,3}.json`, `out/r5_sustain_off_live_{1,2,3}.json`,
+   `out/r5_sustain_off_nogf_{1,2,3}.json`, `out/sk5_sustain_off_live_1r.json`, `out/sk_d1_off_4.json`). This also
+   closes, negatively, the possibility that the take-off cost is the same thing as the taste / smell dependence found
+   in round 5: those are 100 % Brain-side (E.6), the take-offs are 0 % Brain-side.
+2. **The escape route is not attributable to either side at this exposure; the voluntary route is.** With the 4th
+   matched batch the optic side's escape excess over off is no longer significant -- U 2300.0, **p 0.095** (three
+   batches: U 1410.5, p 0.011), 19 vs 11 counts, ratio to the default 0.70x [0.39, 1.26] -- and the excess being
+   attributed has itself shrunk to **2.45x** (shipped 27 vs off 11 over 19,200 fly-s each; binomial p 0.014, Jeffreys
+   95 % CI 1.25-5.08x) from the 3.43x on record, with the default's escape count (3) *below* off's (4) in the
+   skeptic's env block. Only the voluntary route (48 vs 0; optic side 40 vs off 0, U 3040, p 2.7e-10) and the GF
+   median carry the attribution. The two are in any case **one channel, not two**: `flyverse/batch_body.py:85-88`
+   gives escape priority (`voluntary = ~airborne & ~escape & hold >= takeoff_hold_s` = 0.3 s), so an arm with a
+   higher GF pre-empts voluntary launches -- the optic side's lower escape (18 vs 24) with higher voluntary (34 vs
+   32) at a near-equal total (52 vs 56) is that trade-off, not two independent deviations -- and `rows >= 33 Hz` is
+   identical to "rows with at least one escape hop" (47 = 47, 0 disagreements over 192 rows). G.2's and G.3's four
+   measures are therefore two channels, and the escape-count share (65 %) disagreeing with the GF-median share
+   (103 %) is itself evidence that the 65 % is count noise.
+3. **The halves do not cancel in the room.** Unlike `walk.GF_max` (4.6 both, 5.0 neither, 12.5 / 13.3 either alone),
+   the room measure is ordered off ~ Brain-side << optic-side ~ default on hops, on each route separately and on the
+   GF tail. The receptor model's room cost is therefore a single-sided, monotone effect, and the pinned walk
+   section's non-monotonicity is a property of that section, not of the model's take-off behaviour.
+4. **Off with the damping retired is the same denominator.** 0.486 [0.195, 1.002] vs 0.625 [0.286, 1.186] per 1,000
+   fly-s (U 1105, p 0.58), walking-GF median 26.53 vs 27.20 Hz (p 0.24), 6/48 vs 8/48 rows at 33 Hz, and 0 voluntary
+   take-offs in both -- so retiring the GF x0.3 input damping did not make off quieter or noisier, and every ratio
+   the record quotes against off survives with the correct denominator: the shipped default is 8.0x off on hops
+   (3.889 vs 0.486; count ratio 8.0x, 95 % CI 3.9-18.5x) and its 32 voluntary take-offs stand against 0 in 52,800
+   fly-s of off (11 batches).
+5. **Dose is not controlled, and the next hold must control it.** The optic side is 92 % of the changed entries and
+   **95 % of the changed \|W\|** (44,463 / 48,295 entries; 171,111 / 179,944 raw-synapse \|W\|). Nothing in this
+   section separates "the optic PATHWAY carries it" from "the larger perturbation carries it". Round 5's finding that
+   the 3,832-entry Brain side carries 100 % of taste and smell (E.4) shows the small side is not globally inert,
+   which mitigates but does not close it. So the `holdOpticHis` / `holdOpticGlu` split of item 6 is **required, not
+   optional**, and it needs a dose control run beside it: a random 3,832-entry subset of the optic side, matched to
+   the Brain side's entry count, as a fifth arm.
+6. **What this does not settle.** (a) The mechanism. No changed entry touches DNp01, LC4, LPLC2, MN9 or the five
+   formerly damped inputs, so the optic side must act through the state of the medulla it changes; which of T1 /
+   Dm9 / Mi15 / Mi4 / Mi1 / Dm2 / Mi9 does it, and whether through the loom pathway (escape) or through the wing-power
+   command (voluntary), is untested -- the natural next hold is a per-type or per-transmitter split of the optic side
+   (the builder already supports `--groups`; a `holdOpticHis` / `holdOpticGlu` pair would separate the 17,256
+   silencings from the 27,207 flips, 83,191 vs 87,920 \|W\|). (b) Whether the optic-side rate is *too high*: this
+   section measures attribution, not correctness. There is no animal reference on file for spontaneous take-off rate
+   in this arena, and the voluntary route's KNOWN-GAP status (P(pass per 2,400 fly-s draw) ~ 0.1) is unchanged.
+   (c) Three batches per arm here (four with the skeptic's) and one protocol (cx program, apple, fenced, energy 0.9,
+   300 s); the flies are at energy 0 for the last ~2 min of every rollout (median minimum energy 0.0 in all 9
+   batches, 0-8 meals per batch), so the rates are over a mixed fed / starved regime, as every take-off number on
+   record is. (d) Also unsettled by design: `holdOptic` is "postsynaptic superclass outside `ol_intrinsic` /
+   `ol_sensory`", and 94 of its 3,832 entries land on visual centrifugal / visual projection cells (OA-AL2i3 65,
+   TmY14 29), so "the Brain side carries nothing" is a statement about that partition, not about every visual neuron
+   outside the medulla.
+
+**Two bookkeeping notes.** (i) `out/d1_hold_weights.log`'s 175,706 / 167,029 / 8,678 are **shaped-weight** \|W\|
+(167,029 + 8,678 = 175,707, the 1 a float-sum rounding); the G.0 table and every claim above quote **raw synapse**
+\|W\| 179,944 / 171,111 / 8,833. Both are correct and they are different quantities -- the log does not say so.
+(ii) `scripts/batch_sustain.py`'s JSON header should carry `type_path_gain` and the resolved `LIFParams`. This
+section had to certify its arm labels by md5-ing `brain.py` in three run directories (G.1) because the room JSONs
+record `receptor` but not the gains; it is a two-line header change and it makes arms self-describing, which is also
+what `anti_runaway.md` caveat (1) and the round-5 critic asked for.
+
+Files: `out/d1_hold_batch.sh` (launcher), `out/d1_hold_cluster.log` (console; the local `tee` was cut by the
+launcher's `| head -30` after the first job log and is completed in the file from the run directory's per-job logs,
+which are kept in full in `out/d1_hold_joblogs/`), `out/d1_{holdBrain,holdOptic,off}_{1,2,3}.{json,txt}` (results),
+`out/d1_hold_compare.log` (`scripts/compare_sustain_runs.py`, 7 pairs, + the four-arm table),
+`out/d1_hold_summary.py` -> `out/d1_hold_summary.log` (the four-arm table, the Poisson intervals and the excess
+shares; the generator is in `out/` because this task's file list allows only `scripts/batch_sustain.py` under
+`scripts/`), `out/d1_hold_compare.sh` (the
+analysis runner), `out/d1_hold_structure.log` (G.0), `out/d1_hold_weights.log` (the shaped-weight md5s and the
+partition check), `out/d1_walk_gfmax_recount.log` (G.4). The closing skeptic's 4th matched batch and its
+re-derivations (G.5): `scripts/sk_d1_hold_verify.sh`, `scripts/sk_d1_hold_{structure,weights,stats,pool}.py`,
+`out/sk_d1_hold_cluster.log`, `out/sk_d1_{shipped,holdBrain,holdOptic,off}_4.{json,txt}`,
+`out/sk_d1_hold_{structure,weights,stats,pool}.log`.
