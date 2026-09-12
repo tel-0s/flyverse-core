@@ -23,7 +23,20 @@ import pygame  # noqa: E402
 pygame.init(); pygame.display.set_mode((64, 64))
 sys.path.insert(0, os.path.dirname(__file__))
 import room_demo as rd  # noqa: E402
-from flyverse import screen  # noqa: E402
+from flyverse import brain, screen  # noqa: E402
+
+
+def patch_receptor(model, net_rule):
+    """Make every brain.LIFParams built from here on (room_demo.Sim's included) carry the receptor model
+    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'off' leaves the class untouched."""
+    if model in (None, "off"):
+        return
+    L = brain.LIFParams
+
+    def make(**kw):
+        p = L(**kw); p.receptor_model = model; p.receptor_net_rule = net_rule
+        return p
+    brain.LIFParams = make
 
 
 def main():
@@ -33,8 +46,17 @@ def main():
     ap.add_argument("--pattern", default=r"^(DN[a-z]|MDN|LPT|HS|VS|H2|LPi|MeVP|Nod|CH|LLPC|LPC)")
     ap.add_argument("--top", type=int, default=20)
     ap.add_argument("--out", default="out/screen_rotation.csv")
+    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+                    help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
+    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
     args = ap.parse_args()
+    patch_receptor(args.receptor_model, args.receptor_net_rule)
     sim = rd.Sim(0, start=(0.0, 0.0, 0.75), trail_seconds=0.0, wind_speed=0.0)
+    if sim.fb.receptor is not None:
+        cov = sim.fb.receptor.coverage(sim.c.W)
+        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}); fast sign changed on "
+              f"{int((sim.fb.receptor.fast_sign != np.sign(sim.c.W.data)).sum()):,} of {sim.c.W.nnz:,} entries; coverage by tier:")
+        print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
     rec = screen.TypeRecorder.build(sim.c, pattern=args.pattern, by_side=True)
     state = {"h": 0.0}
 

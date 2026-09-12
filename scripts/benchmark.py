@@ -144,7 +144,13 @@ class Context:
     def has_overrides(self):
         a = self.args
         return any(v is not None for v in [a.std_u, a.std_tau, a.adapt_jump, a.same_type_gain, a.norm_alpha, a.norm_ref,
-                                           a.w_syn, a.conn_cap, a.dn_vnc_gain, a.vp_dn_gain, a.gain_out, a.t4_gain])
+                                           a.w_syn, a.conn_cap, a.dn_vnc_gain, a.vp_dn_gain, a.gain_out, a.t4_gain]) or self.receptor_model is not None
+
+    @property
+    def receptor_model(self):
+        """LIFParams.receptor_model from --receptor-model ('off' -> None)."""
+        m = self.args.receptor_model
+        return None if m in (None, "off") else m
 
     def _apply_lif(self, p):
         a = self.args
@@ -152,6 +158,9 @@ class Context:
                      ("input_norm_alpha", a.norm_alpha), ("input_norm_ref", a.norm_ref), ("w_syn", a.w_syn), ("conn_cap", a.conn_cap)]:
             if v is not None:
                 setattr(p, k, v)
+        if self.receptor_model is not None:                  # the receptor model (docs/NT_INTEGRATION.md) reaches every section
+            p.receptor_model = self.receptor_model
+            p.receptor_net_rule = a.receptor_net_rule
         if a.dn_vnc_gain is not None or a.vp_dn_gain is not None:
             p.path_gain = [(r"^descending_neuron$", r"^vnc_", 3.0 if a.dn_vnc_gain is None else a.dn_vnc_gain),
                            (r"^visual_projection$", r"^descending_neuron$", 2.0 if a.vp_dn_gain is None else a.vp_dn_gain)]
@@ -533,7 +542,8 @@ def sec_bitter(ctx):
     mn9 = c.select(type="MN9")
     ms = 1000.0 if ctx.fast else 1500.0
     settings = {"calibrated": ctx.lif(),
-                "shiu": brain.LIFParams(adapt_jump=0.0, conn_cap=0.0, same_type_gain=1.0, input_norm_alpha=0.0, std_u_by_type={}, path_gain=[], type_path_gain=[])}
+                "shiu": brain.LIFParams(adapt_jump=0.0, conn_cap=0.0, same_type_gain=1.0, input_norm_alpha=0.0, std_u_by_type={}, path_gain=[], type_path_gain=[],
+                                        receptor_model=ctx.receptor_model, receptor_net_rule=ctx.args.receptor_net_rule)}   # the receptor model applies to both, as in probe_bitter.py
     res = {"ms": ms, "rate_hz": 100.0}
     steps = int(ms / 0.5)
     for label, p in settings.items():
@@ -697,11 +707,26 @@ def main():
     ap.add_argument("--vp-dn-gain", type=float, default=None, help="gain on visual projection -> descending synapses (default 2)")
     ap.add_argument("--gain-out", type=float, default=None, help="optic lobe -> spiking drive gain (mV)")
     ap.add_argument("--t4-gain", type=float, default=None, help="T4/T5 output gain (default 2)")
+    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+                    help="LIFParams.receptor_model for every section (default off = the presynaptic NT_SIGN rule); 'full' needs --eager")
+    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
     args = ap.parse_args()
     t_all = time.time()
     ctx = Context(args)
     lif, op = ctx.lif(), ctx.optic_params()
+    if ctx.receptor_model is not None:      # the coverage the model runs under (connectome.receptor_signs' tier summary)
+        rs = brain._receptor(ctx.c, lif, with_counts=ctx.receptor_model == "full")
+        cov = rs.coverage(ctx.c.W)
+        print(f"receptor model {ctx.receptor_model} ({args.receptor_net_rule}); fast sign changed on "
+              f"{int((rs.fast_sign != np.sign(ctx.c.W.data)).sum()):,} of {ctx.c.W.nnz:,} entries; coverage by tier:")
+        print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
+        receptor_cfg = {"model": ctx.receptor_model, "net_rule": args.receptor_net_rule, "coverage": cov.to_dict("records"),
+                        "fast_sign_changed_entries": int((rs.fast_sign != np.sign(ctx.c.W.data)).sum())}
+        del rs
+    else:
+        receptor_cfg = {"model": None}
     config = {"lif": {k: getattr(lif, k) for k in ["std_u", "std_tau", "adapt_jump", "same_type_gain", "input_norm_alpha", "input_norm_ref", "w_syn", "conn_cap"]},
+              "receptor": receptor_cfg,
               "path_gain": brain.DEFAULT_PATH_GAIN if lif.path_gain is None else lif.path_gain,
               "type_path_gain": brain.DEFAULT_TYPE_PATH_GAIN if lif.type_path_gain is None else lif.type_path_gain,
               "optic": {"gain_out_mv": op.gain_out_mv, "pair_gain": optic.DEFAULT_PAIR_GAIN if op.pair_gain is None else op.pair_gain},

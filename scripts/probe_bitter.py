@@ -25,8 +25,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rate", type=float, default=100.0)
     ap.add_argument("--ms", type=float, default=1500.0)
+    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+                    help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
+    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
     args = ap.parse_args()
+    receptor = dict(receptor_model=None if args.receptor_model == "off" else args.receptor_model,
+                    receptor_net_rule=args.receptor_net_rule)
     c = connectome.load(verbose=False)
+    if receptor["receptor_model"]:
+        rs = connectome.receptor_signs(c, net_rule=args.receptor_net_rule)
+        cov = rs.coverage(c.W)
+        m = cov[cov.tier == "matched"].iloc[0]
+        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}): matched {m.edges:,} edges = {m.edges_frac:.1%}, "
+              f"{m.syn_W:,.0f} |W| synapses = {m.syn_W_frac:.1%}; fast sign changed on "
+              f"{int((rs.fast_sign != np.sign(c.W.data)).sum()):,} entries")
+    import torch
+    print(f"device: {brain.resolve(None)}; cuda available: {torch.cuda.is_available()}")
     table = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "flyverse", "data", "taste_grns.csv"))
     ids = {k: table.bodyId[table.taste == k].to_numpy() for k in ("sweet", "bitter")}
     sweet = c.index_of(ids["sweet"][np.isin(ids["sweet"], c.neurons.bodyId)])
@@ -40,9 +54,9 @@ def main():
             second[name] = idx
     print(f"sweet GRNs {len(sweet)}, bitter GRNs {len(bitter)}, MN9 {len(mn9)}; second-order sets: " + str({k: len(v) for k, v in second.items()}))
     settings = {
-        "this project (calibrated)": brain.LIFParams(),
+        "this project (calibrated)": brain.LIFParams(**receptor),
         "Shiu et al. rules (uniform 0.275 mV)": brain.LIFParams(adapt_jump=0.0, conn_cap=0.0, same_type_gain=1.0, input_norm_alpha=0.0,
-                                                               std_u_by_type={}, path_gain=[], type_path_gain=[]),
+                                                               std_u_by_type={}, path_gain=[], type_path_gain=[], **receptor),
     }
     steps = int(args.ms / 0.5)
     for label, p in settings.items():

@@ -30,8 +30,20 @@ def main():
     ap.add_argument("--lc-gain", type=float, default=None, help="optic-lobe drive gain on LC4/LPLC2 (default from optic.py)")
     ap.add_argument("--gf-hz", type=float, default=None, help="escape threshold on the smoothed GF rate")
     ap.add_argument("--gain-out", type=float, default=80.0)
+    ap.add_argument("--seed", type=int, default=0, help="Brain RNG seed")
+    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+                    help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
+    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
     args = ap.parse_args()
     c = connectome.load(verbose=False)
+    lp = brain.LIFParams(input_norm_alpha=args.norm_alpha, input_norm_ref=args.norm_ref,
+                         receptor_model=None if args.receptor_model == "off" else args.receptor_model, receptor_net_rule=args.receptor_net_rule)
+    rs = brain._receptor(c, lp, with_counts=lp.receptor_model == "full")      # one lookup shared by the LIF and the optic lobe
+    if rs is not None:
+        cov = rs.coverage(c.W)
+        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}); fast sign changed on "
+              f"{int((rs.fast_sign != np.sign(c.W.data)).sum()):,} of {c.W.nnz:,} entries; coverage by tier:")
+        print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
     r = retina.build_retina(c)
     types = c.neurons.type.fillna("").to_numpy()
     w, info = world.make_room()
@@ -42,9 +54,9 @@ def main():
     op = optic.OpticParams(gain_out_mv=args.gain_out, out_norm=args.out_norm)
     if args.lc_gain is not None:
         op.pair_gain = [g for g in optic.DEFAULT_PAIR_GAIN if "LC4" not in g[1]] + [(r".*", r"^(LC4|LPLC2)$", args.lc_gain)]
-    ol = optic.OpticLobe(c, r, op); ol.relax()
+    ol = optic.OpticLobe(c, r, op, receptor=rs, receptor_gain=brain._receptor_gain(lp)); ol.relax()
     rt = types[ol.rate_idx]
-    b = brain.Brain(c, brain.LIFParams(input_norm_alpha=args.norm_alpha, input_norm_ref=args.norm_ref)); b.freeze(ol.rate_idx)
+    b = brain.Brain(c, lp, seed=args.seed, receptor=rs); b.freeze(ol.rate_idx)
     wg = body.wing_groups(c); flight = body.Flight()
     if args.gf_hz is not None:
         flight.gf_hz = args.gf_hz

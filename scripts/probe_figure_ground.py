@@ -25,8 +25,31 @@ import pygame  # noqa: E402
 pygame.init(); pygame.display.set_mode((64, 64))
 sys.path.insert(0, os.path.dirname(__file__))
 import room_demo as rd  # noqa: E402
+from flyverse import brain  # noqa: E402
 
 APPLE = np.array([0.25, 0.15, 0.79])
+
+
+def patch_receptor(model, net_rule):
+    """Make every brain.LIFParams built from here on (room_demo.Sim's included) carry the receptor model
+    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'off' leaves the class untouched."""
+    if model in (None, "off"):
+        return
+    L = brain.LIFParams
+
+    def make(**kw):
+        p = L(**kw); p.receptor_model = model; p.receptor_net_rule = net_rule
+        return p
+    brain.LIFParams = make
+
+
+def print_coverage(sim, model, net_rule):
+    if sim.fb.receptor is None:
+        return
+    cov = sim.fb.receptor.coverage(sim.c.W)
+    print(f"receptor model {model} ({net_rule}); fast sign changed on {int((sim.fb.receptor.fast_sign != np.sign(sim.c.W.data)).sum()):,} "
+          f"of {sim.c.W.nnz:,} entries; coverage by tier:")
+    print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
 TYPES = ["L1", "L2", "L3", "Mi1", "Tm3", "Mi4", "Mi9", "Tm1", "Tm2", "Tm4", "Tm9", "T2", "T3", "TmY3", "Tm5Y", "TmY21", "Tm20", "TmY17", "Tm34",
          "T4a", "T5a", "LPi34", "LPi43", "Dm8", "Dm9", "Pm2", "Li14"]
 SPIKING = ["LC10a", "LC10b", "LC4", "LPLC2", "LC16"]
@@ -56,11 +79,16 @@ def main():
     ap.add_argument("--seconds", type=float, default=15.0)
     ap.add_argument("--radius-deg", type=float, default=30.0)
     ap.add_argument("--out", default="out/figure_ground_signed.csv")
+    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+                    help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
+    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
     args = ap.parse_args()
+    patch_receptor(args.receptor_model, args.receptor_net_rule)
     r = 0.04 + 0.05
     pos = APPLE[:2] - r * np.array([np.cos(np.deg2rad(135)), np.sin(np.deg2rad(135))])
     heading0 = np.pi / 2
     sim_a, a_apple, d_apple = run("apple", args.seconds, pos, heading0)
+    print_coverage(sim_a, args.receptor_model, args.receptor_net_rule)
     sim_n, a_none, d_none = run("all", args.seconds, pos, heading0)
     c = sim_a.c; o = sim_a.fb.optic
     # which columns view the apple: the column direction (body frame at the mean heading) vs the apple's direction

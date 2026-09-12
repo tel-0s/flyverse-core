@@ -51,6 +51,232 @@ UNKNOWN_NT_OVERRIDE_REGEX = {r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN|LN)": "gaba"}
 PHOTORECEPTOR_TYPES = ["R1-R6", "R7y", "R7p", "R7d", "R7_unclear",
                        "R8y", "R8p", "R8d", "R8_unclear", "R7R8_unclear"]
 
+# ---------------------------------------------------------------------------------------------- receptor model
+# Optional per-(postsynaptic type, presynaptic transmitter) response classes from the transcriptomic receptor table
+# (flyverse/data/receptors_by_type.csv, built by scripts/build_receptor_table.py; rules and coverage in
+# docs/audits/receptor_rules.md). Off unless LIFParams.receptor_model is set; see receptor_signs().
+RECEPTOR_TABLE = Path(__file__).resolve().parent / "data" / "receptors_by_type.csv"
+TRANSMITTERS = ["acetylcholine", "gaba", "glutamate", "histamine", "dopamine", "octopamine", "serotonin"]
+RECEPTOR_TIERS = ["fallback", "pre_unknown", "nt_class", "class", "fuzzy", "alias", "exact"]   # int8 codes 0..6
+GAIN_CLASSES = ["none", "low", "mid", "high"]                                                   # int8 codes 0..3
+RECEPTOR_NET_RULES = ("class", "abs", "nonmda")
+SIGN0_COUNTS_FILE = "sign0_counts.npz"
+
+
+@dataclass
+class ReceptorSigns:
+    """Per stored entry of a connectome's W (CSR order, explicit zeros included): the receptor model's
+    fast sign, slow sign, gain classes and match tier. Produced by receptor_signs(); consumed by
+    brain._shaped_weights, brain._slow_weights and optic.OpticLobe.
+
+    fast_sign: +1 / -1 / 0 (float32). Matched entries (post type x pre transmitter has a table row) take the
+        table's fast sign; every other entry keeps NT_SIGN of the presynaptic cell, so that
+        abs(W.data) * fast_sign == W.data there exactly.
+    slow_sign: +1 / -1 / 0; 0 for unmatched entries.
+    fast_gain, slow_gain: int8 codes into GAIN_CLASSES (0 = none, also for unmatched entries).
+    tier: int8 codes into RECEPTOR_TIERS. matched = the sign came from the table (tier nt_class or better).
+    count: synapse count per entry (float32): abs(W.data), plus the raw count for explicit-zero entries when
+        sign-0 counts were available (see sign0_counts()); None when receptor_signs(with_counts=False).
+    """
+    fast_sign: np.ndarray
+    slow_sign: np.ndarray
+    fast_gain: np.ndarray
+    slow_gain: np.ndarray
+    tier: np.ndarray
+    count: np.ndarray | None
+    net_rule: str
+    nt_class_fallback: bool
+    table_path: str
+
+    @property
+    def matched(self) -> np.ndarray:
+        return self.tier >= RECEPTOR_TIERS.index("nt_class")
+
+    def fast_factor(self, gain: dict | None = None) -> np.ndarray:
+        """Per-entry multiplier for abs(W.data): fast_sign, times the gain-class factor when `gain`
+        ({class_name: factor}) is given (classes absent from the dict get 1)."""
+        f = self.fast_sign.astype(np.float32)
+        if gain:
+            g = np.array([float(gain.get(k, 1.0)) for k in GAIN_CLASSES], dtype=np.float32)
+            f = f * g[self.fast_gain]
+        return f
+
+    def slow_factor(self, gain: dict | None = None) -> np.ndarray:
+        f = self.slow_sign.astype(np.float32)
+        if gain:
+            g = np.array([float(gain.get(k, 1.0)) for k in GAIN_CLASSES], dtype=np.float32)
+            f = f * g[self.slow_gain]
+        return f
+
+    def coverage(self, W: sp.csr_matrix) -> pd.DataFrame:
+        """Edges and abs(W) synapses per tier (fractions of the whole matrix)."""
+        wabs = np.abs(W.tocsr().data).astype(np.float64)
+        rows = []
+        for i, name in enumerate(RECEPTOR_TIERS):
+            m = self.tier == i
+            rows.append({"tier": name, "edges": int(m.sum()), "edges_frac": float(m.mean()) if len(m) else 0.0,
+                         "syn_W": float(wabs[m].sum()), "syn_W_frac": float(wabs[m].sum() / max(wabs.sum(), 1.0))})
+        m = self.matched
+        rows.append({"tier": "matched", "edges": int(m.sum()), "edges_frac": float(m.mean()) if len(m) else 0.0,
+                     "syn_W": float(wabs[m].sum()), "syn_W_frac": float(wabs[m].sum() / max(wabs.sum(), 1.0))})
+        return pd.DataFrame(rows)
+
+
+def read_receptor_table(path=None) -> pd.DataFrame:
+    return pd.read_csv(RECEPTOR_TABLE if path is None else path, comment="#")
+
+
+def receptor_signs(c: "Connectome", table_path=None, net_rule: str = "class", nt_class_fallback: bool = False,
+                   W: sp.csr_matrix | None = None, with_counts: bool = False, counts: np.ndarray | None = None,
+                   table: pd.DataFrame | None = None) -> ReceptorSigns:
+    """Look every stored entry of `W` (default c.W, CSR order) up in the receptor table.
+
+    net_rule: 'class' (sign of the larger gain class; ties keep the NT_SIGN prior), 'abs' (larger summed expression
+    with a 2-fold margin) or 'nonmda' (class rule with the glutamate fast + group restricted to KaiR1D / GluRIA /
+    GluRIB) -- the three column sets of receptors_by_type.csv.
+    nt_class_fallback: unprofiled postsynaptic types take the Davis 2020 ChAT / Gad1 / VGlut whole-class baseline
+    of their own transmitter (tier 'nt_class'); off by default.
+    with_counts: also fill `count` (abs(W.data), with explicit-zero entries -- sign-0 presynaptic cells -- rescued
+    from sign0_counts(c), needed by the slow term); `counts` supplies that array directly (aligned with W.data).
+    Same logic as scripts/build_receptor_table.edge_lookup (which is the audited reference)."""
+    if net_rule not in RECEPTOR_NET_RULES:
+        raise ValueError(f"net_rule must be one of {RECEPTOR_NET_RULES}")
+    W = c.W.tocsr() if W is None else W.tocsr()
+    rt = read_receptor_table(table_path) if table is None else table
+    sfx = {"class": "", "abs": "_abs", "nonmda": "_nonmda"}[net_rule]
+    ssfx = "_abs" if net_rule == "abs" else ""
+    coo = W.tocoo()                                   # csr -> coo keeps the stored order
+    post, pre = coo.row, coo.col
+    n = c.neurons
+    nt_cats = TRANSMITTERS + ["unknown"]
+    nt_code = pd.Categorical(n.nt, categories=nt_cats).codes.astype(np.int16)
+    nt_code[nt_code < 0] = len(TRANSMITTERS)
+    type_cat = pd.Categorical(n.type.fillna(""))
+    type_code = type_cat.codes.astype(np.int32)
+    type_index = {t: i for i, t in enumerate(type_cat.categories)}
+    gain_code = {g: i for i, g in enumerate(GAIN_CLASSES)}
+    tier_code = {t: i for i, t in enumerate(RECEPTOR_TIERS)}
+
+    rows = rt[~rt.malecns_type.astype(str).str.startswith("<")]
+    L = np.full((len(type_cat.categories), len(nt_cats)), -1, dtype=np.int64)
+    ti = np.array([type_index.get(t, -1) for t in rows.malecns_type], dtype=np.int64)
+    ni = np.array([TRANSMITTERS.index(x) for x in rows.transmitter], dtype=np.int64)
+    ok = ti >= 0
+    L[ti[ok], ni[ok]] = np.arange(len(rows))[ok]
+    fs = rows["fast_sign" + sfx].to_numpy(np.float32); ss = rows["slow_sign" + ssfx].to_numpy(np.float32)
+    fg = rows["fast_gain_class" + sfx].map(gain_code).fillna(0).to_numpy(np.int8)
+    sg = rows["slow_gain_class" + ssfx].map(gain_code).fillna(0).to_numpy(np.int8)
+    tr = rows.tier.map(tier_code).fillna(tier_code["class"]).to_numpy(np.int8)
+
+    pre_nt = nt_code[pre]
+    idx = L[type_code[post], pre_nt]
+    matched = idx >= 0
+    i2 = np.where(matched, idx, 0)
+    pre_sign = n.sign.to_numpy(np.float32)[pre]
+    fast_sign = np.where(matched, fs[i2], pre_sign).astype(np.float32)
+    slow_sign = np.where(matched, ss[i2], np.float32(0)).astype(np.float32)
+    fast_gain = np.where(matched, fg[i2], 0).astype(np.int8)
+    slow_gain = np.where(matched, sg[i2], 0).astype(np.int8)
+    tier = np.where(matched, tr[i2], np.where(pre_nt == len(TRANSMITTERS), tier_code["pre_unknown"], 0)).astype(np.int8)
+
+    if nt_class_fallback:
+        sel = rt[rt.malecns_type.astype(str).str.startswith("<nt=")].reset_index(drop=True)
+        L2 = np.full((len(nt_cats), len(nt_cats)), -1, dtype=np.int64)
+        for j, r in sel.iterrows():
+            post_nt = r.malecns_type[len("<nt="):-1]
+            if post_nt in TRANSMITTERS:
+                L2[TRANSMITTERS.index(post_nt), TRANSMITTERS.index(r.transmitter)] = j
+        idx2 = L2[nt_code[post], pre_nt]
+        use = (~matched) & (idx2 >= 0)
+        j2 = idx2[use]
+        fast_sign[use] = sel["fast_sign" + sfx].to_numpy(np.float32)[j2]
+        slow_sign[use] = sel["slow_sign" + ssfx].to_numpy(np.float32)[j2]
+        fast_gain[use] = sel["fast_gain_class" + sfx].map(gain_code).fillna(0).to_numpy(np.int8)[j2]
+        slow_gain[use] = sel["slow_gain_class" + ssfx].map(gain_code).fillna(0).to_numpy(np.int8)[j2]
+        tier[use] = tier_code["nt_class"]
+
+    count = None
+    if counts is not None:
+        count = np.asarray(counts, dtype=np.float32)
+        if count.shape != W.data.shape:
+            raise ValueError("counts must be aligned with W.data")
+    elif with_counts:
+        count = np.abs(W.data).astype(np.float32)
+        zero = W.data == 0
+        if zero.any():
+            rescued = sign0_counts(c, W=W)
+            if rescued is not None:
+                count[zero] = rescued[zero]
+    return ReceptorSigns(fast_sign, slow_sign, fast_gain, slow_gain, tier, count, net_rule, nt_class_fallback,
+                         str(RECEPTOR_TABLE if table_path is None else table_path))
+
+
+def build_sign0_counts(ref: "Connectome", cache_dir: Path = CACHE_DIR, verbose: bool = True) -> Path:
+    """Raw synapse counts of the reference graph's explicit-zero entries (sign-0 presynaptic cells: monoamines
+    and unknown transmitter), keyed by (post, pre) row index of the reference graph, from the raw weights table.
+    Written once to cache/sign0_counts.npz; the cache's W stores 0 for these synapses, so the slow term needs it."""
+    log = print if verbose else (lambda *a, **k: None)
+    if ref.reference is not ref:
+        raise ValueError("build_sign0_counts needs the reference (full) graph")
+    t0 = time.time()
+    w = pf.read_table(DATA_DIR / WEIGHTS_FILE, columns=["body_pre", "body_post", "weight"]).to_pandas()
+    pre = ref.body_to_index.reindex(w.body_pre.to_numpy()).to_numpy()
+    post = ref.body_to_index.reindex(w.body_post.to_numpy()).to_numpy()
+    m = ~np.isnan(pre) & ~np.isnan(post) & (w.weight.to_numpy() >= 1)
+    R = sp.csr_matrix((w.weight.to_numpy()[m].astype(np.float32), (post[m].astype(np.int64), pre[m].astype(np.int64))),
+                      shape=ref.W.shape)
+    R.sum_duplicates()
+    del w
+    Wr = ref.W.tocsr()
+    Rc, Wc = R.tocoo(), Wr.tocoo()
+    zero = Wc.data == 0
+    key_w = Wc.row[zero].astype(np.int64) * ref.n + Wc.col[zero]
+    key_r = Rc.row.astype(np.int64) * ref.n + Rc.col
+    order = np.argsort(key_r, kind="stable")
+    pos = np.searchsorted(key_r, key_w, sorter=order)
+    pos = np.minimum(pos, len(key_r) - 1)
+    hit = key_r[order[pos]] == key_w
+    cnt = np.where(hit, Rc.data[order[pos]], 0.0).astype(np.float32)
+    cache_dir = Path(cache_dir); cache_dir.mkdir(parents=True, exist_ok=True)
+    out = cache_dir / SIGN0_COUNTS_FILE
+    np.savez(out, key=np.sort(key_w), count=cnt[np.argsort(key_w, kind="stable")], n=np.int64(ref.n))
+    log(f"sign-0 counts: {int(zero.sum()):,} zero entries, {int(hit.sum()):,} found in the raw table, "
+        f"{int(cnt.sum()):,} synapses ({time.time() - t0:.1f}s) -> {out}")
+    return out
+
+
+def sign0_counts(c: "Connectome", W: sp.csr_matrix | None = None, cache_dir: Path = CACHE_DIR,
+                 build: bool = True) -> np.ndarray | None:
+    """Raw synapse counts aligned with the stored entries of `W` (default c.W), non-zero only where W.data == 0 and the
+    raw table has the edge. Reads cache/sign0_counts.npz (built from the raw weights table if absent and the table
+    is available); None with a warning when neither exists, in which case the slow term skips sign-0 edges."""
+    import warnings
+    path = Path(cache_dir) / SIGN0_COUNTS_FILE
+    if not path.exists():
+        if not build or not (DATA_DIR / WEIGHTS_FILE).exists():
+            warnings.warn(f"{path} is absent and the raw weights table is not available at {DATA_DIR}: "
+                          "sign-0 (monoamine / unknown) synapses carry no slow term")
+            return None
+        build_sign0_counts(c.reference, cache_dir)
+    z = np.load(path)
+    key, cnt, n_ref = z["key"], z["count"], int(z["n"])
+    if n_ref != c.reference.n:
+        warnings.warn(f"{path} was built for a graph of {n_ref} neurons, this reference has {c.reference.n}; ignored")
+        return None
+    W = c.W.tocsr() if W is None else W.tocsr()
+    coo = W.tocoo()
+    ref_idx = c.reference.index_of(c.neurons.bodyId.to_numpy()) if c.reference is not c else np.arange(c.n)
+    out = np.zeros(W.nnz, dtype=np.float32)
+    zero = coo.data == 0
+    if not zero.any():
+        return out
+    q = ref_idx[coo.row[zero]].astype(np.int64) * n_ref + ref_idx[coo.col[zero]]
+    pos = np.minimum(np.searchsorted(key, q), len(key) - 1)
+    hit = key[pos] == q
+    vals = np.where(hit, cnt[pos], 0.0).astype(np.float32)
+    out[np.flatnonzero(zero)] = vals
+    return out
+
 KEEP_COLS = ["bodyId", "type", "instance", "superclass", "class", "subclass", "somaSide", "somaNeuromere",
              "status", "entryNerve", "exitNerve", "flywireType", "hemibrainType", "mancType",
              "assignedOlHex1", "assignedOlHex2"]
