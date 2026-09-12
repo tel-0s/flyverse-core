@@ -380,3 +380,25 @@ surface noise on, radiance differs by at most 4.6e-5 on the sensory rays and 3.8
 (values 0.1-1) from fast-math contraction in the noise. `#pragma METAL fp contract(off)` was tried: it
 makes 99.8% of rays bit-exact (the rest is Metal's fast division / sqrt, and for the LIF the order of the
 atomic adds in the scatter) at twice the trace time, so the kernels keep fast-math.
+
+## Batching complete room rollouts (September 11, 2026)
+
+`BatchSim` extends batching beyond the brain: independent room rays, plume phases,
+physical senses, body frames, motor readouts, metabolism, ordinary walking and free
+flight. Surface transitions and programs retain their scalar rules; program stimuli
+are combined into row-specific batched pulses. All brain modules and seven sensory
+rays per ommatidium remain enabled. See [BATCH_SIM.md](BATCH_SIM.md) for the API,
+commands and [recorded measurements](batch_profile.json).
+
+On the B200, the plain full-room run went from 1.95 aggregate fly-s/wall-s for the
+scalar demo to 8.09 at B=16. The `cx`/single-apple/fence configuration went from 0.54
+to 11.68 at B=64. These are development measurements on shared hardware, not clean
+speed guarantees or behavioural comparisons. CUDA traces show roughly constant
+operation counts as B grows; the CPU body/physical-sense stage grew from 0.46 ms at
+B=1 to 1.36 ms at B=64 in the `cx` setup (program dispatch measured only in the full
+frame). Individual flies incur higher frame latency while aggregate throughput grows.
+
+The next limits are batched sparse products, the B-scaled ray work, and scalar
+program dispatch. `cx`'s 15 ms pulses still cause the controller's eager fallback
+inside 10 ms frames; their timing was preserved. This change does not establish a
+new real-time UI benchmark or alter the scalar room demo.

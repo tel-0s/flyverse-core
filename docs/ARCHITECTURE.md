@@ -39,6 +39,14 @@ The **room demo** is then `World + Air + FlyBrain(all modules) + body.*` -- the 
 configuration -- and `env.FlyRoomEnv` is the batched version of the same wiring. Neither wires
 sensory neurons by hand any more (both did before; that duplication was the coupling).
 
+`batch_sim.BatchSim` supplies full room rollouts around one `FlyBrain(batch=B)`.
+`BatchWorld` and `BatchAir` batch independent environments; `BatchBody` batches the
+continuous body calculations and shares the scalar model's transition rules.
+Programs keep per-row state and coalesce their neural pulses before controller calls.
+This preserves the room's surface walking, flight and metabolism for seed sweeps;
+`FlyRoomEnv` retains its simpler RL action/reward API. See `docs/BATCH_SIM.md` for
+interfaces, row isolation, RNG semantics and profiling.
+
 Optional live **neurotransmitter readouts** use `FlyBrain.nt_source` and
 `fb.neurotransmitters(batch_index=0)`. An `NTSource` publishes immutable CPU snapshots
 with body IDs, named channels, explicit units/ranges and a timestamp. With no source

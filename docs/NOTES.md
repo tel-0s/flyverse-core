@@ -1186,3 +1186,35 @@ SIMD-group CSR spmv, fused optic substep) through `torch.mps.compile_shader`. Fu
 Session 6, continued: the ray tracer as one Metal kernel plus a fix for a scene-repacking bug that hit every
 MPS trace (device `mps:0` != `mps`). Full-fidelity demo 0.29x -> 0.78x real time, `--fast` 0.39x -> 1.19x.
 The brain's own GPU time (~9 ms per 10 ms frame at full fidelity) is now the floor on the Mac.
+
+## BatchSim follow-up (September 11, 2026)
+
+The session 9 batching follow-up is implemented in `flyverse/batch_sim.py`, exported
+as `BatchSim`. One batched brain now serves independent full room environments:
+seed-specific fruit geometry and air phases, full sensory rays, surface walking,
+flight, metabolism and optional programs. The body constants come from the scalar
+objects; edge transitions/takeoff/landing use the scalar methods. Programs keep
+independent state and their neural stimuli are coalesced by selector/duration into
+batch-row rates. `scripts/batch_sustain.py` runs sweeps and saves per-row JSON;
+`scripts/profile_batch.py` measures full frames and CPU/CUDA work.
+
+Cluster checks: all 12 batching checks pass, including B=1 agreement with the demo
+(ordinary programs and `cx`), 200 mixed body-state comparison subtests, per-row
+scene/stimulus/reset isolation, and native B=4 checkpoints. The wider selected
+suite had 48 passes and 10 opt-in native-kernel tests skipped. A four-fly `cx`
+rollout completed, but this is engineering validation, not a new sustain result.
+
+B200 development timings (same integration settings, full brain, native events,
+cuSPARSE and graphs requested): plain mixed-fruit room, scalar 1.95 aggregate
+fly-s/wall-s -> B=16 8.09; `cx` + apple + fence, scalar 0.54 -> B=64 11.68. The latter
+is 54.8 ms per batch frame, so each individual rollout advances at 0.18x real time.
+GPU operation counts stay approximately constant across batch sizes; physical
+body/sense work for the `cx` configuration is 0.46 ms at B=1, 1.36 ms at B=64.
+The machine was shared, including validation overlap late in the second sweep;
+do not interpret the ratios as idle-GPU guarantees. Details and measurements:
+`docs/BATCH_SIM.md`, `docs/batch_profile.json`.
+
+RNG caveat: environment seeds retain their room/air meaning, but the existing
+batched brain uses one generator over (B,N), so changing B changes the neural
+draw layout. These are independent rollouts, not exact replays of B separately
+seeded Sim processes. Program RNGs are now included in BatchSim checkpoints.

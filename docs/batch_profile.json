@@ -1,0 +1,309 @@
+{
+  "date": "2026-09-11",
+  "source": "perf/batch-sim development snapshots based on 778498d",
+  "qualification": "Shared B200; no idle-GPU guarantee. Final part of cx sweep overlapped validation. Timing samples are separate from three-frame traces.",
+  "experiments": [
+    {
+      "device": "NVIDIA B200",
+      "options": {
+        "seed": 0,
+        "program": "none",
+        "fruit": "all",
+        "fence": false,
+        "escape_gating": false,
+        "brain_dt": 0.5,
+        "optic_dt": 1.0,
+        "cuda_graphs": true,
+        "cuda_kernels": true,
+        "event_driven": true,
+        "cuda_sparse": "torch",
+        "weight_dtype": "float32",
+        "device": null,
+        "batches": "1,4,8,16",
+        "frames": 50,
+        "warmup": 12,
+        "scalar": true,
+        "json": "out/profile_batch.json",
+        "trace": "out/batch_traces"
+      },
+      "results": [
+        {
+          "batch": 1,
+          "median_ms": 5.127204582095146,
+          "p90_ms": 5.3322733379900455,
+          "fly_frames_per_s": 195.0380531902565,
+          "fly_s_per_wall_s": 1.950380531902565,
+          "cuda_span_ms": 5.106047868728638,
+          "peak_allocated_mb": 208.11328125,
+          "neurons": 167106,
+          "brain_batch": 1,
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3039,
+            "gpu_event_us": 8462.21799999987
+          },
+          "kind": "scalar"
+        },
+        {
+          "batch": 1,
+          "median_ms": 5.940154544077814,
+          "p90_ms": 6.113406224176288,
+          "fly_frames_per_s": 168.34578840999603,
+          "fly_s_per_wall_s": 1.6834578840999601,
+          "cuda_span_ms": 5.919232130050659,
+          "peak_allocated_mb": 208.11376953125,
+          "neurons": 167106,
+          "brain_batch": 1,
+          "body_and_physical_senses_ms": 0.5655754031613469,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3068,
+            "gpu_event_us": 8646.44200000004
+          },
+          "kind": "batch"
+        },
+        {
+          "batch": 4,
+          "median_ms": 13.016689918003976,
+          "p90_ms": 13.161248713731766,
+          "fly_frames_per_s": 307.29778654920693,
+          "fly_s_per_wall_s": 3.0729778654920694,
+          "cuda_span_ms": 12.995007991790771,
+          "peak_allocated_mb": 249.04638671875,
+          "neurons": 167106,
+          "brain_batch": 4,
+          "body_and_physical_senses_ms": 0.6569632608443499,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3145,
+            "gpu_event_us": 27155.23100000003
+          },
+          "kind": "batch"
+        },
+        {
+          "batch": 8,
+          "median_ms": 15.078791417181492,
+          "p90_ms": 15.216975752264261,
+          "fly_frames_per_s": 530.546499295986,
+          "fly_s_per_wall_s": 5.30546499295986,
+          "cuda_span_ms": 15.058256149291992,
+          "peak_allocated_mb": 297.185546875,
+          "neurons": 167106,
+          "brain_batch": 8,
+          "body_and_physical_senses_ms": 0.8189514232799411,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3144,
+            "gpu_event_us": 30825.8369999998
+          },
+          "kind": "batch"
+        },
+        {
+          "batch": 16,
+          "median_ms": 19.783222465775907,
+          "p90_ms": 20.034164073877037,
+          "fly_frames_per_s": 808.7661162219293,
+          "fly_s_per_wall_s": 8.087661162219293,
+          "cuda_span_ms": 19.760831832885742,
+          "peak_allocated_mb": 398.9794921875,
+          "neurons": 167106,
+          "brain_batch": 16,
+          "body_and_physical_senses_ms": 0.9293829184025526,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3143,
+            "gpu_event_us": 41674.438
+          },
+          "kind": "batch"
+        }
+      ]
+    },
+    {
+      "device": "NVIDIA B200",
+      "options": {
+        "seed": 0,
+        "program": "cx",
+        "fruit": "apple",
+        "fence": true,
+        "escape_gating": false,
+        "brain_dt": 0.5,
+        "optic_dt": 1.0,
+        "cuda_graphs": true,
+        "cuda_kernels": true,
+        "event_driven": true,
+        "cuda_sparse": "torch",
+        "weight_dtype": "float32",
+        "device": null,
+        "batches": "1,8,16,32,64",
+        "frames": 50,
+        "warmup": 12,
+        "scalar": true,
+        "json": "out/profile_batch_cx.json",
+        "trace": "out/batch_cx_traces"
+      },
+      "results": [
+        {
+          "batch": 1,
+          "median_ms": 18.487059976905584,
+          "p90_ms": 18.665641406551003,
+          "fly_frames_per_s": 54.09188920516407,
+          "fly_s_per_wall_s": 0.5409188920516408,
+          "cuda_span_ms": 18.468575477600098,
+          "peak_allocated_mb": 209.001953125,
+          "neurons": 167106,
+          "brain_batch": 1,
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3870,
+            "gpu_event_us": 10086.453000000005
+          },
+          "kind": "scalar"
+        },
+        {
+          "batch": 1,
+          "median_ms": 11.678200447931886,
+          "p90_ms": 11.781347496435046,
+          "fly_frames_per_s": 85.62963141954734,
+          "fly_s_per_wall_s": 0.8562963141954734,
+          "cuda_span_ms": 11.657759666442871,
+          "peak_allocated_mb": 209.00244140625,
+          "neurons": 167106,
+          "brain_batch": 1,
+          "body_and_physical_senses_ms": 0.4628154821693897,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3898,
+            "gpu_event_us": 10235.662999999817
+          },
+          "kind": "batch"
+        },
+        {
+          "batch": 8,
+          "median_ms": 19.219506881199777,
+          "p90_ms": 20.315490965731442,
+          "fly_frames_per_s": 416.24376990782605,
+          "fly_s_per_wall_s": 4.162437699078261,
+          "cuda_span_ms": 19.20036792755127,
+          "peak_allocated_mb": 308.0029296875,
+          "neurons": 167106,
+          "brain_batch": 8,
+          "body_and_physical_senses_ms": 0.6283879186958075,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3973,
+            "gpu_event_us": 32823.39200000003
+          },
+          "kind": "batch"
+        },
+        {
+          "batch": 16,
+          "median_ms": 25.427981629036367,
+          "p90_ms": 25.741423619911075,
+          "fly_frames_per_s": 629.2280776909757,
+          "fly_s_per_wall_s": 6.292280776909758,
+          "cuda_span_ms": 25.40708827972412,
+          "peak_allocated_mb": 419.2373046875,
+          "neurons": 167106,
+          "brain_batch": 16,
+          "body_and_physical_senses_ms": 0.6931100599467754,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3972,
+            "gpu_event_us": 41721.25400000001
+          },
+          "kind": "batch"
+        },
+        {
+          "batch": 32,
+          "median_ms": 35.27041641063988,
+          "p90_ms": 35.56611961685121,
+          "fly_frames_per_s": 907.2759342400815,
+          "fly_s_per_wall_s": 9.072759342400815,
+          "cuda_span_ms": 35.250144958496094,
+          "peak_allocated_mb": 643.01611328125,
+          "neurons": 167106,
+          "brain_batch": 32,
+          "body_and_physical_senses_ms": 0.966691137291491,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3976,
+            "gpu_event_us": 59042.7029999998
+          },
+          "kind": "batch"
+        },
+        {
+          "batch": 64,
+          "median_ms": 54.77630998939276,
+          "p90_ms": 55.112240579910576,
+          "fly_frames_per_s": 1168.388305316539,
+          "fly_s_per_wall_s": 11.683883053165388,
+          "cuda_span_ms": 54.75556755065918,
+          "peak_allocated_mb": 1091.68115234375,
+          "neurons": 167106,
+          "brain_batch": 64,
+          "body_and_physical_senses_ms": 1.3575225183740258,
+          "work_per_frame": {
+            "brain_frames": 1,
+            "ray_batches": 1,
+            "sensory_encodings": 4,
+            "motor_readouts": 1
+          },
+          "profile": {
+            "frames": 3,
+            "gpu_events": 3975,
+            "gpu_event_us": 93736.02300000036
+          },
+          "kind": "batch"
+        }
+      ]
+    }
+  ]
+}

@@ -49,6 +49,17 @@ views and `V` cycles retinal both/colour/contrast. `--screenshot out/console.png
 requires an optional readout source, not NT labels; see [the NT interface](docs/NT_READOUT.md).
 Save states are ~10 MB and resume bit-exactly.
 
+For headless sweeps of the full room model, `BatchSim` runs independent environments
+through one batched brain, including sensing, surface walking, flight and metabolism:
+
+```powershell
+python scripts/batch_sustain.py --batch 8 --minutes 5 --program cx --fruit apple --fence --cuda-graphs --cuda-kernels --event-driven --cuda-sparse torch --json out/batch.json
+```
+
+See [batched room simulations](docs/BATCH_SIM.md) for per-row configuration, checkpoints,
+random-stream semantics and profiling. The interactive demo and RL environment keep
+their existing APIs.
+
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
 `FLYVERSE_DATA`); only `body-annotations`, `body-neurotransmitters` and `connectome-weights` are used
 (1.1 GB). Torch backend: CUDA, else Apple MPS, else CPU (`FLYVERSE_DEVICE`); on MPS/CPU the synaptic
