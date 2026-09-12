@@ -1,18 +1,58 @@
 """Build flyverse/data/type_map_central.csv and flyverse/data/expression_central.csv from the two central-brain
-single-cell atlases (Davie et al. 2018 Cell, GEO GSE107451; Fly Cell Atlas 2022 Science, head 10x stringent loom)
-and report MaleCNS coverage by tier.
+single-cell atlases (Davie et al. 2018 Cell, GEO GSE107451; Fly Cell Atlas 2022 Science, head 10x stringent loom),
+report MaleCNS v1.0 coverage by tier and run the transmitter cross-check (marker genes vs MaleCNS consensus nt).
 
-Inputs (scratchpad): davie_cluster_expr.parquet, fca_cluster_expr.parquet (from agg_davie.py / agg_fca.py),
-malecns_types.parquet; cache/neurons.parquet; raw weights feather (for sign-0-inclusive output counts).
+Step 3 of 3 of the central-brain expression build (run order, all CPU, from the repo root):
+    PYTHONIOENCODING=utf-8 python scripts/build_central_agg_davie.py   # -> data/external/central/derived/davie_cluster_expr.parquet
+    PYTHONIOENCODING=utf-8 python scripts/build_central_agg_fca.py     # -> data/external/central/derived/fca_cluster_expr.parquet
+    PYTHONIOENCODING=utf-8 python scripts/build_central_map.py         # this script
+Inputs: the two derived parquets above; cache/neurons.parquet and cache/W_post_pre.npz (flyverse.connectome.load() builds them);
+        the raw MaleCNS weights feather at flyverse.connectome.DATA_DIR (env FLYVERSE_DATA) for the sign-0-inclusive 'raw'
+        output-synapse counts (optional: without it the raw columns are NaN).
+Outputs: flyverse/data/type_map_central.csv, flyverse/data/expression_central.csv (shipped, consumed by
+        scripts/build_receptor_table.py), out/coverage_central.md (coverage tables + central-class table + unmatched labels),
+        out/nt_crosscheck_central.md (section 4 of docs/audits/receptor_sources_central.md), out/central_summary.json.
+
+'raw' output-synapse bases: every raw number in the coverage tables and in the central-class table is NODE-RESTRICTED (edges
+with both endpoints in the model's 167,106-node set, the base used by the NT audit's typed total 123,200,528); the central-class
+table adds an 'out syn (raw, unrestricted)' column = the same presynaptic bodies' weight sum over ALL postsynaptic bodies of the
+feather (e.g. PAM 222,136 node-restricted vs 271,752 unrestricted). |W| = signed synapses of c.W (sign-0 presynaptic cells --
+DA / OA / 5-HT / unknown -- contribute 0).
+
+Marker-call rule (transmitter cross-check): score per transmitter = mean over its synthesis / transport genes of the cluster's
+mean_log1p_cp10k (ACh = VAChT, ChAT; GABA = Gad1, VGAT; Glu = VGlut; DA = ple, DAT; OA = Tdc2, Tbh; 5-HT = SerT, Trh;
+His = Hdc). A call requires score >= MARKER_THRESHOLD[source] and frac_expr of the best marker gene >= MARKER_FRAC_MIN;
+'X?' = above threshold but < 2x the runner-up; 'none' = marker-silent. The threshold is per source because FCA is nuclear RNA
+with cp10k over 13,056 retained genes: confirmed cholinergic FCA labels (L2-L5, Tm4, Tm20, TmY4, LC10/12/17, T2-T5; MaleCNS
+ACh 100 %) score 0.62-0.98 on mean(VAChT, ChAT), while the marker-silent FCA labels (T1, at4, Gr21a/63a, R7/R8/outer
+photoreceptors) score <= 0.39; Davie whole-cell clusters of confirmed cholinergic types score 1.3-2.0 and its marker-silent
+clusters (T1, IPC, Hug, Crz, LNv, Photoreceptors) <= 0.97, so Davie keeps 1.0.
 """
-import re, sys, json, numpy as np, pandas as pd, scipy.sparse as sp
+import json
+import re
+import sys
 from pathlib import Path
 
-ROOT = Path(r"D:\Projects\flyverse")
-SCR = Path(r"<workstation-home>\AppData\Local\Temp\claude\D--Projects-flyverse\d280c0e1-e89c-49ce-943c-279a614bcc17\scratchpad")
-OUT_MAP = ROOT / "flyverse/data/type_map_central.csv"
-OUT_EXPR = ROOT / "flyverse/data/expression_central.csv"
-RAW_W = Path(r"D:\Datasets\male-cns-connectome-v1.0\flat-connectome\connectome-weights-male-cns-v1.0-minconf-0.5.feather")
+import numpy as np
+import pandas as pd
+import scipy.sparse as sp
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from flyverse.connectome import DATA_DIR, WEIGHTS_FILE  # noqa: E402
+
+DERIVED = ROOT / "data" / "external" / "central" / "derived"
+OUT_DIR = ROOT / "out"
+OUT_MAP = ROOT / "flyverse" / "data" / "type_map_central.csv"
+OUT_EXPR = ROOT / "flyverse" / "data" / "expression_central.csv"
+RAW_W = DATA_DIR / WEIGHTS_FILE
+
+MARKER_THRESHOLD = {"davie2018": 1.0, "fca2022": 0.5}
+MARKER_FRAC_MIN = 0.3
+MARK = {"ACh": ["VAChT", "ChAT"], "GABA": ["Gad1", "VGAT"], "Glu": ["VGlut"], "DA": ["ple", "DAT"], "OA": ["Tdc2", "Tbh"],
+        "5-HT": ["SerT", "Trh"], "His": ["Hdc"]}
+SHORT = {"acetylcholine": "ACh", "gaba": "GABA", "glutamate": "Glu", "dopamine": "DA", "octopamine": "OA", "serotonin": "5-HT",
+         "histamine": "His", "unknown": "unk"}
 
 # ---------------------------------------------------------------- MaleCNS per-type table
 neurons = pd.read_parquet(ROOT / "cache/neurons.parquet")
@@ -22,15 +62,19 @@ neurons["out_syn_signed"] = np.asarray(abs(W).sum(axis=0)).ravel()
 if RAW_W.exists():
     import pyarrow.feather as pf
     w = pf.read_table(RAW_W, columns=["body_pre", "body_post", "weight"]).to_pandas()
+    raw_all = w.groupby("body_pre").weight.sum()  # unrestricted: all postsynaptic bodies of the feather
     node = set(neurons.bodyId.to_numpy())  # both endpoints in the model's node set (Traced + photoreceptors), as in the NT audit
     w = w[w.body_pre.isin(node) & w.body_post.isin(node)]
     raw = w.groupby("body_pre").weight.sum()
     neurons["out_syn_raw"] = neurons.bodyId.map(raw).fillna(0).astype(np.int64)
-    del w
+    neurons["out_syn_raw_unrestricted"] = neurons.bodyId.map(raw_all).fillna(0).astype(np.int64)
+    del w, raw_all
 else:
+    print(f"WARNING: {RAW_W} not found; raw output-synapse columns are NaN", file=sys.stderr)
     neurons["out_syn_raw"] = np.nan
+    neurons["out_syn_raw_unrestricted"] = np.nan
 T = neurons.groupby("type").agg(n_cells=("bodyId", "size"), out_syn_signed=("out_syn_signed", "sum"),
-                                out_syn_raw=("out_syn_raw", "sum"),
+                                out_syn_raw=("out_syn_raw", "sum"), out_syn_raw_unrestricted=("out_syn_raw_unrestricted", "sum"),
                                 superclass=("superclass", lambda s: s.value_counts(dropna=False).index[0]),
                                 klass=("class", lambda s: s.value_counts(dropna=False).index[0]),
                                 subclass=("subclass", lambda s: s.value_counts(dropna=False).index[0]),
@@ -40,6 +84,7 @@ types = set(T.index)
 OPTIC_SC = {"ol_intrinsic", "visual_projection", "ol_sensory"}
 CENTRAL_SC = {"cb_intrinsic", "cb_sensory", "cb_endocrine", "cb_motor", "cb_efferent", "visual_centrifugal"}
 BRAIN_SC = OPTIC_SC | CENTRAL_SC | {"descending_neuron"}
+
 
 def sel(rule):
     """rule: 'exact:NAME' | 'list:A|B|C' | 're:REGEX' | 'query:<pandas query on T>'."""
@@ -54,6 +99,7 @@ def sel(rule):
         return sorted(T.query(arg).index)
     raise ValueError(rule)
 
+
 # ---------------------------------------------------------------- mapping rules
 # (source, source_name, rule, tier, evidence). tier: exact | alias | fuzzy | class | unmatched.
 #  exact  : the source label (or its FBbt type token) is a MaleCNS type name.
@@ -63,18 +109,21 @@ def sel(rule):
 DAV = "davie2018"; FCA = "fca2022"
 CLOCK = "list:s-LNv|l-LNv|5thsLNv_LNd6|LNd_b|LNd_c|LPN_a|LPN_b|DN1a|DN1pA|DN1pB"
 NONVNC = "superclass in ['cb_intrinsic','cb_sensory','cb_endocrine','cb_motor','visual_centrifugal','visual_projection','ol_intrinsic','descending_neuron']"
+NT_CLASS_NOTE = ("NT-defined class (MaleCNS side selected by consensus nt), circular for a transmitter cross-check, usable as a "
+                 "class-prior receptor profile only; the non-VNC filter includes descending_neuron, so the selection reaches DN "
+                 "types and CX types (FB tangential / ExR / PFGs / PFR_a / EL) and LB2b -- see the coverage report")
 rules = [
-    # ---- Davie 2018 (GEO metadata `annotation`; Table S2 cluster ids in evidence) — central brain
+    # ---- Davie 2018 (GEO metadata `annotation`; Table S2 cluster ids in evidence) -- central brain
     (DAV, "G-KC", r"re:^KCg", "fuzzy", "Table S2 res2 cluster 8 'G-KC' (Awasaki 2000; Crocker 2016); sNPF-high, trio-low (mean log1p cp10k sNPF 3.57, trio 0.10); rule ^KCg -> all gamma KC types"),
     (DAV, "A/B-KC", r"re:^KCab", "fuzzy", "Table S2 res2 cluster 22 'a/b-KC' (Crocker 2016; Johard 2008); sNPF 2.93, trio 0.28; rule ^KCab"),
     (DAV, "A/B*-KC", r"re:^KCa'b'", "fuzzy", "Table S2 res2 cluster 28 \"a'/b'-KC\" (Medioni 2014); trio 1.90, DAT 1.52 (alpha'/beta' KCs express DAT); rule ^KCa'b'"),
-    (DAV, "PAM", r"re:^PAM\d\d$", "fuzzy", "Table S2 subcluster of 42 'PAM (Fer2(+)) neurons' (Bou Dib 2014); ple 3.17, DAT 4.12, Fer2 1.56; rule ^PAM\\d\\d"),
-    (DAV, "Dopaminergic", "query:nt == 'dopamine' and not type.str.match('^PAM') and " + NONVNC, "class", "Table S2 res2 cluster 42 'Dopaminergic' minus the PAM subcluster (= 'Fer2(-) neurons'); ple 3.35, DAT 3.33, Fer2 0.36; MaleCNS side = consensus nt dopamine, non-PAM, non-VNC (PPL1/PPL2/PPM/PAL and other DA types)"),
-    (DAV, "Serotonergic", "query:nt == 'serotonin' and " + NONVNC, "class", "Table S2 res2 cluster 38 'Serotonergic' (Couch 2004); SerT 1.26, Trh 1.80; MaleCNS side = consensus nt serotonin, non-VNC (NT-defined class, not a type match)"),
-    (DAV, "Octopaminergic", "query:nt == 'octopamine' and " + NONVNC, "class", "Table S2 subcluster of 64 'Octopaminergic' (Tdc2 2.45, Tbh 2.56); MaleCNS side = consensus nt octopamine, non-VNC (OA-VUMa/VPM/ASM/AL2i and others); NT-defined class"),
+    (DAV, "PAM", r"re:^PAM\d\d$", "fuzzy", "Table S2 subcluster of 42 'PAM (Fer2(+)) neurons' (Bou Dib 2014); ple 3.17, DAT 4.12, Fer2 1.56; rule ^PAM\\d\\d (15 types, 316 cells; raw output 222,136 node-restricted / 271,752 unrestricted, |W| 0 because dopamine is sign 0)"),
+    (DAV, "Dopaminergic", "query:nt == 'dopamine' and not type.str.match('^PAM') and " + NONVNC, "class", "Table S2 res2 cluster 42 'Dopaminergic' minus the PAM subcluster (= 'Fer2(-) neurons'); ple 3.35, DAT 3.33, Fer2 0.36; MaleCNS side = consensus nt dopamine, non-PAM, non-VNC (PPL1/PPL2/PPM/PAL and other DA types); " + NT_CLASS_NOTE),
+    (DAV, "Serotonergic", "query:nt == 'serotonin' and " + NONVNC, "class", "Table S2 res2 cluster 38 'Serotonergic' (Couch 2004); SerT 1.26, Trh 1.80; MaleCNS side = consensus nt serotonin, non-VNC; " + NT_CLASS_NOTE),
+    (DAV, "Octopaminergic", "query:nt == 'octopamine' and " + NONVNC, "class", "Table S2 subcluster of 64 'Octopaminergic' (Tdc2 2.45, Tbh 2.56); MaleCNS side = consensus nt octopamine, non-VNC (OA-VUMa/VPM/ASM/AL2i and others); " + NT_CLASS_NOTE),
     (DAV, "Tyraminergic", "", "unmatched", "Table S2 subcluster of 64 'Tyraminergic' (Tdc2 2.59, Tbh 0.11); MaleCNS has no tyramine NT label and no tyraminergic type names"),
-    (DAV, "Clock", CLOCK, "class", "Table S2 res2 cluster 36 'Clock neurons' (Abruzzi 2017; Klarsfeld 2004; Park 2000); 389 cells is ~2-3x the ~150 canonical clock neurons, so the cluster is broader than the list; MaleCNS side = the 10 named clock types (no DN2/DN3 names exist in MaleCNS v1.0)"),
-    (DAV, "LNv", "list:s-LNv|l-LNv", "fuzzy", "Table S2 sub-clustering 'LNv' (Pdf-expressing cells; Klarsfeld 2004); Pdf 6.29; rule = the two Pdf+ LNv types (5th s-LNv is Pdf-negative and excluded)"),
+    (DAV, "Clock", CLOCK, "class", "Table S2 res2 cluster 36 'Clock neurons' (Abruzzi 2017; Klarsfeld 2004; Park 2000); 389 cells is ~2-3x the ~150 canonical clock neurons, so the cluster is broader than the list; MaleCNS side = the 10 named clock types (no DN2/DN3 names exist in MaleCNS v1.0). Superclass note: s-LNv (8 cells) and 5thsLNv_LNd6 (4) are visual_projection and l-LNv (8) is ol_intrinsic in MaleCNS, so only 7 of the 10 types (44 of 52 cells) count in the central-brain coverage tables"),
+    (DAV, "LNv", "list:s-LNv|l-LNv", "fuzzy", "Table S2 sub-clustering 'LNv' (Pdf-expressing cells; Klarsfeld 2004); Pdf 6.29; rule = the two Pdf+ LNv types (5th s-LNv is Pdf-negative and excluded); s-LNv is superclass visual_projection, l-LNv ol_intrinsic (neither counts as central brain)"),
     (DAV, "DN1", r"re:^DN1(a|pA|pB)$", "fuzzy", "Table S2 res2 cluster 86 'DN1' (Abruzzi 2017; Kunst 2014); VGlut 5.01, Dh31 4.80 (DN1p are glutamatergic/Dh31+); rule ^DN1(a|pA|pB)"),
     (DAV, "MBON", "query:klass == 'MBON'", "class", "Table S2 res2 cluster 57 'MBON' (mapping to Crocker 2016); MaleCNS class MBON"),
     (DAV, "Olfactory_projection_neurons", r"re:_(ad|l)PN$", "fuzzy", "Table S2 res2 cluster 27 'OPN: adPN and lPN' (Komiyama & Luo 2007; Li 2017); ChAT 1.60, acj6 0.09; rule = uniglomerular adPN/lPN types (_adPN$|_lPN$); vPN/ilPN/lvPN excluded"),
@@ -110,7 +159,7 @@ rules = [
     # ---- Davie 2018 optic-lobe labels (exact / fuzzy by name)
     (DAV, "TmY14", "exact:TmY14", "exact", "Table S2 res2 cluster 11 (mapping to Konstantinides 2018); VGlut 4.04"),
     (DAV, "Mi1", "exact:Mi1", "exact", "Table S2 res2 cluster 26 (Hasegawa 2013); ChAT 2.10"),
-    (DAV, "T1", "exact:T1", "exact", "Table S2 res2 cluster 37 (Hamanaka & Meinertzhagen 2010); ort 2.32"),
+    (DAV, "T1", "exact:T1", "exact", "Table S2 res2 cluster 37 (Hamanaka & Meinertzhagen 2010); ort 0.97 mean log1p cp10k, 55 % of cells (mean cp10k 3.04)"),
     (DAV, "Tm9", "exact:Tm9", "exact", "Table S2 res2 cluster 18 (mapping)"),
     (DAV, "Tm5c", "exact:Tm5c", "exact", "Table S2 res2 cluster 39 'Dm8/Tm5c' sub-annotation; VGlut 3.91"),
     (DAV, "Tm5ab", "list:Tm5a|Tm5b", "fuzzy", "Table S2 res2 cluster 41 'Tm5ab' (Konstantinides 2018); rule Tm5a|Tm5b"),
@@ -139,21 +188,21 @@ rules = [
     (DAV, "Cortex_glia", "", "unmatched", "glia"), (DAV, "Perineurial_glia", "", "unmatched", "glia"),
     (DAV, "Subperineurial_glia", "", "unmatched", "glia"), (DAV, "Chiasm_glia", "", "unmatched", "glia"),
     (DAV, "Plasmatocytes", "", "unmatched", "hemocytes"),
-    # ---- FCA 2022 head (col_attrs/annotation) — central brain
+    # ---- FCA 2022 head (col_attrs/annotation) -- central brain
     (FCA, "gamma Kenyon cell", r"re:^KCg", "fuzzy", "FCA annotation (FBbt); sNPF-high; rule ^KCg"),
     (FCA, "alpha/beta Kenyon cell", r"re:^KCab", "fuzzy", "FCA annotation (FBbt); rule ^KCab"),
     (FCA, "alpha'/beta' Kenyon cell", r"re:^KCa'b'", "fuzzy", "FCA annotation (FBbt); rule ^KCa'b'"),
     (FCA, "Kenyon cell", "query:klass == 'Kenyon_Cell'", "class", "FCA annotation (FBbt, unresolved KC); MaleCNS class Kenyon_Cell"),
-    (FCA, "dopaminergic PAM neuron", r"re:^PAM\d\d$", "fuzzy", "FCA annotation (FBbt); rule ^PAM\\d\\d"),
-    (FCA, "dopaminergic neuron", "query:nt == 'dopamine' and not type.str.match('^PAM') and " + NONVNC, "class", "FCA annotation (FBbt), 25 nuclei; MaleCNS side = consensus nt dopamine, non-PAM, non-VNC"),
-    (FCA, "octopaminergic/tyraminergic neuron", "query:nt == 'octopamine' and " + NONVNC, "class", "FCA annotation (FBbt), Tdc2+ mixed OA/TA; MaleCNS side = consensus nt octopamine, non-VNC (tyraminergic cells have no MaleCNS label) -> mixed"),
+    (FCA, "dopaminergic PAM neuron", r"re:^PAM\d\d$", "fuzzy", "FCA annotation (FBbt); rule ^PAM\\d\\d (15 types, 316 cells; raw output 222,136 node-restricted / 271,752 unrestricted)"),
+    (FCA, "dopaminergic neuron", "query:nt == 'dopamine' and not type.str.match('^PAM') and " + NONVNC, "class", "FCA annotation (FBbt), 25 nuclei; MaleCNS side = consensus nt dopamine, non-PAM, non-VNC; " + NT_CLASS_NOTE),
+    (FCA, "octopaminergic/tyraminergic neuron", "query:nt == 'octopamine' and " + NONVNC, "class", "FCA annotation (FBbt), Tdc2+ mixed OA/TA; MaleCNS side = consensus nt octopamine, non-VNC (tyraminergic cells have no MaleCNS label) -> mixed; " + NT_CLASS_NOTE),
     (FCA, "antennal lobe projection neuron", "query:klass == 'ALPN'", "class", "FCA annotation (FBbt), 23 nuclei; MaleCNS class ALPN"),
     (FCA, "Poxn neuron", r"re:^ER[1-4]", "class", "FCA annotation 'Poxn neuron' (102 nuclei); Poxn+ dorsal cluster = EB ring neurons R1-R4 (Omoto 2019; Minocha 2017); mixed with deutocerebral Poxn neurons; MaleCNS ER1-ER4"),
     (FCA, "olfactory receptor neuron", r"re:^ORN_", "class", "FCA annotation (FBbt); MaleCNS class olfactory (ORN_* types)"),
     (FCA, "adult olfactory receptor neuron Gr21a/63a", "exact:ORN_V", "alias", "Gr21a/Gr63a CO2 ORNs project to glomerulus V (Suh 2004; Jones 2007) -> ORN_V"),
     (FCA, "antennal trichoid sensillum at4", "list:ORN_VA1v|ORN_DL3|ORN_VA1d", "fuzzy", "at4 houses Or47b (VA1v), Or65a/b/c (DL3), Or88a (VA1d) (Couto 2005); 7 nuclei"),
-    (FCA, "Johnston organ neuron", r"re:^JO-", "class", "FCA annotation (FBbt); MaleCNS JO-* types (class mechanosensory)"),
-    (FCA, "auditory sensory neuron", "query:subclass == 'auditory'", "class", "FCA annotation (FBbt); MaleCNS subclass auditory (JO-A/JO-B/JO-CA types)"),
+    (FCA, "Johnston organ neuron", r"re:^JO-", "class", "FCA annotation (FBbt), 541 nuclei; MaleCNS JO-* types (class mechanosensory, all 34 types). Specificity note: this narrower FBbt term maps to all JO types while the broader 'auditory sensory neuron' (706 nuclei) maps only to the subclass-auditory JO types -- inverted specificity, harmless for coverage"),
+    (FCA, "auditory sensory neuron", "query:subclass == 'auditory'", "class", "FCA annotation (FBbt), 706 nuclei -- the broader FBbt term (JO neurons are a subset of auditory sensory neurons) yet mapped to the narrower MaleCNS subclass auditory (JO-A/JO-B/JO-CA types only); inverted specificity relative to 'Johnston organ neuron' (541 nuclei -> all 34 JO types); harmless for coverage, but the two labels' receptor profiles should be read as one JO population"),
     # ---- FCA optic lobe (FBbt label -> type token)
     (FCA, "columnar neuron T1", "exact:T1", "exact", "label token T1"),
     (FCA, "T neuron T4/T5a-b", "list:T4a|T4b|T5a|T5b", "fuzzy", "label token T4/T5a-b -> T4a,T4b,T5a,T5b"),
@@ -173,15 +222,15 @@ rules = [
     (FCA, "medullary intrinsic neuron Mi1", "exact:Mi1", "exact", "label token Mi1"),
     (FCA, "medullary intrinsic neuron Mi4", "exact:Mi4", "exact", "label token Mi4"),
     (FCA, "medullary intrinsic neuron Mi9", "exact:Mi9", "exact", "label token Mi9"),
-    (FCA, "medullary intrinsic neuron Mi15", "exact:Mi15", "exact", "label token Mi15"),
+    (FCA, "medullary intrinsic neuron Mi15", "exact:Mi15", "exact", "label token Mi15; profile is DA-leaning (DAT 1.97, ple 0.75 pooled / 0.63 male) with VAChT 1.25 against MaleCNS ACh 100 % (1,151 cells) -- listed as a disagreement in the cross-check"),
     (FCA, "transmedullary neuron Tm1", "exact:Tm1", "exact", "label token Tm1"),
     (FCA, "transmedullary neuron Tm2", "exact:Tm2", "exact", "label token Tm2"),
-    (FCA, "transmedullary neuron Tm3a", "exact:Tm3", "alias", "Tm3a (Oezel 2021 subtype label) -> MaleCNS Tm3 (single type)"),
+    (FCA, "transmedullary neuron Tm3a", "exact:Tm3", "alias", "Tm3a (Oezel 2021 subtype label) -> MaleCNS Tm3 (single type); a SUBSET, not a synonym: Oezel's Tm3a is about half of Tm3 (Tm3a/Tm3b split), so this profile describes part of the MaleCNS type"),
     (FCA, "transmedullary neuron Tm4", "exact:Tm4", "exact", "label token Tm4"),
     (FCA, "transmedullary neuron Tm9", "exact:Tm9", "exact", "label token Tm9"),
     (FCA, "transmedullary neuron Tm20", "exact:Tm20", "exact", "label token Tm20"),
     (FCA, "transmedullary neuron Tm5c", "exact:Tm5c", "exact", "label token Tm5c"),
-    (FCA, "transmedullary neuron Tm29", "exact:Tm29", "exact", "label token Tm29"),
+    (FCA, "transmedullary neuron Tm29", "exact:Tm29", "exact", "label token Tm29. CAUTION -- exact tier SUSPECT (name collision likely): the FCA Tm29 profile is cholinergic (VAChT 1.24 mean log1p cp10k, 56 % of 115 nuclei; ChAT 0.47; VGlut 0.18, 9 %) whereas MaleCNS Tm29 (= FlyWire Tm5d, 544 cells) is glutamate 100 %; flyverse/data/type_aliases.csv records 'NT pred OL=glutamate FW=acetylcholine (MISMATCH)' for this type. Listed as a disagreement in the cross-check; do not use as a Tm29 receptor profile without resolving the Oezel/FCA Tm29 vs Nern 2025 Tm29 correspondence"),
     (FCA, "transmedullary Y neuron TmY4", "exact:TmY4", "exact", "label token TmY4"),
     (FCA, "transmedullary Y neuron TmY5a", "exact:TmY5a", "exact", "label token TmY5a"),
     (FCA, "transmedullary Y neuron TmY8", "", "unmatched", "MaleCNS v1.0 has no type named TmY8 (renamed in the Nern 2025 optic-lobe nomenclature; correspondence not established here)"),
@@ -218,8 +267,11 @@ rules = [
 ]
 
 # expression tables (per-cluster aggregates)
-dav = pd.read_parquet(SCR / "davie_cluster_expr.parquet")
-fca = pd.read_parquet(SCR / "fca_cluster_expr.parquet")
+for p in (DERIVED / "davie_cluster_expr.parquet", DERIVED / "fca_cluster_expr.parquet"):
+    if not p.exists():
+        sys.exit(f"missing {p}; run scripts/build_central_agg_davie.py and scripts/build_central_agg_fca.py first")
+dav = pd.read_parquet(DERIVED / "davie_cluster_expr.parquet")
+fca = pd.read_parquet(DERIVED / "fca_cluster_expr.parquet")
 dav_labels = list(pd.unique(dav.annotation)); fca_labels = list(pd.unique(fca.annotation))
 covered = {(s, n) for s, n, *_ in rules}
 for lab in dav_labels:
@@ -247,9 +299,12 @@ hdr = ("# type_map_central.csv -- source cluster/annotation -> MaleCNS v1.0 type
        "# tier: exact = source label (or its type token) is a MaleCNS type name; alias = documented synonym of one type; fuzzy = the label names a\n"
        "#       family that MaleCNS splits into several types, selected by the name rule in `rule` (re:regex | list:A|B); class = the label is a cell\n"
        "#       class, MaleCNS side selected by class/subclass/nt columns or a curated list (`rule`); unmatched = no evidenced correspondence.\n"
+       "#       Rows whose `rule` starts with query:nt are NT-defined classes (circular for a transmitter cross-check). 'CAUTION' in `evidence`\n"
+       "#       marks an exact-name tier that is suspect (fca2022 Tm29); 'SUBSET' marks an alias that covers part of the type (fca2022 Tm3a -> Tm3).\n"
        "# One row per (source_name, malecns_type). n_cells_malecns = MaleCNS cells of that type; n_cells_source = cells/nuclei in the source cluster.\n"
        "# Sex: davie2018 is mixed-sex (male 27,854 / female 29,048), fca2022 head is mixed (male 47,409 / female 49,105 / mix 4,013); MaleCNS is male.\n"
-       "# Built by scratchpad/build_central_map.py (session 10 NT integration workflow, source key central).\n")
+       "# Built by scripts/build_central_map.py after scripts/build_central_agg_davie.py and scripts/build_central_agg_fca.py\n"
+       "# (inputs data/external/central/, git-ignored; `python scripts/fetch_data.py --external central`); documented in docs/audits/receptor_sources_central.md.\n")
 OUT_MAP.parent.mkdir(parents=True, exist_ok=True)
 with open(OUT_MAP, "w", encoding="utf-8", newline="") as fh:
     fh.write(hdr)
@@ -267,6 +322,8 @@ SYN = {"KaiR1D": ["KaiR1D", "CG3822"], "Octalpha2R": ["Octalpha2R", "CG18208"], 
        "mAChR-B": ["mAChR-B", "CG7918"], "mAChR-C": ["mAChR-C", "CG12796"], "Octbeta1R": ["Octbeta1R", "CG6919"],
        "Octbeta2R": ["Octbeta2R", "CG6989"], "Octbeta3R": ["Octbeta3R", "CG42244"], "Nmdar1": ["Nmdar1", "NMDAR1"],
        "Nmdar2": ["Nmdar2", "NMDAR2"], "GluClalpha": ["GluClalpha", "GluCl"]}
+
+
 def take(df, src):
     gcols = set(df.columns)
     out = pd.DataFrame({"source": src, "source_name": df.annotation, "metric": df.metric, "n_cells": df.n_cells,
@@ -279,6 +336,8 @@ def take(df, src):
             missing.append(g)
     print(src, "genes absent from source:", missing)
     return out
+
+
 E = pd.concat([take(dav, DAV), take(fca, FCA)], ignore_index=True)
 E = E[E.metric.isin(["mean_log1p_cp10k", "frac_expr"])]
 ehdr = ("# expression_central.csv -- per-cluster expression of transmitter-synthesis and receptor genes from the two central-brain atlases.\n"
@@ -287,7 +346,8 @@ ehdr = ("# expression_central.csv -- per-cluster expression of transmitter-synth
         "# davie2018: GEO GSE107451 57k-cell 10x matrix, cluster = metadata `annotation`, all ages (0-50 d) and both sexes pooled.\n"
         "# fca2022: FCA head 10x stringent loom (s_fca_biohub_head_10x.loom), cluster = col_attrs/annotation; sex_subset = all (pooled) or male.\n"
         "# NaN = gene absent from that source's gene list (fca2022 lacks mAChR-C). Davie symbols CG3822 / CG18208 read as KaiR1D / Octalpha2R.\n"
-        "# Built by scratchpad/build_central_map.py.\n")
+        "# Built by scripts/build_central_map.py after scripts/build_central_agg_davie.py and scripts/build_central_agg_fca.py\n"
+        "# (inputs data/external/central/, git-ignored; `python scripts/fetch_data.py --external central`); documented in docs/audits/receptor_sources_central.md.\n")
 with open(OUT_EXPR, "w", encoding="utf-8", newline="") as fh:
     fh.write(ehdr)
     E.round(4).to_csv(fh, index=False)
@@ -295,28 +355,44 @@ print("wrote", OUT_EXPR, E.shape)
 
 # ---------------------------------------------------------------- coverage
 order = {"exact": 0, "alias": 1, "fuzzy": 2, "class": 3}
-best = (M[M.tier != "unmatched"].assign(o=lambda d: d.tier.map(order)).sort_values("o").drop_duplicates("malecns_type").set_index("malecns_type").tier)
-best_src = {}
-for src in (DAV, FCA):
-    best_src[src] = (M[(M.tier != "unmatched") & (M.source == src)].assign(o=lambda d: d.tier.map(order)).sort_values("o").drop_duplicates("malecns_type").set_index("malecns_type").tier)
+
+
+def best_tier(frame):
+    """Best tier per MaleCNS type: sort by tier order BEFORE drop_duplicates (the round-1 summary skipped the sort)."""
+    f = frame[frame.tier != "unmatched"].assign(o=lambda d: d.tier.map(order)).sort_values("o", kind="stable")
+    return f.drop_duplicates("malecns_type").set_index("malecns_type").tier
+
+
+best = best_tier(M)
+best_src = {src: best_tier(M[M.source == src]) for src in (DAV, FCA)}
+have_raw = RAW_W.exists()
+
+
 def cov(group_mask, label, tiers):
     G = T[group_mask]
     tot = dict(types=len(G), cells=int(G.n_cells.sum()), out_signed=float(G.out_syn_signed.sum()), out_raw=float(G.out_syn_raw.sum()))
-    lines = [f"### {label}: {tot['types']} types, {tot['cells']:,} cells, {tot['out_signed']:,.0f} signed output synapses (|W|), {tot['out_raw']:,.0f} raw output synapses",
+    lines = [f"### {label}: {tot['types']} types, {tot['cells']:,} cells, {tot['out_signed']:,.0f} signed output synapses (|W|), {tot['out_raw']:,.0f} raw output synapses (node-restricted)",
              "", "| tier | types | cells | cells % | out syn (|W|) | % | out syn (raw) | % |", "|---|---|---|---|---|---|---|---|"]
     cum = dict(types=0, cells=0, out_signed=0.0, out_raw=0.0)
     for tier in ["exact", "alias", "fuzzy", "class"]:
         idx = [t for t in G.index if tiers.get(t) == tier]
         S = G.loc[idx]
         r = dict(types=len(S), cells=int(S.n_cells.sum()), out_signed=float(S.out_syn_signed.sum()), out_raw=float(S.out_syn_raw.sum()))
-        for k in cum: cum[k] += r[k]
+        for k in cum:
+            cum[k] += r[k]
         lines.append(f"| {tier} | {r['types']} | {r['cells']:,} | {100*r['cells']/max(tot['cells'],1):.1f}% | {r['out_signed']:,.0f} | {100*r['out_signed']/max(tot['out_signed'],1):.1f}% | {r['out_raw']:,.0f} | {100*r['out_raw']/max(tot['out_raw'],1):.1f}% |")
     lines.append(f"| any tier | {cum['types']} | {cum['cells']:,} | {100*cum['cells']/max(tot['cells'],1):.1f}% | {cum['out_signed']:,.0f} | {100*cum['out_signed']/max(tot['out_signed'],1):.1f}% | {cum['out_raw']:,.0f} | {100*cum['out_raw']/max(tot['out_raw'],1):.1f}% |")
     un = tot['cells'] - cum['cells']
     lines.append(f"| unmatched | {tot['types']-cum['types']} | {un:,} | {100*un/max(tot['cells'],1):.1f}% | {tot['out_signed']-cum['out_signed']:,.0f} | {100*(tot['out_signed']-cum['out_signed'])/max(tot['out_signed'],1):.1f}% | {tot['out_raw']-cum['out_raw']:,.0f} | {100*(tot['out_raw']-cum['out_raw'])/max(tot['out_raw'],1):.1f}% |")
     return "\n".join(lines) + "\n"
+
+
 optic = T.superclass.isin(OPTIC_SC); central = T.superclass.isin(CENTRAL_SC); allb = T.superclass.isin(BRAIN_SC)
-report = []
+report = ["# Central-brain sources: MaleCNS v1.0 coverage (generated by scripts/build_central_map.py)\n",
+          "Base: typed MaleCNS cells (`type` non-empty). 'raw' = output synapses from the MaleCNS weights feather restricted to edges with both "
+          "endpoints in the model's node set (node-restricted base; the typed total is 123,200,528, the NT audit's 124,161,873 adds the 2,605 "
+          "untyped cells); '|W|' = signed synapses of c.W (sign-0 presynaptic cells contribute 0). The central-class table below adds the "
+          "unrestricted feather base (all postsynaptic bodies).\n"]
 for name, tiers in [("both sources (best tier per type)", best), ("davie2018 only", best_src[DAV]), ("fca2022 only", best_src[FCA])]:
     report.append(f"## Coverage, {name}\n")
     report.append(cov(optic, "Optic lobe (ol_intrinsic + visual_projection + ol_sensory)", tiers))
@@ -324,13 +400,35 @@ for name, tiers in [("both sources (best tier per type)", best), ("davie2018 onl
     report.append(cov(allb, "All brain (optic + central + descending_neuron)", tiers))
     report.append(cov(pd.Series(True, index=T.index), "All MaleCNS typed cells", tiers))
 # per-class detail for central classes
-report.append("## Central-brain classes matched (both sources; MaleCNS cells / signed out / raw out)\n")
-report.append("| source | source_name | tier | n MaleCNS types | MaleCNS cells | out syn (|W|) | out syn (raw) | source cells |\n|---|---|---|---|---|---|---|---|")
+report.append("## Central-brain classes matched (both sources; MaleCNS cells / signed out / raw out, node-restricted and unrestricted)\n")
+report.append("| source | source_name | tier | n MaleCNS types | MaleCNS cells | out syn (|W|) | out syn (raw, node-restricted) | out syn (raw, unrestricted) | source cells |\n|---|---|---|---|---|---|---|---|---|")
 for (src, name), g in M[M.tier != "unmatched"].groupby(["source", "source_name"], sort=False):
     S = T.loc[g.malecns_type]
     if not S.superclass.isin(CENTRAL_SC).any():
         continue
-    report.append(f"| {src} | {name} | {g.tier.iloc[0]} | {len(g)} | {int(S.n_cells.sum()):,} | {S.out_syn_signed.sum():,.0f} | {S.out_syn_raw.sum():,.0f} | {int(g.n_cells_source.iloc[0]):,} |")
+    report.append(f"| {src} | {name} | {g.tier.iloc[0]} | {len(g)} | {int(S.n_cells.sum()):,} | {S.out_syn_signed.sum():,.0f} | {S.out_syn_raw.sum():,.0f} | {S.out_syn_raw_unrestricted.sum():,.0f} | {int(g.n_cells_source.iloc[0]):,} |")
+
+# NT-defined class rows: which DN / CX / gustatory types they reach (circular for a transmitter cross-check)
+report.append("\n## NT-defined class rows (rule query:nt ...): DN, CX and gustatory types they reach\n")
+report.append("These rows select the MaleCNS side by consensus `nt`, so they cannot cross-check a transmitter; they are usable only as class-prior receptor profiles.\n")
+report.append("| source | source_name | MaleCNS types (cells) | of which DN types (cells) | of which CX types (cells) | of which gustatory (cells) |\n|---|---|---|---|---|---|")
+reach = {}
+for (src, name), g in M[M.rule.fillna("").str.startswith("query:nt")].groupby(["source", "source_name"], sort=False):
+    S = T.loc[g.malecns_type]
+    dn = S[S.superclass == "descending_neuron"]
+    cx = S[S.index.str.match(r"^(FB\d|ExR\d|PFGs|PFR_a|EL$|ER\d|EPG|PEN|PFN|hDelta|vDelta|PFL|Delta7|LNO|GLNO|SpsP|IbSpsP)")]
+    gu = S[S.klass == "gustatory"] if (S.klass == "gustatory").any() else S[S.index.str.match(r"^LB\d")]
+    fmt = lambda X: f"{len(X)} ({int(X.n_cells.sum())})" + (": " + ", ".join(f"{t} {int(n)}" for t, n in X.n_cells.items()) if len(X) else "")
+    reach[(src, name)] = dict(types=len(S), cells=int(S.n_cells.sum()), dn=fmt(dn), cx=fmt(cx), gust=fmt(gu))
+    report.append(f"| {src} | {name} | {len(S)} ({int(S.n_cells.sum())}) | {fmt(dn)} | {fmt(cx)} | {fmt(gu)} |")
+# Clock superclass note
+clk = T.loc[sel(CLOCK)]
+clk_central = clk[clk.superclass.isin(CENTRAL_SC)]
+report.append(f"\nClock list: {len(clk)} types / {int(clk.n_cells.sum())} cells; superclass per type: " +
+              ", ".join(f"{t} {r.superclass} ({int(r.n_cells)})" for t, r in clk.iterrows()) +
+              f". Only {len(clk_central)} types / {int(clk_central.n_cells.sum())} cells are in the central-brain superclasses "
+              "(s-LNv and 5thsLNv_LNd6 are visual_projection, l-LNv is ol_intrinsic).\n")
+
 report.append("\n## Unmatched source labels\n")
 report.append("| source | source_name | source cells | note |\n|---|---|---|---|")
 for _, r in M[M.tier == "unmatched"].iterrows():
@@ -339,7 +437,60 @@ for _, r in M[M.tier == "unmatched"].iterrows():
     report.append(f"| {r.source} | {r.source_name} | {int(r.n_cells_source):,} | {r.evidence} |")
 nd = M[(M.tier == "unmatched") & (M.source == DAV) & M.source_name.str.isdigit()]
 report.append(f"| davie2018 | {len(nd)} unannotated numeric res.2 clusters | {int(nd.n_cells_source.sum()):,} | 'Unannotated' in Table S2 |")
-(SCR / "coverage_central.md").write_text("\n".join(report), encoding="utf-8")
-print("\n".join(report))
-summary = dict(n_map_rows=len(M), n_matched_types=int(best.shape[0]), tiers=M[M.tier != 'unmatched'].drop_duplicates('malecns_type').tier.value_counts().to_dict())
-print(json.dumps(summary))
+OUT_DIR.mkdir(exist_ok=True)
+(OUT_DIR / "coverage_central.md").write_text("\n".join(report), encoding="utf-8")
+print("wrote", OUT_DIR / "coverage_central.md")
+
+# ---------------------------------------------------------------- transmitter cross-check
+Ev = E[(E.metric == "mean_log1p_cp10k") & (E.sex_subset == "all")].set_index(["source", "source_name"])
+Ef = E[(E.metric == "frac_expr") & (E.sex_subset == "all")].set_index(["source", "source_name"])
+xrows = []
+for (src, name), g in M[M.tier != "unmatched"].groupby(["source", "source_name"], sort=False):
+    e, f = Ev.loc[(src, name)], Ef.loc[(src, name)]
+    score = {k: float(np.mean([e[c] for c in v])) for k, v in MARK.items()}
+    frac = {k: float(np.max([f[c] for c in v])) for k, v in MARK.items()}
+    top = max(score, key=score.get)
+    second = sorted(score.values())[-2]
+    thr = MARKER_THRESHOLD[src]
+    if score[top] >= thr and frac[top] >= MARKER_FRAC_MIN:
+        call = top if score[top] >= 2 * second else top + "?"
+    else:
+        call = "none"
+    cells = neurons[neurons.type.isin(g.malecns_type)]
+    vc = cells.nt.map(SHORT).value_counts(normalize=True)
+    cons = ", ".join(f"{k} {100*v:.0f}%" for k, v in vc.head(3).items())
+    agree = "yes" if call.rstrip("?") == vc.index[0] else ("-" if call == "none" else "NO")
+    circular = str(g.rule.iloc[0]).startswith("query:nt")
+    xrows.append(dict(source=src, source_name=name, tier=g.tier.iloc[0], n_types=len(g), cells=len(cells), marker_call=call,
+                      score=round(score[top], 2), frac=round(frac[top], 2),
+                      VAChT=round(e.VAChT, 2), Gad1=round(e.Gad1, 2), VGlut=round(e.VGlut, 2), DAT=round(e.DAT, 2), Tbh=round(e.Tbh, 2),
+                      SerT=round(e.SerT, 2), Hdc=round(e.Hdc, 2), malecns_consensus=cons, agree=agree + (" (circular)" if circular else "")))
+X = pd.DataFrame(xrows)
+xr = [f"Marker-call rule: score = mean log1p cp10k over the transmitter's marker genes; call if score >= {MARKER_THRESHOLD} (per source) and "
+      f"frac_expr of the best marker gene >= {MARKER_FRAC_MIN}; 'X?' = < 2x the runner-up; 'none' = marker-silent. "
+      f"Result over {len(X)} matched labels: {X.agree.str.replace(' (circular)', '', regex=False).value_counts().to_dict()} "
+      f"(rows marked 'circular' select the MaleCNS side by consensus nt and are not independent evidence).\n",
+      "| source | source_name | tier | types | cells | marker call | score | frac | VAChT | Gad1 | VGlut | DAT | Tbh | SerT | Hdc | MaleCNS consensus (cell-weighted) | agree |",
+      "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+for r in X.itertuples():
+    xr.append(f"| {r.source} | {r.source_name} | {r.tier} | {r.n_types} | {r.cells:,} | {r.marker_call} | {r.score} | {r.frac} | {r.VAChT} | {r.Gad1} | {r.VGlut} | {r.DAT} | {r.Tbh} | {r.SerT} | {r.Hdc} | {r.malecns_consensus} | {r.agree} |")
+(OUT_DIR / "nt_crosscheck_central.md").write_text("\n".join(xr) + "\n", encoding="utf-8")
+print("wrote", OUT_DIR / "nt_crosscheck_central.md")
+dis = X[X.agree.str.startswith("NO")]
+silent = X[X.agree.str.startswith("-")]
+print("cross-check:", X.agree.str.replace(" (circular)", "", regex=False).value_counts().to_dict())
+print("disagreements:\n" + dis[["source", "source_name", "marker_call", "score", "malecns_consensus"]].to_string())
+print("marker-silent:", [f"{r.source}:{r.source_name}" for r in silent.itertuples()])
+
+summary = dict(n_map_rows=len(M), n_matched_rows=int((M.tier != "unmatched").sum()), n_unmatched_rows=int((M.tier == "unmatched").sum()),
+               n_matched_types=int(best.shape[0]), best_tier_counts=best.value_counts().to_dict(),
+               crosscheck=X.agree.str.replace(" (circular)", "", regex=False).value_counts().to_dict(),
+               disagreements=[f"{r.source}:{r.source_name} {r.marker_call} vs {r.malecns_consensus}" for r in dis.itertuples()],
+               marker_silent=[f"{r.source}:{r.source_name}" for r in silent.itertuples()],
+               marker_rule=dict(threshold=MARKER_THRESHOLD, frac_min=MARKER_FRAC_MIN),
+               pam_raw=dict(node_restricted=int(T.loc[sel(r"re:^PAM\d\d$")].out_syn_raw.sum()) if have_raw else None,
+                            unrestricted=int(T.loc[sel(r"re:^PAM\d\d$")].out_syn_raw_unrestricted.sum()) if have_raw else None),
+               clock=dict(types=len(clk), cells=int(clk.n_cells.sum()), central_types=len(clk_central), central_cells=int(clk_central.n_cells.sum())),
+               nt_class_reach={f"{k[0]}:{k[1]}": v for k, v in reach.items()})
+(OUT_DIR / "central_summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
+print(json.dumps(summary, indent=1))

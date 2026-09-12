@@ -55,8 +55,8 @@ TYPES = ["L1", "L2", "L3", "Mi1", "Tm3", "Mi4", "Mi9", "Tm1", "Tm2", "Tm4", "Tm9
 SPIKING = ["LC10a", "LC10b", "LC4", "LPLC2", "LC16"]
 
 
-def run(fruit, seconds, pos, heading0):
-    sim = rd.Sim(0, start=(float(pos[0]), float(pos[1]), 0.75), trail_seconds=0.0, fruit_set=fruit, fence=True, wind_speed=0.0,
+def run(fruit, seconds, pos, heading0, seed=0):
+    sim = rd.Sim(seed, start=(float(pos[0]), float(pos[1]), 0.75), trail_seconds=0.0, fruit_set=fruit, fence=True, wind_speed=0.0,
                  cuda_kernels=True, cuda_graphs=False, event_driven=True, cuda_sparse="warp")
     if fruit == "all":
         for i, s in enumerate(sim.world.spheres):
@@ -82,14 +82,16 @@ def main():
     ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
                     help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
     ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
+    ap.add_argument("--seed", type=int, default=0, help="room_demo.Sim seed (Brain RNG); replicates otherwise sample the native backend's nondeterminism")
     args = ap.parse_args()
     patch_receptor(args.receptor_model, args.receptor_net_rule)
+    print(f"seed {args.seed}")
     r = 0.04 + 0.05
     pos = APPLE[:2] - r * np.array([np.cos(np.deg2rad(135)), np.sin(np.deg2rad(135))])
     heading0 = np.pi / 2
-    sim_a, a_apple, d_apple = run("apple", args.seconds, pos, heading0)
+    sim_a, a_apple, d_apple = run("apple", args.seconds, pos, heading0, args.seed)
     print_coverage(sim_a, args.receptor_model, args.receptor_net_rule)
-    sim_n, a_none, d_none = run("all", args.seconds, pos, heading0)
+    sim_n, a_none, d_none = run("all", args.seconds, pos, heading0, args.seed)
     c = sim_a.c; o = sim_a.fb.optic
     # which columns view the apple: the column direction (body frame at the mean heading) vs the apple's direction
     eye = np.array([pos[0], pos[1], 0.75 + 0.0012]); to_apple = APPLE - eye; to_apple /= np.linalg.norm(to_apple)

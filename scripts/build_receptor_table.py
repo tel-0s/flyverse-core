@@ -13,6 +13,9 @@ NT-integration workflow wrote into flyverse/data/ (no downloads, no simulation, 
   type_map_central.csv, expression_central.csv
       Davie et al. 2018 (Cell 174:982; GEO GSE107451) and Fly Cell Atlas 2022 (Science 375:eabk2432) head 10x:
       per-cluster mean log1p(cp10k) and fraction of cells expressing.
+  type_map_kurmangaliyev2020.csv, expression_kurmangaliyev2020.csv
+      Kurmangaliyev et al. 2020 (Neuron 108:1045; GEO GSE156455): PUPAL (24-96 h APF) optic-lobe scRNA-seq; the
+      96 h APF (pharate adult) rows are used, 'late' (72-96 h pooled) for clusters with < 20 cells at 96 h.
   type_map_nern2025.csv
       Nern et al. 2025 (Nature 641:1225): per-type transmitter prediction (no expression data).
   type_aliases.csv
@@ -33,10 +36,20 @@ Importable:
       entries (c.W.tocoo() order, explicit zeros included), and edge_stats(c, edges, raw=None) -> coverage /
       flip / monoamine summaries. load_raw_counts(c) -> uncapped synapse counts aligned the same way (or None).
 
-Run:  PYTHONIOENCODING=utf-8 python scripts/build_receptor_table.py   (about 1-2 min with the raw weights)
+Profile selection per (type, transmitter) -- round-2 rule (docs/audits/receptor_verification.md, verify:implement):
+  the best-ranked profile (tier, QC, source priority) decides the sign, EXCEPT that a profile with no receptor
+  group for the transmitter ('none' = the edge would be silenced) only stands if every other source profiling the
+  type agrees. A single-nucleus 'none' (fca2022 / davie2018, dropout-prone) never outranks a whole-cell profile
+  (davis2020 / ozel2021 / kurmangaliyev2020) that has the group on: that profile is used instead
+  ('group_on_override'); any other disagreement about 'none' falls back to NT_SIGN ('none_contested'), and so does a
+  'none' carried by a single source ('none_single_source'): a silencing needs >= 2 agreeing sources.
+
+Run:  PYTHONIOENCODING=utf-8 python scripts/build_receptor_table.py [--previous <old receptors_by_type.csv>]
+      (about 2-3 min with the raw weights; --previous adds a change section to receptor_rules.md)
 """
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import time
@@ -71,8 +84,9 @@ MONOAMINES = ["dopamine", "octopamine", "serotonin"]
 # Transmitter identity from synthesis / transport genes: (genes, rule). "any": one gene suffices (ChAT is poorly
 # captured in 10x data, VAChT is the reliable 10x marker; both are bimodal in bulk data); "all": both genes must be
 # on (Tbh and DAT are expressed at low level in many non-aminergic clusters, so the enzyme alone is not enough).
-# GABA uses Gad1 only: VGAT is 51-311 TPM with P(on) = 1 in every Davis 2020 type (T1, L1, Mi1, ...), so it cannot
-# discriminate; it is recorded in the expression tables but not used for the call.
+# GABA uses Gad1 only: VGAT is 1.7-586 TPM over the neuronal QC-pass Davis 2020 rows (photoreceptors 1.7-14.5 with
+# P(on) = 0; 60-586 TPM with P(on) = 1 in every other neuronal row, T1 172.6 / L1 304.6 / Mi1 236.1), so it cannot
+# discriminate among non-photoreceptor neurons; it is recorded in the expression tables but not used for the call.
 NT_MARKERS = {
     "acetylcholine": (["ChAT", "VAChT"], "any"),
     "gaba": (["Gad1"], "any"),
@@ -119,9 +133,10 @@ RECEPTOR_GROUPS = {
     },
 }
 # The NMDA receptor is an obligate Nmdar1 + Nmdar2 heteromer: the iGluR group counts as present only if one of the
-# non-NMDA members is on or both Nmdar genes are on. Because Nmdar2 is 95-727 TPM in every Davis 2020 type (a
-# ubiquitous, voltage-gated coincidence detector rather than a fast transmitter receptor), the glutamate rows also
-# carry a `_nonmda` variant in which the fast + group is KaiR1D / GluRIA / GluRIB only.
+# non-NMDA members is on or both Nmdar genes are on. Because Nmdar2 is 5.3-1,073 TPM over the neuronal QC-pass
+# Davis 2020 rows -- off (P(on) = 0) only in the photoreceptors R1-6 / R7 / R8, 102-1,073 TPM with P(on) = 1 in every
+# other neuronal row (a ubiquitous, voltage-gated coincidence detector rather than a fast transmitter receptor) --
+# the glutamate rows also carry a `_nonmda` variant in which the fast + group is KaiR1D / GluRIA / GluRIB only.
 NMDA_PAIR = ("Nmdar1", "Nmdar2")
 IGLUR_NONMDA = (+1, "iGluR_nonNMDA", ["KaiR1D", "GluRIA", "GluRIB"])
 GENES = sorted({g for t in NT_MARKERS.values() for g in t[0]} |
@@ -135,11 +150,15 @@ CENTRAL_FRAC_ON = 0.2    # fraction of cells / nuclei with >= 1 UMI
 ABS_RATIO = 2.0          # net_abs: the larger group must exceed the other by this factor, else 'mixed'
 POOL_PURE_SHARE = 0.9    # a pooled source row is 'mixed' when its member types' majority model label holds < 90 % of cells
 WEAK_MARKER_RANK = 0.25  # primary marker below this quantile of the source's on-profiles -> confidence 'low'
-LOG_SOURCES = {"ozel2021", "fca2022", "davie2018"}   # levels are means of log1p: linearised with expm1 before summing
+LOG_SOURCES = {"ozel2021", "kurmangaliyev2020", "fca2022", "davie2018"}   # levels are means of log1p: linearised with expm1 before summing
+KURM_TIME, KURM_TIME_FALLBACK, KURM_MIN_CELLS = "96h", "late", 20   # Kurmangaliyev: pharate-adult rows, pooled 72-96 h when < 20 cells
 
 GAIN_CLASSES = ["none", "low", "mid", "high"]
 TIER_RANK = {"exact": 0, "alias": 1, "fuzzy": 2, "class": 3}
-SOURCE_PRIORITY = {"davis2020": 0, "ozel2021": 1, "fca2022": 2, "davie2018": 3}
+# adult bulk / whole-cell first; the pupal whole-cell atlas after the adult ones; single-nucleus last
+SOURCE_PRIORITY = {"davis2020": 0, "ozel2021": 1, "kurmangaliyev2020": 2, "fca2022": 3, "davie2018": 4}
+WHOLE_CELL_SOURCES = {"davis2020", "ozel2021", "kurmangaliyev2020"}   # bulk nuclear / whole-cell: a 'none' is evidence
+SINGLE_NUCLEUS_SOURCES = {"fca2022", "davie2018"}                      # 10x single nucleus: a 'none' may be dropout
 QC_RANK = {"pass": 0, "suboptimal_only": 1}
 NON_NEURONAL_KEYWORDS = ("glia", "glial", "muscle", "hemocyte", "plasmatocyte", "cone cell", "epithelial", "pigment",
                          "fat body", "fat mass", "artefact", "unannotated", "dissected", "not neurons",
@@ -248,6 +267,43 @@ def load_central():
     m["qc"] = "pass"
     m["circular"] = m.rule.fillna("").str.startswith("query:nt")
     m["n_targets"] = m.groupby(["source", "source_key"]).malecns_type.transform("size")
+    return prof, m[["source", "source_key", "source_name", "malecns_type", "tier", "qc", "n_targets", "circular", "evidence"]]
+
+
+def load_kurmangaliyev():
+    """Kurmangaliyev 2020 (pupal optic lobe): per cluster the 96 h APF rows (pharate adult, the closest to the adult
+    sources: median Pearson r 0.90 with the Özel adult profile of the same type over the 54 genes, vs 0.89 for the
+    72-96 h pool and 0.80 for all timepoints), or the 72-96 h pool when the cluster has < KURM_MIN_CELLS cells at 96 h.
+    'on' = fraction of cells with >= 1 UMI >= CENTRAL_FRAC_ON (no mixture model is published for this atlas)."""
+    ex = read_csv(DATA / "expression_kurmangaliyev2020.csv")
+    tm = read_csv(DATA / "type_map_kurmangaliyev2020.csv")
+    ex["source_cluster"] = ex.source_cluster.astype(str)
+    val = ex[ex.metric == "mean_log1p_cp10k"].set_index(["source_cluster", "time"])
+    frac = ex[ex.metric == "frac_expr"].set_index(["source_cluster", "time"])
+    keys, times = [], []
+    for k in sorted(val.index.get_level_values(0).unique()):
+        t = KURM_TIME
+        if (k, t) not in val.index or val.loc[(k, t), "n_cells"] < KURM_MIN_CELLS:
+            t = KURM_TIME_FALLBACK if (k, KURM_TIME_FALLBACK) in val.index else "all"
+        keys.append(k); times.append(t)
+    idx = list(zip(keys, times))
+    v, f = val.loc[idx], frac.loc[idx]
+    unm = tm[tm.tier == "unmatched"]
+    bad = {str(k) for k, n, e in zip(unm.source_cluster, unm.source_name, unm.evidence) if is_non_neuronal(e, n)}
+    names = np.array([f"{k}@{t}" for k, t in idx])
+    prof = _profile({"source": "kurmangaliyev2020", "source_key": np.array(keys), "source_name": names,
+                     "time": np.array(times), "n_cells_source": v.n_cells.to_numpy()},
+                    {g: v[g].to_numpy(dtype=float) for g in GENES if g in v},
+                    {g: (f[g].to_numpy(dtype=float) >= CENTRAL_FRAC_ON) for g in GENES if g in f},
+                    [k not in bad for k in keys])
+    m = tm[tm.tier != "unmatched"].copy()
+    m["source"] = "kurmangaliyev2020"
+    m["source_key"] = m.source_cluster.astype(str)
+    tmap = dict(zip(keys, times))
+    m["source_name"] = [f"{k}@{tmap.get(k, '?')}" for k in m.source_key]
+    m["qc"] = "pass"
+    m["circular"] = False
+    m["n_targets"] = m.groupby("source_key").malecns_type.transform("size")
     return prof, m[["source", "source_key", "source_name", "malecns_type", "tier", "qc", "n_targets", "circular", "evidence"]]
 
 
@@ -385,6 +441,44 @@ def combine(sign_groups: list[tuple[int, str]], rec: pd.Series, prior: int):
                 net=net, sign=sign, gain=gain, net_abs=net_a, sign_abs=sign_a, gain_abs=gain_a, groups=";".join(names))
 
 
+NONE_CONTESTED = "none_contested"
+NONE_SINGLE = "none_single_source"
+MIN_SOURCES_TO_SILENCE = 2   # a silencing (no fast receptor) needs at least this many agreeing sources
+NONE_FALLBACK = (NONE_CONTESTED, NONE_SINGLE)   # net labels whose fast sign is the NT_SIGN prior
+
+
+def select_profile(cands: list[dict], min_sources: int = MIN_SOURCES_TO_SILENCE) -> tuple[int, str]:
+    """Round-2 profile selection for one (type, transmitter, fast variant).
+
+    cands: the best row of every source that profiles the type, in rank order (tier, QC, source priority, ...),
+    each {'source': str, 'net': '+1' | '-1' | 'mixed' | 'none'} where net == 'none' means the profile has no fast
+    receptor group for the transmitter (the edge would be silenced).
+    Returns (index of the candidate to use, selection label):
+      'primary'            -- the best-ranked profile decides (it has the group on, or every source agrees on 'none'
+                              and there are at least `min_sources` of them);
+      'group_on_override'  -- the best-ranked profile is a single-nucleus 'none' and a whole-cell source has the group
+                              on: the best-ranked whole-cell profile with the group on is used instead;
+      'none_contested'     -- the best-ranked profile is 'none' but another source has the group on and the override
+                              does not apply (whole-cell 'none' vs any 'on', or single-nucleus 'none' vs single-nucleus
+                              'on'): the caller keeps the primary profile but falls back to NT_SIGN for the fast sign;
+      'none_single_source' -- every source agrees on 'none' but fewer than `min_sources` profile the type (one
+                              profile's dropout / threshold call is not enough to silence an anatomical synapse):
+                              the caller keeps the primary profile and falls back to NT_SIGN.
+    A silencing therefore needs every source that profiles the type to agree, and at least two of them."""
+    if not cands:
+        raise ValueError("no candidate profiles")
+    if cands[0]["net"] != "none":
+        return 0, "primary"
+    on = [i for i, cnd in enumerate(cands) if i > 0 and cnd["net"] != "none"]
+    if not on:
+        return 0, ("primary" if len(cands) >= min_sources else NONE_SINGLE)
+    if cands[0]["source"] in SINGLE_NUCLEUS_SOURCES:
+        for i in on:
+            if cands[i]["source"] in WHOLE_CELL_SOURCES:
+                return i, "group_on_override"
+    return 0, NONE_CONTESTED
+
+
 # --------------------------------------------------------------------------------------------------------------
 # 3. Connectome-side per-type numbers
 # --------------------------------------------------------------------------------------------------------------
@@ -444,7 +538,7 @@ def per_type_numbers(c: cn.Connectome, raw: np.ndarray | None) -> pd.DataFrame:
 # --------------------------------------------------------------------------------------------------------------
 def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print):
     profs, maps = [], []
-    for loader in (load_ozel, load_davis, load_central):
+    for loader in (load_ozel, load_davis, load_central, load_kurmangaliyev):
         p, m = loader()
         profs.append(p); maps.append(m)
     prof = pd.concat(profs, ignore_index=True)
@@ -585,34 +679,50 @@ def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print):
             "agree_nern": "" if agree_nern is None else str(agree_nern),
             "agreement": flag,
             "model_sign": int(cn.NT_SIGN.get(model, 0)), "transcriptome_sign": int(cn.NT_SIGN.get(call, 0)),
-            "marker_scores": pbest.marker_scores,
+            "marker_scores": (pcall.marker_scores if called else pbest.marker_scores),
         })
     nt_table = pd.DataFrame(nt_rows)
 
     # ---- (b) receptor table ---------------------------------------------------------------------------------
     rec_rows = []
 
-    def receptor_rows_for(t, g, tn):
-        best = g.iloc[0]
-        p = prof.iloc[best.pid]
-        alts = g.drop_duplicates("source").iloc[1:]
-        def fast_groups(nt, nonmda=False):
-            gs = [(s, f"{nt}|fast|{n}") for s, n, _ in RECEPTOR_GROUPS[nt]["fast"]]
-            if nonmda and nt == "glutamate":
-                gs = [(s, k) for s, k in gs if not k.endswith("|iGluR")] + [(IGLUR_NONMDA[0], f"glutamate|fast|{IGLUR_NONMDA[1]}")]
-            return gs
+    def fast_groups(nt, nonmda=False):
+        gs = [(s, f"{nt}|fast|{n}") for s, n, _ in RECEPTOR_GROUPS[nt]["fast"]]
+        if nonmda and nt == "glutamate":
+            gs = [(s, k) for s, k in gs if not k.endswith("|iGluR")] + [(IGLUR_NONMDA[0], f"glutamate|fast|{IGLUR_NONMDA[1]}")]
+        return gs
 
+    def slow_groups(nt):
+        return [(s, f"{nt}|slow|{n}") for s, n, _ in RECEPTOR_GROUPS[nt]["slow"]]
+
+    def receptor_rows_for(t, g, tn):
+        cands = g.drop_duplicates("source")          # best row per source, in rank order (g is sorted)
+        primary = cands.iloc[0]
         for nt in TRANSMITTERS:
             prior = int(cn.NT_SIGN[nt])
-            fast = combine(fast_groups(nt), p, prior)
-            fast_nn = combine(fast_groups(nt, nonmda=True), p, prior)
-            slow = combine([(s, f"{nt}|slow|{n}") for s, n, _ in RECEPTOR_GROUPS[nt]["slow"]], p, 0)
-            alt = []
-            for _, a in alts.iterrows():
+            per = []                                  # per candidate source: (map row, fast, fast_nonmda, slow)
+            for _, a in cands.iterrows():
                 pa = prof.iloc[a.pid]
-                fa = combine(fast_groups(nt), pa, prior)
-                sa = combine([(s, f"{nt}|slow|{n}") for s, n, _ in RECEPTOR_GROUPS[nt]["slow"]], pa, 0)
-                alt.append(f"{a.source}({a.tier}):fast={fa['net']},slow={sa['net']}")
+                per.append((a, combine(fast_groups(nt), pa, prior), combine(fast_groups(nt, nonmda=True), pa, prior),
+                            combine(slow_groups(nt), pa, 0)))
+            i_c, how_c = select_profile([{"source": a.source, "net": f["net"]} for a, f, _, _ in per])
+            i_n, how_n = select_profile([{"source": a.source, "net": fn["net"]} for a, _, fn, _ in per])
+            best, fast, _, slow = per[i_c]
+            fast_nn = per[i_n][2]
+            # the class / abs variants use the profile chosen for the class variant (same group presence); the
+            # nonmda variant may pick a different one (NMDA-only profiles are 'none' there). A contested 'none'
+            # keeps the primary profile and the NT_SIGN prior as the fast sign (gain class none = factor 1).
+            fast = dict(fast); fast_nn = dict(fast_nn)
+            if how_c in NONE_FALLBACK:
+                fast.update(net=how_c, sign=prior, gain=0, net_abs=how_c, sign_abs=prior, gain_abs=0)
+            if how_n in NONE_FALLBACK:
+                fast_nn.update(net=how_n, sign=prior, gain=0)
+            on_sources = [a.source for a, f, _, _ in per if f["net"] != "none"]
+            sel_c = how_c if how_c in ("primary", NONE_SINGLE) else f"{how_c}:{best.source}" if how_c == "group_on_override" \
+                else f"{how_c}:{'+'.join(on_sources)}"
+            sel_n = how_n if how_n in ("primary", NONE_SINGLE) else f"{how_n}:{per[i_n][0].source}" if how_n == "group_on_override" \
+                else f"{how_n}:{'+'.join(a.source for a, _, fn, _ in per if fn['net'] != 'none')}"
+            alt = [f"{a.source}({a.tier}):fast={fa['net']},slow={sa['net']}" for j, (a, fa, _, sa) in enumerate(per) if j != i_c]
             rec_rows.append({
                 "malecns_type": t, "transmitter": nt,
                 "fast_sign": fast["sign"], "fast_gain_class": GAIN_CLASSES[fast["gain"]],
@@ -630,6 +740,8 @@ def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print):
                 "slow_net_abs": slow["net_abs"],
                 "tier": best.tier, "source": best.source, "source_name": best.source_name, "qc": best.qc,
                 "pool_mixed": bool(best.pool_mixed),
+                "fast_selection": sel_c, "fast_selection_nonmda": sel_n, "source_nonmda": per[i_n][0].source,
+                "primary_source": primary.source, "primary_tier": primary.tier, "n_sources": len(per),
                 "n_cells": int(tn.n_cells) if tn is not None else 0,
                 "superclass": tn.superclass if tn is not None else "",
                 "in_syn_W": int(tn.in_syn_W) if tn is not None else 0,
@@ -652,7 +764,7 @@ def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print):
 # --------------------------------------------------------------------------------------------------------------
 GAIN_CODE = {g: i for i, g in enumerate(GAIN_CLASSES)}
 TIER_CODES = ["fallback", "pre_unknown", "nt_class", "class", "fuzzy", "alias", "exact"]
-SOURCE_CODES = ["none", "davis2020", "ozel2021", "fca2022", "davie2018"]
+SOURCE_CODES = ["none", "davis2020", "ozel2021", "fca2022", "davie2018", "kurmangaliyev2020"]
 
 
 def edge_lookup(c: cn.Connectome, receptors: pd.DataFrame | None = None, net_rule: str = "class",
@@ -843,6 +955,60 @@ def edge_stats(c: cn.Connectome, edges: pd.DataFrame, raw: np.ndarray | None = N
         rows.append({"transmitter": nt, "matched_edges": int(m.sum()), "matched_syn_W": float(wabs[m].sum()),
                      "no_fast_receptor_edges": int(z.sum()), "no_fast_receptor_syn_W": float(wabs[z].sum())})
     out["classical_no_receptor"] = pd.DataFrame(rows)
+    # silenced classical edges (profiled target, fast sign 0): by (pre transmitter, pre type, post type), by post
+    # type, and the named pairs of the round-2 selection rule
+    cls_codes = [nt_cats.index(x) for x in CLASSICAL]
+    z = np.isin(nt_codes, cls_codes) & matched_tier & (fast_sign == 0)
+    types_all = c.neurons.type.fillna("").to_numpy()
+    zp = pd.DataFrame({"pre_nt": np.array(nt_cats)[nt_codes[z]], "pre_type": types_all[pre_i[z]],
+                       "post_type": pt_cats[pt_codes[z]], "syn": wabs[z]})
+    out["silenced_total"] = {"edges": int(z.sum()), "syn_W": float(wabs[z].sum())}
+    out["silenced_pairs"] = (zp.groupby(["pre_nt", "pre_type", "post_type"]).syn.agg(["sum", "size"])
+                             .rename(columns={"sum": "syn_W", "size": "edges"}).sort_values("syn_W", ascending=False).head(top))
+    out["silenced_by_post_type"] = (zp.groupby(["pre_nt", "post_type"]).syn.agg(["sum", "size"])
+                                    .rename(columns={"sum": "syn_W", "size": "edges"}).sort_values("syn_W", ascending=False).head(top))
+    pre_t, post_t = zp.pre_type.to_numpy().astype(str), zp.post_type.to_numpy().astype(str)
+    named = {
+        "R7* -> Tm5a / Tm5b (histamine)": np.char.startswith(pre_t, "R7") & np.isin(post_t, ["Tm5a", "Tm5b"]),
+        "R8* -> Mi1 (histamine)": np.char.startswith(pre_t, "R8") & (post_t == "Mi1"),
+        "glutamate / GABA -> R7* / R8* (photoreceptor targets)": zp.pre_nt.isin(["glutamate", "gaba"]).to_numpy() & np.isin(post_t, cn.PHOTORECEPTOR_TYPES),
+        "histamine -> any": (zp.pre_nt == "histamine").to_numpy(),
+        "glutamate -> any": (zp.pre_nt == "glutamate").to_numpy(),
+        "GABA -> any": (zp.pre_nt == "gaba").to_numpy(),
+        "acetylcholine -> any": (zp.pre_nt == "acetylcholine").to_numpy(),
+    }
+    out["silenced_named"] = pd.DataFrame([{"pair": k, "edges": int(m.sum()), "syn_W": float(zp.syn.to_numpy()[m].sum())}
+                                          for k, m in named.items()])
+    return out
+
+
+def compare_tables(new: pd.DataFrame, old: pd.DataFrame) -> dict:
+    """Per (type, transmitter) differences between two receptors_by_type tables: net-call / sign / profile changes."""
+    key = ["malecns_type", "transmitter"]
+    cols = ["fast_net", "fast_net_abs", "fast_net_nonmda", "fast_sign", "fast_sign_abs", "fast_sign_nonmda",
+            "slow_net", "tier", "source", "source_name", "fast_pos_lead", "fast_pos_lead_nonmda"]
+    cols = [c for c in cols if c in new and c in old]
+    m = new[key + cols].merge(old[key + cols], on=key, how="outer", suffixes=("_new", "_old"), indicator=True)
+    both = m[m["_merge"] == "both"].copy()
+    out = {"types_new": sorted(set(new.malecns_type) - set(old.malecns_type)),
+           "types_removed": sorted(set(old.malecns_type) - set(new.malecns_type)),
+           "rows_both": int(len(both))}
+    changed = np.zeros(len(both), dtype=bool)
+    trans = {}
+    for c in cols:
+        a, b = both[c + "_new"], both[c + "_old"]
+        if pd.api.types.is_numeric_dtype(a) and pd.api.types.is_numeric_dtype(b):
+            d = ~np.isclose(a.to_numpy(dtype=float), b.to_numpy(dtype=float), equal_nan=True)
+            d = pd.Series(d, index=both.index)
+        else:
+            d = a.astype(str) != b.astype(str)
+        out["changed_" + c] = int(d.sum())
+        if c.startswith("fast_net") or c == "slow_net":
+            changed |= d.to_numpy()
+            tr = both[d].groupby([c + "_old", c + "_new"]).size().sort_values(ascending=False)
+            trans[c] = tr
+    out["transitions"] = trans
+    out["rows_changed"] = both[changed | (both.source_new.astype(str) != both.source_old.astype(str))].sort_values(key)
     return out
 
 
@@ -928,10 +1094,24 @@ def write_disagreements(nt_table: pd.DataFrame, types: pd.DataFrame, nern: pd.Da
                                  "synapses": [int(t[t.agreement == a][syn_col].sum()) for a in vc.index]})), ""]
     called = t[(t.nt_transcriptome != "none")]
     both = called[called.agree_model != ""]
+    pure = both[~both.pool_mixed.astype(bool)]
+    nern_any = t.nern2025_prediction.fillna("").astype(str) != ""
+    nern_call = nern_any & (t.nern2025_prediction.fillna("").astype(str) != "unclear")
+    comp = t[t.agree_nern != ""]
     L += [f"* Types with a transcriptome call: {len(called):,} of {len(t):,}; comparable with the model (model label not "
-          f"unknown): {len(both):,}; agree {int((both.agree_model == 'True').sum()):,} "
-          f"({100 * (both.agree_model == 'True').mean():.1f}%), disagree {int((both.agree_model == 'False').sum()):,}.",
-          f"* Confidence of the calls: {called.confidence.value_counts().to_dict()}.", ""]
+          f"unknown), all rows: {len(both):,} / agree {int((both.agree_model == 'True').sum()):,} "
+          f"({100 * (both.agree_model == 'True').mean():.1f}%) / disagree {int((both.agree_model == 'False').sum()):,} "
+          f"(this count includes {int(both.pool_mixed.astype(bool).sum()):,} mixed-pool rows, "
+          f"{int(((both.agree_model == 'True') & both.pool_mixed.astype(bool)).sum()):,} of which happen to agree).",
+          f"* **Outside mixed pools (symmetric denominators): comparable {len(pure):,} / agree "
+          f"{int((pure.agree_model == 'True').sum()):,} ({100 * (pure.agree_model == 'True').mean():.1f}%) / disagree "
+          f"{int((pure.agree_model == 'False').sum()):,}.**",
+          f"* Nern 2025 label present for {int(nern_any.sum()):,} of {len(t):,} types ({int(nern_call.sum()):,} not "
+          f"'unclear'); transcriptome call comparable with Nern: {len(comp):,} / agree {int((comp.agree_nern == 'True').sum()):,} "
+          f"/ disagree {int((comp.agree_nern == 'False').sum()):,}.",
+          f"* Confidence of the calls: {called.confidence.value_counts().to_dict()}.",
+          f"* Sources: {t.source.value_counts().to_dict()} (best-ranked agreeing source per type); "
+          f"{int((t.n_sources >= 2).sum()):,} types have >= 2 sources.", ""]
 
     def verdict(r):
         if r.agreement == "pool_mixed_not_evaluable":
@@ -953,12 +1133,19 @@ def write_disagreements(nt_table: pd.DataFrame, types: pd.DataFrame, nern: pd.Da
     dis["verdict"] = dis.apply(verdict, axis=1)
     dis = dis.sort_values(syn_col, ascending=False)
     cols = ["malecns_type", "n_cells", syn_col, "model_sign", "malecns_consensus", "malecns_consensus_share",
-            "nt_transcriptome", "nt_secondary", "confidence", "tier", "sources_agreeing", "sources_disagreeing",
-            "nern2025_prediction", "nern2025_validated", "verdict"]
+            "nt_transcriptome", "nt_secondary", "confidence", "tier", "source", "sources_agreeing", "sources_disagreeing",
+            "nern2025_prediction", "nern2025_validated", "verdict", "marker_scores"]
     L += ["## 2. Disagreements among the three sources (transcriptome call present, per-type or pure-pool profile)", "",
           f"{len(dis):,} types; proposals (two of three against the model): "
           f"{int((dis.agreement == 'transcriptome_nern_agree_vs_model').sum())}; of those with a sign flip under "
-          f"`NT_SIGN`: {int(((dis.agreement == 'transcriptome_nern_agree_vs_model') & (dis.model_sign != dis.transcriptome_sign)).sum())}.",
+          f"`NT_SIGN`: {int(((dis.agreement == 'transcriptome_nern_agree_vs_model') & (dis.model_sign != dis.transcriptome_sign)).sum())}. "
+          "`marker_scores` = the marker levels of the deciding profile in the source's units (TPM for davis2020; expm1 of the "
+          "log-mean for the 10x sources; `*` = on by the source's rule), so a 'below the floor' value is visible (e.g. l-LNv "
+          "Davis SerT 5.4 TPM < 10, not 0). Sources vote equally whatever their tier (a class-pool profile counts like a "
+          "per-type one; only mixed pools are demoted), so R7 / R8 types are called acetylcholine where the pooled "
+          "Kurmangaliyev 2020 'R7.8' and Davie 2018 'Photoreceptors' clusters (ChAT / VAChT above Hdc in expm1 units, "
+          "both markers on) outvote the per-type Davis 2020 R7 / R8 drivers (histamine): a co-expression that Nern 2025 "
+          "validated as histamine+acetylcholine for R8y / R8p, not a sign question -- the model keeps histamine.",
           "", md_table(dis[cols].rename(columns={syn_col: "synapses"})), ""]
     pm = t[t.agreement == "pool_mixed_not_evaluable"].copy()
     pm["verdict"] = pm.apply(verdict, axis=1)
@@ -1010,7 +1197,9 @@ def write_disagreements(nt_table: pd.DataFrame, types: pd.DataFrame, nern: pd.Da
 
 
 def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.DataFrame, nt_table: pd.DataFrame,
-                raw_available: bool, n_edges: int, stats_ntclass: dict | None, stats_nonmda: dict | None = None):
+                raw_available: bool, n_edges: int, stats_ntclass: dict | None, stats_nonmda: dict | None = None,
+                prev: tuple | None = None):
+    rec_t = rec[~rec.malecns_type.str.startswith("<")]
     L = ["# Receptor rules: transmitter -> postsynaptic response class, and the coverage of the edge lookup",
          "",
          "Generated by `scripts/build_receptor_table.py` (docs/NT_INTEGRATION.md steps 3-5). The rules below are the "
@@ -1026,19 +1215,29 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
          "| ozel2021 | Özel et al. 2021 Nature, adult optic-lobe scRNA-seq, female | per-cluster mean of ln(1 + UMI/total x 1e4) | authors' mixture-model P(on) >= 0.5 | exact / fuzzy / class per `type_map_ozel2021.csv` |",
          "| fca2022 | Fly Cell Atlas 2022 head 10x (single nucleus), 5 d, mixed sex (pooled rows) | per-cluster mean log1p(cp10k) | fraction of nuclei with >= 1 UMI >= 0.2 | exact / alias / fuzzy / class per `type_map_central.csv` |",
          "| davie2018 | Davie et al. 2018 Cell whole-brain 10x, 0-50 d pooled, mixed sex | per-cluster mean log1p(cp10k) | fraction of cells with >= 1 UMI >= 0.2 | exact / fuzzy / class per `type_map_central.csv` |",
+         f"| kurmangaliyev2020 | Kurmangaliyev et al. 2020 Neuron, PUPAL optic-lobe scRNA-seq (24-96 h APF; female by roX check), whole cell 10x v3 | per-cluster mean log1p(cp10k) of the {KURM_TIME} APF (pharate adult) rows, `{KURM_TIME_FALLBACK}` (72-96 h pooled) when < {KURM_MIN_CELLS} cells at {KURM_TIME} | fraction of cells with >= 1 UMI >= {CENTRAL_FRAC_ON} | exact / alias / fuzzy / class per `type_map_kurmangaliyev2020.csv` |",
          "| nern2025 | Nern et al. 2025 Nature, optic-lobe EM transmitter classifier (same male volume) | transmitter label only | - | exact / class per `type_map_nern2025.csv` |",
          "",
          "Expression is not conductance: levels are used only (i) to rank marker genes within a profile and (ii) to bin "
-         "receptor groups into quantile classes within a source. Values are never compared across sources.",
+         "receptor groups into quantile classes within a source. Values are never compared across sources. "
+         "Source classes for the selection rule (section 3): whole-cell = davis2020 (bulk nuclear), ozel2021, "
+         "kurmangaliyev2020 (whole-cell 10x); single-nucleus = fca2022, davie2018 (10x nuclei; low-abundance receptors "
+         "drop out, so a 'none' is weaker evidence). The Kurmangaliyev atlas is pupal: its 96 h APF profiles correlate "
+         "with the Özel adult profile of the same type at median Pearson r 0.90 over the 54 genes (72-96 h pool 0.89, "
+         "all timepoints 0.80; 42 types in both, computed by the round-2 rebuild), and it ranks after the two adult "
+         "whole-cell sources at equal tier.",
          "",
          "## 2. Transmitter identity from synthesis / transport genes (`nt_by_type_transcriptome.csv`)",
          "",
          "* Marker groups: acetylcholine = ChAT or VAChT on (score = max of the two levels); GABA = Gad1 on (VGAT is "
-         "not used: it is 51-311 TPM with P(on) = 1 in every Davis 2020 type, T1 / L1 / Mi1 included); glutamate = "
+         "not used: over the 69 neuronal QC-pass Davis 2020 rows it is 1.7-586 TPM, off only in the photoreceptors "
+         "(1.7-14.5 TPM, P(on) = 0) and 60-586 TPM with P(on) = 1 in every other row, T1 172.6 / L1 304.6 / Mi1 236.1, "
+         "so it does not discriminate among non-photoreceptor neurons); glutamate = "
          "VGlut; histamine = Hdc; dopamine = ple AND DAT on (score = min); octopamine = Tdc2 AND Tbh on (min); "
          "serotonin = Trh AND SerT on (min). The 'AND' for the monoamines is deliberate: Tbh, Tdc2 and DAT are "
-         "detected at low level in many non-aminergic clusters (Tbh in T4 / T5, Dm11, Poxn; Tdc2 4-15 TPM with "
-         "P(on) = 0.89 in Davis), the enzyme alone is not evidence. Levels of the log-mean sources are linearised "
+         "detected at low level in many non-aminergic clusters (Tbh in T4 / T5, Dm11, Poxn; Tdc2 0.6-35 TPM over the "
+         "neuronal QC-pass Davis rows with mean P(on) 0.88 -- 'on' by this script's own rule, P(on) >= 0.5 AND "
+         "TPM >= 10, in 32 % of them), the enzyme alone is not evidence. Levels of the log-mean sources are linearised "
          "(expm1) before comparison.",
          "* Primary call = the present classical marker group (ACh / GABA / Glu / His) with the highest level in the "
          "source's own units; other present classical groups within 0.5x of it are listed in `nt_secondary` "
@@ -1081,9 +1280,11 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
          "members that are on, in the source's units linearised (TPM as is; expm1 of the log-mean for the 10x "
          "sources, so that summing over members is a linear operation). `*_pos_lead` / `*_neg_lead` name the member "
          "gene with the largest level.",
-         "* Because Nmdar2 is 95-727 TPM in every Davis 2020 type (and Nmdar1 is on in half of them), the glutamate "
-         "rows carry a third variant `fast_*_nonmda`: the class rule with the fast + group restricted to KaiR1D / "
-         "GluRIA / GluRIB. `edge_lookup(..., net_rule='nonmda')` uses it.",
+         "* Because Nmdar2 is 5.3-1,073 TPM over the neuronal QC-pass Davis 2020 rows -- off (P(on) = 0) only in "
+         "R1-6 / R7 / R8, 102-1,073 TPM with P(on) = 1 in every other neuronal row (Nmdar1 on in about half) -- the "
+         "glutamate rows carry a third variant `fast_*_nonmda`: the class rule with the fast + group restricted to "
+         "KaiR1D / GluRIA / GluRIB. `edge_lookup(..., net_rule='nonmda')` uses it. KaiR1D is CG3822 (FBgn0038837) in "
+         "every source since the round-2 Davis rebuild (round 1 had CG8916 under that name).",
          "* Gain class (none / low / mid / high): `none` if the group is absent; otherwise the tertile of the group "
          "level among the neuronal profiles of the same source in which the group is present (tertiles are computed "
          "per source and per group, so a class says 'this target expresses the group at a low / mid / high level "
@@ -1096,10 +1297,27 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
          f"{ABS_RATIO:g}-fold in summed source-unit level, else `mixed`. This rule is provided because the class rule "
          "compares ranks, not amounts: GluCl is expressed at ~10x the iGluR level in every profiled optic type "
          "(Davis 2020), which the tertile classes erase.",
-         "* One profile per type: the mapping row with the best tier (exact > alias > fuzzy > class), then QC pass "
-         "before suboptimal, then source priority davis2020 > ozel2021 > fca2022 > davie2018, then the source row "
-         "pooling the fewest MaleCNS types, then the source name (alphabetical). `alt_sources` lists the other sources' "
-         "net calls for the same type so a disagreement can be seen.",
+         "* One candidate profile per source and type: the mapping row with the best tier (exact > alias > fuzzy > "
+         "class), then QC pass before suboptimal, then the row pooling the fewest MaleCNS types, then the source name "
+         "(alphabetical); the sources are ranked davis2020 > ozel2021 > kurmangaliyev2020 > fca2022 > davie2018 at "
+         "equal tier / QC. The best-ranked candidate is the `primary` profile.",
+         "* **Profile selection per (type, transmitter) -- round-2 rule** (`select_profile`; "
+         "docs/audits/receptor_verification.md, verify:implement and the critic): the primary profile decides the fast "
+         "sign, EXCEPT when it has no fast receptor group for the transmitter (`none`, i.e. the edge would be silenced). "
+         "A silencing stands only if every source that profiles the type agrees. (i) If the primary is a single-nucleus "
+         "profile (fca2022 / davie2018) and a whole-cell source (davis2020 / ozel2021 / kurmangaliyev2020) has the group "
+         "on, that whole-cell profile is used for the row (`fast_selection` = `group_on_override:<source>`; `tier` / "
+         "`source` / `source_name` then name it). (ii) Any other disagreement about `none` (a whole-cell `none` against "
+         "any `on`, or a single-nucleus `none` against a single-nucleus `on`) keeps the primary profile but falls back "
+         "to `NT_SIGN` for the fast sign: `fast_net` = `none_contested`, `fast_sign` = the prior, `fast_gain_class` = "
+         "`none` (gain factor 1 under `sign+gain`). (iii) A `none` carried by fewer than "
+         f"{MIN_SOURCES_TO_SILENCE} sources (every source agrees, but only one profiles the type) also falls back to "
+         "`NT_SIGN`: `fast_net` = `none_single_source` (an anatomical synapse is silenced only on >= 2 concurring "
+         "profiles; one profile's dropout or threshold call -- e.g. Özel cluster 163 Pm1/Pm5/Pm6 with Rdl P(on) 0.37 at "
+         "mean log 2.4 -- is not enough). (iv) The `_nonmda` variant is selected separately (a profile whose "
+         "only iGluR members are Nmdar1 + Nmdar2 is `none` there; `fast_selection_nonmda`, `source_nonmda`). The slow "
+         "columns come from the profile selected for the class variant. `primary_source` / `primary_tier` record what "
+         "the round-1 rule (primary always) would have used; `alt_sources` lists the other candidates' net calls.",
          "* Rows `<nt=acetylcholine|gaba|glutamate>` are the Davis 2020 ChAT / Gad1 / VGlut protein-trap drivers: the "
          "receptor baseline of a whole transmitter class, usable as a fallback for unprofiled targets "
          "(`edge_lookup(..., nt_class_fallback=True)`), off by default.",
@@ -1158,10 +1376,42 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
           "Absolute rule (`slow_net_abs`):", "", md_table(stats_abs["monoamine_slow"]), "",
           f"Lead gene of the dopamine slow + group over the {len(da):,} profiled (type) rows where it is present: "
           f"{da.slow_pos_lead.value_counts().to_dict()}. DopEcR is an ecdysone-responsive GPCR with dopamine affinity in "
-          "the micromolar range and is on in 85 % of Davis 2020 types; if it is dropped from the group the dopamine "
+          "the micromolar range and is on in 67 of the 79 QC-pass Davis 2020 rows including glia and muscle (93 % of the "
+          "neuronal QC-pass rows; lowest L3 97.8 TPM with P(on) 0); if it is dropped from the group the dopamine "
           "slow sign rests on Dop1R1 / Dop1R2 vs Dop2R only (rerun with `RECEPTOR_GROUPS` edited; not done here).", "",
           "### 4g. Classical transmitters onto profiled targets that express no fast receptor for them (edge silenced by the lookup)", "",
-          md_table(stats_class["classical_no_receptor"]), ""]
+          "Under the round-2 selection rule a silencing needs every source profiling the target to agree (section 3).", "",
+          md_table(stats_class["classical_no_receptor"]), "",
+          f"Silenced classical edges in total: {stats_class['silenced_total']['edges']:,} entries / "
+          f"{stats_class['silenced_total']['syn_W']:,.0f} |W| synapses. The named pairs of the verification record "
+          "(R7* / R8* = every presynaptic type whose name starts with R7 / R8, R7R8_unclear counted under R7):", "",
+          md_table(stats_class["silenced_named"]), "",
+          "Top silenced (presynaptic transmitter, presynaptic type, postsynaptic type) triples:", "",
+          md_table(stats_class["silenced_pairs"].reset_index()), "",
+          "Top silenced postsynaptic types per presynaptic transmitter:", "",
+          md_table(stats_class["silenced_by_post_type"].reset_index()), ""]
+    # net-call tallies per transmitter over the type rows (the 'claim 14' recount)
+    L += ["### 4h. Net-call tallies per transmitter over the type rows of `receptors_by_type.csv`", "",
+          f"{len(rec_t):,} rows = {rec_t.malecns_type.nunique():,} types x {len(TRANSMITTERS)} transmitters "
+          "(the `<nt=...>` selector rows excluded). Counts of rows per net call:", ""]
+    tally = []
+    for nt in TRANSMITTERS:
+        r = rec_t[rec_t.transmitter == nt]
+        for col in ["fast_net", "fast_net_abs", "fast_net_nonmda", "slow_net", "slow_net_abs"]:
+            if nt in MONOAMINES and col.startswith("fast"):
+                continue
+            if nt != "glutamate" and col == "fast_net_nonmda":
+                continue
+            vc = r[col].value_counts()
+            tally.append({"transmitter": nt, "column": col, "+1": int(vc.get("+1", 0)), "-1": int(vc.get("-1", 0)),
+                          "mixed": int(vc.get("mixed", 0)), "none": int(vc.get("none", 0)),
+                          "none_contested": int(vc.get(NONE_CONTESTED, 0)), "none_single_source": int(vc.get(NONE_SINGLE, 0))})
+    L += [md_table(pd.DataFrame(tally)), "",
+          "Source x tier of the profile deciding the fast sign (class variant); one row per (type, transmitter):", "",
+          md_table(rec_t.groupby(["source", "tier"]).size().rename("rows").reset_index()), "",
+          "Selection outcomes over all type rows: " +
+          ", ".join(f"{k} {v:,}" for k, v in rec_t.fast_selection.str.split(":").str[0].value_counts().items()) +
+          "; nonmda: " + ", ".join(f"{k} {v:,}" for k, v in rec_t.fast_selection_nonmda.str.split(":").str[0].value_counts().items()) + ".", ""]
     L += ["## 5. Caveats", "",
           "* Sex and age: davis2020 / davie2018 / fca2022 are mixed-sex, ozel2021 female; MaleCNS is male. FCA male-only "
           "rows exist in `expression_central.csv` (differences < 0.15 log units for the receptor genes at cluster level) "
@@ -1175,7 +1425,34 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
           "tertile, regardless of the absolute levels; score both rules (step 6 of the plan) before adopting either.",
           "* No receptor table covers the VNC, the descending neurons, the lateral horn, the CX columnar system "
           "beyond Davis's Delta7 / EPG / PEN / PFN drivers, or the gustatory second-order cells: those edges stay "
-          "under `NT_SIGN` (tier `fallback`)."]
+          "under `NT_SIGN` (tier `fallback`).",
+          "* kurmangaliyev2020 is a pupal atlas (no post-eclosion timepoint); it decides a row only where no adult "
+          "source offers a better tier (T4a-d / T5a-d exact where Davis has the pooled T4 / T5 drivers at fuzzy tier). "
+          "Its T1 / R1-R6 clusters are marker-silent like the adult ones."]
+    if prev is not None:
+        d, st_prev = prev
+        L += ["", "## 6. Changes against the previous table (`--previous`)", "",
+              f"Compared with the previous `receptors_by_type.csv` ({d['rows_both']:,} (type, transmitter) rows in both; "
+              f"types added {len(d['types_new'])}: {d['types_new'][:20]}; removed {len(d['types_removed'])}: "
+              f"{d['types_removed'][:20]}). Rows whose value changed: " +
+              ", ".join(f"{k[8:]} {v:,}" for k, v in d.items() if k.startswith("changed_")) + ".", ""]
+        for col, tr in d["transitions"].items():
+            if len(tr):
+                L += [f"`{col}` transitions (old -> new: rows):", "",
+                      md_table(tr.rename("rows").reset_index()), ""]
+        gp, gc = st_prev["glutamate"], stats_class["glutamate"]
+        L += ["Edge-level effect (class rule, |W| synapses): glutamate flips -1 -> +1 "
+              f"{gp['flip_edges']:,} / {gp['flip_syn_W']:,.0f} -> {gc['flip_edges']:,} / {gc['flip_syn_W']:,.0f}; "
+              f"silenced classical edges {st_prev['silenced_total']['edges']:,} / {st_prev['silenced_total']['syn_W']:,.0f} -> "
+              f"{stats_class['silenced_total']['edges']:,} / {stats_class['silenced_total']['syn_W']:,.0f}.", "",
+              "Named silenced pairs, previous table:", "", md_table(st_prev["silenced_named"]), "",
+              "Named silenced pairs, this table:", "", md_table(stats_class["silenced_named"]), "",
+              "Silenced pairs of the previous table (top):", "", md_table(st_prev["silenced_pairs"].reset_index()), ""]
+        rows = d["rows_changed"]
+        show = [c for c in ["malecns_type", "transmitter", "fast_net_old", "fast_net_new", "fast_net_abs_old", "fast_net_abs_new",
+                            "fast_net_nonmda_old", "fast_net_nonmda_new", "slow_net_old", "slow_net_new", "source_old", "source_new",
+                            "tier_old", "tier_new", "fast_pos_lead_old", "fast_pos_lead_new"] if c in rows]
+        L += [f"All {len(rows):,} rows whose net call, slow call or deciding source changed:", "", md_table(rows[show]), ""]
     OUT_RULES.write_text("\n".join(L), encoding="utf-8")
 
 
@@ -1183,6 +1460,9 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
 # 7. Main
 # --------------------------------------------------------------------------------------------------------------
 def main():
+    ap = argparse.ArgumentParser(description="build nt_by_type_transcriptome.csv / receptors_by_type.csv and the two audit docs")
+    ap.add_argument("--previous", default=None, help="a previous receptors_by_type.csv: adds a change section to receptor_rules.md")
+    args = ap.parse_args()
     t0 = time.time()
     log = print
     c = cn.load(verbose=False)
@@ -1197,9 +1477,11 @@ def main():
         "scripts/build_receptor_table.py from the per-source tables in flyverse/data/ (Özel 2021 GSE142787; Davis 2020 GSE116969;",
         "Davie 2018 GSE107451; Fly Cell Atlas 2022 head; Nern 2025 Sup. Table 1) and cache/neurons.parquet. Rules and thresholds:",
         "docs/audits/receptor_rules.md section 2; disagreements: docs/audits/receptor_nt_disagreements.md.",
-        "nt_transcriptome: acetylcholine = ChAT|VAChT on; gaba = Gad1 on (VGAT unused: ubiquitous in bulk data); glutamate = VGlut;",
+        "nt_transcriptome: acetylcholine = ChAT|VAChT on; gaba = Gad1 on (VGAT unused: 60-586 TPM with P(on) = 1 in every non-photoreceptor",
+        "neuronal QC-pass Davis row); glutamate = VGlut;",
         "histamine = Hdc; dopamine = ple&DAT; octopamine = Tdc2&Tbh; serotonin = Trh&SerT ('on' = source mixture-model P(on) >= 0.5",
-        "[ozel2021], P(on) >= 0.5 & TPM >= 10 [davis2020], fraction of cells >= 0.2 [davie2018 / fca2022]); primary = highest classical",
+        "[ozel2021], P(on) >= 0.5 & TPM >= 10 [davis2020], fraction of cells >= 0.2 [davie2018 / fca2022 / kurmangaliyev2020 96 h APF]);",
+        "primary = highest classical",
         "marker level (expm1-linearised for the 10x sources), monoamines only when no classical marker is on; majority over sources",
         "(circular NT-class selections excluded; mixed pools never outvote per-type rows); none = no marker on.",
         "confidence: high = exact/alias tier and >= 2 sources agree; medium = exact/alias single source or >= 2 fuzzy/class; low = single",
@@ -1212,9 +1494,9 @@ def main():
     write_csv_with_header(nt_table, OUT_NT, nt_header)
     rec_header = [
         "receptors_by_type.csv -- postsynaptic response class per (MaleCNS v1.0 type, transmitter), built by",
-        "scripts/build_receptor_table.py from flyverse/data/expression_{ozel2021,davis2020,central}.csv and the matching type maps",
-        "(Özel 2021 GSE142787; Davis 2020 GSE116969 CC BY 4.0; Davie 2018 GSE107451; Fly Cell Atlas 2022 head). Full rules and",
-        "coverage: docs/audits/receptor_rules.md.",
+        "scripts/build_receptor_table.py from flyverse/data/expression_{ozel2021,davis2020,central,kurmangaliyev2020}.csv and the",
+        "matching type maps (Özel 2021 GSE142787; Davis 2020 GSE116969 CC BY 4.0; Davie 2018 GSE107451; Fly Cell Atlas 2022 head;",
+        "Kurmangaliyev 2020 GSE156455, pupal 96 h APF). Full rules and coverage: docs/audits/receptor_rules.md.",
         "Receptor groups: acetylcholine fast + nAChR alpha1-7/beta1-3, slow + mAChR-A (Gq) / slow - mAChR-B (Gi); gaba fast - Rdl/Lcch3/Grd,",
         "slow - GABA-B-R1/2/3; glutamate fast - GluClalpha, fast + KaiR1D/GluRIA/GluRIB/Nmdar1+Nmdar2, slow - mGluR; histamine fast -",
         "HisCl1/ort; dopamine slow + Dop1R1/Dop1R2/DopEcR, slow - Dop2R; octopamine slow + Oamb/Octbeta1-3R, slow - Octalpha2R;",
@@ -1226,12 +1508,21 @@ def main():
         "larger class, 'mixed' if equal (then *_sign keeps the NT_SIGN prior for fast, 0 for slow), 'none' if both absent;",
         "*_gain_class: class of the winning group. *_abs columns: the same under the absolute rule (larger summed level, 2-fold",
         "margin, else mixed). fast_*_nonmda: the class rule with the glutamate fast + group restricted to KaiR1D/GluRIA/GluRIB",
-        "(Nmdar2 is 95-727 TPM in every Davis type); identical to the plain columns for the other transmitters.",
-        "tier / source / source_name / qc: the profile used (best tier, QC pass first, then davis2020 > ozel2021 > fca2022 >",
-        "davie2018, then the row pooling the fewest types, then name); pool_mixed: the profile is a pooled cluster whose member",
-        "types carry mixed model transmitter labels (a class prior, not a per-type measurement); alt_sources: the other sources'",
-        "net calls. Rows '<nt=...>' are the Davis 2020 ChAT / Gad1 / VGlut whole-class baselines (tier class), used only with",
-        "edge_lookup(nt_class_fallback=True).",
+        "(Nmdar2 is 102-1,073 TPM with P(on) = 1 in every non-photoreceptor neuronal QC-pass Davis row); identical to the plain",
+        "columns for the other transmitters. KaiR1D = CG3822 in every source.",
+        "tier / source / source_name / qc: the profile deciding the row. Candidates: the best row per source (best tier, QC pass",
+        "first, then the row pooling the fewest types, then name), ranked davis2020 > ozel2021 > kurmangaliyev2020 > fca2022 >",
+        "davie2018 at equal tier / QC; the best-ranked is the primary (primary_source / primary_tier). Selection rule (round 2):",
+        "the primary decides unless its fast group for the transmitter is 'none' and another source has it on -- a single-",
+        "nucleus (fca2022 / davie2018) 'none' is replaced by the best whole-cell (davis2020 / ozel2021 / kurmangaliyev2020)",
+        "profile with the group on (fast_selection = group_on_override:<source>); any other such disagreement keeps the primary",
+        "but falls back to NT_SIGN: fast_net = none_contested, fast_sign = the prior, fast_gain_class = none (factor 1); a",
+        "'none' carried by a single source falls back the same way (fast_net = none_single_source). A silencing (fast_sign 0)",
+        "therefore needs every source profiling the type to agree and at least two of them. fast_selection_nonmda /",
+        "source_nonmda: the same for the nonmda variant (selected separately). n_sources: candidate sources for the type.",
+        "pool_mixed: the profile is a pooled cluster whose member types carry mixed model transmitter labels (a class prior, not",
+        "a per-type measurement); alt_sources: the other candidates' net calls. Rows '<nt=...>' are the Davis 2020 ChAT / Gad1 /",
+        "VGlut whole-class baselines (tier class), used only with edge_lookup(nt_class_fallback=True).",
     ]
     write_csv_with_header(rec_table, OUT_RECEPTORS, rec_header)
     log(f"wrote {OUT_NT} and {OUT_RECEPTORS}")
@@ -1249,7 +1540,14 @@ def main():
     edges_nt = edge_lookup(c, rec_table, net_rule="class", nt_class_fallback=True)
     st_nt = edge_stats(c, edges_nt, raw)
     cov = coverage_by_group(rec_table, types)
-    write_rules(st_class, st_abs, cov, rec_table, nt_table, raw is not None, len(edges_class), st_nt, st_nn)
+    prev = None
+    if args.previous:
+        old = read_csv(Path(args.previous))
+        st_prev = edge_stats(c, edge_lookup(c, old, net_rule="class"), raw, receptors=old)
+        prev = (compare_tables(rec_table, old), st_prev)
+        log(f"previous table {args.previous}: {len(old):,} rows; changed net calls: "
+            + ", ".join(f"{k[8:]} {v}" for k, v in prev[0].items() if k.startswith("changed_")))
+    write_rules(st_class, st_abs, cov, rec_table, nt_table, raw is not None, len(edges_class), st_nt, st_nn, prev)
     log(f"wrote {OUT_RULES} ({time.time() - t0:.1f}s)")
 
     # ---- headline numbers -----------------------------------------------------------------------------------
@@ -1283,6 +1581,13 @@ def main():
         print("  top post types: " + ", ".join(f"{t} {r.syn_W:,.0f} [{r.lead_gene}]" for t, r in st["glutamate_flip_top_post_types"].head(10).iterrows()))
         if "glutamate_flip_by_lead_gene" in st:
             print("  by lead gene: " + ", ".join(f"{g_} {r.syn_W:,.0f}" for g_, r in st["glutamate_flip_by_lead_gene"].iterrows()))
+    for name, st in (("class", st_class), ("nonmda", st_nn)) + ((("previous", prev[1]),) if prev else ()):
+        z = st["silenced_total"]
+        print(f"silenced classical edges ({name}): {z['edges']:,} entries / {z['syn_W']:,.0f} syn; "
+              + "; ".join(f"{r.pair} {r.edges:,} / {r.syn_W:,.0f}" for _, r in st["silenced_named"].iterrows()))
+    rt_ = rec_table[~rec_table.malecns_type.str.startswith("<")]
+    print("selection outcomes: " + ", ".join(f"{k} {v:,}" for k, v in rt_.fast_selection.str.split(":").str[0].value_counts().items())
+          + "; nonmda: " + ", ".join(f"{k} {v:,}" for k, v in rt_.fast_selection_nonmda.str.split(":").str[0].value_counts().items()))
     pm = int((nt_table.agreement == "pool_mixed_not_evaluable").sum())
     print(f"pool-mixed (not evaluable) rows: {pm}")
     for name, st in (("class", st_class), ("abs", st_abs)):

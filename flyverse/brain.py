@@ -106,26 +106,109 @@ class LIFParams:
     #   for that transmitter, ...); unmatched edges keep NT_SIGN. Applied to abs(W) BEFORE the connection cap.
     # "sign+gain": as "sign", times the gain-class factor `receptor_gain` of the row (expression tertiles, not
     #   conductances -- a parameter to sweep), also before the cap.
-    # "full": "sign+gain" plus a SLOW conductance g_slow per neuron driven by the row's slow (metabotropic /
-    #   monoamine) sign and gain class through a second sparse matrix W_slow (entries with a non-zero slow sign
-    #   only: mAChR, GABA-B, mGluR, dopamine / octopamine / serotonin receptors), time constant `slow_tau_ms`,
-    #   scale `slow_gain` x w_syn per synapse, added to the membrane input like g. Monoamine synapses are explicit
-    #   zeros in the cached W, so their counts come from cache/sign0_counts.npz (connectome.sign0_counts, built
-    #   from the raw weights table on first use). The native CUDA / Metal kernels do not carry g_slow: "full"
-    #   forces the Torch path (a warning if kernels were requested), like adapt_by_type.
+    # "full": "sign+gain" plus a SLOW tone g_slow per neuron driven by the row's slow (metabotropic / monoamine) sign
+    #   and gain class through sparse matrices W_slow (entries with a non-zero slow sign only), ONE PER SLOW CLASS
+    #   (connectome.SLOW_CLASSES: 'metabotropic_classical' = mAChR-A/-B, GABA-B, mGluR on ACh / GABA / glutamate
+    #   edges; 'monoamine' = the dopamine / octopamine / serotonin receptors), each with its own scale
+    #   (`slow_gain_by_class`, x w_syn per synapse per presynaptic spike) and time constant (`slow_tau_by_class`).
+    #   Round 2 (docs/audits/slow_term.md): the classical class defaults to 0 -- 98 % of the round-1 slow entries were
+    #   mAChR-B / GABA-B / mGluR, which act mostly presynaptically in the animal and turned into a runaway current --
+    #   and the monoamine class is the term the plan asked for. How g_slow acts is `slow_mode`:
+    #     "additive"  : g_slow (mV) is added to the membrane target like g (round 1's form);
+    #     "gain"      : the fast synaptic input g is multiplied by clamp(1 + g_slow / (v_th - v_rest), slow_gain_clip)
+    #                   -- NOTE: g is the NET synaptic input (excitation minus inhibition), so a +7 mV tone doubles it and a
+    #                   -7 mV tone zeroes it whatever its sign: on a net-inhibited target a negative tone REDUCES the
+    #                   inhibition (disinhibits). A per-sign gain would need separate excitatory / inhibitory accumulators;
+    #     "threshold" : the spike threshold becomes v_th - min(g_slow, 0.9 (v_th - v_rest)) -- a +7 mV tone puts the
+    #                   threshold 0.7 mV above rest, a negative tone raises it without bound.
+    #   In every mode g_slow = sum over classes of a per-class state that jumps by slow_gain[class] x w_syn x count x
+    #   slow sign x gain factor per transmitted presynaptic spike and decays with slow_tau[class]; the steady tone of a
+    #   presynaptic cell at rate R is therefore slow_gain x tau_slow / tau_syn times the fast conductance the same
+    #   synapses would carry (gain 0.02, tau 200 ms: 0.8x). Monoamine synapses are explicit zeros in the cached W, so
+    #   their counts come from cache/sign0_counts.npz (connectome.sign0_counts, built from the raw weights table on
+    #   first use). The native CUDA / Metal kernels do not carry g_slow: "full" forces the Torch path (a warning if
+    #   kernels were requested), like adapt_by_type; when every class gain is 0 no slow matrix is built and the step
+    #   loop does no slow work (the weights and the dynamics then equal "sign+gain" on the Torch path).
     receptor_model: str | None = None
     receptor_net_rule: str = "class"          # "class" | "abs" | "nonmda": which column set of the table decides the sign
     receptor_nt_class_fallback: bool = False  # unprofiled targets take the Davis 2020 whole-class baseline (tier nt_class)
     receptor_table: str | None = None         # path override for receptors_by_type.csv
     receptor_gain: dict | None = None         # {gain class: factor}; None = DEFAULT_RECEPTOR_GAIN (low 0.5, mid 1, high 1.5)
-    slow_tau_ms: float = 200.0                # time constant of g_slow (a parameter: GPCR cascades are 100s of ms)
-    slow_gain: float = 0.1                    # g_slow jump per synapse = slow_gain x w_syn x slow sign x gain factor
+    slow_tau_ms: float = 200.0                # monoamine time constant (ms; GPCR cascades are 100s of ms) -- see slow_tau_by_class
+    slow_gain: float = 0.02                   # monoamine scale (x w_syn per synapse per spike; round 1 used 0.1 for every class)
+    # {slow class: scale} / {slow class: tau ms}; None = DEFAULT_SLOW_GAIN_BY_CLASS / DEFAULT_SLOW_TAU_BY_CLASS with the
+    # monoamine entries taken from slow_gain / slow_tau_ms. Keys must be connectome.SLOW_CLASSES[1:].
+    slow_gain_by_class: dict | None = None
+    slow_tau_by_class: dict | None = None
+    slow_mode: str = "additive"               # "additive" | "gain" | "threshold" (see above)
+    slow_gain_clip: tuple = (0.0, 4.0)        # bounds of the multiplicative factor in "gain" mode
 
 
 # Gain-class factors of the receptor model ("sign+gain" / "full"): the table's classes are per-source expression
 # tertiles of the winning receptor group ("none" only occurs with sign 0). Parameters, not measurements.
 DEFAULT_RECEPTOR_GAIN = {"none": 1.0, "low": 0.5, "mid": 1.0, "high": 1.5}
 RECEPTOR_MODELS = (None, "sign", "sign+gain", "full")
+SLOW_MODES = ("additive", "gain", "threshold")
+# Slow-term defaults per class (docs/audits/slow_term.md). The classical metabotropic class is OFF (scale 0): mAChR-B /
+# GABA-B / mGluR act largely presynaptically (release, adaptation) and as an additive current they were round 1's
+# runaway; its tau (100 ms, the GABA-B IPSP scale) is a parameter with no calibration behind it. The monoamine
+# entries come from LIFParams.slow_gain / slow_tau_ms.
+DEFAULT_SLOW_GAIN_BY_CLASS = {"metabotropic_classical": 0.0, "monoamine": None}
+DEFAULT_SLOW_TAU_BY_CLASS = {"metabotropic_classical": 100.0, "monoamine": None}
+SLOW_THRESHOLD_MAX_FRAC = 0.9             # "threshold" mode: the threshold never drops below v_rest + 0.1 (v_th - v_rest)
+
+
+@dataclass
+class SlowSpec:
+    """The resolved slow term of receptor_model == 'full' (brain._slow_spec): mode, per-class scale and time constant
+    (classes with scale 0 are dropped), the fast synaptic time constant the scales are relative to, and the
+    normalisation of the multiplicative modes (norm_mv = v_th - v_rest for the LIF). Shared with optic.OpticLobe."""
+    mode: str
+    gain: dict            # {class name: scale}, non-zero entries only
+    tau: dict             # {class name: ms}, same keys
+    tau_syn: float        # ms
+    norm_mv: float        # mV: the tone that doubles the fast input ('gain') / would put the threshold at rest ('threshold')
+    clip: tuple = (0.0, 4.0)
+
+    @property
+    def classes(self) -> list:
+        return list(self.gain)
+
+
+def _slow_gains(p: LIFParams) -> dict:
+    g = dict(DEFAULT_SLOW_GAIN_BY_CLASS); g["monoamine"] = float(p.slow_gain)
+    if p.slow_gain_by_class:
+        g.update({k: float(v) for k, v in p.slow_gain_by_class.items()})
+    return g
+
+
+def _slow_taus(p: LIFParams) -> dict:
+    t = dict(DEFAULT_SLOW_TAU_BY_CLASS); t["monoamine"] = float(p.slow_tau_ms)
+    if p.slow_tau_by_class:
+        t.update({k: float(v) for k, v in p.slow_tau_by_class.items()})
+    return t
+
+
+def _slow_spec(p: LIFParams) -> SlowSpec | None:
+    """None unless receptor_model == 'full' AND some class has a non-zero scale (then the term costs nothing)."""
+    if p.receptor_model != "full":
+        return None
+    from .connectome import SLOW_CLASSES
+    if p.slow_mode not in SLOW_MODES:
+        raise ValueError(f"slow_mode must be one of {SLOW_MODES}")
+    gains, taus = _slow_gains(p), _slow_taus(p)
+    bad = set(gains) | set(taus)
+    bad -= set(SLOW_CLASSES[1:])
+    if bad:
+        raise ValueError(f"unknown slow classes {sorted(bad)}; use {SLOW_CLASSES[1:]}")
+    for k, tau in taus.items():
+        if not (math.isfinite(tau) and tau > 0):
+            raise ValueError(f"slow tau of class {k!r} must be positive and finite")
+    active = {k: g for k, g in gains.items() if g != 0.0}
+    if not active:
+        return None
+    return SlowSpec(p.slow_mode, active, {k: taus[k] for k in active}, float(p.tau_syn), float(p.v_th - p.v_rest),
+                    tuple(float(x) for x in p.slow_gain_clip))
 
 
 # Depression only in the antennal lobe (ORN -> PN and the LN/PN recurrence are documented depressing
@@ -215,19 +298,23 @@ def _shaped_weights(c: Connectome, p: LIFParams, receptor: ReceptorSigns | None 
     return W
 
 
-def _slow_weights(c: Connectome, p: LIFParams, receptor: ReceptorSigns):
-    """The slow (metabotropic / monoamine) matrix of the "full" receptor model, in synapse-equivalents: per edge
-    count x slow sign x gain factor, capped like the fast synapses (conn_cap on the magnitude); entries with slow
-    sign 0 are dropped. Path gains and same-type damping (fast-synapse stop-gaps) are NOT applied; the fan-in scale
-    and w_syn x slow_gain are applied by Brain."""
+def _slow_weights(c: Connectome, p: LIFParams, receptor: ReceptorSigns, spec: SlowSpec) -> dict:
+    """The slow (metabotropic / monoamine) matrices of the "full" receptor model, one per active slow class
+    ({class name: csr}), in synapse-equivalents: per edge count x slow sign x gain factor, capped like the fast
+    synapses (conn_cap on the magnitude); entries with slow sign 0 or of another class are dropped. Path gains and
+    same-type damping (fast-synapse stop-gaps) are NOT applied; the fan-in scale and w_syn x slow_gain[class] are
+    applied by Brain."""
     if receptor.count is None:
         raise ValueError("the slow term needs receptor_signs(..., with_counts=True)")
-    S = c.W.tocsr().copy()
-    S.data = receptor.count * receptor.slow_factor(_receptor_gain(p))
-    if p.conn_cap > 0:
-        S.data = np.sign(S.data) * np.minimum(np.abs(S.data), np.float32(p.conn_cap))
-    S.eliminate_zeros()
-    return S
+    out = {}
+    for cls in spec.classes:
+        S = c.W.tocsr().copy()
+        S.data = receptor.count * receptor.slow_factor(_receptor_gain(p), slow_class=cls)
+        if p.conn_cap > 0:
+            S.data = np.sign(S.data) * np.minimum(np.abs(S.data), np.float32(p.conn_cap))
+        S.eliminate_zeros()
+        out[cls] = S
+    return out
 
 
 class Brain:
@@ -249,12 +336,15 @@ class Brain:
         if self.B < 1 or not math.isfinite(p.dt) or p.dt <= 0:
             raise ValueError("batch must be positive and dt must be positive and finite")
 
+        # receptor_model == "full" keeps the Torch path (no native kernel carries g_slow); the slow term itself is
+        # active only when some class has a non-zero scale (self.slow, a SlowSpec) -- otherwise nothing is built.
         self._slow_on = p.receptor_model == "full"
-        if self._slow_on and not (math.isfinite(p.slow_tau_ms) and p.slow_tau_ms > 0):
-            raise ValueError("slow_tau_ms must be positive and finite")
-        self.receptor = _receptor(c, p, receptor, with_counts=self._slow_on)
+        self.slow = _slow_spec(p)
+        self._slow_active = self.slow is not None
+        self.slow_classes = self.slow.classes if self._slow_active else []
+        self.receptor = _receptor(c, p, receptor, with_counts=self._slow_active)
         W = _shaped_weights(c, p, self.receptor)
-        S = _slow_weights(c, p, self.receptor) if self._slow_on else None
+        S = _slow_weights(c, p, self.receptor, self.slow) if self._slow_active else None
         if p.input_norm_alpha > 0:
             ref = c.reference
             key = repr((p.conn_cap, DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain,
@@ -271,11 +361,13 @@ class Brain:
             import scipy.sparse as sp
             W = (sp.diags(scale) @ W).tocsr()
             if S is not None:
-                S = (sp.diags(scale) @ S).tocsr()
+                S = {k: (sp.diags(scale) @ Sk).tocsr() for k, Sk in S.items()}
             self.input_scale = scale
         W = W.copy(); W.data = W.data * np.float32(p.w_syn)
         if S is not None:
-            S = S.copy(); S.data = S.data * np.float32(p.w_syn * p.slow_gain)
+            S = {k: Sk.copy() for k, Sk in S.items()}
+            for k, Sk in S.items():
+                Sk.data = Sk.data * np.float32(p.w_syn * self.slow.gain[k])
         self.event_driven = (self.device.type != "cuda") if p.event_driven is None else bool(p.event_driven)
         adapt_map_early = DEFAULT_ADAPT_BY_TYPE if p.adapt_by_type is None else p.adapt_by_type
         if adapt_map_early and cuda_kernels:
@@ -285,8 +377,15 @@ class Brain:
             import warnings
             warnings.warn("the slow receptor term (receptor_model='full') is not in the native LIF kernel; using the Torch path")
         self.cuda = cuda.use(self.device, False if (adapt_map_early or self._slow_on) else cuda_kernels)
-        if cuda_sparse not in ("torch", "warp") or (cuda_sparse == "warp" and not self.cuda):
-            raise ValueError("cuda_sparse must be torch or warp; warp requires CUDA kernels")
+        if cuda_sparse not in ("torch", "warp"):
+            raise ValueError("cuda_sparse must be torch or warp")
+        if cuda_sparse == "warp" and not self.cuda:
+            if cuda_kernels and (adapt_map_early or self._slow_on):          # the model option, not the caller, turned the kernels off
+                import warnings
+                warnings.warn("cuda_sparse=warp needs the native kernels, which this model configuration disables; using cuSPARSE")
+                cuda_sparse = "torch"
+            else:
+                raise ValueError("cuda_sparse=warp requires CUDA kernels")
         self.cuda_sparse, self.cuda_compact = cuda_sparse, cuda_compact
         self.metal = (metal.use(self.device, metal_kernels) and self.event_driven and p.weight_dtype == "float32"
                       and not self._slow_on)
@@ -306,8 +405,13 @@ class Brain:
         B, N, dev = self.B, self.n, self.device
         self.v = torch.full((B, N), p.v_rest, device=dev)
         self.g = torch.zeros(B, N, device=dev)
-        self.g_slow = torch.zeros(B, N, device=dev)          # slow receptor conductance (mV), receptor_model == "full"
-        self._a_slow = math.exp(-p.dt / p.slow_tau_ms) if self._slow_on else 1.0
+        # slow receptor tone (mV): per active slow class (K, B, N) and its sum (B, N); K = 0 when the term is off
+        self.g_slow_cls = torch.zeros(len(self.slow_classes), B, N, device=dev)
+        self.g_slow = torch.zeros(B, N, device=dev)
+        self._a_slow = [math.exp(-p.dt / self.slow.tau[k]) for k in self.slow_classes]
+        if self._slow_active and self.slow.mode == "threshold":
+            self._th_max = torch.tensor(SLOW_THRESHOLD_MAX_FRAC * self.slow.norm_mv, device=dev)
+        self._th = torch.full((B, N), p.v_th, device=dev) if self._slow_active and self.slow.mode == "threshold" else None
         self.refrac = torch.zeros(B, N, device=dev)          # ms left in refractory period
         self.drive = torch.zeros(B, N, device=dev)           # I_ext (mV), set by the environment
         self.poisson_p = torch.zeros(B, N, device=dev)       # per-step spike prob for forced neurons
@@ -380,11 +484,45 @@ class Brain:
             self._syn_input = torch.empty(self.n, self.B, dtype=torch.float32, device=self.device)
 
     def _set_slow_weights(self, S) -> None:
-        """Install the slow-term matrix (mV per transmitted spike; None = no slow term). Always a plain sparse matmul."""
-        self.W_slow = None if S is None else sparse_matrix(S, self.device, dtype=torch.float32)
+        """Install the slow-term matrices ({class: csr}, mV per transmitted spike; None = no slow term) as plain torch
+        sparse matrices in class order (self.slow_classes)."""
+        self.W_slow = None if S is None else [sparse_matrix(S[k], self.device, dtype=torch.float32) for k in self.slow_classes]
 
-    def _add_slow_input(self, W_slow, x: torch.Tensor) -> None:
-        self.g_slow.add_((W_slow @ x.T.contiguous()).T)
+    def _slow_update(self, W_slow: list, x: torch.Tensor, a_slow=None) -> None:
+        """Decay every class tone and add the slow input of transmitted spikes x (B, N); refresh the summed tone."""
+        for k, Wk in enumerate(W_slow):
+            gk = self.g_slow_cls[k]
+            gk.mul_(self._a_slow[k] if a_slow is None else a_slow[k])
+            gk.add_((Wk @ x.T.contiguous()).T)
+        torch.sum(self.g_slow_cls, dim=0, out=self.g_slow)
+
+    def _slow_decay(self, a_slow=None) -> None:
+        """Decay only (clocked path: the input is added per clock)."""
+        for k in range(len(self.slow_classes)):
+            self.g_slow_cls[k].mul_(self._a_slow[k] if a_slow is None else a_slow[k])
+
+    def _slow_add(self, W_slow: list, x: torch.Tensor) -> None:
+        for k, Wk in enumerate(W_slow):
+            self.g_slow_cls[k].add_((Wk @ x.T.contiguous()).T)
+
+    def _membrane_target(self) -> torch.Tensor:
+        """v_rest + synaptic input + drive - adaptation, with the slow tone applied per slow_mode."""
+        p = self.p
+        if not self._slow_active or self.slow.mode == "threshold":
+            return p.v_rest + self.g + self.drive - self.adapt
+        if self.slow.mode == "additive":
+            return p.v_rest + self.g + self.drive - self.adapt + self.g_slow
+        # "gain": the fast synaptic input scaled by the normalised tone
+        f = torch.clamp(1.0 + self.g_slow / self.slow.norm_mv, self.slow.clip[0], self.slow.clip[1])
+        return p.v_rest + self.g * f + self.drive - self.adapt
+
+    def _threshold(self):
+        """The spike threshold: v_th, or v_th - min(g_slow, 0.9 gap) in "threshold" mode (a (B, N) tensor)."""
+        if self._th is None:
+            return self.p.v_th
+        torch.minimum(self.g_slow, self._th_max, out=self._th)
+        self._th.neg_().add_(self.p.v_th)
+        return self._th
 
     def _sparse(self, W, dtype):
         return cuda.CSR(W, self.device, dtype) if self.cuda_sparse == "warp" else sparse_matrix(W, self.device, dtype=dtype)
@@ -409,7 +547,9 @@ class Brain:
         self._W_cpu = W
         self.set_weights(W)
         if self._W_slow_cpu is not None:
-            S = (sp.diags(keep) @ self._W_slow_cpu @ sp.diags(keep)).tocsr(); S.eliminate_zeros()
+            S = {}
+            for k, Sk in self._W_slow_cpu.items():
+                Sk = (sp.diags(keep) @ Sk @ sp.diags(keep)).tocsr(); Sk.eliminate_zeros(); S[k] = Sk
             self._W_slow_cpu = S
             self._set_slow_weights(S)
         if self._kvec is not None:
@@ -434,7 +574,7 @@ class Brain:
             one = torch.ones_like(u)
             coef = lambda tau: torch.where(u > 0, torch.exp(-p.dt * kt / tau), one)
             self._phase.append({"u": u, "a_m": coef(p.tau_m), "a_s": coef(p.tau_syn), "a_r": coef(p.rate_tau),
-                                "a_slow": coef(p.slow_tau_ms) if self._slow_on else one,
+                                "a_slow": [coef(self.slow.tau[k]) for k in self.slow_classes],
                                 "a_ad": coef(p.adapt_tau) if p.adapt_jump > 0 else torch.zeros_like(u),
                                 "a_std": coef(p.std_tau) if self._std_on else one,
                                 "dt": u * kt * p.dt, "rate_gain": u * (1 - torch.exp(-p.dt * kt / p.rate_tau)) * 1000.0 / (kt * p.dt),
@@ -455,8 +595,11 @@ class Brain:
             Wk = (sp.diags(rows) @ self._W_cpu).tocsr(); Wk.eliminate_zeros()
             self._W_k[int(kk)] = self._sparse(Wk, dtype)
             if self._W_slow_cpu is not None:
-                Sk = (sp.diags(rows) @ self._W_slow_cpu).tocsr(); Sk.eliminate_zeros()
-                self._W_slow_k[int(kk)] = sparse_matrix(Sk, self.device, dtype=torch.float32)
+                mats = []
+                for cls in self.slow_classes:
+                    Sk = (sp.diags(rows) @ self._W_slow_cpu[cls]).tocsr(); Sk.eliminate_zeros()
+                    mats.append(sparse_matrix(Sk, self.device, dtype=torch.float32))
+                self._W_slow_k[int(kk)] = mats
             if kk > 1:
                 self._acc[int(kk)] = torch.zeros(self.B, self.n, device=self.device)
         self.W = None
@@ -513,6 +656,7 @@ class Brain:
         for t in (self.g, self.g_slow, self.refrac, self.drive, self.poisson_p, self.rate, self.spikes, self.adapt,
                   self.spike_counts):
             t[sel] = 0.0
+        self.g_slow_cls[:, sel] = 0.0
         self.res[sel] = 1.0
         self.spike_buf[:, sel] = 0.0
         for acc in self._acc.values():
@@ -536,21 +680,18 @@ class Brain:
             # synaptic input from spikes emitted `delay` ago: one sparse matmul for all B brains
             self.g.mul_(self._a_s)
             self._add_synaptic_input(self.spike_buf[self.buf_pos])          # spikes emitted `delay` ago, (B, N)
-            if self._slow_on:
-                # slow (metabotropic / monoamine) conductance: same delayed spikes, its own time constant
-                self.g_slow.mul_(self._a_slow)
-                self._add_slow_input(self.W_slow, self.spike_buf[self.buf_pos])
+            if self._slow_active:
+                # slow (metabotropic / monoamine) tone per class: same delayed spikes, its own time constant
+                self._slow_update(self.W_slow, self.spike_buf[self.buf_pos])
 
             # membrane (exponential Euler with g and drive held constant over the step)
-            target = p.v_rest + self.g + self.drive - self.adapt
-            if self._slow_on:
-                target = target + self.g_slow
+            target = self._membrane_target()
             torch.add(target, (self.v - target) * self._a_m, out=self.v)
             in_ref = self.refrac > 0
             torch.where(in_ref, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
             torch.clamp(self.refrac - p.dt, min=0.0, out=self.refrac)
 
-            torch.mul((self.v >= p.v_th).float(), self.active, out=self.spikes)
+            torch.mul((self.v >= self._threshold()).float(), self.active, out=self.spikes)
             spikes = self.spikes
             if self._poisson_on:
                 forced = (torch.rand(self.v.shape, generator=self.gen, device=self.device) < self.poisson_p).float()
@@ -611,20 +752,22 @@ class Brain:
             c = self._phase[self.step_count % self.K]
             x = self.spike_buf[self.buf_pos]
             self.g.mul_(c["a_s"])
-            if self._slow_on:
-                self.g_slow.mul_(c["a_slow"])
+            if self._slow_active:
+                self._slow_decay(c["a_slow"])
             for kk, Wk in self._W_k.items():
                 if kk == 1:
                     self._matmul_add(Wk, x)
-                    if self._slow_on:
-                        self._add_slow_input(self._W_slow_k[kk], x)
+                    if self._slow_active:
+                        self._slow_add(self._W_slow_k[kk], x)
                 else:
                     acc = self._acc[kk]; acc.add_(x)
                     if (self.step_count % kk) == 0:
                         self._matmul_add(Wk, acc)
-                        if self._slow_on:
-                            self._add_slow_input(self._W_slow_k[kk], acc)
+                        if self._slow_active:
+                            self._slow_add(self._W_slow_k[kk], acc)
                         acc.zero_()
+            if self._slow_active:
+                torch.sum(self.g_slow_cls, dim=0, out=self.g_slow)
             if self.cuda:
                 rnd = torch.rand(self.v.shape, generator=self.gen, device=self.device) if self._poisson_on else self.poisson_p
                 cuda.lif_update(self, rnd, c["cuda"])
@@ -632,14 +775,12 @@ class Brain:
                 self.t += p.dt
                 self.step_count += 1
                 continue
-            target = p.v_rest + self.g + self.drive - self.adapt
-            if self._slow_on:
-                target = target + self.g_slow
+            target = self._membrane_target()
             torch.add(target, (self.v - target) * c["a_m"], out=self.v)
             in_ref = self.refrac > 0
             torch.where(in_ref, torch.full_like(self.v, p.v_reset), self.v, out=self.v)
             torch.clamp(self.refrac - c["dt"], min=0.0, out=self.refrac)
-            torch.mul((self.v >= p.v_th).float() * c["u"], self.active, out=self.spikes)
+            torch.mul((self.v >= self._threshold()).float() * c["u"], self.active, out=self.spikes)
             spikes = self.spikes
             if self._poisson_on:
                 forced = (torch.rand(self.v.shape, generator=self.gen, device=self.device) < self.poisson_p * c["pois"]).float()

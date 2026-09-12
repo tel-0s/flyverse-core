@@ -28,19 +28,22 @@ def main():
     ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
                     help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
     ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
+    ap.add_argument("--receptor-nt-class-fallback", action="store_true",
+                    help="LIFParams.receptor_nt_class_fallback: unprofiled targets take the Davis 2020 ChAT / Gad1 / VGlut class baseline")
+    ap.add_argument("--seed", type=int, default=0, help="Brain RNG seed (the Poisson GRN drive; a real replicate)")
     args = ap.parse_args()
     receptor = dict(receptor_model=None if args.receptor_model == "off" else args.receptor_model,
-                    receptor_net_rule=args.receptor_net_rule)
+                    receptor_net_rule=args.receptor_net_rule, receptor_nt_class_fallback=bool(args.receptor_nt_class_fallback))
     c = connectome.load(verbose=False)
     if receptor["receptor_model"]:
-        rs = connectome.receptor_signs(c, net_rule=args.receptor_net_rule)
+        rs = connectome.receptor_signs(c, net_rule=args.receptor_net_rule, nt_class_fallback=bool(args.receptor_nt_class_fallback))
         cov = rs.coverage(c.W)
         m = cov[cov.tier == "matched"].iloc[0]
         print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}): matched {m.edges:,} edges = {m.edges_frac:.1%}, "
               f"{m.syn_W:,.0f} |W| synapses = {m.syn_W_frac:.1%}; fast sign changed on "
               f"{int((rs.fast_sign != np.sign(c.W.data)).sum()):,} entries")
     import torch
-    print(f"device: {brain.resolve(None)}; cuda available: {torch.cuda.is_available()}")
+    print(f"device: {brain.resolve(None)}; cuda available: {torch.cuda.is_available()}; seed {args.seed}")
     table = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "flyverse", "data", "taste_grns.csv"))
     ids = {k: table.bodyId[table.taste == k].to_numpy() for k in ("sweet", "bitter")}
     sweet = c.index_of(ids["sweet"][np.isin(ids["sweet"], c.neurons.bodyId)])
@@ -61,7 +64,7 @@ def main():
     steps = int(args.ms / 0.5)
     for label, p in settings.items():
         for cond, drive in [("sugar", {"sweet": args.rate}), ("sugar + bitter", {"sweet": args.rate, "bitter": args.rate}), ("bitter", {"bitter": args.rate})]:
-            b = brain.Brain(c, p, seed=0)
+            b = brain.Brain(c, p, seed=args.seed)
             for k, hz in drive.items():
                 b.set_poisson(sweet if k == "sweet" else bitter, hz)
             b.step(steps // 3)                                        # let it settle, then measure the last two thirds

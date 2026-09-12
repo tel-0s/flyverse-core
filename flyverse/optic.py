@@ -113,20 +113,39 @@ def _mv(M, x: torch.Tensor) -> torch.Tensor:
 class OpticLobe:
     def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1,
                  metal_kernels: bool | None = None, cuda_kernels: bool | None = None, cuda_sparse: str = "torch",
-                 receptor: ReceptorSigns | None = None, receptor_gain: dict | None = None):
+                 receptor: ReceptorSigns | None = None, receptor_gain: dict | None = None, slow=None):
         """metal_kernels: custom Metal kernels for the sparse products and the substep (flyverse/metal.py);
         None = automatically on MPS when available.
         receptor: an optional connectome.receptor_signs(c, ...) (LIFParams.receptor_model): every optic-lobe edge
         (rate <-> rate, photoreceptor -> rate, spiking -> rate, rate -> spiking) takes abs(count) x the row's fast
         sign (x the gain-class factor `receptor_gain`, {class: factor}, when given) instead of sign(NT_pre) x count;
         unmatched edges are unchanged. The normalisation denominators (in_syn / in_syn_l2 of the neuron table) are
-        the unmodified totals. The rate model has no slow term: the receptor table's slow signs are not used here."""
+        the unmodified totals.
+        slow: an optional brain.SlowSpec (brain._slow_spec(LIFParams) under receptor_model == 'full'): the slow
+        (metabotropic / monoamine) term of the LIF, applied to the rate units in the same form. Per active slow class k
+        the rate unit i carries a tone g_k,i that relaxes with tau_k towards
+            scale_k x (gain_fb x sum_s Wslow_is s_s + gain_rr x sum_j Wslow_ij dr_j),   scale_k = gain_k x tau_k / tau_syn,
+        where Wslow = count x slow sign x gain-class factor of the row, normalised by the same denominators as the fast
+        weights (no pair gains), s = spiking rate / 100 Hz and dr the rate units' deviations -- i.e. the steady tone of a
+        presynaptic cell is gain_k x tau_k / tau_syn times the fast input the same synapses would give, as in the LIF.
+        g_slow = sum_k g_k acts per slow.mode: 'additive' adds it to the unit's input; 'gain' multiplies the fast
+        NET synaptic input (recurrent + photoreceptor + spiking, signed) by clamp(1 + g_slow / (1 - baseline), clip) -- so
+        a negative tone disinhibits a net-inhibited unit rather than silencing it -- the
+        normaliser is the distance from the operating point to saturation, the rate-model counterpart of the LIF's
+        rest-to-threshold gap; 'threshold' shifts the output nonlinearity, r = clip(v + b + min(g_slow, 0.9 (1 - b)), 0, 1).
+        Spiking targets of rate-unit monoamine cells (Mi19 serotonin -> central brain) are outside both models (the LIF
+        prunes frozen presynaptic cells). The native CUDA / Metal optic kernels do not carry the tone: an active slow
+        term runs the Torch substep (a warning if kernels were requested)."""
         self.c, self.r, self.p = c, retina, params or OpticParams()
         self.receptor = receptor
+        self.slow = slow if (slow is not None and receptor is not None and slow.gain) else None
         self.B = int(batch)
         self.device = resolve(device)
-        self.metal = metal.use(self.device, metal_kernels)
-        self.cuda = cuda.use(self.device, cuda_kernels)
+        if self.slow is not None and (metal_kernels or cuda_kernels):
+            import warnings
+            warnings.warn("the optic lobe's slow receptor term is not in the native optic kernels; using the Torch substep")
+        self.metal = metal.use(self.device, False if self.slow is not None else metal_kernels)
+        self.cuda = cuda.use(self.device, False if self.slow is not None else cuda_kernels)
         if cuda_sparse not in ("torch", "warp") or (cuda_sparse == "warp" and not self.cuda):
             raise ValueError("cuda_sparse must be torch or warp; warp requires CUDA kernels")
         if not np.isfinite(self.p.dt_ms) or self.p.dt_ms <= 0:
@@ -174,6 +193,36 @@ class OpticLobe:
         self.W_sr = _csr(apply_pair_gain((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], rt, types[self.spk_idx]), self.device, self.metal)
         self.rate_idx_t = torch.as_tensor(self.rate_idx, device=self.device)
         self.spk_idx_t = torch.as_tensor(self.spk_idx, device=self.device)
+
+        # slow (metabotropic / monoamine) term: per active class the spiking -> rate and rate -> rate slow matrices
+        # (None where a class has no entries), normalised like Wn_ol; scale_k = gain_k tau_k / tau_syn; a_k = exp(-dt / tau_k)
+        self.slow_classes = list(self.slow.classes) if self.slow is not None else []
+        self.W_slow_rs, self.W_slow_rr, self._slow_scale, self._a_slow = [], [], [], []
+        self.slow_entries = {}
+        if self.slow is not None:
+            if receptor.count is None:
+                raise ValueError("the optic lobe's slow term needs receptor_signs(..., with_counts=True)")
+            denom = c.neurons.in_syn_l2.to_numpy() if self.p.norm == "l2" else tot
+            for cls in self.slow_classes:
+                S = c.W.tocsr().copy()
+                S.data = receptor.count * receptor.slow_factor(receptor_gain, slow_class=cls)
+                S.eliminate_zeros()
+                Sn = (sp.diags(1.0 / np.maximum(denom, 1.0)) @ S).tocsr()
+                rs = Sn[self.rate_idx][:, self.spk_idx].tocsr(); rr = Sn[self.rate_idx][:, self.rate_idx].tocsr()
+                self.slow_entries[cls] = {"spiking_to_rate": int(rs.nnz), "rate_to_rate": int(rr.nnz),
+                                          "syn_eq_spiking_to_rate": float(np.abs(S[self.rate_idx][:, self.spk_idx].data).sum()),
+                                          "syn_eq_rate_to_rate": float(np.abs(S[self.rate_idx][:, self.rate_idx].data).sum())}
+                self.W_slow_rs.append(_csr(rs, self.device) if rs.nnz else None)
+                self.W_slow_rr.append(_csr(rr, self.device) if rr.nnz else None)
+                self._slow_scale.append(float(self.slow.gain[cls] * self.slow.tau[cls] / self.slow.tau_syn))
+                self._a_slow.append(float(np.exp(-self.p.dt_ms / self.slow.tau[cls])))
+            self._slow_norm = float(1.0 - self.p.baseline)          # operating point -> saturation
+            if self._slow_norm <= 0:
+                raise ValueError("the optic slow term needs baseline < 1")
+        K = len(self.slow_classes)
+        self.g_slow_cls = torch.zeros(K, self.B, self.n_rate, device=self.device)      # per-class tone
+        self.g_slow = torch.zeros(self.B, self.n_rate, device=self.device)             # its sum
+        self._slow_in_s = torch.zeros(K, self.B, self.n_rate, device=self.device)      # spiking part, held per frame
 
         # photoreceptor stage: per (column, family) intensity, low-pass + contrast adaptation
         self.pr_family = np.array([FAMILY_OF_TYPE[t] for t in types[self.pr_idx]])
@@ -236,15 +285,35 @@ class OpticLobe:
 
     # ------------------------------------------------------------------ rate dynamics
     def rates(self) -> torch.Tensor:
+        if self.slow is not None and self.slow.mode == "threshold":
+            return (self.v + self.b_vec[None] + self.g_slow.clamp(max=0.9 * self._slow_norm)).clamp(0.0, 1.0)
         return (self.v + self.b_vec[None]).clamp(0.0, 1.0)
 
     @torch.no_grad()
     def _substep(self, pr_input: torch.Tensor, spk_input: torch.Tensor) -> None:
         p = self.p
         dr = self.rates() - self.b_vec[None]                                                 # (B, n_rate)
-        # Keep the addition order: combining the held inputs would change rounding.
-        inp = p.gain_rr * _mv(self.W_rr, dr) + pr_input - p.adapt_gain * self.adapt
-        inp = inp + spk_input
+        if self.slow is None:
+            # Keep the addition order: combining the held inputs would change rounding.
+            inp = p.gain_rr * _mv(self.W_rr, dr) + pr_input - p.adapt_gain * self.adapt
+            inp = inp + spk_input
+        else:
+            # slow tone per class: relax towards scale x (held spiking part + recurrent part)
+            for k in range(len(self.slow_classes)):
+                target = self._slow_in_s[k]
+                if self.W_slow_rr[k] is not None:
+                    target = target + p.gain_rr * _mv(self.W_slow_rr[k], dr)
+                gk = self.g_slow_cls[k]
+                torch.add(target * self._slow_scale[k], (gk - target * self._slow_scale[k]) * self._a_slow[k], out=gk)
+            torch.sum(self.g_slow_cls, dim=0, out=self.g_slow)
+            syn = p.gain_rr * _mv(self.W_rr, dr) + pr_input + spk_input
+            if self.slow.mode == "additive":
+                inp = syn - p.adapt_gain * self.adapt + self.g_slow
+            elif self.slow.mode == "gain":
+                f = torch.clamp(1.0 + self.g_slow / self._slow_norm, self.slow.clip[0], self.slow.clip[1])
+                inp = syn * f - p.adapt_gain * self.adapt
+            else:                                                     # "threshold": the shift acts in rates()
+                inp = syn - p.adapt_gain * self.adapt
         torch.add(inp, (self.v - inp) * self._a[None], out=self.v)
         torch.add(dr, (self.adapt - dr) * self._a_ad, out=self.adapt)
 
@@ -271,6 +340,10 @@ class OpticLobe:
             # Only the recurrent optic product changes between substeps.
             pr_input = self.p.gain_in * _mv(self.W_rp, a_pr)
             spk_input = self.p.gain_fb * _mv(self.W_rs, s)
+            if self.slow is not None:                                # the spiking part of the slow input, held too
+                for k in range(len(self.slow_classes)):
+                    if self.W_slow_rs[k] is not None:
+                        self._slow_in_s[k] = self.p.gain_fb * _mv(self.W_slow_rs[k], s)
             if self.cuda:
                 cuda.optic_dr(self.v, self.b_vec, self._cuda_dr)
                 pr_input, spk_input = pr_input.contiguous(), spk_input.contiguous()
@@ -295,10 +368,12 @@ class OpticLobe:
     def reset(self, rows=None) -> None:
         if rows is None:
             self._fresh[:] = True; self.v.zero_(); self.adapt.zero_()
+            self.g_slow_cls.zero_(); self.g_slow.zero_(); self._slow_in_s.zero_()
             self._pending_ms = 0.0
         else:
             sel = torch.as_tensor(np.asarray(rows), device=self.device, dtype=torch.long)
             self._fresh[sel] = True; self.v[sel] = 0.0; self.adapt[sel] = 0.0
+            self.g_slow_cls[:, sel] = 0.0; self.g_slow[sel] = 0.0; self._slow_in_s[:, sel] = 0.0
 
     # ------------------------------------------------------------------ inspection
     def delta_rate_by_type(self, top: int = 15, row: int = 0):

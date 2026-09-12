@@ -25,6 +25,10 @@ above 22 Hz inside / outside the driven wedges, PEN / Delta7 / ER-ExR rates and 
 3 / 5 s after the pulse. `--no-delta7-pen` applies gD to Delta7 -> EPG only (Delta7 -> PEN stays x1; with the gain
 on Delta7 -> PEN as well, the NOTES-session-8 convention, Delta7 clamps PEN and no bump survives). `--ring-gain`
 scales ER/ExR -> EPG / PEN / PEG. Rows append to --sim-out (JSON); `--plot-sim` draws the wedge profiles from it.
+Round 2 of the receptor integration (docs/audits/cx_glno.md, driver scripts/cx_glno.py): `--nt-override TYPE=nt`
+(repeatable) compiles the connectome with connectome.TYPE_NT_OVERRIDE extended into the scratch cache
+out/cache_<hash>/ (`--scratch-cache` does so without an override), `--receptor-model` / `--receptor-net-rule` thread
+LIFParams.receptor_model, and every row records the rate of GLNO (4 cells, 19 % of PEN's raw input, NT unknown).
 
 Findings (docs/audits/cx_wedge.md): the tuned structure is there (PEN excitation local, Delta7 inhibition
 cosine-shaped with own-wedge / opposite = 0.10); the loop is shut at gain x1 by the untuned EPG -> ExR6 / ExR4 /
@@ -34,9 +38,13 @@ gD 15-40 on Delta7 -> EPG only (rho = gD / gE^2 of 4-10), or for gE 1-1.25 with 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -48,12 +56,61 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from flyverse import brain, connectome  # noqa: E402
 
 AUDIT_DIR = Path(__file__).resolve().parent.parent / "docs" / "audits"
-RING16 = ["L1", "R8", "L2", "R7", "L3", "R6", "L4", "R5", "L5", "R4", "L6", "R3", "L7", "R2", "L8", "R1"]
+SCRATCH_ROOT = Path(__file__).resolve().parent.parent / "out"      # scratch connectome caches: out/cache_<hash>/
+RING16 =["L1", "R8", "L2", "R7", "L3", "R6", "L4", "R5", "L5", "R4", "L6", "R3", "L7", "R2", "L8", "R1"]
 POS16 = {g: i for i, g in enumerate(RING16)}
 POS16["L9"] = 0     # L9 wraps onto L1 (Delta7_L1L9R8), R9 onto R1 (Delta7_L8R1R9)
 POS16["R9"] = 15
 COMPASS_RE = r"^(EPG|PEN|PEG|Delta7)"
 RING_RE = r"^(ER|ExR)"      # ring neurons and extrinsic ring neurons: the EPG -> ExR / ER -> EPG, PEN global feedback
+
+
+def parse_nt_override(items) -> dict:
+    """--nt-override TYPE=nt (repeatable) -> {type: nt}; nt must be a NT_SIGN key."""
+    ov = {}
+    for it in items or []:
+        if "=" not in it:
+            raise SystemExit(f"--nt-override expects TYPE=nt, got {it!r}")
+        t, nt = it.split("=", 1)
+        nt = nt.strip().lower()
+        if nt not in connectome.NT_SIGN:
+            raise SystemExit(f"--nt-override {it!r}: transmitter must be one of {sorted(connectome.NT_SIGN)}")
+        ov[t.strip()] = nt
+    return ov
+
+
+def override_table(extra: dict | None) -> dict:
+    """connectome.TYPE_NT_OVERRIDE (when it is the default) extended by `extra`."""
+    table = dict(connectome.TYPE_NT_OVERRIDE if connectome.TYPE_NT_OVERRIDE_DEFAULT else {})
+    table.update(extra or {})
+    return table
+
+
+def override_cache_dir(table: dict, root: Path = SCRATCH_ROOT) -> Path:
+    h = hashlib.sha1(json.dumps(sorted(table.items())).encode()).hexdigest()[:8]
+    return Path(root) / f"cache_{h}"
+
+
+def load_connectome(extra: dict | None = None, scratch: bool = False, verbose: bool = False, root: Path = SCRATCH_ROOT):
+    """The default cache, unless a type-NT override is given (or `scratch`): then the connectome is compiled from the
+    raw MaleCNS files with TYPE_NT_OVERRIDE extended by `extra` into out/cache_<hash>/ (hash of the full table;
+    TYPE_NT_OVERRIDE.json alongside), built in a temporary directory and renamed into place so that concurrent jobs
+    building the same table cannot see a half-written cache. Returns (connectome, cache_dir or None, table)."""
+    table = override_table(extra)
+    if not extra and not scratch:
+        return connectome.load(verbose=verbose), None, table
+    cache_dir = override_cache_dir(table, root)
+    if (cache_dir / "W_post_pre.npz").exists():
+        return connectome.load(cache_dir=cache_dir, verbose=verbose), cache_dir, table
+    cache_dir.parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix=cache_dir.name + ".tmp-", dir=cache_dir.parent))
+    c = connectome.load(cache_dir=tmp, rebuild=True, verbose=verbose, type_nt_override=table)
+    (tmp / "TYPE_NT_OVERRIDE.json").write_text(json.dumps(table, indent=1))
+    try:
+        os.rename(tmp, cache_dir)                      # fails when another job has already put its copy there
+    except OSError:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return c, cache_dir, table
 
 
 def effective_weights(c, p: brain.LIFParams):
@@ -163,9 +220,9 @@ def heatmap(M, labels, title, path, cmap="RdBu_r", symmetric=True, fmt=None):
     fig.tight_layout(); fig.savefig(path, dpi=130); plt.close(fig)
 
 
-def structure(out_dir: Path, gamma_nominal=6.0, verbose=True):
+def structure(out_dir: Path, gamma_nominal=6.0, verbose=True, c=None):
     log = print if verbose else (lambda *a, **k: None)
-    c = connectome.load(verbose=False)
+    c = connectome.load(verbose=False) if c is None else c
     p = brain.LIFParams()
     A, scale, tot = effective_weights(c, p)
     cells = compass_cells(c)
@@ -450,9 +507,13 @@ def rate_grid(c, cells, gEs, gDs, delta7_pen, log=print, **kw):
 
 
 def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, pulse_hz=40.0, start_wedge=0, width=4, seed=0,
-             thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, gR=1.0, verbose=True):
+             thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, gR=1.0, verbose=True,
+             receptor_model=None, receptor_net_rule="class", nt_override=None):
     """FlyBrain on the full connectome; drive `width` contiguous wedges (of 16) of the EPG ring from `start_wedge`;
-    report persistence and confinement after the pulse."""
+    report persistence and confinement after the pulse. receptor_model / receptor_net_rule thread
+    LIFParams.receptor_model (the optional receptor-expression sign stage); nt_override is recorded in the row (the
+    connectome `c` must already carry it, see load_connectome). GLNO (the 4 LAL-NO1 cells, 19 % of PEN's raw input,
+    transmitter unknown) is reported alongside PEN / Delta7."""
     from flyverse.fly import FlyBrain
     log = print if verbose else (lambda *a, **k: None)
     epg = cells["EPG"]
@@ -460,6 +521,7 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
     inside = np.isin(wedge_of, [(start_wedge + j) % 16 for j in range(width)])
     idx_epg = epg["idx"]
     pen_idx, d7_idx, peg_idx, ring_idx = cells["PEN"]["idx"], cells["Delta7"]["idx"], cells["PEG"]["idx"], cells["Ring"]["idx"]
+    glno_idx = np.flatnonzero(c.neurons.type.fillna("").to_numpy() == "GLNO")
     others = np.setdiff1d(np.arange(c.n), np.concatenate([idx_epg, pen_idx, d7_idx, peg_idx, cells["EPGt"]["idx"]]))
     out = []
     for gE, gD in gains:
@@ -467,7 +529,8 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                                                     (r"^EPG$", r"^PEG$", gE), (r"^PEG$", r"^EPG$", gE),
                                                     (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD),
                                                     (RING_RE, r"^(EPG$|PEN_|PEG$)", gR)]
-        params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=tpg)
+        params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=tpg,
+                                 receptor_model=receptor_model, receptor_net_rule=receptor_net_rule)
         t0 = time.time()
         fb = FlyBrain(c, lif_params=params, seed=seed, cuda_graphs=cuda_graphs)
         # background: FlyBrain.stimulate pulses expire, so hold the background as a long pulse (as the grid did)
@@ -481,6 +544,8 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                  f"{tag}_pen": float(fb.brain.mean_rate(pen_idx)), f"{tag}_delta7": float(fb.brain.mean_rate(d7_idx)),
                  f"{tag}_peg": float(fb.brain.mean_rate(peg_idx)), f"{tag}_rest": float(fb.brain.mean_rate(others)),
                  f"{tag}_ring": float(fb.brain.mean_rate(ring_idx)),
+                 f"{tag}_glno": float(fb.brain.mean_rate(glno_idx)),
+                 f"{tag}_glno_cells": [float(x) for x in fb.brain.rates(glno_idx)],
                  f"{tag}_wedge_profile": [float(r[wedge_of == w].mean()) for w in range(16)]}
             ang = 2 * np.pi * wedge_of / 16
             z = np.sum(r * np.exp(1j * ang)) / max(r.sum(), 1e-9)
@@ -488,7 +553,10 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
             return d
 
         row = dict(gE=gE, gD=gD, gR=gR, delta7_pen=delta7_pen, background_hz=background_hz, pulse_hz=pulse_hz, start_wedge=start_wedge,
-                   width=width, seed=seed, n_in=int(inside.sum()), n_out=int((~inside).sum()))
+                   width=width, seed=seed, n_in=int(inside.sum()), n_out=int((~inside).sum()),
+                   receptor_model=receptor_model, receptor_net_rule=receptor_net_rule if receptor_model else None,
+                   nt_override=dict(nt_override or {}), n_glno=int(len(glno_idx)),
+                   glno_nt=sorted(set(c.neurons.nt.to_numpy()[glno_idx].tolist())))
         fb.step(1000.0)                                             # 1 s settle on background
         row.update(sample("pre"))
         fb.stimulate(idx_epg[inside], background_hz + pulse_hz, pulse_s * 1000)
@@ -503,8 +571,9 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
 
         def fmt(tag):
             return (f"in {row[f'{tag}_in_mean']:.1f} ({row[f'{tag}_in_above']}/{row['n_in']}) out {row[f'{tag}_out_mean']:.1f} "
-                    f"({row[f'{tag}_out_above']}/{row['n_out']}) PEN {row[f'{tag}_pen']:.1f} D7 {row[f'{tag}_delta7']:.1f} R {row[f'{tag}_ring']:.1f} vs {row[f'{tag}_vector_strength']:.2f}")
-        log(f"gE {gE} gD {gD} gR {gR} (D7->PEN {'x gD' if delta7_pen else 'x1'}, bg {background_hz} Hz, width {width}): pre {fmt('pre')}; "
+                    f"({row[f'{tag}_out_above']}/{row['n_out']}) PEN {row[f'{tag}_pen']:.1f} D7 {row[f'{tag}_delta7']:.1f} GLNO {row[f'{tag}_glno']:.1f} R {row[f'{tag}_ring']:.1f} vs {row[f'{tag}_vector_strength']:.2f}")
+        log(f"gE {gE} gD {gD} gR {gR} (D7->PEN {'x gD' if delta7_pen else 'x1'}, bg {background_hz} Hz, width {width}, seed {seed}, "
+            f"receptor {receptor_model or 'off'}{'/' + receptor_net_rule if receptor_model else ''}, GLNO nt {row['glno_nt']}): pre {fmt('pre')}; "
             f"during {fmt('during')}; " + "; ".join(f"{m}s {fmt(f't{m}')}" for m in marks)
             + f"; PEG {row['t5.0_peg']:.1f} rest {row['t5.0_rest']:.2f} Hz; {row['wall_s']} s")
         out.append(row)
@@ -557,15 +626,34 @@ def main():
     ap.add_argument("--ring-gain", type=float, default=1.0, help="gain on ER/ExR -> EPG/PEN/PEG (rate model and simulation)")
     ap.add_argument("--no-ring", action="store_true", help="rate model without the ER/ExR cells")
     ap.add_argument("--plot-sim", default=None, help="draw wedge profiles from this simulation JSON (no structure / sim run)")
+    ap.add_argument("--nt-override", action="append", default=None, metavar="TYPE=nt",
+                    help="repeatable; compile the connectome with connectome.TYPE_NT_OVERRIDE extended by TYPE=nt (applied to the "
+                         "type's sign-0 cells) into the scratch cache out/cache_<hash>/, e.g. --nt-override GLNO=glutamate")
+    ap.add_argument("--scratch-cache", action="store_true",
+                    help="compile into out/cache_<hash>/ even without --nt-override (a cluster whose shared cache predates TYPE_NT_OVERRIDE)")
+    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+                    help="LIFParams.receptor_model for the simulation (default off = the presynaptic NT_SIGN rule)")
+    ap.add_argument("--receptor-net-rule", default="class", choices=list(connectome.RECEPTOR_NET_RULES))
     a = ap.parse_args()
     out_dir = Path(a.out)
+    if (a.nt_override or (a.receptor_model and a.receptor_model != 'off')) and Path(a.out).resolve() == AUDIT_DIR.resolve() and not a.no_structure:
+        a.no_structure = True                                   # docs/audits/cx_wedge.* describe the default connectome only
+        print('note: --nt-override / --receptor-model with the default --out: structural outputs skipped (pass --out <dir> to write them)')
     if a.plot_sim:
         plot_sim(Path(a.plot_sim), out_dir / "cx_wedge_sim_profiles.png")
         return
+    nt_override = parse_nt_override(a.nt_override)
+    c, cache_dir, table = load_connectome(nt_override, scratch=a.scratch_cache)
+    if cache_dir is not None:
+        print(f"connectome from scratch cache {cache_dir} (TYPE_NT_OVERRIDE = {table})")
+    for t in nt_override:
+        m = c.neurons.type.fillna("") == t
+        print(f"  {t}: {int(m.sum())} cells, nt {c.neurons.nt[m].value_counts().to_dict()}, sign {c.neurons.sign[m].value_counts().to_dict()}")
+    receptor_model = None if a.receptor_model == "off" else a.receptor_model
     if a.no_structure:
-        c = connectome.load(verbose=False); cells = compass_cells(c)
+        cells = compass_cells(c)
     else:
-        res, cells, c = structure(out_dir)
+        res, cells, c = structure(out_dir, c=c)
     if a.rate_grid is not None:
         gEs = [float(x) for x in a.rate_grid[0].split(",")]; gDs = [float(x) for x in a.rate_grid[1].split(",")]
         rows = rate_grid(c, cells, gEs, gDs, not a.no_delta7_pen, background_hz=a.background, pulse_hz=a.pulse_hz,
@@ -576,7 +664,8 @@ def main():
     if a.sim is not None:
         gains = [tuple(float(x) for x in g.split(":")) for g in a.sim] or [(1.0, 1.0)]
         rows = simulate(c, cells, gains, seconds=a.seconds, background_hz=a.background, pulse_hz=a.pulse_hz, start_wedge=a.start_wedge, width=a.width,
-                        seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen, gR=a.ring_gain)
+                        seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen, gR=a.ring_gain,
+                        receptor_model=receptor_model, receptor_net_rule=a.receptor_net_rule, nt_override=nt_override)
         if a.sim_out:
             path = Path(a.sim_out)
             old = json.load(open(path)) if path.exists() else []

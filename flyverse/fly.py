@@ -33,8 +33,8 @@ class FlyBrain:
     (columns,4) or (B,columns,4) radiance [UV,B,G,R] in this controller's retina order.
     Body IDs remain stable across modules; integer stimulus selectors are local row indices.
     """
-    BRAIN_TENSORS = ("v", "g", "g_slow", "refrac", "drive", "poisson_p", "rate", "spikes", "adapt", "res", "spike_buf", "spike_counts")
-    OPTIC_TENSORS = ("v", "adapt", "I_lp", "I_mean", "_fresh", "contrast", "delta_rate")
+    BRAIN_TENSORS = ("v", "g", "g_slow", "g_slow_cls", "refrac", "drive", "poisson_p", "rate", "spikes", "adapt", "res", "spike_buf", "spike_counts")
+    OPTIC_TENSORS = ("v", "adapt", "I_lp", "I_mean", "_fresh", "contrast", "delta_rate", "g_slow", "g_slow_cls", "_slow_in_s")
 
     def __init__(self, c=None, *, modules=None, batch=1, device=None, seed=0,
                  lif_params=None, optic_params=None, eye_geometry=None, cuda_graphs=False, cuda_kernels=None,
@@ -43,8 +43,10 @@ class FlyBrain:
         if self.c.n == 0:
             raise ValueError("FlyBrain needs at least one neuron")
         lp = lif_params or brain.LIFParams()
-        # The optional receptor model (LIFParams.receptor_model): one per-edge lookup shared by the LIF and the optic lobe.
-        self.receptor = brain._receptor(self.c, lp, with_counts=lp.receptor_model == "full")
+        # The optional receptor model (LIFParams.receptor_model): one per-edge lookup shared by the LIF and the optic lobe;
+        # the slow term's resolved spec (None unless 'full' with a non-zero class scale) is shared the same way.
+        self.slow = brain._slow_spec(lp)
+        self.receptor = brain._receptor(self.c, lp, with_counts=self.slow is not None)
         self.brain = brain.Brain(self.c, lp, device=device, batch=batch, seed=seed, cuda_kernels=cuda_kernels,
                                  cuda_sparse=cuda_sparse, cuda_compact=cuda_compact, receptor=self.receptor)
         self.B, self.device = self.brain.B, self.brain.device
@@ -59,7 +61,7 @@ class FlyBrain:
             if self.retina.n_columns:
                 self.optic = optic.OpticLobe(self.c, self.retina, optic_params, device=self.device, batch=self.B,
                                            cuda_kernels=cuda_kernels, cuda_sparse=cuda_sparse,
-                                           receptor=self.receptor, receptor_gain=brain._receptor_gain(lp))
+                                           receptor=self.receptor, receptor_gain=brain._receptor_gain(lp), slow=self.slow)
                 self.optic.relax()
                 self.brain.freeze(self.optic.rate_idx)
                 if self.brain.p.prune_frozen:

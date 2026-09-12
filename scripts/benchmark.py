@@ -133,8 +133,12 @@ class Context:
         self.seeds = [int(s) for s in args.seeds.split(",")]
         if self.fast:
             self.seeds = self.seeds[:1]
-        self.c = connectome.load(verbose=False)
+        self.cache_dir = args.cache_dir or os.environ.get("FLYVERSE_CACHE") or None   # a scratch cache (e.g. TYPE_NT_OVERRIDE trials)
+        self.c = connectome.load(verbose=False) if self.cache_dir is None else connectome.load(cache_dir=self.cache_dir, verbose=False)
         connectome.load = lambda *a, **k: self.c        # every FlyBrain / demo Sim built here shares this one graph
+        self.receptor_table, self.dopamine_lead_info = None, None
+        if args.dopamine_lead not in (None, "all") and self.receptor_model is not None:
+            self.receptor_table, self.dopamine_lead_info = self._build_dopamine_lead_table(args.dopamine_lead)
         self.checks = []
         self.results = {}
         self.runtime = {}
@@ -158,13 +162,63 @@ class Context:
                      ("input_norm_alpha", a.norm_alpha), ("input_norm_ref", a.norm_ref), ("w_syn", a.w_syn), ("conn_cap", a.conn_cap)]:
             if v is not None:
                 setattr(p, k, v)
-        if self.receptor_model is not None:                  # the receptor model (docs/NT_INTEGRATION.md) reaches every section
-            p.receptor_model = self.receptor_model
-            p.receptor_net_rule = a.receptor_net_rule
+        self._apply_receptor(p)
         if a.dn_vnc_gain is not None or a.vp_dn_gain is not None:
             p.path_gain = [(r"^descending_neuron$", r"^vnc_", 3.0 if a.dn_vnc_gain is None else a.dn_vnc_gain),
                            (r"^visual_projection$", r"^descending_neuron$", 2.0 if a.vp_dn_gain is None else a.vp_dn_gain)]
         return p
+
+    def _apply_receptor(self, p):
+        """The receptor-model flags (model, net rule, class fallback, the slow term's mode / class scales / taus and the
+        --dopamine-lead table) on a LIFParams; a no-op with --receptor-model off."""
+        a = self.args
+        if self.receptor_model is None:
+            return p
+        p.receptor_model = self.receptor_model                # the receptor model (docs/NT_INTEGRATION.md) reaches every section
+        p.receptor_net_rule = a.receptor_net_rule
+        p.receptor_nt_class_fallback = bool(a.receptor_nt_class_fallback)
+        if a.receptor_gain:
+            low, mid, high = (float(x) for x in a.receptor_gain.split(","))
+            p.receptor_gain = {"none": 1.0, "low": low, "mid": mid, "high": high}
+        p.slow_mode = a.slow_mode
+        gains, taus = {}, {}
+        if a.slow_gain_monoamine is not None:
+            gains["monoamine"] = a.slow_gain_monoamine
+        if a.slow_gain_classical is not None:
+            gains["metabotropic_classical"] = a.slow_gain_classical
+        if a.slow_tau_monoamine is not None:
+            taus["monoamine"] = a.slow_tau_monoamine
+        if a.slow_tau_classical is not None:
+            taus["metabotropic_classical"] = a.slow_tau_classical
+        p.slow_gain_by_class = gains or None
+        p.slow_tau_by_class = taus or None
+        if self.receptor_table is not None:
+            p.receptor_table = self.receptor_table
+        return p
+
+    def _build_dopamine_lead_table(self, lead):
+        """--dopamine-lead dop1r1: rebuild receptors_by_type.csv in memory with the dopamine slow + group restricted to
+        Dop1R1 / Dop1R2 (DopEcR ignored) through scripts/build_receptor_table's own rule (its RECEPTOR_GROUPS patched;
+        without the raw weights, which only feed the per-type synapse columns -- every sign / class column is identical
+        to the shipped table under the unpatched groups), written to out/receptors_by_type_<lead>.csv for the run."""
+        import build_receptor_table as brt
+        if lead != "dop1r1":
+            raise ValueError(f"unknown --dopamine-lead {lead!r}")
+        brt.RECEPTOR_GROUPS["dopamine"]["slow"] = [(+1, "Dop1R", ["Dop1R1", "Dop1R2"]), (-1, "Dop2R", ["Dop2R"])]
+        t0 = time.time()
+        _, rec, *_ = brt.build_tables(self.c, None, log=lambda *a, **k: None)
+        path = os.path.join(os.path.dirname(__file__), "..", "out", f"receptors_by_type_{lead}.csv")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(f"# receptors_by_type.csv rebuilt by scripts/benchmark.py --dopamine-lead {lead}: dopamine slow + group = Dop1R1 / Dop1R2 only\n")
+            rec.to_csv(f, index=False)
+        d = rec[(rec.transmitter == "dopamine") & ~rec.malecns_type.astype(str).str.startswith("<")]
+        info = {"lead": lead, "path": path, "seconds": round(time.time() - t0, 1),
+                "dopamine_rows": int(len(d)), "slow_net": {k: int(v) for k, v in d.slow_net.value_counts().items()},
+                "slow_pos_lead": {str(k): int(v) for k, v in d.slow_pos_lead.fillna("").value_counts().items()}}
+        print(f"dopamine lead {lead}: table rebuilt in {info['seconds']} s -> {path}; dopamine rows {info['dopamine_rows']}, "
+              f"slow_net {info['slow_net']}, + lead {info['slow_pos_lead']}", flush=True)
+        return path, info
 
     def _apply_optic(self, op):
         a = self.args
@@ -542,8 +596,8 @@ def sec_bitter(ctx):
     mn9 = c.select(type="MN9")
     ms = 1000.0 if ctx.fast else 1500.0
     settings = {"calibrated": ctx.lif(),
-                "shiu": brain.LIFParams(adapt_jump=0.0, conn_cap=0.0, same_type_gain=1.0, input_norm_alpha=0.0, std_u_by_type={}, path_gain=[], type_path_gain=[],
-                                        receptor_model=ctx.receptor_model, receptor_net_rule=ctx.args.receptor_net_rule)}   # the receptor model applies to both, as in probe_bitter.py
+                "shiu": ctx._apply_receptor(brain.LIFParams(adapt_jump=0.0, conn_cap=0.0, same_type_gain=1.0, input_norm_alpha=0.0, std_u_by_type={},
+                                                            path_gain=[], type_path_gain=[]))}   # the receptor model (incl. the slow term) applies to both, as in probe_bitter.py
     res = {"ms": ms, "rate_hz": 100.0}
     steps = int(ms / 0.5)
     for label, p in settings.items():
@@ -710,18 +764,45 @@ def main():
     ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
                     help="LIFParams.receptor_model for every section (default off = the presynaptic NT_SIGN rule); 'full' needs --eager")
     ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
+    ap.add_argument("--receptor-nt-class-fallback", action="store_true",
+                    help="LIFParams.receptor_nt_class_fallback: unprofiled targets take the Davis 2020 ChAT / Gad1 / VGlut class baseline (tier nt_class)")
+    ap.add_argument("--cache-dir", default=None,
+                    help="connectome cache directory (default cache/, or $FLYVERSE_CACHE); e.g. a scratch cache built with a different TYPE_NT_OVERRIDE")
+    # the slow term of --receptor-model full (LIFParams.slow_*; docs/audits/slow_term.md)
+    ap.add_argument("--slow-mode", default="additive", choices=list(brain.SLOW_MODES),
+                    help="how the slow tone acts on its target: added to the membrane input, a multiplicative gain on the fast input, or a threshold shift")
+    ap.add_argument("--slow-gain-monoamine", type=float, default=None, help="scale of the monoamine (DA / OA / 5-HT) slow class, x w_syn per synapse per spike (default LIFParams.slow_gain = 0.02)")
+    ap.add_argument("--slow-gain-classical", type=float, default=None, help="scale of the classical metabotropic class (mAChR / GABA-B / mGluR; default 0 = off)")
+    ap.add_argument("--slow-tau-monoamine", type=float, default=None, help="time constant (ms) of the monoamine slow class (default LIFParams.slow_tau_ms = 200)")
+    ap.add_argument("--slow-tau-classical", type=float, default=None, help="time constant (ms) of the classical metabotropic class (default 100)")
+    ap.add_argument("--dopamine-lead", default="all", choices=["all", "dop1r1"],
+                    help="'dop1r1': rebuild the receptor table with the dopamine slow + group = Dop1R1 / Dop1R2 only (DopEcR ignored) and use it")
+    ap.add_argument("--receptor-gain", default=None,
+                    help="gain-class factors of 'sign+gain' / 'full' as low,mid,high (default 0.5,1,1.5); '1,1,1' = the 'sign' fast weights under 'full'")
     args = ap.parse_args()
     t_all = time.time()
     ctx = Context(args)
     lif, op = ctx.lif(), ctx.optic_params()
     if ctx.receptor_model is not None:      # the coverage the model runs under (connectome.receptor_signs' tier summary)
-        rs = brain._receptor(ctx.c, lif, with_counts=ctx.receptor_model == "full")
+        rs = brain._receptor(ctx.c, lif, with_counts=ctx.receptor_model == "full")   # counts for the slow-term summary below
         cov = rs.coverage(ctx.c.W)
         print(f"receptor model {ctx.receptor_model} ({args.receptor_net_rule}); fast sign changed on "
               f"{int((rs.fast_sign != np.sign(ctx.c.W.data)).sum()):,} of {ctx.c.W.nnz:,} entries; coverage by tier:")
         print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
-        receptor_cfg = {"model": ctx.receptor_model, "net_rule": args.receptor_net_rule, "coverage": cov.to_dict("records"),
-                        "fast_sign_changed_entries": int((rs.fast_sign != np.sign(ctx.c.W.data)).sum())}
+        receptor_cfg = {"model": ctx.receptor_model, "net_rule": args.receptor_net_rule, "nt_class_fallback": bool(args.receptor_nt_class_fallback),
+                        "coverage": cov.to_dict("records"), "fast_sign_changed_entries": int((rs.fast_sign != np.sign(ctx.c.W.data)).sum()),
+                        "table": rs.table_path, "dopamine_lead": ctx.dopamine_lead_info, "gain_classes": brain._receptor_gain(lif)}
+        if ctx.receptor_model == "full":                                    # the slow term in force: spec and per-class entry counts
+            spec = brain._slow_spec(lif)
+            slow_cfg = {"mode": lif.slow_mode, "gain_by_class": brain._slow_gains(lif), "tau_by_class": brain._slow_taus(lif),
+                        "active": spec is not None, "entries_by_class": {}}
+            for i, name in enumerate(connectome.SLOW_CLASSES[1:], 1):
+                m = rs.slow_class == i
+                slow_cfg["entries_by_class"][name] = {"entries": int(m.sum()),
+                                                      "syn_eq": float((rs.count[m] * np.abs(rs.slow_sign[m])).sum()) if rs.count is not None else None}
+            receptor_cfg["slow"] = slow_cfg
+            print(f"slow term: mode {lif.slow_mode}, gains {slow_cfg['gain_by_class']}, taus {slow_cfg['tau_by_class']} ms, "
+                  f"active {spec is not None}; entries {slow_cfg['entries_by_class']}")
         del rs
     else:
         receptor_cfg = {"model": None}
@@ -732,7 +813,9 @@ def main():
               "optic": {"gain_out_mv": op.gain_out_mv, "pair_gain": optic.DEFAULT_PAIR_GAIN if op.pair_gain is None else op.pair_gain},
               "fast": ctx.fast, "backend": "native (cuda_kernels, cuda_graphs, event_driven, warp)" if ctx.native else "eager torch",
               "seeds": ctx.seeds, "device": str(torch.cuda.get_device_name(0)) if torch.cuda.is_available() else "cpu",
-              "gf_hz": float(body.Flight().gf_hz), "neurons": int(ctx.c.n)}
+              "gf_hz": float(body.Flight().gf_hz), "neurons": int(ctx.c.n),
+              "cache_dir": str(ctx.cache_dir or connectome.CACHE_DIR),
+              "nt_counts": {k: int(v) for k, v in ctx.c.neurons.nt.value_counts().items()}}
     print("LIF:", config["lif"], " gain_out", op.gain_out_mv, " backend:", config["backend"], " fast:", ctx.fast, flush=True)
     for letter, name, fn in select_sections(args.sections):
         print(f"\n=== [{letter or '-'}] {name}", flush=True)

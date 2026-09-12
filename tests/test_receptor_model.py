@@ -178,7 +178,8 @@ class ReceptorLookupTests(unittest.TestCase):
         self.assertTrue(b._slow_on); self.assertIsNotNone(b.W_slow)
         self.assertEqual(float(b.W.to_dense()[1, 0]), 0.0)                         # no fast synapse
         jump = p.w_syn * p.slow_gain * 20.0 * DEFAULT_RECEPTOR_GAIN["mid"]
-        self.assertAlmostEqual(float(b.W_slow.to_dense()[1, 0]), jump, places=6)
+        self.assertEqual(b.slow_classes, ["monoamine"])                             # round 2: one matrix per active class
+        self.assertAlmostEqual(float(b.W_slow[0].to_dense()[1, 0]), jump, places=6)
         b.spike_buf[b.buf_pos, 0, 0] = 1.0                                        # a transmitted dopamine spike
         b.step(1)
         self.assertAlmostEqual(float(b.g_slow[0, 1]), jump, places=6)
@@ -239,6 +240,367 @@ class CachedConnectomeTests(unittest.TestCase):
         # the full-graph fallback reproduces c.W exactly
         un = ~full.matched
         np.testing.assert_array_equal(np.abs(self.c.W.data[un]) * full.fast_sign[un], self.c.W.data[un])
+
+    def test_type_nt_override_targets_exist(self):
+        """TYPE_NT_OVERRIDE names real MaleCNS types and NT_SIGN transmitters; the shipped cache states whether it was applied."""
+        n = self.c.neurons
+        for t, nt in cn.TYPE_NT_OVERRIDE.items():
+            self.assertIn(nt, cn.NT_SIGN)
+            self.assertGreater(int((n.type == t).sum()), 0, t)
+        # a cache built with the override has every cell of each type relabelled; one built without keeps its consensus
+        applied = [bool((n.nt[n.type == t] == nt).all()) for t, nt in cn.TYPE_NT_OVERRIDE.items()]
+        self.assertIn(all(applied), (True, False))
+
+
+# ---- round-2 slow term: class split, zero-cost off, the multiplicative variants, the optic-lobe term ----------------
+from flyverse.brain import SlowSpec, _slow_spec, _slow_gains, _slow_taus, DEFAULT_SLOW_TAU_BY_CLASS  # noqa: E402
+from flyverse.connectome import SLOW_CLASSES  # noqa: E402
+from flyverse import optic as optic_mod  # noqa: E402
+from flyverse.retina import Retina, EyeGeometry  # noqa: E402
+
+
+def two_neuron_graph(pre_nt="dopamine", post_type="TA"):
+    """cell 0 (pre_nt, type TC) -> cell 1 (post_type, acetylcholine); the edge is an explicit zero when the presynaptic
+    cell is a monoamine (as in the cache), so its count comes from `counts`."""
+    nts = [pre_nt, "acetylcholine"]
+    n = pd.DataFrame({"bodyId": [1, 2], "type": ["TC", post_type], "superclass": ["cb_intrinsic"] * 2, "class": ["", ""],
+                      "subclass": ["", ""], "somaSide": ["L", "L"], "nt": nts,
+                      "sign": np.array([cn.NT_SIGN[x] for x in nts], dtype=np.float32)})
+    W = sp.csr_matrix((np.array([cn.NT_SIGN[pre_nt] * 20.0], np.float32), (np.array([1]), np.array([0]))), shape=(2, 2))
+    return Connectome(n, W, pd.Series([0, 1], index=[1, 2]))
+
+
+class SlowTermRound2Tests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.table = Path(self.tmp.name) / "receptors.csv"
+        with open(self.table, "w", encoding="utf-8") as f:
+            f.write("# test table\n")
+            small_table().to_csv(f, index=False)
+        self.c, self.cnt = graph()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _full(self, **kw):
+        base = dict(event_driven=False, receptor_model="full", receptor_table=str(self.table), input_norm_alpha=0.0,
+                    path_gain=[], type_path_gain=[], adapt_jump=0.0, same_type_gain=1.0)
+        base.update(kw)
+        return LIFParams(**base)
+
+    def test_slow_class_per_entry(self):
+        rs = receptor_signs(self.c, table_path=self.table, counts=self.cnt[self.c.W.tocoo().row, self.c.W.tocoo().col])
+        coo = self.c.W.tocoo(); nt = self.c.neurons.nt.to_numpy()[coo.col]; types = self.c.neurons.type.to_numpy()[coo.row]
+        names = np.array(SLOW_CLASSES)[rs.slow_class]
+        # ACh -> TA carries mAChR-B (slow -1): classical; dopamine -> TA slow +1: monoamine; glutamate -> TB slow -1 (mGluR): classical
+        self.assertTrue(np.all(names[(nt == "acetylcholine") & (types == "TA")] == "metabotropic_classical"))
+        self.assertTrue(np.all(names[(nt == "dopamine") & (types == "TA")] == "monoamine"))
+        self.assertTrue(np.all(names[(nt == "glutamate") & (types == "TB")] == "metabotropic_classical"))
+        self.assertTrue(np.all(names[rs.slow_sign == 0] == "none"))
+        self.assertTrue(np.all((rs.slow_sign != 0) == (rs.slow_class != 0)))
+        # slow_factor restricted to a class zeroes the other class's entries
+        f_mono = rs.slow_factor(slow_class="monoamine"); f_cls = rs.slow_factor(slow_class="metabotropic_classical")
+        self.assertTrue(np.all(f_mono[names != "monoamine"] == 0) and np.all(f_mono[names == "monoamine"] == rs.slow_sign[names == "monoamine"]))
+        self.assertTrue(np.all(f_cls[names != "metabotropic_classical"] == 0))
+        np.testing.assert_array_equal(f_mono + f_cls, rs.slow_factor())
+        with self.assertRaises(ValueError):
+            rs.slow_factor(slow_class="nonsense")
+
+    def test_class_split_builds_one_matrix_per_active_class(self):
+        counts = self.cnt[self.c.W.tocoo().row, self.c.W.tocoo().col]
+        rs = receptor_signs(self.c, table_path=self.table, counts=counts)
+        # defaults: classical 0 (off), monoamine slow_gain -> only the monoamine matrix (the dopamine -> TA entries)
+        b = Brain(self.c, self._full(), device="cpu", receptor=rs)
+        self.assertEqual(b.slow_classes, ["monoamine"]); self.assertEqual(len(b.W_slow), 1)
+        M = b.W_slow[0].to_dense().numpy()
+        nt = self.c.neurons.nt.to_numpy(); types = self.c.neurons.type.to_numpy()
+        for post in range(6):
+            for pre in range(6):
+                expect = 0.0
+                if nt[pre] == "dopamine" and types[post] == "TA":
+                    expect = b.p.w_syn * b.p.slow_gain * min(self.cnt[post, pre], 60.0) * DEFAULT_RECEPTOR_GAIN["mid"]
+                self.assertAlmostEqual(M[post, pre], expect, places=6, msg=(post, pre))
+        # classical on, monoamine off: only the mAChR-B / mGluR entries, with the classical scale
+        p2 = self._full(slow_gain_by_class={"metabotropic_classical": 0.05, "monoamine": 0.0})
+        b2 = Brain(self.c, p2, device="cpu", receptor=rs)
+        self.assertEqual(b2.slow_classes, ["metabotropic_classical"])
+        M2 = b2.W_slow[0].to_dense().numpy()
+        self.assertTrue(np.all(M2[:, nt == "dopamine"] == 0))
+        ach_TA = (M2[0, 4], self.cnt[0, 4])          # ACh cell 4 -> TA cell 0: slow -1 (mAChR-B, low)
+        self.assertAlmostEqual(ach_TA[0], -0.275 * 0.05 * ach_TA[1] * DEFAULT_RECEPTOR_GAIN["low"], places=6)
+        # both on: two matrices, two time constants, in SLOW_CLASSES order
+        p3 = self._full(slow_gain_by_class={"metabotropic_classical": 0.05, "monoamine": 0.02},
+                        slow_tau_by_class={"metabotropic_classical": 80.0}, slow_tau_ms=300.0)
+        b3 = Brain(self.c, p3, device="cpu", receptor=rs)
+        self.assertEqual(b3.slow_classes, ["metabotropic_classical", "monoamine"])
+        self.assertEqual(b3.slow.tau, {"metabotropic_classical": 80.0, "monoamine": 300.0})
+        self.assertEqual(b3.g_slow_cls.shape, (2, 1, 6))
+        with self.assertRaises(ValueError):
+            Brain(self.c, self._full(slow_gain_by_class={"peptide": 1.0}), device="cpu", receptor=rs)
+        with self.assertRaises(ValueError):
+            Brain(self.c, self._full(slow_mode="nonsense"), device="cpu", receptor=rs)
+        self.assertEqual(_slow_gains(LIFParams())["metabotropic_classical"], 0.0)
+        self.assertEqual(_slow_taus(LIFParams())["metabotropic_classical"], DEFAULT_SLOW_TAU_BY_CLASS["metabotropic_classical"])
+
+    def test_zero_gains_cost_nothing_and_equal_sign_gain(self):
+        """'full' with every class scale 0: no slow matrix, no slow state, the Torch path kept, and the dynamics
+        byte-identical to 'sign+gain' on the same path (and receptor_model=None still byte-identical to the base)."""
+        counts = self.cnt[self.c.W.tocoo().row, self.c.W.tocoo().col]
+        rs = receptor_signs(self.c, table_path=self.table, counts=counts)
+        p_off = self._full(slow_gain=0.0)
+        self.assertIsNone(_slow_spec(p_off))
+        b = Brain(self.c, p_off, device="cpu", receptor=rs)
+        self.assertTrue(b._slow_on); self.assertFalse(b._slow_active); self.assertIsNone(b.W_slow)
+        self.assertEqual(b.g_slow_cls.shape, (0, 1, 6)); self.assertEqual(b.slow_classes, [])
+        self.assertFalse(b.cuda); self.assertFalse(b.metal)
+        p_sg = LIFParams(**{**p_off.__dict__, "receptor_model": "sign+gain"})
+        b_sg = Brain(self.c, p_sg, device="cpu", receptor=receptor_signs(self.c, table_path=self.table))
+        torch.testing.assert_close(b.W.to_dense(), b_sg.W.to_dense(), rtol=0, atol=0)
+        for bb in (b, b_sg):
+            bb.set_poisson([0, 1], 200.0); bb.step(200)
+        torch.testing.assert_close(b.v, b_sg.v, rtol=0, atol=0); torch.testing.assert_close(b.rate, b_sg.rate, rtol=0, atol=0)
+        self.assertEqual(float(b.g_slow.abs().sum()), 0.0)
+        # the model off is still byte-identical to the base weights
+        base = _shaped_weights(self.c, LIFParams()); off = _shaped_weights(self.c, LIFParams(receptor_model=None, slow_mode="gain"))
+        np.testing.assert_array_equal(base.data, off.data)
+
+    def _tone(self, mode, **kw):
+        """A dopamine spike into TA (slow +, mid, count 20) under `mode`; returns the brain and the tone jump."""
+        c = two_neuron_graph()
+        rs = receptor_signs(c, table_path=self.table, counts=np.array([20.0], np.float32))
+        p = self._full(slow_mode=mode, slow_gain=0.1, slow_tau_ms=1e9, **kw)    # tau -> inf: the tone holds
+        b = Brain(c, p, device="cpu", receptor=rs)
+        jump = p.w_syn * 0.1 * 20.0 * DEFAULT_RECEPTOR_GAIN["mid"]               # 0.55 mV
+        b.spike_buf[b.buf_pos, 0, 0] = 1.0; b.step(1)
+        self.assertAlmostEqual(float(b.g_slow[0, 1]), jump, places=6)
+        self.assertAlmostEqual(float(b.g_slow_cls[0, 0, 1]), jump, places=6)
+        return b, jump
+
+    def test_gain_mode_scales_the_fast_input(self):
+        b, jump = self._tone("gain")
+        p = b.p
+        self.assertEqual(b.slow.norm_mv, p.v_th - p.v_rest)
+        # no fast input yet: the tone alone does nothing to the membrane (unlike 'additive')
+        self.assertAlmostEqual(float(b.v[0, 1]), p.v_rest, places=6)
+        ba, _ = self._tone("additive")
+        self.assertGreater(float(ba.v[0, 1]), p.v_rest)
+        # a fast conductance g under the tone is scaled by 1 + jump / 7 mV
+        for bb in (b, ba):
+            bb.g[0, 1] = 2.0
+        b.step(1); ba.step(1)
+        a_m = math.exp(-p.dt / p.tau_m); a_s = math.exp(-p.dt / p.tau_syn)
+        g_now = 2.0 * a_s                                                       # g decays before the membrane update
+        f = 1.0 + jump / (p.v_th - p.v_rest)
+        self.assertAlmostEqual(float(b.v[0, 1]), p.v_rest + g_now * f * (1 - a_m), places=5)
+        # 'additive' adds the tone instead: target v_rest + g + jump
+        v_add_1 = p.v_rest + jump * (1 - a_m)                                    # after the first step
+        self.assertAlmostEqual(float(ba.v[0, 1]), (p.v_rest + g_now + jump) + (v_add_1 - (p.v_rest + g_now + jump)) * a_m, places=5)
+        # the factor is clamped: a huge negative tone silences the input (factor 0), never inverts it
+        b.g_slow_cls[0, 0, 1] = -100.0; b.g[0, 1] = 2.0; v0 = float(b.v[0, 1]); b.step(1)
+        self.assertLessEqual(float(b.v[0, 1]), max(v0, p.v_rest) + 1e-6)
+
+    def test_threshold_mode_shifts_the_threshold(self):
+        b, jump = self._tone("threshold")
+        p = b.p
+        self.assertAlmostEqual(float(b.v[0, 1]), p.v_rest, places=6)              # the tone is not a current
+        th = b._threshold()                                                          # float32 state: 5 places
+        self.assertAlmostEqual(float(th[0, 1]), p.v_th - jump, places=5); self.assertAlmostEqual(float(th[0, 0]), p.v_th, places=5)
+        # a membrane between the shifted and the nominal threshold fires only under the tone
+        b.v[0, 1] = p.v_th - jump / 2; b.step(1)
+        self.assertEqual(float(b.spikes[0, 1]), 1.0)
+        ba, _ = self._tone("additive"); ba.g_slow_cls.zero_(); ba.g_slow.zero_()
+        ba.v[0, 1] = p.v_th - jump / 2; ba.step(1)
+        self.assertEqual(float(ba.spikes[0, 1]), 0.0)
+        # the shift is capped at 0.9 of the rest-threshold gap; a negative tone raises the threshold without bound
+        b.g_slow_cls[0, 0, 1] = 100.0; b.g_slow.copy_(b.g_slow_cls.sum(0)); th = b._threshold()
+        self.assertAlmostEqual(float(th[0, 1]), p.v_th - 0.9 * (p.v_th - p.v_rest), places=5)
+        b.g_slow_cls[0, 0, 1] = -100.0
+        b.g_slow.copy_(b.g_slow_cls.sum(0)); th = b._threshold()
+        self.assertAlmostEqual(float(th[0, 1]), p.v_th + 100.0, places=5)
+
+    def test_state_reset_and_batch(self):
+        c = two_neuron_graph()
+        rs = receptor_signs(c, table_path=self.table, counts=np.array([20.0], np.float32))
+        b = Brain(c, self._full(slow_mode="gain"), device="cpu", batch=3, receptor=rs)
+        self.assertEqual(b.g_slow_cls.shape, (1, 3, 2)); self.assertEqual(b.g_slow.shape, (3, 2))
+        b.spike_buf[b.buf_pos, 1, 0] = 1.0; b.step(1)
+        self.assertGreater(float(b.g_slow[1, 1]), 0); self.assertEqual(float(b.g_slow[0, 1]), 0.0)
+        b.reset([1])
+        self.assertEqual(float(b.g_slow.abs().sum()), 0.0); self.assertEqual(float(b.g_slow_cls.abs().sum()), 0.0)
+
+    # ---- the optic-lobe term ----------------------------------------------------------------------------------------
+    def _optic_graph(self):
+        """4 cells: 0 photoreceptor R1-R6 (histamine), 1 rate unit Mi1 (ol_intrinsic, ACh), 2 spiking octopamine cell
+        (visual_centrifugal), 3 spiking LC4 (visual_projection). Edges: 0 -> 1 (10), 2 -> 1 (20, explicit zero), 1 -> 3 (30)."""
+        nts = ["histamine", "acetylcholine", "octopamine", "acetylcholine"]
+        n = pd.DataFrame({"bodyId": [1, 2, 3, 4], "type": ["R1-R6", "Mi1", "OAVC", "LC4"],
+                          "superclass": ["ol_sensory", "ol_intrinsic", "visual_centrifugal", "visual_projection"],
+                          "class": [""] * 4, "subclass": [""] * 4, "somaSide": ["L"] * 4, "nt": nts,
+                          "sign": np.array([cn.NT_SIGN[x] for x in nts], dtype=np.float32)})
+        W = sp.csr_matrix((np.array([-10.0, 0.0, 30.0], np.float32), (np.array([1, 1, 3]), np.array([0, 2, 1]))), shape=(4, 4))
+        W.sort_indices()
+        c = Connectome(n, W, pd.Series(np.arange(4), index=n.bodyId))
+        counts = np.array([10.0, 20.0, 30.0], np.float32)                          # CSR order: (1,0), (1,2), (3,1)
+        rt = pd.DataFrame([table_row("Mi1", "histamine", -1, "mid", 0, "none"),
+                           table_row("Mi1", "octopamine", 0, "none", 1, "mid")])[TABLE_COLUMNS]
+        path = Path(self.tmp.name) / "optic_table.csv"
+        rt.to_csv(path, index=False)
+        rs = receptor_signs(c, table_path=path, counts=counts)
+        retina = Retina(pr_index=np.array([0]), pr_column=np.array([0]), pr_sens=np.ones((1, 4), np.float32) / 4,
+                        col_side=np.array(["L"]), col_hex=np.zeros((1, 2), int), col_dir=np.array([[1.0, 0.0, 0.0]]),
+                        col_az_el=np.zeros((1, 2)), geometry=EyeGeometry())
+        return c, rs, retina
+
+    def test_optic_slow_term(self):
+        c, rs, retina = self._optic_graph()
+        # adapt_gain 0: the rate units' slow adaptation would otherwise halve any tonic offset at steady state
+        op = optic_mod.OpticParams(pair_gain=[], tau_by_type={}, baseline_by_type={}, adapt_gain=0.0)
+        gain, tau, tau_syn = 0.02, 50.0, 5.0
+        spec = SlowSpec("additive", {"monoamine": gain}, {"monoamine": tau}, tau_syn, 7.0)
+        ol0 = optic_mod.OpticLobe(c, retina, op, device="cpu", receptor=rs, receptor_gain=DEFAULT_RECEPTOR_GAIN)
+        ol = optic_mod.OpticLobe(c, retina, op, device="cpu", receptor=rs, receptor_gain=DEFAULT_RECEPTOR_GAIN, slow=spec)
+        self.assertEqual(ol.slow_classes, ["monoamine"]); self.assertEqual(ol0.slow_classes, [])
+        self.assertEqual(ol.slow_entries["monoamine"]["spiking_to_rate"], 1); self.assertEqual(ol.slow_entries["monoamine"]["rate_to_rate"], 0)
+        self.assertFalse(ol.cuda); self.assertFalse(ol.metal)
+        # the fast octopamine edge is a zero (fast sign 0) in both; the slow matrix carries count / l2-norm x sign x gain factor
+        self.assertEqual(float(ol.W_rs.to_dense()[0, 0]), 0.0)                                # Mi1 <- OAVC fast
+        denom = float(c.neurons.in_syn_l2.iloc[1])                                            # |W| l2 of Mi1's inputs (10)
+        self.assertAlmostEqual(float(ol.W_slow_rs[0].to_dense()[0, 0]), 20.0 * DEFAULT_RECEPTOR_GAIN["mid"] / denom, places=6)
+        # octopamine cell at 100 Hz (s = 1), dark: the Mi1 tone relaxes to scale x gain_fb x w with scale = gain tau / tau_syn
+        rad = torch.zeros(1, 1, 4); rates = torch.zeros(1, 4); rates[0, 2] = 100.0
+        for _ in range(1000):                                 # 1 s = 20 tau: within 1e-8 of the steady state
+            drive = ol.step_frame(rad, rates, 1.0)
+        w = 20.0 * DEFAULT_RECEPTOR_GAIN["mid"] / denom
+        g_inf = gain * tau / tau_syn * op.gain_fb * w
+        self.assertAlmostEqual(float(ol.g_slow[0, 0]), g_inf, places=5)
+        self.assertAlmostEqual(float(ol.rates()[0, 0]), op.baseline + g_inf, places=4)         # additive: r = b + tone
+        self.assertGreater(float(drive[0, 3]), 0.0)                                            # ... which drives LC4
+        # without the spec (the round-1 optic model) the same input does nothing
+        for _ in range(1000):
+            drive0 = ol0.step_frame(rad, rates, 1.0)
+        self.assertEqual(float(ol0.rates()[0, 0]), op.baseline); self.assertEqual(float(drive0[0, 3]), 0.0)
+        # 'gain' scales the synaptic input (none here: no rate change), 'threshold' shifts the output like 'additive'
+        olg = optic_mod.OpticLobe(c, retina, op, device="cpu", receptor=rs, receptor_gain=DEFAULT_RECEPTOR_GAIN,
+                                  slow=SlowSpec("gain", {"monoamine": gain}, {"monoamine": tau}, tau_syn, 7.0))
+        olt = optic_mod.OpticLobe(c, retina, op, device="cpu", receptor=rs, receptor_gain=DEFAULT_RECEPTOR_GAIN,
+                                  slow=SlowSpec("threshold", {"monoamine": gain}, {"monoamine": tau}, tau_syn, 7.0))
+        for _ in range(1000):
+            olg.step_frame(rad, rates, 1.0); olt.step_frame(rad, rates, 1.0)
+        self.assertAlmostEqual(float(olg.g_slow[0, 0]), g_inf, places=5); self.assertEqual(float(olg.rates()[0, 0]), op.baseline)
+        self.assertAlmostEqual(float(olt.rates()[0, 0]), op.baseline + g_inf, places=4); self.assertAlmostEqual(float(olt.v[0, 0]), 0.0, places=5)
+        # a lit photoreceptor under the 'gain' tone: the (inhibitory) histamine input is scaled by 1 + tone / (1 - b)
+        lit = torch.full((1, 1, 4), 1.0)
+        for o in (olg, ol0):
+            o.reset(); o.relax()
+        for _ in range(200):
+            olg.step_frame(lit, rates, 1.0); ol0.step_frame(lit, torch.zeros(1, 4), 1.0)
+        # after the onset transient both are at their operating points again (contrast adapts) but the tone persists in olg
+        self.assertGreater(float(olg.g_slow[0, 0]), 0.0)
+        olg.reset(); olg.relax(); ol0.reset(); ol0.relax()
+        ol.reset(); self.assertEqual(float(ol.g_slow.abs().sum()), 0.0); self.assertEqual(float(ol.g_slow_cls.abs().sum()), 0.0)
+
+
+# ---- round-2 profile-selection rule (scripts/build_receptor_table.select_profile) --------------------------------
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import build_receptor_table as brt  # noqa: E402
+
+
+def _cands(*pairs):
+    return [{"source": s, "net": n} for s, n in pairs]
+
+
+class SelectProfileTests(unittest.TestCase):
+    """A silencing ('none') stands only if every source agrees; a single-nucleus 'none' never outranks a whole-cell 'on'."""
+
+    def test_primary_with_group_on_decides(self):
+        self.assertEqual(brt.select_profile(_cands(("fca2022", "-1"), ("davis2020", "none"))), (0, "primary"))
+        self.assertEqual(brt.select_profile(_cands(("davis2020", "+1"), ("ozel2021", "none"), ("davie2018", "-1"))), (0, "primary"))
+
+    def test_all_none_is_silenced_only_with_two_sources(self):
+        self.assertEqual(brt.select_profile(_cands(("davis2020", "none"), ("ozel2021", "none"), ("fca2022", "none"))), (0, "primary"))
+        self.assertEqual(brt.select_profile(_cands(("davis2020", "none"), ("fca2022", "none"))), (0, "primary"))
+        # one profile's 'none' (Özel cluster 163 -> Pm5 / Pm6, Rdl P(on) 0.37) is not enough to silence
+        self.assertEqual(brt.select_profile(_cands(("davie2018", "none"))), (0, brt.NONE_SINGLE))
+        self.assertEqual(brt.select_profile(_cands(("ozel2021", "none"))), (0, brt.NONE_SINGLE))
+        self.assertEqual(brt.select_profile(_cands(("ozel2021", "none")), min_sources=1), (0, "primary"))
+        self.assertEqual(brt.MIN_SOURCES_TO_SILENCE, 2)
+
+    def test_single_nucleus_none_yields_to_whole_cell_on(self):
+        # Tm5a / Tm5b: Davie 'Tm5ab' (fuzzy, HisCl off) vs Özel 'PR'-independent class row with ort on
+        self.assertEqual(brt.select_profile(_cands(("davie2018", "none"), ("ozel2021", "-1"))), (1, "group_on_override"))
+        # the FIRST whole-cell source with the group on is taken, single-nucleus 'on' rows are skipped
+        self.assertEqual(brt.select_profile(_cands(("fca2022", "none"), ("davie2018", "mixed"), ("kurmangaliyev2020", "+1"),
+                                                   ("ozel2021", "-1"))), (2, "group_on_override"))
+
+    def test_contested_none_falls_back_to_prior(self):
+        # whole-cell 'none' against any 'on' (R7y glutamate: Davis R7 off vs Davie 'Photoreceptors' mixed)
+        self.assertEqual(brt.select_profile(_cands(("davis2020", "none"), ("davie2018", "mixed"))), (0, brt.NONE_CONTESTED))
+        self.assertEqual(brt.select_profile(_cands(("davis2020", "none"), ("ozel2021", "-1"))), (0, brt.NONE_CONTESTED))
+        # single-nucleus 'none' against a single-nucleus 'on' only
+        self.assertEqual(brt.select_profile(_cands(("fca2022", "none"), ("davie2018", "-1"))), (0, brt.NONE_CONTESTED))
+
+    def test_empty_raises(self):
+        with self.assertRaises(ValueError):
+            brt.select_profile([])
+
+    def test_source_classes_partition_the_priority_list(self):
+        srcs = set(brt.SOURCE_PRIORITY)
+        self.assertEqual(brt.WHOLE_CELL_SOURCES | brt.SINGLE_NUCLEUS_SOURCES, srcs)
+        self.assertFalse(brt.WHOLE_CELL_SOURCES & brt.SINGLE_NUCLEUS_SOURCES)
+
+
+@unittest.skipUnless(cn.RECEPTOR_TABLE.exists(), "receptor table absent")
+class ShippedTableRuleTests(unittest.TestCase):
+    """The shipped receptors_by_type.csv obeys the round-2 rule."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.rt = cn.read_receptor_table()
+        cls.rt = cls.rt[~cls.rt.malecns_type.astype(str).str.startswith("<")]
+
+    def _row(self, t, nt):
+        r = self.rt[(self.rt.malecns_type == t) & (self.rt.transmitter == nt)]
+        self.assertEqual(len(r), 1, (t, nt))
+        return r.iloc[0]
+
+    def test_silenced_rows_have_every_source_at_none(self):
+        classical = self.rt[self.rt.transmitter.isin(brt.CLASSICAL)]
+        z = classical[classical.fast_sign == 0]
+        self.assertGreater(len(z), 0)
+        for _, r in z.iterrows():
+            self.assertEqual(r.fast_net, "none", (r.malecns_type, r.transmitter))
+            alts = [a for a in str(r.alt_sources).split(";") if a]
+            for a in alts:
+                self.assertIn("fast=none", a, (r.malecns_type, r.transmitter, a))
+            self.assertGreaterEqual(len(alts) + 1, brt.MIN_SOURCES_TO_SILENCE, (r.malecns_type, r.transmitter))
+        # and a contested or single-source none never silences
+        nc = classical[classical.fast_net.isin(brt.NONE_FALLBACK)]
+        self.assertGreater(len(nc), 0)
+        self.assertTrue((nc.fast_sign != 0).all())
+        for _, r in nc.iterrows():
+            self.assertEqual(int(r.fast_sign), int(cn.NT_SIGN[r.transmitter]))
+            self.assertEqual(r.fast_gain_class, "none")
+        single = classical[classical.fast_net == brt.NONE_SINGLE]
+        self.assertTrue((single.n_sources == 1).all())
+
+    def test_named_pairs_of_the_verification_record(self):
+        for t in ("Tm5a", "Tm5b"):                       # R7 -> Tm5a/b: Özel class profile with ort on replaces Davie 'Tm5ab'
+            r = self._row(t, "histamine")
+            self.assertEqual(int(r.fast_sign), -1); self.assertTrue(str(r.fast_selection).startswith("group_on_override"))
+        r = self._row("Mi1", "histamine")                # R8 -> Mi1: every source has HisCl / ort off -> stays silenced
+        self.assertEqual(int(r.fast_sign), 0); self.assertEqual(r.fast_selection, "primary")
+        for t in ("R7y", "R7p", "R8y", "R8p"):           # glutamate / GABA onto photoreceptors: contested -> NT_SIGN
+            for nt in ("glutamate", "gaba"):
+                self.assertEqual(int(self._row(t, nt).fast_sign), -1, (t, nt))
+        for t in ("Pm5", "Pm6"):                         # Özel class row is the only source: single-source none -> NT_SIGN
+            r = self._row(t, "gaba")
+            self.assertEqual(int(r.fast_sign), -1); self.assertEqual(r.fast_net, brt.NONE_SINGLE)
+
+    def test_kaird1_is_not_the_old_alias_and_kurmangaliyev_is_present(self):
+        self.assertIn("kurmangaliyev2020", set(self.rt.source))
+        for t in ("T4a", "T5a"):
+            self.assertEqual(self._row(t, "acetylcholine").source, "kurmangaliyev2020")
 
 
 if __name__ == "__main__":

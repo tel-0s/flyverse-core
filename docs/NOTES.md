@@ -1170,6 +1170,37 @@ as an override table, and tests the GLNO sign in the compass.
 Infrastructure notes from the round: `cluster_run.py --fetch` now accumulates; two budgeted jobs starting in the
 same second once came up without CUDA (a node-agent race, reported); the round used ~5.0 M agent tokens.
 
+## Session 10: receptor-expression integration, round 2
+
+Round 2 (17 agents; skeptics on Opus) applied every round-1 table correction, added Kurmangaliyev 2020 as a sixth
+source, rebuilt the receptor table under a stricter silencing rule (a synapse is silenced only when >= 2 sources
+agree and no whole-cell profile has the receptor on: 286,600 -> 83,473 synapses), and ran the experiments the plan
+had left open. `docs/NT_INTEGRATION.md` section 7 has the round-2 outcome in full; the verification record is in
+`docs/audits/receptor_verification.md`. The five results:
+
+1. **The small-object hypothesis is closed on the receptor route.** None of Tm5Y / TmY21 / TmY13 / LC11 / Y3 / Li19 /
+   Tm32 has a profile in any source; the lookup changes no input of the object detectors; and the moving-ball assay
+   (`scripts/probe_object_sweep.py`) shows no object signal at LC11 / LC10a in any mode, with the skeptic's positive
+   control demonstrating that the loom chain does respond to size (a 43 deg object drives LPLC2 +3.7 mV, LC11 +0.2).
+   The object item becomes a medulla -> lobula wiring / dynamics question.
+2. **A suite-neutral receptor mode exists:** `sign` with the absolute-level rule (`abs`, 0.17 % of synapses changed)
+   is 27/0/2 in four suite runs (off 26/1/2, 24/3/2), raises the loom GF and escapes, costs 10 Hz on the legacy loom,
+   and touches nothing on the object, optomotor or compass populations. Held back until a contested-flip rule removes
+   the 26 +1 rows another source contradicts (Tm9 above all) and a Tm9-held-at-minus-one control is run.
+3. **Default model changed, data-driven:** `TYPE_NT_OVERRIDE` labels TmY14 glutamate, Mi19 serotonin and aMe8
+   acetylcholine for their previously sign-0 cells (107 cells, 0.027 % of synapses; three-seed suite: no status change).
+   The cache is rebuilt locally and on the cluster.
+4. **Compass:** the receptor model is inert on the ring; the GLNO <-> PEN loop (19 % of PEN's input, sign 0 today)
+   decides the persistence window -- glutamatergic GLNO kills the bump at gE 1.75 in 6/6 seeds, cholinergic holds it --
+   and both EM predictions favour inhibitory, so the session-9 compass gains were tuned against a silent loop.
+5. **Slow term:** per-class split removes the runaway; four settings pass the runaway checks but only on class weights;
+   the 'gain' mode acts on the net input; remains an experiment flag.
+
+Code fixes from the verification: a model option that forces the Torch path now downgrades `cuda_sparse=warp` to
+cuSPARSE with a warning instead of aborting the room sections silently; `cx_wedge.py --nt-override` can no longer
+overwrite the audit's structural files; `cluster_run.py --fetch out/` copies the directory's contents instead of
+nesting; the two remaining scratchpad generators are in `scripts/`.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

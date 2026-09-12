@@ -5,14 +5,22 @@ Inputs (git-ignored, downloaded by hand; see docs/audits/receptor_sources_ozel20
     data/external/ozel2021/GSE142787_Log_normalized_average_expression.xlsx  sheet Adult_average_expression
     data/external/ozel2021/GSE142787_Mixture_modeling.xlsx           sheet Adult_MM_final
     cache/neurons.parquet, cache/W_post_pre.npz                      the model's connectome cache
+    data/external/nern2025/nature_esm/MOESM4_unzipped/Sup_Table_7_MatchingCellTypes_final.xlsx
+        (Nern 2025 Sup_Table_7: MaleCNS optic-lobe type <-> FlyWire Matsliah / Schlegel names; used to verify the
+        Pm1 -> {Pm1, Pm5, Pm6}, Pm2 -> {Pm2a, Pm2b}, Pm3 / Pm4, Dm11 (+ Dm-DRA2) and Tm29 (= Tm5d / CB3851) bridges;
+        optional: the script warns and keeps the hard-coded bridge if the file is missing)
 
 Outputs (redistributable derived tables):
-    flyverse/data/type_map_ozel2021.csv       source cluster -> MaleCNS type, with tier + evidence
+    flyverse/data/type_map_ozel2021.csv       source cluster -> MaleCNS type, with tier + evidence + flag
     flyverse/data/expression_ozel2021.csv     per adult cluster, log-normalised mean expression of 54 NT genes
-    flyverse/data/expression_ozel2021_mm.csv  per adult cluster, mixture-model P(expressed) of the same genes
+    flyverse/data/expression_ozel2021_mm.csv  per adult cluster, mixture-model P(ON) of the same genes (198 clusters)
     docs/audits/receptor_sources_ozel2021.md  provenance (URL, size, SHA-256), licence, coverage tables
 
     PYTHONIOENCODING=utf-8 python scripts/build_ozel2021_tables.py
+
+Round 2 (docs/audits/receptor_verification.md, 'verify:tables:ozel2021'): cluster 163 Pm1 re-tiered class over
+{Pm1, Pm5, Pm6}; cluster 55 Tm29 demoted to fuzzy with a name-collision flag; Dm11 minor-split note; mAChR-C wording;
+the mixture-model table documented as 198 clusters of model P(ON); the Pm nomenclature bridge cited to Sup_Table_7.
 """
 from __future__ import annotations
 
@@ -32,6 +40,16 @@ ROOT = Path(__file__).resolve().parents[1]
 EXT = ROOT / "data" / "external" / "ozel2021"
 DATA = ROOT / "flyverse" / "data"
 AUDIT = ROOT / "docs" / "audits" / "receptor_sources_ozel2021.md"
+NERN_ST7 = ROOT / "data" / "external" / "nern2025" / "nature_esm" / "MOESM4_unzipped" / "Sup_Table_7_MatchingCellTypes_final.xlsx"
+
+# Nern 2025 Sup_Table_7 (MatchingCellTypes): MaleCNS optic-lobe type -> (Matsliah / FlyWire type, Schlegel / FlyWire type).
+# The `hemibrainType` column of cache/neurons.parquet is EMPTY for every mapped ol_intrinsic type (round-1 cited it
+# wrongly for the Pm bridge); the bridge below is read from Sup_Table_7 and re-verified against the file when present.
+ST7_BRIDGE = {
+    "Pm1": ("Pm01", "Pm1"), "Pm5": ("Pm02", "Pm1"), "Pm6": ("Pm06", "Pm1"),
+    "Pm2a": ("Pm03", "Pm2"), "Pm2b": ("Pm08", "Pm2"), "Pm3": ("Pm09", "CB3856"), "Pm4": ("Pm05", "Pm4"),
+    "Dm11": ("Dm11", "Dm11"), "Dm-DRA2": ("DmDRA2", "Dm11"), "Tm29": ("Tm5d", "CB3851"),
+}
 
 # ----------------------------------------------------------------------------------------------
 # Gene list (model names) -> symbol in the source's gene build (BDGP6.88, FlyBase 2019 symbols).
@@ -54,9 +72,17 @@ SOURCE_SYMBOL = {"ChAT": "Cha", "KaiR1D": "CG3822", "Octalpha2R": "CG18208", "mA
 # reported as unmatched. Tiers: exact (author's annotation is a MaleCNS type name, unstarred),
 # alias (name differs but a documented renaming links them; none needed for this source),
 # fuzzy (author-flagged less confident '*' annotation, or a 'likely' assignment, or a subtype letter
-# whose correspondence to the MaleCNS subtype letter is not established), class (the source cluster
-# is a union of several MaleCNS types, or a subdivision of one MaleCNS type).
+# whose correspondence to the MaleCNS subtype letter is not established, or a name-only match whose
+# identity with the MaleCNS type is contested), class (the source cluster is a union of several
+# MaleCNS types, or a subdivision of one MaleCNS type).
+# FLAGS (per cluster, written to the `flag` column): name_collision = the annotation name exists in
+# MaleCNS but the two may denote different cells; minor_split = the 2020 type is a MaleCNS type plus a
+# small sibling that is not added to the map.
 # ----------------------------------------------------------------------------------------------
+FLAGS = {
+    55: "name_collision",   # Tm29: Özel/FCA 'Tm29' (FCA cholinergic) vs MaleCNS Tm29 = FlyWire Tm5d / CB3851 (glutamate)
+    136: "minor_split",     # Dm11: Schlegel Dm11 = MaleCNS Dm11 (158 cells) + Dm-DRA2 (33 cells, 7,110 out-syn)
+}
 ST1 = "Supplementary Table 1 (41586_2020_2879_MOESM4_ESM.xlsx)"
 CLEAR = "ST1: 'Clear match to {t} transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)"
 
@@ -81,7 +107,7 @@ MAP: list[tuple[int, str, list[str], str, str]] = [
     (33, "Mi9", ["Mi9"], "exact", CLEAR.format(t="Mi9")),
     (34, "Tm5c", ["Tm5c"], "exact", CLEAR.format(t="Tm5c")),
     (42, "TmY5a", ["TmY5a"], "exact", CLEAR.format(t="TmY5a")),
-    (55, "Tm29", ["Tm29"], "exact", CLEAR.format(t="Tm29") + "; MaleCNS Tm29 = FlyWire Tm5d (flywireType column), same name in Özel"),
+    (55, "Tm29", ["Tm29"], "fuzzy", CLEAR.format(t="Tm29") + "; NAME COLLISION (round-2 demotion exact -> fuzzy): the match rests on the name of a 2018 driver line called 'Tm29' (Konstantinides 2018), and MaleCNS Tm29 is FlyWire Tm5d (Matsliah) / CB3851 (Schlegel, 373 cells, also lumps Tm39 / Tm40) with no hemibrain name (Nern 2025 Sup_Table_7); whether that driver labels Nern-2025 Tm29 is not evidenced in the sources used; FCA 'transmedullary neuron Tm29' is cholinergic (VAChT 1.24, ChAT 0.47, VGlut 0.18) while MaleCNS Tm29 is glutamate 100 % (544 cells) and Sup_Table_7 FW_transmitter_pred for CB3851 is acetylcholine; Özel cluster 55 itself is VGlut P(ON) 1.00, which agrees with MaleCNS but is weak support"),
     (60, "T2a", ["T2a"], "exact", "ST1: only unidentified cluster expressing the T2a markers acj6 and ap (mixture modelling) with a unicolumnar-sized cluster; main text lists T2a among marker-identified clusters"),
     (61, "Tm20", ["Tm20"], "exact", CLEAR.format(t="Tm20")),
     (64, "LC12*", ["LC12"], "fuzzy", "ST1 (author-starred = less confident): LC12 is cut+, Acj6+, toy+, beat-1c+, kn- (Extended Data Fig. 4); only cluster matching by mixture modelling"),
@@ -106,7 +132,7 @@ MAP: list[tuple[int, str, list[str], str, str]] = [
     (125, "Tm4", ["Tm4"], "exact", CLEAR.format(t="Tm4")),
     (126, "Tm3", ["Tm3"], "exact", CLEAR.format(t="Tm3") + "; clusters 126+127 merged (OOBE 0.23)"),
     (128, "Dm2", ["Dm2"], "exact", CLEAR.format(t="Dm2")),
-    (136, "Dm11", ["Dm11"], "exact", CLEAR.format(t="Dm11")),
+    (136, "Dm11", ["Dm11"], "exact", CLEAR.format(t="Dm11") + "; minor split: FlyWire/Schlegel Dm11 (74/77 cells) = MaleCNS Dm11 (158 cells, 46,109 out-syn; Matsliah Dm11) + Dm-DRA2 (33 cells, 7,110 out-syn; Matsliah DmDRA2) per Nern 2025 Sup_Table_7; Dm-DRA2 is not added to the map (13 % of the pair's output synapses; both glutamate)"),
     (137, "TmY14*", ["TmY14"], "fuzzy", "ST1 (author-starred): TmY14 is kn+, DIP-gamma+, toy+, D-, dac- (Extended Data Fig. 4); only cluster matching by mixture modelling; VGlut+ as expected for TmY14 (Raghu & Borst 2011); DIP-beta discrepancy noted by the authors"),
     (140, "Tm1", ["Tm1"], "exact", CLEAR.format(t="Tm1") + "; clusters 140+141 merged (OOBE 0.14)"),
     (142, "Mi1", ["Mi1"], "exact", CLEAR.format(t="Mi1") + "; clusters 142+143 merged (OOBE 0.14)"),
@@ -115,12 +141,12 @@ MAP: list[tuple[int, str, list[str], str, str]] = [
     (147, "LC4", ["LC4"], "exact", CLEAR.format(t="LC4")),
     (148, "LPLC1", ["LPLC1"], "exact", CLEAR.format(t="LPLC1")),
     (150, "LPLC2", ["LPLC2"], "exact", CLEAR.format(t="LPLC2")),
-    (151, "Pm3*", ["Pm3"], "fuzzy", "ST1 (author-starred) / Methods: the Pm3 bulk transcriptome 'correlated best, but weakly, with cluster 151', verified by previously described Pm3 markers (Extended Data Fig. 3c, mixture modelling); hemibrain name Pm3 retained in MaleCNS"),
-    (152, "Pm4", ["Pm4"], "exact", CLEAR.format(t="Pm4") + "; hemibrain name Pm4 retained in MaleCNS"),
-    (163, "Pm1", ["Pm1"], "exact", "ST1: only cluster hth+, svp+, tsh+, Lim3+ by mixture modelling, the Pm1 markers of Erclik et al. 2017; hemibrain name Pm1 retained in MaleCNS (hemibrainType column)"),
+    (151, "Pm3*", ["Pm3"], "fuzzy", "ST1 (author-starred) / Methods: the Pm3 bulk transcriptome 'correlated best, but weakly, with cluster 151', verified by previously described Pm3 markers (Extended Data Fig. 3c, mixture modelling); MaleCNS Pm3 = FlyWire Matsliah Pm09 / Schlegel CB3856 (Nern 2025 Sup_Table_7; no FlyWire or hemibrain 'Pm3' name)"),
+    (152, "Pm4", ["Pm4"], "exact", CLEAR.format(t="Pm4") + "; MaleCNS Pm4 = FlyWire Matsliah Pm05 / Schlegel Pm4 (Nern 2025 Sup_Table_7)"),
+    (163, "Pm1", ["Pm1", "Pm5", "Pm6"], "class", "ST1: only cluster hth+, svp+, tsh+, Lim3+ by mixture modelling, the Pm1 markers of Erclik et al. 2017; the 2020-era Pm1 (FlyWire/Schlegel 'Pm1', 245/231 cells) is a THREE-way MaleCNS split per Nern 2025 Sup_Table_7: Pm1 (Matsliah Pm01, 121 cells in the Nern optic-lobe volume; 246 cells / 169,388 out-syn in MaleCNS), Pm5 (Matsliah Pm02, 94; 182 / 147,555) and Pm6 (Matsliah Pm06, 24; 50 / 77,713); tiered class like Pm2 -> Pm2a/Pm2b (round-2 correction of a round-1 'exact' row)"),
     (164, "Mi4", ["Mi4"], "exact", CLEAR.format(t="Mi4")),
     (165, "C3", ["C3"], "exact", CLEAR.format(t="C3")),
-    (175, "Pm2", ["Pm2a", "Pm2b"], "class", CLEAR.format(t="Pm2") + "; MaleCNS splits hemibrain Pm2 into Pm2a / Pm2b by connectivity (Nern 2025 ED Fig. 2e-h; the Pm2 driver labels the group '[Pm2]')"),
+    (175, "Pm2", ["Pm2a", "Pm2b"], "class", CLEAR.format(t="Pm2") + "; FlyWire/Schlegel Pm2 = MaleCNS Pm2a (Matsliah Pm03) + Pm2b (Matsliah Pm08) per Nern 2025 Sup_Table_7 (connectivity split, Nern 2025 ED Fig. 2e-h; the Pm2 driver labels the group '[Pm2]')"),
     (182, "C2", ["C2"], "exact", CLEAR.format(t="C2")),
     (222, "LC6", ["LC6"], "exact", "ST1: backprojection from P70; 'Clear match to LC6 transcriptome' (cluster 97 split into 221 / 222 at P70, 222 = LC6)"),
     (225, "Dm3a", ["Dm3a", "Dm3b", "Dm3c"], "class", "ST1: Dm3 subtype from P70 backprojection. Özel could not assign the two orthogonal Dm3 arbor orientations to anatomical directions (ED Fig. 7d, 'Dm3x / Dm3y'); MaleCNS has three Dm3 types (Dm3a = FlyWire Dm3p, Dm3b = Dm3q, Dm3c = Dm3v; Nern 2025). Subtype letters are NOT assumed to correspond; mapped to the Dm3 family"),
@@ -181,6 +207,30 @@ def read_sheet(fname: str, sheet: str) -> tuple[pd.DataFrame, list[str]]:
     return df, genes_all
 
 
+def read_st7() -> dict[str, dict] | None:
+    """Nern 2025 Sup_Table_7 rows for the types in ST7_BRIDGE: OL_type -> {Matsliah_type, Schlegel_type, hemibrain_type,
+    OL (cells in the Nern volume), Matsliah, Schlegel_L, Schlegel_R, OL_transmitter_pred, FW_transmitter_pred}.
+    Returns None (with a warning) when the file is absent; otherwise asserts the hard-coded bridge."""
+    if not NERN_ST7.exists():
+        print(f"WARNING: {NERN_ST7} missing (python scripts/fetch_data.py --external nern2025); Pm/Dm11/Tm29 bridge not re-verified")
+        return None
+    ws = openpyxl.load_workbook(NERN_ST7, read_only=True)["All"]
+    it = ws.iter_rows(values_only=True)
+    hdr = [str(c).strip() if c is not None else f"_{i}" for i, c in enumerate(next(it))]
+    col = {h: i for i, h in enumerate(hdr)}
+    found = {}
+    for r in it:
+        t = r[col["OL_type"]]
+        if t in ST7_BRIDGE:
+            found[t] = {k: r[col[k]] for k in ("Matsliah_type", "Schlegel_type", "hemibrain_type", "OL", "Matsliah",
+                                              "Schlegel_L", "Schlegel_R", "OL_transmitter_pred", "FW_transmitter_pred")}
+    for t, (mats, schl) in ST7_BRIDGE.items():
+        assert t in found, f"{t} not in Sup_Table_7"
+        assert (found[t]["Matsliah_type"], found[t]["Schlegel_type"]) == (mats, schl), (t, found[t])
+        assert found[t]["hemibrain_type"] is None, (t, found[t])   # the hemibrain bridge is empty for all of these
+    return found
+
+
 def write_csv_with_header(df: pd.DataFrame, path: Path, header_lines: list[str]) -> None:
     with open(path, "w", encoding="utf-8", newline="") as f:
         for line in header_lines:
@@ -194,10 +244,14 @@ def main() -> None:
     mm, genes_mm = read_sheet("GSE142787_Mixture_modeling.xlsx", "Adult_MM_final")
     assert genes_avg == genes_mm, "gene lists differ between the two GEO tables"
     adult_clusters = list(avg.index)
-    mm = mm.reindex(adult_clusters)
+    mm_clusters = list(mm.index)                       # Adult_MM_final has 198 cluster columns: 192 (LQ) is absent
+    mm_absent = sorted(set(adult_clusters) - set(mm_clusters))
+    assert mm_absent == [192] and not (set(mm_clusters) - set(adult_clusters)), mm_absent
+    mm = mm.reindex(adult_clusters)                    # row 192 -> all NaN
     absent = [g for g in GENES if avg[g].isna().all()]
-    print(f"adult clusters {len(adult_clusters)}, genes in source build {len(genes_avg)}, "
-          f"requested genes present {len(GENES) - len(absent)}/{len(GENES)}, absent {absent}")
+    print(f"adult clusters {len(adult_clusters)} (log-normalised) / {len(mm_clusters)} (mixture model; absent {mm_absent}), "
+          f"genes in source build {len(genes_avg)}, requested genes present {len(GENES) - len(absent)}/{len(GENES)}, absent {absent}")
+    st7 = read_st7()
 
     def source_name(c: int) -> str:
         a = ann.loc[c, "annotation"] if c in ann.index else str(c)
@@ -223,7 +277,7 @@ def main() -> None:
     for c, sname, ts, tier, ev in MAP:
         assert c in adult_clusters, f"cluster {c} has no adult expression column"
         for t in ts:
-            rows.append(dict(source_name=sname, malecns_type=t, tier=tier, evidence=ev,
+            rows.append(dict(source_name=sname, malecns_type=t, tier=tier, flag=FLAGS.get(c, ""), evidence=ev,
                              n_cells_malecns=int(ncell[t]), source_cluster=c,
                              malecns_superclass=neurons.loc[neurons.type == t, "superclass"].mode().iat[0],
                              malecns_nt=neurons.loc[neurons.type == t, "nt"].mode().iat[0]))
@@ -239,7 +293,7 @@ def main() -> None:
                 why = f"glia / low-quality cluster ('{a}')"
             else:
                 why = "unannotated neuronal cluster (no type assigned by the authors)"
-        tmap.loc[len(tmap)] = dict(source_name=sname, malecns_type="", tier="unmatched", evidence=why,
+        tmap.loc[len(tmap)] = dict(source_name=sname, malecns_type="", tier="unmatched", flag="", evidence=why,
                                    n_cells_malecns=0, source_cluster=c, malecns_superclass="", malecns_nt="")
     tmap = tmap.sort_values(["source_cluster", "malecns_type"]).reset_index(drop=True)
     tier_rank = {"exact": 0, "alias": 1, "fuzzy": 2, "class": 3}
@@ -248,8 +302,11 @@ def main() -> None:
         "(GEO GSE142787, Supplementary Table 1 annotations) -> MaleCNS v1.0 cell types (cache/neurons.parquet).",
         "Built by scripts/build_ozel2021_tables.py; provenance and coverage in docs/audits/receptor_sources_ozel2021.md.",
         "tier: exact = author annotation is the MaleCNS type name (unstarred); alias = documented renaming (none needed);",
-        "fuzzy = author-starred (less confident) annotation, a 'likely' assignment, or a subtype letter not shown to correspond;",
-        "class = source cluster pools several MaleCNS types or is a subdivision of one; unmatched = no evidenced MaleCNS type.",
+        "fuzzy = author-starred (less confident) annotation, a 'likely' assignment, a subtype letter not shown to correspond,",
+        "or a name-only match whose identity with the MaleCNS type is contested (Tm29); class = source cluster pools several",
+        "MaleCNS types (incl. Pm1 -> Pm1/Pm5/Pm6 per Nern 2025 Sup_Table_7) or is a subdivision of one; unmatched = no evidenced type.",
+        "flag: name_collision = Özel/FCA 'Tm29' vs MaleCNS Tm29 (= FlyWire Tm5d / CB3851, glutamate; FCA Tm29 cholinergic);",
+        "minor_split = Schlegel Dm11 = MaleCNS Dm11 + Dm-DRA2 (33 cells, not added). Empty otherwise.",
         "source_name = the author's annotation (cluster number when unannotated); source_cluster = ST1 / GEO column id;",
         "n_cells_malecns = cells of malecns_type in MaleCNS; malecns_nt = the model's transmitter label (mode).",
     ])
@@ -268,15 +325,18 @@ def main() -> None:
         "Adult timepoint only: 109,743 cells, female Canton-S 1-3 days old (male libraries removed by the authors), 10x v2.",
         "One row per adult cluster (199 columns of the GEO sheet: 193 final clusters incl. P70/P50 backprojections 221-235).",
         "Gene symbols are the plan's names; the source build (BDGP6.88) names differ for ChAT (=Cha), KaiR1D (=CG3822),",
-        "Octalpha2R (=CG18208); mAChR-C (CG7918) is absent from the source gene set -> NaN. Built by scripts/build_ozel2021_tables.py.",
+        "Octalpha2R (=CG18208); mAChR-C (CG7918) is not among the 12,028 genes retained in the authors' per-cluster tables -> NaN.",
+        "Built by scripts/build_ozel2021_tables.py.",
     ]
     write_csv_with_header(expr_table(avg), DATA / "expression_ozel2021.csv", common + [
         "UNIT: per-cluster arithmetic mean of Seurat LogNormalize values, ln(1 + UMI / total_UMI * 1e4) per cell",
         "(sheet Adult_average_expression of GSE142787_Log_normalized_average_expression.xlsx, non-integrated data).",
     ])
     write_csv_with_header(expr_table(mm), DATA / "expression_ozel2021_mm.csv", common + [
-        "UNIT: mixture-model probability that the gene is expressed in the cluster (0-1; ~fraction of cells ON),",
-        "sheet Adult_MM_final of GSE142787_Mixture_modeling.xlsx (Özel 2021 Methods 'mixture modelling').",
+        "UNIT: the mixture model's P(ON) for the gene in the cluster (0-1), i.e. the model's posterior that the cluster is in the",
+        "'on' component -- NOT a fraction of cells (the sheet's separate freq_cell_ON = fraction of cells with >= 1 UMI is not exported).",
+        f"Sheet Adult_MM_final of GSE142787_Mixture_modeling.xlsx (Özel 2021 Methods 'mixture modelling') has {len(mm_clusters)} cluster",
+        f"columns: cluster(s) {mm_absent} (LQ) have no column -> that row is all NaN; {len(mm_clusters)} of {len(adult_clusters)} rows carry data.",
     ])
 
     # ------------------------------------------------------------------ coverage
@@ -397,10 +457,16 @@ def main() -> None:
                "own per-cluster summary tables, plus our mapping) with attribution, which is the reuse the Supplementary Discussion "
                "invites ('These tables can be used to identify molecular effectors ... without additional bioinformatic analysis').\n"
                "* Nomenclature: the authors named clusters with the EM / Fischbach type names of 2020 and matched them to driver-line bulk "
-               "transcriptomes (Konstantinides et al. 2018 Cell; Davis et al. 2020 eLife). MaleCNS uses the Nern et al. 2025 names; the "
-               "renamings that matter here were read off the `hemibrainType` / `flywireType` columns of `cache/neurons.parquet` "
-               "(Tm29 = FlyWire Tm5d; Dm3a/b/c = FlyWire Dm3p/q/v; Dm8a/b = yDm8/pDm8; Pm1-4 keep their hemibrain names; Pm2 -> Pm2a/Pm2b, "
-               "LC10c -> LC10c-1/-2, LC14a -> LC14a-1/-2 are MaleCNS connectivity splits).\n")
+               "transcriptomes (Konstantinides et al. 2018 Cell; Davis et al. 2020 eLife). MaleCNS uses the Nern et al. 2025 names. The "
+               "`hemibrainType` column of `cache/neurons.parquet` is **empty for every mapped ol_intrinsic type** (Pm1-4 included; the round-1 "
+               "claim that Pm1-4 'keep their hemibrain names (hemibrainType column)' was wrong), so the bridge to the 2020 names is "
+               "**Nern 2025 Sup_Table_7** (`data/external/nern2025/nature_esm/MOESM4_unzipped/Sup_Table_7_MatchingCellTypes_final.xlsx`, "
+               "columns OL_type / Matsliah_type / Schlegel_type; hemibrain_type is None for all rows below" + (", re-verified from the file by this script" if st7 else "; file absent at build time, bridge hard-coded") + "): "
+               "Pm1 = Schlegel Pm1 / Matsliah Pm01, **Pm5 = Schlegel Pm1 / Matsliah Pm02, Pm6 = Schlegel Pm1 / Matsliah Pm06** (so the 2020 'Pm1' is a "
+               "3-way MaleCNS split), Pm2a = Pm2 / Pm03, Pm2b = Pm2 / Pm08, Pm3 = CB3856 / Pm09 (no FlyWire 'Pm3' name), Pm4 = Pm4 / Pm05, "
+               "Dm11 = Dm11 / Dm11 with Dm-DRA2 = Dm11 / DmDRA2 (minor split), Tm29 = CB3851 / Tm5d (name collision, see the Tm29 row). "
+               "The `flywireType` column of `cache/neurons.parquet` carries the Matsliah names and agrees (Tm29 = Tm5d; Dm3a/b/c = Dm3p/q/v; "
+               "Dm8a/b = yDm8/pDm8; Pm1/Pm5/Pm6 = Pm01/Pm02/Pm06). LC10c -> LC10c-1/-2 and LC14a -> LC14a-1/-2 are MaleCNS connectivity splits.\n")
     out.append("## 2. Files\n")
     out.append("| file (`data/external/ozel2021/`) | URL | bytes | SHA-256 | content |\n|---|---|---|---|---|")
     for fname, url, desc in files:
@@ -419,16 +485,23 @@ def main() -> None:
     out.append(md(n_tiers.rename_axis("tier")) + "\n")
     out.append(f"* `flyverse/data/expression_ozel2021.csv`: {len(avg)} clusters x {len(GENES)} genes, per-cluster mean of Seurat "
                f"LogNormalize values ln(1 + UMI/total x 1e4). {len(GENES) - len(absent)}/{len(GENES)} genes present in the source gene set "
-               f"({len(genes_avg):,} genes); absent -> NaN: {absent} (mAChR-C = CG7918 is not in the BDGP6.88 set the authors used). "
+               f"({len(genes_avg):,} genes); absent -> NaN: {absent} (mAChR-C = CG7918 is not among the {len(genes_avg):,} genes retained in the "
+               "authors' per-cluster tables -- their expressed-gene set after filtering, not the BDGP6.88 annotation, which does contain CG7918). "
                "Symbol translations: ChAT = `Cha`, KaiR1D = `CG3822`, Octalpha2R = `CG18208`.\n"
-               f"* `flyverse/data/expression_ozel2021_mm.csv`: the same clusters x genes as the mixture-model probability of expression "
-               "(0-1; the authors' binarised 'on/off' call per cluster, Methods 'mixture modelling'). This is the binned quantity the plan's "
-               "step 4 asks for (expression is not conductance).\n")
+               f"* `flyverse/data/expression_ozel2021_mm.csv`: {len(adult_clusters)} rows x {len(GENES)} genes, of which **{len(mm_clusters)} rows carry "
+               f"data**: the Adult_MM_final sheet has {len(mm_clusters)} cluster columns and no column for cluster(s) {mm_absent} (LQ), whose row is "
+               "all NaN. The value is the **mixture model's P(ON)** for the gene in the cluster (0-1; the posterior that the cluster belongs to "
+               "the 'on' component of the authors' two-component model, Methods 'mixture modelling') -- it is not a fraction of cells; the "
+               "sheet's separate `freq_cell_ON` (fraction of the cluster's cells with >= 1 UMI) is not exported. This is the binned quantity the "
+               "plan's step 4 asks for (expression is not conductance); the receptor table thresholds it at P(ON) >= 0.5.\n")
     out.append("Tier rules: **exact** = the author's annotation (unstarred) is the MaleCNS type name; **alias** = documented renaming "
                "(no row needed for this source: every name that differs between 2020 and MaleCNS is a split, i.e. class); **fuzzy** = "
                "author-starred (`*` = less confident, marker-combination evidence only), or a 'likely' assignment (cluster 93 -> LC10c), "
-               "or a subtype letter not shown to correspond; **class** = the cluster pools several MaleCNS types (PR, Dm8, LC14, Tm5ab, Pm2, "
-               "T4-5a/b, T4-5c/d, Dm3a/b) or subdivides one (Tm9v / Tm9d). Every row keeps the source cluster id and the ST1 sentence it rests on.\n")
+               "or a subtype letter not shown to correspond, or a name-only match whose identity is contested (Tm29, `flag = name_collision`: "
+               "FCA 'Tm29' is cholinergic, MaleCNS Tm29 = FlyWire Tm5d / CB3851 is glutamate; demoted from exact in round 2); **class** = the "
+               "cluster pools several MaleCNS types (PR, Dm8, LC14, Tm5ab, Pm1 -> Pm1/Pm5/Pm6, Pm2 -> Pm2a/Pm2b, T4-5a/b, T4-5c/d, Dm3a/b) or "
+               "subdivides one (Tm9v / Tm9d). Dm11 stays exact with `flag = minor_split` (Schlegel Dm11 = MaleCNS Dm11 + Dm-DRA2, 33 cells / "
+               "7,110 out-syn, not added). Every row keeps the source cluster id and the ST1 sentence it rests on.\n")
     out.append("## 4. Coverage of MaleCNS (best tier per type; cells and synapses from `cache/`, `|W|` column sums = output synapses, "
                "row sums = input synapses; sign-0 synapses (2.2 % overall, 0.1 % of optic-lobe output) are zeros in `W` and therefore excluded)\n")
     out.append(cov_md(cov_ol) + "\n")
@@ -465,13 +538,56 @@ def main() -> None:
                "* Cluster purity: the authors flag LC14 (possible LC14/LC14b mix), Pm3 (weak correlation), LC16 (gap 0.03), LC10b (LC10a/c/d correlate too).\n"
                "* T4/T5: only the a/b vs c/d split exists in the adult tables (clusters 234 / 235); the per-subtype clusters 261-268 are P50-only.\n"
                "* Dm3: the Özel a/b letters and the MaleCNS a/b/c letters are independent labellings; both Dm3 rows are mapped to the family.\n"
+               "* Pm1: the Erclik-2017 marker definition used by Özel names the 2020 'Pm1', which Nern 2025 Sup_Table_7 splits into MaleCNS "
+               "Pm1 / Pm5 / Pm6; cluster 163 is therefore a class profile shared by all three (all GABA).\n"
+               "* Tm29: name collision (see the row's evidence); the profile is kept at tier fuzzy so that an exact-tier profile from another "
+               "source outranks it in the receptor table, and `flag = name_collision` lets a consumer drop it.\n"
+               "* Dm11: Schlegel Dm11 = MaleCNS Dm11 + Dm-DRA2 (33 cells); Dm-DRA2 is unmatched here (`flag = minor_split`).\n"
+               "* Mixture-model table: 198 of 199 rows carry data (cluster 192 LQ has no Adult_MM_final column); values are the model's "
+               "P(ON) per cluster, not fractions of cells.\n"
                "* 111 neuronal clusters (of 172) carry no type; the largest unmatched MaleCNS optic types are listed in 4b. Expect these to "
                "be resolvable only with a later atlas (e.g. the 2024-2025 optic-lobe / FlyWire-matched atlases) or by marker-gene matching, "
                "which this task did not attempt (no mapping without evidence).\n")
+    # ------------------------------------------------------------------ round-2 corrections, before / after
+    def type_stats(ts: list[str]) -> tuple[int, int, int]:
+        s = neurons[neurons.type.isin(ts)]
+        return len(s), int(round(s.out_syn.sum())), int(round(s.in_syn_raw.sum()))
+    pm56 = type_stats(["Pm5", "Pm6"]); pm1 = type_stats(["Pm1"]); tm29 = type_stats(["Tm29"]); dra2 = type_stats(["Dm-DRA2"])
+    r1 = dict(exact_types=46, exact_cells=44658, exact_out=22276748, exact_in=15664813, fuzzy_types=7, fuzzy_cells=2214, fuzzy_out=1697167,
+              class_types=31, class_cells=27251, class_out=6882604, unm_types=544, unm_cells=30566, unm_out=21066750,
+              both_named=15732833, both_ef=9731080, pre_named=30856518, pairs=88, types=84, rows=224)
+    e, f_, k, u = (cov_ol.loc[t] for t in ("exact", "fuzzy", "class", "unmatched"))
+    pre_named = both.loc[named].to_numpy().sum()
+    out.append("## 7. Round-2 corrections (verify:tables:ozel2021, `docs/audits/receptor_verification.md`) and their effect on the counts\n")
+    out.append("Applied in `scripts/build_ozel2021_tables.py` and rebuilt; round-1 numbers are those of the committed round-1 document (commit c0332e3).\n")
+    out.append("| item | round 1 | round 2 |\n|---|---|---|")
+    out.append(f"| cluster 163 Pm1 | tier exact -> MaleCNS Pm1 only | tier class over Pm1, Pm5, Pm6 (Nern 2025 Sup_Table_7: Schlegel Pm1 = Matsliah Pm01 + Pm02 + Pm06) |")
+    out.append(f"| cluster 55 Tm29 | tier exact (name only) | tier fuzzy, `flag = name_collision` (FCA Tm29 cholinergic; MaleCNS Tm29 = FlyWire Tm5d / CB3851, glutamate; Sup_Table_7 FW_transmitter_pred acetylcholine); {tm29[0]:,} cells / {tm29[1]:,} out-syn move exact -> fuzzy |")
+    out.append(f"| cluster 136 Dm11 | tier exact, no note | tier exact, `flag = minor_split` (Schlegel Dm11 = MaleCNS Dm11 + Dm-DRA2: {dra2[0]} cells / {dra2[1]:,} out-syn, unmatched) |")
+    out.append("| mAChR-C | 'not in the BDGP6.88 gene set the authors used' | 'not among the 12,028 genes retained in the authors' per-cluster tables' (BDGP6.88 does contain CG7918) |")
+    out.append(f"| expression_ozel2021_mm.csv | '199 clusters x 54 genes', header gloss '~fraction of cells ON' | {len(mm_clusters)} of {len(adult_clusters)} rows carry data (cluster {mm_absent} LQ absent from Adult_MM_final); value = the model's P(ON), gloss removed |")
+    out.append("| Pm nomenclature bridge | cited the `hemibrainType` column (empty for Pm1-4) | cites Nern 2025 Sup_Table_7 (Pm1 = Pm1/Pm01, Pm5 = Pm1/Pm02, Pm6 = Pm1/Pm06, Pm2a = Pm2/Pm03, Pm2b = Pm2/Pm08, Pm3 = CB3856/Pm09, Pm4 = Pm4/Pm05), verified from the file by the builder |")
+    out.append(f"| type-map rows / pairs / types | {r1['rows']} / {r1['pairs']} / {r1['types']} | {len(tmap)} / {len(tmap[tmap.tier != 'unmatched'])} / {tmap[tmap.tier != 'unmatched'].malecns_type.nunique()} |")
+    out.append(f"| tier counts (clusters / types) | exact 46 / 46, fuzzy 6 / 7, class 11 / 31 | exact {n_tiers.loc['exact', 'clusters']} / {n_tiers.loc['exact', 'malecns_types']}, fuzzy {n_tiers.loc['fuzzy', 'clusters']} / {n_tiers.loc['fuzzy', 'malecns_types']}, class {n_tiers.loc['class', 'clusters']} / {n_tiers.loc['class', 'malecns_types']} |")
+    out.append(f"| optic-lobe exact tier (types / cells / out-syn / in-syn) | {r1['exact_types']} / {r1['exact_cells']:,} / {r1['exact_out']:,} / {r1['exact_in']:,} | {int(e.types)} / {int(e.cells):,} / {int(e.out_syn):,} / {int(e.in_syn):,} ({e.cells_frac:.1%} of OL cells, {e.out_syn_frac:.1%} of OL out-syn) |")
+    out.append(f"| optic-lobe fuzzy tier | 7 / {r1['fuzzy_cells']:,} / {r1['fuzzy_out']:,} | {int(f_.types)} / {int(f_.cells):,} / {int(f_.out_syn):,} ({f_.out_syn_frac:.1%}) |")
+    out.append(f"| optic-lobe class tier | {r1['class_types']} / {r1['class_cells']:,} / {r1['class_out']:,} | {int(k.types)} / {int(k.cells):,} / {int(k.out_syn):,} ({k.out_syn_frac:.1%}) |")
+    out.append(f"| optic-lobe unmatched | {r1['unm_types']} / {r1['unm_cells']:,} / {r1['unm_out']:,} | {int(u.types)} / {int(u.cells):,} / {int(u.out_syn):,} ({u.out_syn_frac:.1%}) |")
+    out.append(f"| both ends matched (any tier) / exact-or-fuzzy both ends / pre matched | {r1['both_named']:,} ({r1['both_named'] / tot_ol_syn:.1%}) / {r1['both_ef']:,} ({r1['both_ef'] / tot_ol_syn:.1%}) / {r1['pre_named']:,} ({r1['pre_named'] / tot_ol_syn:.1%}) | {both_named:,.0f} ({both_named / tot_ol_syn:.1%}) / {both_ef:,.0f} ({both_ef / tot_ol_syn:.1%}) / {pre_named:,.0f} ({pre_named / tot_ol_syn:.1%}) |")
+    out.append(f"| transmitter cross-check | 74 of 88 pairs agree | {int(xc.agree.sum())} of {len(xc)} pairs agree |")
+    out.append(f"\n* The Pm move: Pm5 + Pm6 = {pm56[0]:,} cells / {pm56[1]:,} out-syn / {pm56[2]:,} in-syn go unmatched -> class; Pm1 = {pm1[0]:,} cells / "
+               f"{pm1[1]:,} out-syn / {pm1[2]:,} in-syn go exact -> class (skeptic's expectation: 232 / 225,268 and 246 / 169,388). "
+               f"The Tm29 demotion moves {tm29[0]:,} cells / {tm29[1]:,} out-syn from exact to fuzzy. Cluster 163's profile is now shared by three GABAergic "
+               f"types; no expression value changed.\n"
+               "* Consumers: `scripts/build_receptor_table.py` reads `tier` and selects named columns, so the new `flag` column is ignored there; "
+               "the Tm29 row now sits below any exact-tier profile of another source and Pm1/Pm5/Pm6 receive a class profile. "
+               "`receptors_by_type.csv` was NOT rebuilt by this task (it belongs to the receptor-table task).\n")
     AUDIT.write_text("\n".join(out), encoding="utf-8")
     print(f"wrote {AUDIT}")
     print(cov_ol)
     print(both)
+    print(f"Pm5+Pm6 unmatched->class: {pm56}; Pm1 exact->class: {pm1}; Tm29 exact->fuzzy: {tm29}; Dm-DRA2 {dra2}")
+    print(n_tiers)
     print(xc[["source_name", "malecns_type", "tier", "malecns_nt", "transcript_call", "agree"]].to_string())
 
 
