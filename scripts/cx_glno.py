@@ -21,6 +21,13 @@ Cluster (one batch, one job per config; each job asserts CUDA):
     --fetch out/cx_glno_base.json out/cx_glno_base.txt ...
 Report (CPU, local): python scripts/cx_glno.py --report   -> the config x seed table (out/cx_glno_table.md) and the
 count of receptor-model entries changed on EPG / PEN / Delta7 (connectome.receptor_signs restricted to those cells).
+
+Round 3 (docs/audits/cx_glno.md section 4): the GLNO=gaba gain scan, config `gaba`, gE {1.75, 2, 2.25, 2.5} x
+gD {8, 15, 25, 40} (Delta7 -> EPG only), 3 seeds, one job per gE (12 runs each), plus `glu` at gE 2 / 2.25 on the
+same gD grid and `base` at gE 2 / gD 15 from the shared cache (--no-scratch; it carries TYPE_NT_OVERRIDE since round 2):
+  python scripts/cluster_run.py --name r3-glno-gaba --minutes 20 \
+    "python -c 'import torch; assert torch.cuda.is_available()' && python scripts/cx_glno.py --run gaba --gains 1.75:8,1.75:15,1.75:25,1.75:40 --out out/cx_glno_gaba_gE1.75.json > out/cx_glno_gaba_gE1.75.txt; cat out/cx_glno_gaba_gE1.75.txt" ... --fetch out/
+  python scripts/cx_glno.py --report --files "out/cx_glno_gaba_*.json" "out/cx_glno_glu_gE*.json" out/cx_glno_base_r3.json --table cx_glno_gaba_table
 """
 from __future__ import annotations
 
@@ -47,8 +54,14 @@ CONFIGS = {
     "ach": dict(nt_override={"GLNO": "acetylcholine"}, receptor_model=None, receptor_net_rule="class"),
     "sign-class": dict(nt_override={}, receptor_model="sign", receptor_net_rule="class"),
     "sign-abs": dict(nt_override={}, receptor_model="sign", receptor_net_rule="abs"),
+    # round 3 (docs/audits/cx_glno.md section 4): the GLNO=gaba gain scan -- both EM predictions (MaleCNS T-bars, FlyWire
+    # top_nt) favour an inhibitory GLNO; gE x gD grid, Delta7 -> EPG only, 3 seeds, 5 s
+    "gaba": dict(nt_override={"GLNO": "gaba"}, receptor_model=None, receptor_net_rule="class"),
 }
 GAINS = [(2.0, 15.0), (1.75, 15.0)]
+# round-3 grid: gE in {1.75, 2, 2.25, 2.5} x gD in {8, 15, 25, 40} for gaba; gE 2 / 2.25 for glu; base gE 2 / gD 15 anchor
+GRID_GE = [1.75, 2.0, 2.25, 2.5]
+GRID_GD = [8.0, 15.0, 25.0, 40.0]
 SEEDS = [0, 1, 2]
 THRESH_HZ = 22.0
 
@@ -129,13 +142,16 @@ def ring_table_rows(log=print) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------------------------- run (GPU)
-def run(config: str, seeds, gains, out_path: Path, cuda_graphs=True):
+def run(config: str, seeds, gains, out_path: Path, cuda_graphs=True, scratch=True):
+    """scratch=False: a config without an override reads the default (shared) cache, which since round 2 carries
+    TYPE_NT_OVERRIDE (sum|W| 121,460,584); configs with an override always compile into out/cache_<hash>/."""
     import torch
     assert torch.cuda.is_available(), "CUDA is not available on this node (resubmit the job)"
     print(f"device {torch.cuda.get_device_name(0)}; torch {torch.__version__}")
     cfg = CONFIGS[config]
     t0 = time.time()
-    c, cache_dir, table = cx_wedge.load_connectome(cfg["nt_override"], scratch=True, verbose=False)
+    c, cache_dir, table = cx_wedge.load_connectome(cfg["nt_override"], scratch=scratch, verbose=False)
+    print(f"sum|W| {float(abs(c.W).sum()):.0f}")
     print(f"connectome: {c.n} cells, nnz {c.W.nnz}; scratch cache {cache_dir}; TYPE_NT_OVERRIDE {table}; {time.time() - t0:.0f} s")
     st = glno_structure(c)
     extra = {}
@@ -192,10 +208,17 @@ def metrics(r: dict) -> dict:
                 rest=round(r[f"{t5}_rest"], 3), wall_s=r["wall_s"])
 
 
-def report(out_dir: Path, configs=None):
+def report(out_dir: Path, configs=None, files=None, table="cx_glno_table"):
+    """files: explicit JSON paths / globs (round 3: out/cx_glno_gaba_*.json ...); otherwise out/cx_glno_<config>.json.
+    The summary groups by (gE, gD, config); the tables go to out/<table>.md / .csv."""
     rows = []
-    for cfg in configs or CONFIGS:
-        p = out_dir / f"cx_glno_{cfg}.json"
+    paths = []
+    if files:
+        for pat in files:
+            paths += sorted(Path().glob(pat)) if any(ch in pat for ch in "*?[") else [Path(pat)]
+    else:
+        paths = [out_dir / f"cx_glno_{cfg}.json" for cfg in (configs or CONFIGS)]
+    for p in paths:
         if not p.exists():
             print(f"missing {p}"); continue
         for r in json.load(open(p)):
@@ -203,8 +226,8 @@ def report(out_dir: Path, configs=None):
     df = pd.DataFrame(rows)
     if df.empty:
         print("no rows"); return None
-    df = df.sort_values(["gE", "config", "seed"], key=lambda s: s.map(list(CONFIGS).index) if s.name == "config" else s,
-                        ascending=[False, True, True]).reset_index(drop=True)
+    df = df.sort_values(["config", "gE", "gD", "seed"], key=lambda s: s.map(list(CONFIGS).index) if s.name == "config" else s,
+                        ascending=[True, True, True, True]).reset_index(drop=True)
     pd.set_option("display.width", 300); pd.set_option("display.max_columns", 40)
     print(df.to_string(index=False))
     # markdown table
@@ -218,20 +241,28 @@ def report(out_dir: Path, configs=None):
         lines.append("| " + " | ".join(str(r[c]) for c in cols) + " |")
     md = "\n".join(lines)
     # per-config summary (mean over seeds, per gain)
-    summ = df.groupby(["gE", "config"], sort=False).agg(n=("seed", "size"), persist=("persist", lambda s: int((s == "yes").sum())),
-                                                        bump_hz=("bump_hz", "mean"), out_hz=("out_hz", "mean"), vs=("vs", "mean"),
-                                                        pen=("pen", "mean"), delta7=("delta7", "mean"), glno=("glno", "mean"),
-                                                        glno_during=("glno_during", "mean"),
-                                                        captured=("capture", lambda s: f"{int((s == 'captured').sum())}/{int(s.isin(['captured', 'not captured']).sum())}")).reset_index()
+    def rng(s):
+        return f"{s.min():.0f}-{s.max():.0f}" if s.max() - s.min() >= 1 else f"{s.mean():.0f}"
+
+    summ = df.groupby(["config", "gE", "gD"], sort=False).agg(
+        n=("seed", "size"), persist=("persist", lambda s: int((s == "yes").sum())),
+        bump_hz=("bump_hz", "mean"), bump_range=("bump_hz", rng), out_hz=("out_hz", "mean"), out_range=("out_hz", rng),
+        in_above=("in_above", lambda s: "/".join(x.split("/")[0] for x in s)), out_above=("out_above", lambda s: "/".join(x.split("/")[0] for x in s)),
+        vs=("vs", "mean"), vs_min=("vs", "min"), pen=("pen", "mean"), delta7=("delta7", "mean"), glno=("glno", "mean"),
+        glno_during=("glno_during", "mean"),
+        captured=("capture", lambda s: f"{int((s == 'captured').sum())}/{int(s.isin(['captured', 'not captured']).sum())}")).reset_index()
     print("\nsummary (mean over seeds):")
     print(summ.to_string(index=False))
-    s_lines = ["| gE | gD 15, config | runs | persist (n) | bump Hz at 5 s | out Hz | vs | PEN | Delta7 | GLNO (5 s) | GLNO (pulse) | captured / with prior bump elsewhere |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    s_lines = ["| config | gE | gD | runs | persist (n) | bump Hz at 5 s (mean; range) | out Hz (mean; range) | in >22 Hz (/11, per seed) | out >22 Hz (/35, per seed) | vs (mean; min) | PEN | Delta7 | GLNO (5 s) | GLNO (pulse) | captured / with prior bump elsewhere |",
+               "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for _, r in summ.iterrows():
-        s_lines.append(f"| {r.gE} | {r.config} | {r.n} | {r.persist} | {r.bump_hz:.0f} | {r.out_hz:.1f} | {r.vs:.2f} | {r.pen:.1f} | {r.delta7:.1f} | {r.glno:.1f} | {r.glno_during:.1f} | {r.captured} |")
+        s_lines.append(f"| {r.config} | {r.gE} | {r.gD:.0f} | {r.n} | {r.persist} | {r.bump_hz:.0f}; {r.bump_range} | {r.out_hz:.1f}; {r.out_range} | {r.in_above} | {r.out_above} | "
+                       f"{r.vs:.2f}; {r.vs_min:.2f} | {r.pen:.1f} | {r.delta7:.1f} | {r.glno:.1f} | {r.glno_during:.1f} | {r.captured} |")
     md_all = "## Per run\n\n" + md + "\n\n## Summary\n\n" + "\n".join(s_lines) + "\n"
-    (out_dir / "cx_glno_table.md").write_text(md_all, encoding="utf-8")
-    df.to_csv(out_dir / "cx_glno_table.csv", index=False)
-    print(f"\n-> {out_dir / 'cx_glno_table.md'}, {out_dir / 'cx_glno_table.csv'}")
+    (out_dir / f"{table}.md").write_text(md_all, encoding="utf-8")
+    df.to_csv(out_dir / f"{table}.csv", index=False)
+    summ.to_csv(out_dir / f"{table}_summary.csv", index=False)
+    print(f"\n-> {out_dir / (table + '.md')}, {out_dir / (table + '.csv')}, {out_dir / (table + '_summary.csv')}")
     return df
 
 
@@ -246,11 +277,16 @@ def main():
     ap.add_argument("--check-receptor", action="store_true",
                     help="count receptor-model entries changed on EPG / PEN / Delta7 in the local cache, all three net rules (CPU)")
     ap.add_argument("--configs", default=None, help="comma-separated subset for --report")
+    ap.add_argument("--files", nargs="*", default=None, help="--report: explicit JSON paths / globs instead of out/cx_glno_<config>.json")
+    ap.add_argument("--table", default="cx_glno_table", help="--report: output basename under out/")
+    ap.add_argument("--no-scratch", action="store_true",
+                    help="--run: a config without an override reads the default (shared) cache instead of compiling into out/cache_<hash>/")
     a = ap.parse_args()
     if a.run:
         seeds = [int(s) for s in a.seeds.split(",")]
         gains = [tuple(float(x) for x in g.split(":")) for g in a.gains.split(",")]
-        run(a.run, seeds, gains, Path(a.out) if a.out else OUT / f"cx_glno_{a.run}.json", cuda_graphs=not a.no_graphs)
+        run(a.run, seeds, gains, Path(a.out) if a.out else OUT / f"cx_glno_{a.run}.json", cuda_graphs=not a.no_graphs,
+            scratch=not a.no_scratch)
     if a.check_receptor:
         c = connectome.load(verbose=False)
         print(f"local cache: {c.n} cells, nnz {c.W.nnz}")
@@ -261,7 +297,7 @@ def main():
             json.dump(res, f, indent=1)
         print(f"-> {OUT / 'cx_glno_receptor_check.json'}")
     if a.report:
-        report(OUT, a.configs.split(",") if a.configs else None)
+        report(OUT, a.configs.split(",") if a.configs else None, files=a.files, table=a.table)
 
 
 if __name__ == "__main__":

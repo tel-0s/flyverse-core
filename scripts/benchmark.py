@@ -137,6 +137,12 @@ class Context:
         self.c = connectome.load(verbose=False) if self.cache_dir is None else connectome.load(cache_dir=self.cache_dir, verbose=False)
         connectome.load = lambda *a, **k: self.c        # every FlyBrain / demo Sim built here shares this one graph
         self.receptor_table, self.dopamine_lead_info = None, None
+        if getattr(args, "receptor_table", None):                 # --receptor-table PATH -> LIFParams.receptor_table
+            if args.dopamine_lead not in (None, "all"):
+                raise SystemExit("--receptor-table and --dopamine-lead both replace the receptor table; pass one of them")
+            if not os.path.isfile(args.receptor_table):
+                raise SystemExit(f"--receptor-table {args.receptor_table}: no such file")
+            self.receptor_table = args.receptor_table
         if args.dopamine_lead not in (None, "all") and self.receptor_model is not None:
             self.receptor_table, self.dopamine_lead_info = self._build_dopamine_lead_table(args.dopamine_lead)
         self.checks = []
@@ -148,11 +154,11 @@ class Context:
     def has_overrides(self):
         a = self.args
         return any(v is not None for v in [a.std_u, a.std_tau, a.adapt_jump, a.same_type_gain, a.norm_alpha, a.norm_ref,
-                                           a.w_syn, a.conn_cap, a.dn_vnc_gain, a.vp_dn_gain, a.gain_out, a.t4_gain]) or self.receptor_model is not None
+                                           a.w_syn, a.conn_cap, a.dn_vnc_gain, a.vp_dn_gain, a.gain_out, a.t4_gain]) or self.args.receptor_model != "default"
 
     @property
     def receptor_model(self):
-        """LIFParams.receptor_model from --receptor-model ('off' -> None)."""
+        """--receptor-model: 'off' -> None (the presynaptic-sign rule), 'default' -> LIFParams' own default, else the model name."""
         m = self.args.receptor_model
         return None if m in (None, "off") else m
 
@@ -172,7 +178,10 @@ class Context:
         """The receptor-model flags (model, net rule, class fallback, the slow term's mode / class scales / taus and the
         --dopamine-lead table) on a LIFParams; a no-op with --receptor-model off."""
         a = self.args
-        if self.receptor_model is None:
+        if self.receptor_model is None:                      # --receptor-model off: the presynaptic-sign rule, explicitly
+            p.receptor_model = None
+            return p
+        if self.receptor_model == "default":               # leave LIFParams' own defaults in force
             return p
         p.receptor_model = self.receptor_model                # the receptor model (docs/NT_INTEGRATION.md) reaches every section
         p.receptor_net_rule = a.receptor_net_rule
@@ -357,8 +366,9 @@ def sec_walk(ctx):
     w, info = world.make_room()
     w.spheres.append(world.Sphere((9, 9, 9), (0.03,) * 3, "black")); loom_idx = len(w.spheres) - 1
     dirs_b, wts = r.ray_directions(); wts_t = torch.from_numpy(wts).float().to(w.device)
-    ol = optic.OpticLobe(c, r, ctx.optic_params()); ol.relax()
-    b = brain.Brain(c, ctx.lif()); b.freeze(ol.rate_idx)
+    lif = ctx.lif(); rs = brain._receptor(c, lif)                                     # the receptor lookup reaches the rate lobe too
+    ol = optic.OpticLobe(c, r, ctx.optic_params(), receptor=rs, receptor_gain=brain._receptor_gain(lif)); ol.relax()
+    b = brain.Brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
     fly = body.FlyState(x=-0.3, y=0.0, z=info["table_top_z"], heading=0.0)
 
     def col_rad():
@@ -434,8 +444,9 @@ def sec_motion(ctx):
     from probe_motion import DIRS, grating
     c = ctx.c; types = c.neurons.type.fillna("").to_numpy()
     r = retina.build_retina(c)
-    ol = optic.OpticLobe(c, r, ctx.optic_params()); ol.relax(); rt = types[ol.rate_idx]
-    b = brain.Brain(c, ctx.lif()); b.freeze(ol.rate_idx)
+    lif = ctx.lif(); rs = brain._receptor(c, lif)
+    ol = optic.OpticLobe(c, r, ctx.optic_params(), receptor=rs, receptor_gain=brain._receptor_gain(lif)); ol.relax(); rt = types[ol.rate_idx]
+    b = brain.Brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
     if b.p.prune_frozen:
         b.prune(ol.rate_idx)
     subtypes = optic.T4T5
@@ -761,9 +772,11 @@ def main():
     ap.add_argument("--vp-dn-gain", type=float, default=None, help="gain on visual projection -> descending synapses (default 2)")
     ap.add_argument("--gain-out", type=float, default=None, help="optic lobe -> spiking drive gain (mV)")
     ap.add_argument("--t4-gain", type=float, default=None, help="T4/T5 output gain (default 2)")
-    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+    ap.add_argument("--receptor-model", default="default", choices=["off", "sign", "sign+gain", "full", "default"],
                     help="LIFParams.receptor_model for every section (default off = the presynaptic NT_SIGN rule); 'full' needs --eager")
     ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
+    ap.add_argument("--receptor-table", default=None, metavar="PATH",
+                    help="LIFParams.receptor_table: a receptors_by_type.csv other than flyverse/data/receptors_by_type.csv (e.g. out/receptors_r2.csv)")
     ap.add_argument("--receptor-nt-class-fallback", action="store_true",
                     help="LIFParams.receptor_nt_class_fallback: unprofiled targets take the Davis 2020 ChAT / Gad1 / VGlut class baseline (tier nt_class)")
     ap.add_argument("--cache-dir", default=None,
@@ -783,16 +796,16 @@ def main():
     t_all = time.time()
     ctx = Context(args)
     lif, op = ctx.lif(), ctx.optic_params()
-    if ctx.receptor_model is not None:      # the coverage the model runs under (connectome.receptor_signs' tier summary)
-        rs = brain._receptor(ctx.c, lif, with_counts=ctx.receptor_model == "full")   # counts for the slow-term summary below
+    if lif.receptor_model is not None:      # the coverage the model runs under (connectome.receptor_signs' tier summary) -- from the LIFParams in force, not the flag
+        rs = brain._receptor(ctx.c, lif, with_counts=lif.receptor_model == "full")   # counts for the slow-term summary below
         cov = rs.coverage(ctx.c.W)
-        print(f"receptor model {ctx.receptor_model} ({args.receptor_net_rule}); fast sign changed on "
+        print(f"receptor model {lif.receptor_model} ({lif.receptor_net_rule}; flag --receptor-model {args.receptor_model}); fast sign changed on "
               f"{int((rs.fast_sign != np.sign(ctx.c.W.data)).sum()):,} of {ctx.c.W.nnz:,} entries; coverage by tier:")
         print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
-        receptor_cfg = {"model": ctx.receptor_model, "net_rule": args.receptor_net_rule, "nt_class_fallback": bool(args.receptor_nt_class_fallback),
+        receptor_cfg = {"model": lif.receptor_model, "net_rule": lif.receptor_net_rule, "flag": args.receptor_model, "nt_class_fallback": bool(lif.receptor_nt_class_fallback),
                         "coverage": cov.to_dict("records"), "fast_sign_changed_entries": int((rs.fast_sign != np.sign(ctx.c.W.data)).sum()),
                         "table": rs.table_path, "dopamine_lead": ctx.dopamine_lead_info, "gain_classes": brain._receptor_gain(lif)}
-        if ctx.receptor_model == "full":                                    # the slow term in force: spec and per-class entry counts
+        if lif.receptor_model == "full":                                    # the slow term in force: spec and per-class entry counts
             spec = brain._slow_spec(lif)
             slow_cfg = {"mode": lif.slow_mode, "gain_by_class": brain._slow_gains(lif), "tau_by_class": brain._slow_taus(lif),
                         "active": spec is not None, "entries_by_class": {}}
@@ -805,7 +818,8 @@ def main():
                   f"active {spec is not None}; entries {slow_cfg['entries_by_class']}")
         del rs
     else:
-        receptor_cfg = {"model": None}
+        print(f"receptor model None (the presynaptic-sign rule; flag --receptor-model {args.receptor_model}); fast sign changed on 0 entries")
+        receptor_cfg = {"model": None, "flag": args.receptor_model}
     config = {"lif": {k: getattr(lif, k) for k in ["std_u", "std_tau", "adapt_jump", "same_type_gain", "input_norm_alpha", "input_norm_ref", "w_syn", "conn_cap"]},
               "receptor": receptor_cfg,
               "path_gain": brain.DEFAULT_PATH_GAIN if lif.path_gain is None else lif.path_gain,

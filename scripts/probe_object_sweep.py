@@ -18,13 +18,31 @@ from brain.spike_counts); for the optic-lobe rate units (T2, T3, Tm5Y, TmY21, Tm
 medulla reference) the deviation from the operating point (rate units, optic.rates() - r0).
 
 Pass criterion (docs/audits/object_sweep.md): LC11 or LC10a peak per-cell drive > 7 mV or rate > 1 Hz with the ball
-and not without.
+and not without.  That criterion is a coin flip at the noise floor (round-2 verification); the quantitative statistic
+is `diff_max_over_cells_mean_mv` -- the max over cells of the per-cell (ball - none) time-mean drive -- read against
+the none-vs-none null that `--null` measures.
 
-    python scripts/probe_object_sweep.py --receptor-model {off,sign} --receptor-net-rule {class,abs,nonmda}
-                                         [--seed 0] [--seconds 12] [--rectify-t2t3] [--cache-dir DIR] [--out out/obj.json]
+    python scripts/probe_object_sweep.py --receptor-model {default,off,sign} --receptor-net-rule {class,abs,nonmda}
+                                         [--seed 0] [--seconds 12] [--rectify-t2t3] [--null]
+                                         [--ball-radius 0.005] [--ahead 0.05] [--half-sweep 0.06]
+                                         [--cache-dir DIR] [--out out/obj.json]
 
 --rectify-t2t3 sets the T2 / T3 baseline to 0 in optic.DEFAULT_BASELINE_BY_TYPE before the model is built (ReLU units
 like T4 / T5): the critic's ON/OFF-cancellation hypothesis (NOTES session 9, 'Critic's follow-ups').
+
+--null runs the NO-BALL condition twice (same seed, same code path) and reports the same statistics for the
+none-vs-none pair: the difference statistics are then pure run-to-run scatter of the native backend, i.e. the null
+distribution against which a (ball - none) difference has to be read (round 3).
+
+--ball-radius / --ahead / --half-sweep move the object's geometry (m): the angular-size ladder of the round-2 skeptic
+is 11.4 deg static `--ball-radius 0.005 --ahead 0.05 --half-sweep 1e-9`, 22.6 deg `--ball-radius 0.010`, 28.1 deg
+`--ahead 0.02 --half-sweep 0.024`, 43.6 deg `--ball-radius 0.020` (angular diameter 2*atan(r / ahead)).
+
+NOTE on --receptor-model: since round 3 `brain.LIFParams.receptor_model` DEFAULTS to 'sign' with net rule 'abs'.
+`default` (the flag's default) leaves LIFParams alone and therefore runs that shipped model; `off` is APPLIED
+explicitly (receptor_model = None), it is not "leave the class alone". Every run prints and records the
+(receptor_model, receptor_net_rule) it actually used -- `config.receptor_model` / `config.receptor_net_rule` in the
+JSON, with the flag itself in `config.receptor_model_flag`.
 """
 from __future__ import annotations
 
@@ -53,9 +71,9 @@ SPIKING = ["LC11", "LC10a", "LC10b", "LC16", "LPLC2", "LC4"]
 RATE = ["T2", "T3", "Tm5Y", "TmY21", "TmY13", "TmY5a", "Mi4", "Tm3", "Mi1"]
 POS = (-0.20, 0.10, 0.75)          # on the table top, 45 cm from the (removed) apple's spot
 HEADING = -np.pi / 2               # facing -y: plain wall behind the table edge
-BALL_R = 0.005                     # 1 cm diameter
-AHEAD = 0.05                       # m ahead of the eye
-HALF_SWEEP = 0.06                  # +-6 cm = 12 cm lateral sweep
+BALL_R = 0.005                     # 1 cm diameter          (--ball-radius; module globals, set from the flags in main)
+AHEAD = 0.05                       # m ahead of the eye     (--ahead)
+HALF_SWEEP = 0.06                  # +-6 cm = 12 cm lateral sweep  (--half-sweep; 1e-9 = a static ball)
 SWEEP_S = 3.0                      # s per one-way sweep
 FRAME_S = rd.FRAME_MS / 1000.0
 PASS_DRIVE_MV = 7.0
@@ -64,15 +82,26 @@ PASS_RATE_HZ = 1.0
 
 def patch_receptor(model, net_rule):
     """Make every brain.LIFParams built from here on (room_demo.Sim's included) carry the receptor model
-    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'off' leaves the class untouched."""
-    if model in (None, "off"):
+    (LIFParams.receptor_model; docs/NT_INTEGRATION.md), INCLUDING 'off'.
+
+    'default' is the only value that leaves the class alone (and so runs whatever LIFParams ships with).
+    'off' has to be APPLIED, not skipped: since round 3 the class default is receptor_model 'sign' / net rule 'abs',
+    so leaving the class alone would run the default model under the label 'off'."""
+    if model == "default":
         return
     L = brain.LIFParams
+    rm = None if model in (None, "off") else model
 
     def make(**kw):
-        p = L(**kw); p.receptor_model = model; p.receptor_net_rule = net_rule
+        p = L(**kw); p.receptor_model = rm; p.receptor_net_rule = net_rule
         return p
     brain.LIFParams = make
+
+
+def resolved_receptor():
+    """(receptor_model, receptor_net_rule) that every LIFParams built from here on actually carries, after patching."""
+    p = brain.LIFParams()
+    return p.receptor_model, p.receptor_net_rule
 
 
 def patch_cache(cache_dir):
@@ -204,15 +233,20 @@ def tuning(frames, bins):
 
 
 def smooth_peak(frames, w=10):
-    """Peak over cells and time of the per-cell drive smoothed with a `w`-frame boxcar (100 ms at w = 10)."""
+    """Peak over cells and time of the per-cell drive smoothed with a `w`-frame boxcar (100 ms at w = 10).
+
+    The cumulative sum carries a leading zero row, so window i is frames[i:i+w] (i = 0 ... n-w): without it the first
+    window was frames[1:w+1] and frame 0 was never scored (the round-2 off-by-one)."""
     if frames.shape[0] < w:
         return float(frames.max())
-    cs = np.cumsum(frames, axis=0, dtype=np.float64); sm = (cs[w:] - cs[:-w]) / w
+    cs = np.concatenate([np.zeros((1, frames.shape[1])), np.cumsum(frames, axis=0, dtype=np.float64)])
+    sm = (cs[w:] - cs[:-w]) / w
     return float(sm.max())
 
 
 def summarize(res, other=None):
-    """Per type numbers for one condition; `other` (the no-ball run) gives the per-frame difference statistics."""
+    """Per type numbers for one condition; `other` (the no-ball run, or the second no-ball run under --null) gives the
+    difference statistics: every `diff_*` field is condition A minus condition B."""
     out = {}
     for t, r in res["drive"].items():
         m = r.mean(); hz = res["rates_hz"][t]; frames = res["drive_frames"][t]
@@ -235,7 +269,12 @@ def summarize(res, other=None):
             fo = other["drive_frames"][t]; n = min(len(frames), len(fo)); diff = frames[:n] - fo[:n]
             md = m - other["drive"][t].mean()
             tun_o, _ = tuning(fo[:n], bins[:n]); tun_ro, _ = tuning(other["spk_frames"][t][:n], bins[:n]); tun_ro = tun_ro / FRAME_S
-            d.update({"diff_best_cell_mean_mv": float(md.max()), "diff_peak_mv": float(diff.max()), "diff_peak_cells_over_7mv": int((diff.max(0) > PASS_DRIVE_MV).sum()),
+            # diff_max_over_cells_mean_mv: max OVER CELLS of the per-cell (ball - none) time-mean drive (round-2 name
+            # diff_best_cell_mean_mv, which read as "the difference at the best-driven cell" and is not that).
+            # diff_peak_mv / diff_peak_cells_over_7mv are gone: a frame-by-frame subtraction of two independent
+            # stochastic runs is noise (round-2 verification).  diff_peak_100ms_mv has the same defect and is kept
+            # only because --null measures its null; do not read it as a signal.
+            d.update({"diff_max_over_cells_mean_mv": float(md.max()), "diff_mean_over_cells_mean_mv": float(md.mean()),
                       "diff_peak_100ms_mv": smooth_peak(diff),
                       "diff_tuning_peak_mv": float((tun - tun_o).max()),                  # best (cell, ball-position bin) of the sweep-locked difference
                       "diff_tuning_rate_peak_hz": float((tun_rate - tun_ro).max()),
@@ -256,28 +295,42 @@ def summarize(res, other=None):
 
 
 def main():
+    global BALL_R, AHEAD, HALF_SWEEP                 # the geometry flags below rebind them (ball_offset / run read them)
     ap = argparse.ArgumentParser()
-    ap.add_argument("--receptor-model", default="off", choices=["off", "sign"], help="LIFParams.receptor_model (off = the presynaptic NT_SIGN rule)")
-    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
+    ap.add_argument("--receptor-model", default="default", choices=["default", "off", "sign"],
+                    help="default = whatever LIFParams ships with (round 3: sign / abs); off = the presynaptic NT_SIGN rule "
+                         "(receptor_model None, applied explicitly); sign = the receptor table's fast signs")
+    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"],
+                    help="only with --receptor-model sign; this flag's default stays 'class' (round-2 commands), "
+                         "the LIFParams default is 'abs' -- give it explicitly")
     ap.add_argument("--seed", type=int, default=0, help="room_demo.Sim seed (Brain RNG; the empty-table scene does not depend on it)")
     ap.add_argument("--seconds", type=float, default=12.0, help="scored sweep window (4 one-way sweeps at the default)")
     ap.add_argument("--settle", type=float, default=3.0, help="settling time before the window, ball hidden")
     ap.add_argument("--rectify-t2t3", action="store_true", help="T2 / T3 baseline 0 (ReLU units) via optic.DEFAULT_BASELINE_BY_TYPE")
+    ap.add_argument("--null", action="store_true", help="none vs none: run the no-ball condition twice and report the same statistics (the null distribution of every diff_* field)")
+    ap.add_argument("--ball-radius", type=float, default=BALL_R, help="ball radius (m; 0.005 = 1 cm diameter = 11.4 deg at 5 cm)")
+    ap.add_argument("--ahead", type=float, default=AHEAD, help="distance of the ball ahead of the eye (m)")
+    ap.add_argument("--half-sweep", type=float, default=HALF_SWEEP, help="half the lateral sweep (m; 1e-9 = a static ball at azimuth 0)")
     ap.add_argument("--cache-dir", default=os.environ.get("FLYVERSE_CACHE") or None, help="connectome cache directory (default cache/ or $FLYVERSE_CACHE)")
     ap.add_argument("--out", default="out/object_sweep.json")
     args = ap.parse_args()
     assert torch.cuda.is_available(), "CUDA is not available (node race; resubmit)"
+    BALL_R, AHEAD, HALF_SWEEP = args.ball_radius, args.ahead, args.half_sweep
     patch_receptor(args.receptor_model, args.receptor_net_rule)
     patch_cache(args.cache_dir)
     if args.rectify_t2t3:
         optic.DEFAULT_BASELINE_BY_TYPE.update({"T2": 0.0, "T3": 0.0})
-    mode = "off" if args.receptor_model == "off" else f"sign-{args.receptor_net_rule}"
-    print(f"object sweep: mode {mode}{' rectified T2/T3' if args.rectify_t2t3 else ''}; seed {args.seed}; window {args.seconds} s after {args.settle} s settle; "
+    rm, rule = resolved_receptor()                   # what the runs will really use (LIFParams after patching)
+    mode = "off" if rm is None else f"{rm}-{rule}"
+    print(f"object sweep{' NULL (none vs none)' if args.null else ''}: mode {mode} (--receptor-model {args.receptor_model})"
+          f"{' rectified T2/T3' if args.rectify_t2t3 else ''}; seed {args.seed}; "
+          f"window {args.seconds} s after {args.settle} s settle; ball r {BALL_R} m at {AHEAD} m (angular diameter "
+          f"{2 * np.degrees(np.arctan(BALL_R / AHEAD)):.1f} deg), half sweep {HALF_SWEEP} m; "
           f"cache {args.cache_dir or connectome.CACHE_DIR}; torch {torch.__version__} on {torch.cuda.get_device_name(0)}", flush=True)
-    sim_b, with_ball = run(True, args, args.seed)
+    sim_b, with_ball = run(not args.null, args, args.seed)
     if sim_b.fb.receptor is not None:
         cov = sim_b.fb.receptor.coverage(sim_b.c.W)
-        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}); fast sign changed on "
+        print(f"receptor model {rm} ({rule}); fast sign changed on "
               f"{int((sim_b.fb.receptor.fast_sign != np.sign(sim_b.c.W.data)).sum()):,} of {sim_b.c.W.nnz:,} entries; coverage by tier:")
         print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"), flush=True)
     del sim_b; torch.cuda.empty_cache()
@@ -292,10 +345,11 @@ def main():
         rate_pass = b_["rate_hz_max_cell"] > PASS_RATE_HZ and not n_["rate_hz_max_cell"] > PASS_RATE_HZ
         verdict[t] = {"drive_pass": bool(drive_pass), "rate_pass": bool(rate_pass), "pass": bool(drive_pass or rate_pass)}
     verdict["pass"] = bool(verdict["LC11"]["pass"] or verdict["LC10a"]["pass"])
-    # table
-    print(f"\nmode {mode}{' rectified T2/T3' if args.rectify_t2t3 else ''}, seed {args.seed}: {args.seconds:.0f} s window, ball vs none")
+    # table  (under --null column A is a second no-ball run, so every A/B and diff figure is run-to-run scatter)
+    print(f"\nmode {mode}{' rectified T2/T3' if args.rectify_t2t3 else ''}, seed {args.seed}: {args.seconds:.0f} s window, "
+          f"{'none vs none (NULL)' if args.null else 'ball vs none'}")
     print(f"{'type':7s} {'cells':>5s} | {'drive mean mV':>14s} {'best cell mean':>15s} {'peak mV':>15s} {'peak 100ms':>15s} {'>7mV cells':>10s} | "
-          f"{'rate Hz mean':>14s} {'max cell Hz':>15s} {'>1Hz':>9s} | {'tuning best mV':>15s} {'tuning Hz':>13s} | diff best mean/peak/tuning")
+          f"{'rate Hz mean':>14s} {'max cell Hz':>15s} {'>1Hz':>9s} | {'tuning best mV':>15s} {'tuning Hz':>13s} | diff maxcell/meancell/tuning")
     for t in SPIKING:
         b_ = S_b[t]; n_ = S_n[t]
         print(f"{t:7s} {b_['n_cells']:5d} | {b_['drive_mean_mv']:+6.2f}/{n_['drive_mean_mv']:+6.2f} {b_['drive_best_cell_mean_mv']:+6.2f}/{n_['drive_best_cell_mean_mv']:+6.2f}   "
@@ -303,7 +357,7 @@ def main():
               f"{b_['drive_peak_cells_over_7mv']:4d}/{n_['drive_peak_cells_over_7mv']:<4d} | "
               f"{b_['rate_hz_mean']:6.3f}/{n_['rate_hz_mean']:6.3f} {b_['rate_hz_max_cell']:6.2f}/{n_['rate_hz_max_cell']:6.2f} {b_['cells_over_1hz']:3d}/{n_['cells_over_1hz']:<3d} | "
               f"{b_['tuning_range_best_cell_mv']:6.2f}/{n_['tuning_range_best_cell_mv']:6.2f} {b_['tuning_rate_peak_hz']:5.2f}/{n_['tuning_rate_peak_hz']:5.2f} | "
-              f"{b_['diff_best_cell_mean_mv']:+.2f}/{b_['diff_peak_mv']:+.2f}/{b_['diff_tuning_peak_mv']:+.2f} mV")
+              f"{b_['diff_max_over_cells_mean_mv']:+.3f}/{b_['diff_mean_over_cells_mean_mv']:+.3f}/{b_['diff_tuning_peak_mv']:+.2f} mV")
     print(f"{'type':7s} {'cells':>5s} | {'|dev| mean':>14s} {'best cell |dev|':>15s} {'dev max/min':>15s} | signed mean | diff |dev| mean / best")
     for t in RATE:
         b_ = S_b[t]; n_ = S_n[t]
@@ -311,7 +365,11 @@ def main():
               f"{b_['dev_max']:+5.2f}/{b_['dev_min']:+5.2f} vs {n_['dev_max']:+5.2f}/{n_['dev_min']:+5.2f} | {b_['dev_mean']:+7.4f}/{n_['dev_mean']:+7.4f} | "
               f"{b_['diff_abs_mean']:+.4f} / {b_['diff_abs_best_cell_mean']:+.4f}")
     print(f"verdict: LC11 {verdict['LC11']}  LC10a {verdict['LC10a']}  -> {'PASS' if verdict['pass'] else 'FAIL'} "
-          f"(criterion: peak per-cell drive > {PASS_DRIVE_MV:.0f} mV or a cell > {PASS_RATE_HZ:.0f} Hz with the ball and not without)")
+          f"(criterion: peak per-cell drive > {PASS_DRIVE_MV:.0f} mV or a cell > {PASS_RATE_HZ:.0f} Hz with the ball and not without"
+          f"{'; MEANINGLESS under --null -- there is no ball in either run' if args.null else ''})")
+    print("(ball - none) max over cells of the per-cell time-mean drive, mV: " +
+          "  ".join(f"{t} {S_b[t]['diff_max_over_cells_mean_mv']:+.4f}" for t in SPIKING) +
+          ("   [NULL: none - none]" if args.null else ""))
     # per-sweep time course of the population mean drive (ball run) for the two detectors and LPLC2
     n_per = int(SWEEP_S / FRAME_S)
     tc = {}
@@ -326,7 +384,10 @@ def main():
                  "none_max_cell_drive_per_500ms": [float(mxn[i:i + 50].max()) for i in range(0, len(mxn), 50)]}
     print("population mean |drive| per one-way sweep (ball / none): " + "; ".join(
         f"{t} " + " ".join(f"{a:.2f}/{b:.2f}" for a, b in zip(v["ball_mean_abs_drive_per_sweep"], v["none_mean_abs_drive_per_sweep"])) for t, v in tc.items()))
-    out = {"config": {"mode": mode, "receptor_model": args.receptor_model, "receptor_net_rule": args.receptor_net_rule, "rectify_t2t3": bool(args.rectify_t2t3),
+    out = {"config": {"mode": mode, "receptor_model": rm, "receptor_net_rule": rule,          # the LIFParams actually used
+                      "receptor_model_flag": args.receptor_model, "rectify_t2t3": bool(args.rectify_t2t3),
+                      "null": bool(args.null), "condition_a": "none" if args.null else "ball", "condition_b": "none",
+                      "angular_diameter_deg": float(2 * np.degrees(np.arctan(BALL_R / AHEAD))),
                       "seed": args.seed, "seconds": args.seconds, "settle": args.settle, "cache_dir": str(args.cache_dir or connectome.CACHE_DIR),
                       "pos": list(POS), "heading_rad": float(HEADING), "ball_radius_m": BALL_R, "ahead_m": AHEAD, "half_sweep_m": HALF_SWEEP, "sweep_s": SWEEP_S,
                       "pass_drive_mv": PASS_DRIVE_MV, "pass_rate_hz": PASS_RATE_HZ, "device": torch.cuda.get_device_name(0), "torch": torch.__version__},
