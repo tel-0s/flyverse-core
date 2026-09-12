@@ -98,7 +98,7 @@ def main() -> int:
     ap.add_argument("--priority", type=int, default=40)
     ap.add_argument("--node", default=None)
     ap.add_argument("--tags", default="flyverse")
-    ap.add_argument("--fetch", nargs="*", default=[], help="paths (relative to the repo root) to copy back when the job ends")
+    ap.add_argument("--fetch", nargs="*", action="extend", default=[], help="paths (relative to the repo root) to copy back when the job ends; may be repeated; a directory (out/) is the robust form")
     ap.add_argument("--no-wait", action="store_true")
     ap.add_argument("--poll", type=float, default=20.0)
     ap.add_argument("--sync-only", action="store_true", help="prepare the run directory and print it; submit nothing")

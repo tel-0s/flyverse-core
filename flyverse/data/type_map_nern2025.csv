@@ -1,0 +1,795 @@
+# Type map: Nern et al. 2025 optic-lobe inventory -> MaleCNS v1.0 type names. Built by scripts/build_type_map_nern2025.py.
+# Source: Nern A, Loesche F, Takemura S-y, et al. (2025) Connectome-driven neural inventory of a complete visual system. Nature 641, 1225-1237. doi:10.1038/s41586-025-08746-0 (CC BY 4.0); Supplementary Tables 1, 5, 7 (MOESM4 zip), hashes in docs/audits/receptor_sources_nern2025.md.
+# tier: exact = identical type name in both inventories; class = MaleCNS '<prefix>_unclear' bin whose Nern subtypes all carry one prediction;
+#       unmatched = MaleCNS optic-lobe-superclass type with no Nern counterpart (evidence says why). No alias / fuzzy rows were needed: all 732 Nern names are MaleCNS names.
+# nern_nt: Sup_Table_1 'predicted neurotransmitter' (EM synapse classifier trained on 59 optic-lobe types; 'unclear' = low confidence, not independently confirmed).
+# fw_nt: Sup_Table_7 FlyWire prediction for the matched FlyWire type (Eckstein et al. 2024 classifier, female brain). validated_*: Sup_Table_5 experimental transmitter
+#       (FISH / bulk RNA-seq / antibody); validated_in_training = yes means the type was classifier ground truth, so it is not an independent check of nern_nt.
+# malecns_*: from cache/neurons.parquet (model nt after the AL-LN override; mode over the type's cells, share of cells with that mode, cells with nt = unknown);
+# out_syn_W = sum |c.W| over the type's output edges (sign-0 edges are zero); out_syn_raw = uncapped MaleCNS synapse count on the model's node set.
+# NT vocabulary: acetylcholine gaba glutamate histamine dopamine octopamine serotonin unclear; 'a+b' = source lists two.
+source_name,malecns_type,tier,evidence,n_cells_malecns,nern_main_group,nern_n_cells_R,nern_n_cells_L,nern_nt,fw_nt,t7_matched_as,validated_nt,validated_method,validated_reference,validated_in_training,malecns_superclass,malecns_nt,malecns_nt_share,malecns_n_unknown_nt,out_syn_W,out_syn_raw
+5-HTPMPV03,5-HTPMPV03,exact,"identical name; Sup_Table_1 row 2 (instance 5-HTPMPV03_R, 1 cells, VCN)",2,VCN,1,1,serotonin,dopamine,1-to-1,serotonin,antibody staining of genetically marked cells,Pooryasin and Fiala 2015,yes,visual_centrifugal,serotonin,1.0,0,0,33975.0
+5thsLNv_LNd6,5thsLNv_LNd6,exact,"identical name; Sup_Table_1 row 3 (instance 5thsLNv_LNd6_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,glutamate,1-to-2,acetylcholine,antibody staining,Johard et al 2009,no,visual_projection,acetylcholine,1.0,0,5665,5665.0
+Am1,Am1,exact,"identical name; Sup_Table_1 row 4 (instance Am1_R, 1 cells, ONCN)",2,ONCN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,92310,92310.0
+aMe_TBD1,aMe_TBD1,exact,"identical name; Sup_Table_1 row 5 (instance aMe_TBD1_R, 1 cells, other)",2,other,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,gaba,1.0,0,18252,18252.0
+aMe1,aMe1,exact,"identical name; Sup_Table_1 row 6 (instance aMe1_R, 2 cells, VPN)",4,VPN,2,0,gaba,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,5199,5199.0
+aMe2,aMe2,exact,"identical name; Sup_Table_1 row 7 (instance aMe2_R, 4 cells, VCN)",8,VCN,4,0,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,7053,7053.0
+aMe3,aMe3,exact,"identical name; Sup_Table_1 row 8 (instance aMe3_R, 1 cells, VPN)",2,VPN,1,0,glutamate,unclear,1-to-1,,,,,visual_projection,glutamate,1.0,0,10265,10265.0
+aMe4,aMe4,exact,"identical name; Sup_Table_1 row 9 (instance aMe4_R, 9 cells, VCN)",19,VCN,9,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,47463,47463.0
+aMe5,aMe5,exact,"identical name; Sup_Table_1 row 10 (instance aMe5_R, 17 cells, VPN)",42,VPN,17,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,19613,19613.0
+aMe6a,aMe6a,exact,"identical name; Sup_Table_1 row 11 (instance aMe6a_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2587,2587.0
+aMe6b,aMe6b,exact,"identical name; Sup_Table_1 row 12 (instance aMe6b_R, 1 cells, ONIN)",2,ONIN,1,0,acetylcholine,,unmatched,,,,,ol_intrinsic,acetylcholine,1.0,0,3126,3126.0
+aMe6c,aMe6c,exact,"identical name; Sup_Table_1 row 13 (instance aMe6c_R, 1 cells, ONCN)",3,ONCN,1,0,glutamate,,unmatched,,,,,ol_intrinsic,glutamate,1.0,0,3264,3264.0
+aMe8,aMe8,exact,"identical name; Sup_Table_1 row 14 (instance aMe8_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,unknown,0.75,3,0,7238.0
+aMe9,aMe9,exact,"identical name; Sup_Table_1 row 15 (instance aMe9_R, 2 cells, VPN)",4,VPN,2,2,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,10246,10246.0
+aMe10,aMe10,exact,"identical name; Sup_Table_1 row 16 (instance aMe10_R, 2 cells, VPN)",3,VPN,2,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4074,4074.0
+aMe12,aMe12,exact,"identical name; Sup_Table_1 row 17 (instance aMe12_R, 2 cells, VPN)",6,VPN,2,4,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,13528,13528.0
+aMe13,aMe13,exact,"identical name; Sup_Table_1 row 18 (instance aMe13_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,3506,3506.0
+aMe15,aMe15,exact,"identical name; Sup_Table_1 row 19 (instance aMe15_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,5645,5645.0
+aMe17a,aMe17a,exact,"identical name; Sup_Table_1 row 20 (instance aMe17a_R, 1 cells, VCN)",2,VCN,1,0,glutamate,unclear,1-to-1,,,,,visual_centrifugal,serotonin,1.0,0,0,20900.0
+aMe17b,aMe17b,exact,"identical name; Sup_Table_1 row 21 (instance aMe17b_R, 2 cells, VCN)",5,VCN,2,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,18906,18906.0
+aMe17c,aMe17c,exact,"identical name; Sup_Table_1 row 22 (instance aMe17c_R, 2 cells, VCN)",4,VCN,2,0,glutamate,gaba,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,57872,57872.0
+aMe17e,aMe17e,exact,"identical name; Sup_Table_1 row 23 (instance aMe17e_R, 1 cells, VCN)",2,VCN,1,0,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,27293,27293.0
+aMe20,aMe20,exact,"identical name; Sup_Table_1 row 24 (instance aMe20_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,8046,8046.0
+aMe22,aMe22,exact,"identical name; Sup_Table_1 row 25 (instance aMe22_R, 1 cells, VCN)",2,VCN,1,0,glutamate,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,4332,4332.0
+aMe23,aMe23,exact,"identical name; Sup_Table_1 row 26 (instance aMe23_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,2584,2584.0
+aMe24,aMe24,exact,"identical name; Sup_Table_1 row 27 (instance aMe24_R, 1 cells, other)",2,other,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,5291,5291.0
+aMe25,aMe25,exact,"identical name; Sup_Table_1 row 28 (instance aMe25_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3362,3362.0
+aMe26,aMe26,exact,"identical name; Sup_Table_1 row 29 (instance aMe26_R, 3 cells, VPN)",6,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,16315,16315.0
+aMe30,aMe30,exact,"identical name; Sup_Table_1 row 30 (instance aMe30_R, 2 cells, VCN)",5,VCN,2,0,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,11475,11475.0
+AN09A005,AN09A005,exact,"identical name; Sup_Table_1 row 31 (instance AN09A005_R, 2 cells, other)",11,other,2,2,unclear,serotonin,1-to-many,,,,,ascending_neuron,serotonin,1.0,0,0,4874.0
+AN27X013,AN27X013,exact,"identical name; Sup_Table_1 row 32 (instance AN27X013_R, 2 cells, other)",4,other,2,2,unclear,serotonin,1-to-many,,,,,ascending_neuron,serotonin,1.0,0,0,3152.0
+AOTU045,AOTU045,exact,"identical name; Sup_Table_1 row 33 (instance AOTU045_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,5059,5059.0
+AOTU056,AOTU056,exact,"identical name; Sup_Table_1 row 34 (instance AOTU056_R, 5 cells, other)",8,other,5,0,unclear,gaba,1-to-1,,,,,cb_intrinsic,gaba,1.0,0,4234,4234.0
+AOTU058,AOTU058,exact,"identical name; Sup_Table_1 row 35 (instance AOTU058_R, 2 cells, other)",8,other,2,0,unclear,gaba,1-to-1,,,,,cb_intrinsic,gaba,1.0,0,4142,4142.0
+C2,C2,exact,"identical name; Sup_Table_1 row 36 (instance C2_R, 874 cells, ONCN)",1745,ONCN,874,0,gaba,gaba,1-to-1,gaba,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,gaba,1.0,0,230044,230044.0
+C3,C3,exact,"identical name; Sup_Table_1 row 37 (instance C3_R, 892 cells, ONCN)",1779,ONCN,892,0,gaba,gaba,1-to-1,gaba,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,gaba,1.0,0,539977,539977.0
+CL125,CL125,exact,"identical name; Sup_Table_1 row 38 (instance CL125_R, 2 cells, VPN)",4,VPN,2,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,2531,2531.0
+Cm-DRA,Cm-DRA,exact,"identical name; Sup_Table_1 row 39 (instance Cm-DRA_R, 3 cells, ONIN)",7,ONIN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,7598,7598.0
+Cm1,Cm1,exact,"identical name; Sup_Table_1 row 40 (instance Cm1_R, 231 cells, ONIN)",472,ONIN,231,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,77882,77882.0
+Cm2,Cm2,exact,"identical name; Sup_Table_1 row 41 (instance Cm2_R, 203 cells, ONIN)",383,ONIN,203,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,63301,63301.0
+Cm3,Cm3,exact,"identical name; Sup_Table_1 row 42 (instance Cm3_R, 167 cells, ONIN)",323,ONIN,167,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,151626,151626.0
+Cm4,Cm4,exact,"identical name; Sup_Table_1 row 43 (instance Cm4_R, 126 cells, ONIN)",251,ONIN,126,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,37227,37227.0
+Cm5,Cm5,exact,"identical name; Sup_Table_1 row 44 (instance Cm5_R, 109 cells, ONIN)",214,ONIN,109,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,84897,84897.0
+Cm6,Cm6,exact,"identical name; Sup_Table_1 row 45 (instance Cm6_R, 106 cells, ONIN)",211,ONIN,106,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,50509,50509.0
+Cm7,Cm7,exact,"identical name; Sup_Table_1 row 46 (instance Cm7_R, 93 cells, ONIN)",184,ONIN,93,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,102864,102864.0
+Cm8,Cm8,exact,"identical name; Sup_Table_1 row 47 (instance Cm8_R, 90 cells, ONIN)",182,ONIN,90,0,gaba,gaba,1-to-2,,,,,ol_intrinsic,gaba,1.0,0,70336,70336.0
+Cm9,Cm9,exact,"identical name; Sup_Table_1 row 48 (instance Cm9_R, 73 cells, ONIN)",143,ONIN,73,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,85217,85217.0
+Cm10,Cm10,exact,"identical name; Sup_Table_1 row 49 (instance Cm10_R, 45 cells, ONIN)",89,ONIN,45,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,38616,38616.0
+Cm11a,Cm11a,exact,"identical name; Sup_Table_1 row 50 (instance Cm11a_R, 40 cells, ONIN)",75,ONIN,40,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,64444,64444.0
+Cm11b,Cm11b,exact,"identical name; Sup_Table_1 row 51 (instance Cm11b_R, 30 cells, ONIN)",56,ONIN,30,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,84923,84923.0
+Cm11c,Cm11c,exact,"identical name; Sup_Table_1 row 52 (instance Cm11c_R, 23 cells, ONIN)",44,ONIN,23,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,38072,38072.0
+Cm11d,Cm11d,exact,"identical name; Sup_Table_1 row 53 (instance Cm11d_R, 9 cells, ONIN)",18,ONIN,9,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,29910,29910.0
+Cm12,Cm12,exact,"identical name; Sup_Table_1 row 54 (instance Cm12_R, 35 cells, ONIN)",70,ONIN,35,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,36895,36895.0
+Cm13,Cm13,exact,"identical name; Sup_Table_1 row 55 (instance Cm13_R, 27 cells, ONIN)",52,ONIN,27,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,35539,35539.0
+Cm14,Cm14,exact,"identical name; Sup_Table_1 row 56 (instance Cm14_R, 23 cells, ONIN)",48,ONIN,23,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,26842,26842.0
+Cm15,Cm15,exact,"identical name; Sup_Table_1 row 57 (instance Cm15_R, 22 cells, ONIN)",47,ONIN,22,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,18548,18548.0
+Cm16,Cm16,exact,"identical name; Sup_Table_1 row 58 (instance Cm16_R, 17 cells, ONIN)",38,ONIN,17,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,10113,10113.0
+Cm17,Cm17,exact,"identical name; Sup_Table_1 row 59 (instance Cm17_R, 16 cells, ONIN)",31,ONIN,16,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,34701,34701.0
+Cm18,Cm18,exact,"identical name; Sup_Table_1 row 60 (instance Cm18_R, 14 cells, ONIN)",28,ONIN,14,0,glutamate,,unmatched,,,,,ol_intrinsic,glutamate,1.0,0,4167,4167.0
+Cm19,Cm19,exact,"identical name; Sup_Table_1 row 61 (instance Cm19_R, 14 cells, ONIN)",30,ONIN,14,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,42464,42464.0
+Cm20,Cm20,exact,"identical name; Sup_Table_1 row 62 (instance Cm20_R, 13 cells, ONIN)",26,ONIN,13,0,gaba,gaba,2-to-1,,,,,ol_intrinsic,gaba,1.0,0,18318,18318.0
+Cm21,Cm21,exact,"identical name; Sup_Table_1 row 63 (instance Cm21_R, 13 cells, ONIN)",25,ONIN,13,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,37721,37721.0
+Cm22,Cm22,exact,"identical name; Sup_Table_1 row 64 (instance Cm22_R, 10 cells, ONIN)",19,ONIN,10,0,gaba,gaba,2-to-1,,,,,ol_intrinsic,gaba,1.0,0,7647,7647.0
+Cm23,Cm23,exact,"identical name; Sup_Table_1 row 65 (instance Cm23_R, 8 cells, ONIN)",17,ONIN,8,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,14318,14318.0
+Cm24,Cm24,exact,"identical name; Sup_Table_1 row 66 (instance Cm24_R, 5 cells, ONIN)",11,ONIN,5,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,10383,10383.0
+Cm25,Cm25,exact,"identical name; Sup_Table_1 row 67 (instance Cm25_R, 3 cells, ONIN)",7,ONIN,3,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,8749,8749.0
+Cm26,Cm26,exact,"identical name; Sup_Table_1 row 68 (instance Cm26_R, 6 cells, ONIN)",13,ONIN,6,0,glutamate,,unmatched,,,,,ol_intrinsic,glutamate,1.0,0,22696,22696.0
+Cm27,Cm27,exact,"identical name; Sup_Table_1 row 69 (instance Cm27_R, 5 cells, ONIN)",9,ONIN,5,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,5633,5633.0
+Cm28,Cm28,exact,"identical name; Sup_Table_1 row 70 (instance Cm28_R, 6 cells, ONIN)",12,ONIN,6,0,unclear,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,12332,12332.0
+Cm29,Cm29,exact,"identical name; Sup_Table_1 row 71 (instance Cm29_R, 3 cells, ONIN)",6,ONIN,3,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,30644,30644.0
+Cm30,Cm30,exact,"identical name; Sup_Table_1 row 72 (instance Cm30_R, 2 cells, ONIN)",4,ONIN,2,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,15991,15991.0
+Cm31a,Cm31a,exact,"identical name; Sup_Table_1 row 73 (instance Cm31a_R, 2 cells, ONIN)",4,ONIN,2,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,47263,47263.0
+Cm31b,Cm31b,exact,"identical name; Sup_Table_1 row 74 (instance Cm31b_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,33192,33192.0
+Cm32,Cm32,exact,"identical name; Sup_Table_1 row 75 (instance Cm32_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,5427,5427.0
+Cm33,Cm33,exact,"identical name; Sup_Table_1 row 76 (instance Cm33_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,6259,6259.0
+Cm34,Cm34,exact,"identical name; Sup_Table_1 row 77 (instance Cm34_R, 1 cells, ONIN)",2,ONIN,1,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,57627,57627.0
+Cm35,Cm35,exact,"identical name; Sup_Table_1 row 78 (instance Cm35_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,13190,13190.0
+dCal1,dCal1,exact,"identical name; Sup_Table_1 row 79 (instance dCal1_R, 1 cells, VPN)",2,VPN,1,1,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,8532,8532.0
+Dm-DRA1,Dm-DRA1,exact,"identical name; Sup_Table_1 row 80 (instance Dm-DRA1_R, 26 cells, ONIN)",50,ONIN,26,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,24103,24103.0
+Dm-DRA2,Dm-DRA2,exact,"identical name; Sup_Table_1 row 81 (instance Dm-DRA2_R, 18 cells, ONIN)",33,ONIN,18,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,7110,7110.0
+Dm1,Dm1,exact,"identical name; Sup_Table_1 row 82 (instance Dm1_R, 39 cells, ONIN)",80,ONIN,39,0,glutamate,gaba,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,156748,156748.0
+Dm2,Dm2,exact,"identical name; Sup_Table_1 row 83 (instance Dm2_R, 726 cells, ONIN)",1452,ONIN,726,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,449192,449192.0
+Dm3a,Dm3a,exact,"identical name; Sup_Table_1 row 84 (instance Dm3a_R, 601 cells, ONIN)",1204,ONIN,601,0,glutamate,glutamate,1-to-1,glutamate,RNASeq (TAPIN),Davis et al 2020,no,ol_intrinsic,glutamate,1.0,0,106540,106540.0
+Dm3b,Dm3b,exact,"identical name; Sup_Table_1 row 85 (instance Dm3b_R, 571 cells, ONIN)",1137,ONIN,571,0,glutamate,glutamate,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_intrinsic,glutamate,1.0,0,99438,99438.0
+Dm3c,Dm3c,exact,"identical name; Sup_Table_1 row 86 (instance Dm3c_R, 401 cells, ONIN)",787,ONIN,401,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,91388,91388.0
+Dm4,Dm4,exact,"identical name; Sup_Table_1 row 87 (instance Dm4_R, 48 cells, ONIN)",99,ONIN,48,0,glutamate,glutamate,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,129535,129535.0
+Dm6,Dm6,exact,"identical name; Sup_Table_1 row 88 (instance Dm6_R, 29 cells, ONIN)",62,ONIN,29,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,147144,147144.0
+Dm8a,Dm8a,exact,"identical name; Sup_Table_1 row 89 (instance Dm8a_R, 285 cells, ONIN)",572,ONIN,285,0,glutamate,glutamate,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_intrinsic,glutamate,1.0,0,162710,162710.0
+Dm8b,Dm8b,exact,"identical name; Sup_Table_1 row 90 (instance Dm8b_R, 265 cells, ONIN)",532,ONIN,265,0,glutamate,glutamate,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_intrinsic,glutamate,1.0,0,114276,114276.0
+Dm9,Dm9,exact,"identical name; Sup_Table_1 row 91 (instance Dm9_R, 135 cells, ONIN)",273,ONIN,135,0,glutamate,acetylcholine,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,247828,247828.0
+Dm10,Dm10,exact,"identical name; Sup_Table_1 row 92 (instance Dm10_R, 311 cells, ONIN)",626,ONIN,311,0,gaba,gaba,1-to-1,gaba,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,gaba,1.0,0,141680,141680.0
+Dm11,Dm11,exact,"identical name; Sup_Table_1 row 93 (instance Dm11_R, 82 cells, ONIN)",158,ONIN,82,0,glutamate,glutamate,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,46109,46109.0
+Dm12,Dm12,exact,"identical name; Sup_Table_1 row 94 (instance Dm12_R, 137 cells, ONIN)",276,ONIN,137,0,glutamate,gaba,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,233792,233792.0
+Dm13,Dm13,exact,"identical name; Sup_Table_1 row 95 (instance Dm13_R, 28 cells, ONIN)",53,ONIN,28,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,115286,115286.0
+Dm14,Dm14,exact,"identical name; Sup_Table_1 row 96 (instance Dm14_R, 16 cells, ONIN)",34,ONIN,16,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,75680,75680.0
+Dm15,Dm15,exact,"identical name; Sup_Table_1 row 97 (instance Dm15_R, 242 cells, ONIN)",485,ONIN,242,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,180554,180554.0
+Dm16,Dm16,exact,"identical name; Sup_Table_1 row 98 (instance Dm16_R, 75 cells, ONIN)",151,ONIN,75,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,59635,59635.0
+Dm17,Dm17,exact,"identical name; Sup_Table_1 row 99 (instance Dm17_R, 4 cells, ONIN)",8,ONIN,4,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,104773,104773.0
+Dm18,Dm18,exact,"identical name; Sup_Table_1 row 100 (instance Dm18_R, 27 cells, ONIN)",58,ONIN,27,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,82244,82244.0
+Dm19,Dm19,exact,"identical name; Sup_Table_1 row 101 (instance Dm19_R, 15 cells, ONIN)",30,ONIN,15,0,glutamate,gaba,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,110556,110556.0
+Dm20,Dm20,exact,"identical name; Sup_Table_1 row 102 (instance Dm20_R, 48 cells, ONIN)",98,ONIN,48,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,132200,132200.0
+DN1a,DN1a,exact,"identical name; Sup_Table_1 row 103 (instance DN1a_R, 2 cells, VCN)",4,VCN,2,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,4714,4714.0
+DNc01,DNc01,exact,"identical name; Sup_Table_1 row 104 (instance DNc01_R, 1 cells, other)",2,other,1,1,unclear,dopamine,1-to-1,,,,,descending_neuron,unknown,1.0,2,0,6375.0
+DNp11,DNp11,exact,"identical name; Sup_Table_1 row 105 (instance DNp11_R, 1 cells, other)",2,other,1,0,unclear,acetylcholine,1-to-1,,,,,descending_neuron,acetylcholine,1.0,0,12886,12886.0
+DNp27,DNp27,exact,"identical name; Sup_Table_1 row 106 (instance DNp27_R, 1 cells, other)",2,other,1,1,unclear,serotonin,1-to-1,,,,,descending_neuron,acetylcholine,1.0,0,18630,18630.0
+DNp30,DNp30,exact,"identical name; Sup_Table_1 row 107 (instance DNp30_R, 1 cells, other)",2,other,1,1,unclear,serotonin,1-to-1,,,,,descending_neuron,glutamate,1.0,0,5020,5020.0
+DNpe053,DNpe053,exact,"identical name; Sup_Table_1 row 108 (instance DNpe053_R, 1 cells, other)",2,other,1,1,acetylcholine,acetylcholine,1-to-1,,,,,descending_neuron,acetylcholine,1.0,0,37958,37958.0
+H1,H1,exact,"identical name; Sup_Table_1 row 109 (instance H1_R, 1 cells, VPN)",2,VPN,1,1,glutamate,unclear,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,13201,13201.0
+H2,H2,exact,"identical name; Sup_Table_1 row 110 (instance H2_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,9172,9172.0
+HBeyelet,HBeyelet,exact,"identical name; Sup_Table_1 row 111 (instance HBeyelet_R, 3 cells, ONIN)",7,ONIN,3,0,histamine,glutamate,1-to-1,histamine+acetylcholine,antibody staining,"Pollack and Hofbauer 1991, Yasuyama and Meinertzhagen 1999",no,ol_sensory,histamine,1.0,0,4144,4144.0
+HSE,HSE,exact,"identical name; Sup_Table_1 row 112 (instance HSE_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),Zhao et al 2023,no,visual_projection,acetylcholine,1.0,0,1411,1411.0
+HSN,HSN,exact,"identical name; Sup_Table_1 row 113 (instance HSN_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),Zhao et al 2023,no,visual_projection,acetylcholine,1.0,0,1351,1351.0
+HSS,HSS,exact,"identical name; Sup_Table_1 row 114 (instance HSS_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),Zhao et al 2023,no,visual_projection,acetylcholine,1.0,0,2411,2411.0
+HST,HST,exact,"identical name; Sup_Table_1 row 115 (instance HST_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6094,6094.0
+KCg-s1,KCg-s1,exact,"identical name; Sup_Table_1 row 116 (instance KCg-s1_R, 1 cells, other)",2,other,1,0,unclear,dopamine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,5271,5271.0
+l-LNv,l-LNv,exact,"identical name; Sup_Table_1 row 117 (instance l-LNv_R, 4 cells, VPN)",8,VPN,4,4,unclear,serotonin,1-to-1,unclear,,,no,ol_intrinsic,serotonin,1.0,0,0,7560.0
+L1,L1,exact,"identical name; Sup_Table_1 row 118 (instance L1_R, 892 cells, ONCN)",1776,ONCN,892,0,glutamate,glutamate,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,589071,589071.0
+L2,L2,exact,"identical name; Sup_Table_1 row 119 (instance L2_R, 893 cells, ONCN)",1779,ONCN,893,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,1249022,1249022.0
+L3,L3,exact,"identical name; Sup_Table_1 row 120 (instance L3_R, 892 cells, ONCN)",1772,ONCN,892,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,655375,655375.0
+L4,L4,exact,"identical name; Sup_Table_1 row 121 (instance L4_R, 891 cells, ONCN)",1769,ONCN,891,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,304873,304873.0
+L5,L5,exact,"identical name; Sup_Table_1 row 122 (instance L5_R, 898 cells, ONCN)",1787,ONCN,898,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,977136,977136.0
+Lai,Lai,exact,"identical name; Sup_Table_1 row 123 (instance Lai_R, 48 cells, ONIN)",84,ONIN,48,0,glutamate,gaba,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,9169,9169.0
+LAL047,LAL047,exact,"identical name; Sup_Table_1 row 124 (instance LAL047_R, 1 cells, other)",2,other,1,0,gaba,gaba,1-to-1,,,,,cb_intrinsic,gaba,1.0,0,9556,9556.0
+LAL048,LAL048,exact,"identical name; Sup_Table_1 row 125 (instance LAL048_R, 2 cells, other)",10,other,2,0,unclear,,unmatched,,,,,cb_intrinsic,gaba,1.0,0,4563,4563.0
+Lat1,Lat1,exact,"identical name; Sup_Table_1 row 126 (instance Lat1_R, 4 cells, VCN)",8,VCN,4,0,unclear,serotonin,3-to-1,,,,,visual_centrifugal,unknown,1.0,8,0,163.0
+Lat2,Lat2,exact,"identical name; Sup_Table_1 row 127 (instance Lat2_R, 2 cells, VCN)",4,VCN,2,0,unclear,serotonin,3-to-1,,,,,visual_centrifugal,unknown,1.0,4,0,70.0
+Lat3,Lat3,exact,"identical name; Sup_Table_1 row 128 (instance Lat3_R, 4 cells, ONCN)",8,ONCN,4,0,unclear,serotonin,2-to-1,,,,,ol_intrinsic,octopamine,1.0,0,0,599.0
+Lat4,Lat4,exact,"identical name; Sup_Table_1 row 129 (instance Lat4_R, 1 cells, ONCN)",2,ONCN,1,0,unclear,serotonin,2-to-1,,,,,ol_intrinsic,unknown,1.0,2,0,18.0
+Lat5,Lat5,exact,"identical name; Sup_Table_1 row 130 (instance Lat5_R, 1 cells, VCN)",2,VCN,1,0,unclear,serotonin,3-to-1,,,,,visual_centrifugal,unknown,1.0,2,0,111.0
+Lawf1,Lawf1,exact,"identical name; Sup_Table_1 row 131 (instance Lawf1_R, 184 cells, ONCN)",361,ONCN,184,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,40654,40654.0
+Lawf2,Lawf2,exact,"identical name; Sup_Table_1 row 132 (instance Lawf2_R, 188 cells, ONCN)",383,ONCN,188,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,9619,9619.0
+LC4,LC4,exact,"identical name; Sup_Table_1 row 133 (instance LC4_R, 55 cells, VPN)",126,VPN,55,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,visual_projection,acetylcholine,1.0,0,144613,144613.0
+LC6,LC6,exact,"identical name; Sup_Table_1 row 134 (instance LC6_R, 65 cells, VPN)",124,VPN,65,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,visual_projection,acetylcholine,1.0,0,77898,77898.0
+LC9,LC9,exact,"identical name; Sup_Table_1 row 135 (instance LC9_R, 115 cells, VPN)",219,VPN,115,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,194622,194622.0
+LC10a,LC10a,exact,"identical name; Sup_Table_1 row 136 (instance LC10a_R, 140 cells, VPN)",275,VPN,140,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,visual_projection,acetylcholine,1.0,0,274834,274834.0
+LC10b,LC10b,exact,"identical name; Sup_Table_1 row 137 (instance LC10b_R, 48 cells, VPN)",95,VPN,48,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,36898,36898.0
+LC10c-1,LC10c-1,exact,"identical name; Sup_Table_1 row 138 (instance LC10c-1_R, 66 cells, VPN)",130,VPN,66,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,82342,82342.0
+LC10c-2,LC10c-2,exact,"identical name; Sup_Table_1 row 139 (instance LC10c-2_R, 66 cells, VPN)",125,VPN,66,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,88719,88719.0
+LC10d,LC10d,exact,"identical name; Sup_Table_1 row 140 (instance LC10d_R, 106 cells, VPN)",214,VPN,106,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,visual_projection,acetylcholine,1.0,0,177536,177536.0
+LC10e,LC10e,exact,"identical name; Sup_Table_1 row 141 (instance LC10e_R, 48 cells, VPN)",110,VPN,48,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,31129,31129.0
+LC11,LC11,exact,"identical name; Sup_Table_1 row 142 (instance LC11_R, 75 cells, VPN)",143,VPN,75,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,172566,172566.0
+LC12,LC12,exact,"identical name; Sup_Table_1 row 143 (instance LC12_R, 242 cells, VPN)",498,VPN,242,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,454462,454462.0
+LC13,LC13,exact,"identical name; Sup_Table_1 row 144 (instance LC13_R, 94 cells, VPN)",177,VPN,94,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,97964,97964.0
+LC14a-1,LC14a-1,exact,"identical name; Sup_Table_1 row 145 (instance LC14a-1_R, 15 cells, VPN)",30,VPN,15,15,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,71729,71729.0
+LC14a-2,LC14a-2,exact,"identical name; Sup_Table_1 row 146 (instance LC14a-2_R, 8 cells, VPN)",15,VPN,8,7,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,23862,23862.0
+LC14b,LC14b,exact,"identical name; Sup_Table_1 row 147 (instance LC14b_R, 22 cells, VPN)",43,VPN,22,21,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,80999,80999.0
+LC15,LC15,exact,"identical name; Sup_Table_1 row 148 (instance LC15_R, 65 cells, VPN)",126,VPN,65,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,110164,110164.0
+LC16,LC16,exact,"identical name; Sup_Table_1 row 149 (instance LC16_R, 94 cells, VPN)",182,VPN,94,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,visual_projection,acetylcholine,1.0,0,116249,116249.0
+LC17,LC17,exact,"identical name; Sup_Table_1 row 150 (instance LC17_R, 175 cells, VPN)",353,VPN,175,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,482233,482233.0
+LC18,LC18,exact,"identical name; Sup_Table_1 row 151 (instance LC18_R, 104 cells, VPN)",208,VPN,104,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,143776,143776.0
+LC19,LC19,exact,"identical name; Sup_Table_1 row 152 (instance LC19_R, 8 cells, VPN)",14,VPN,8,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,14680,14680.0
+LC20a,LC20a,exact,"identical name; Sup_Table_1 row 153 (instance LC20a_R, 30 cells, VPN)",62,VPN,30,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,45725,45725.0
+LC20b,LC20b,exact,"identical name; Sup_Table_1 row 154 (instance LC20b_R, 40 cells, VPN)",79,VPN,40,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,visual_projection,glutamate,1.0,0,71099,71099.0
+LC21,LC21,exact,"identical name; Sup_Table_1 row 155 (instance LC21_R, 78 cells, VPN)",153,VPN,78,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,134770,134770.0
+LC22,LC22,exact,"identical name; Sup_Table_1 row 156 (instance LC22_R, 35 cells, VPN)",73,VPN,35,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,50256,50256.0
+LC23,LC23,exact,"identical name; Sup_Table_1 row 157 (instance LC23_R, 6 cells, VPN)",11,VPN,6,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,16930,16930.0
+LC24,LC24,exact,"identical name; Sup_Table_1 row 158 (instance LC24_R, 54 cells, VPN)",94,VPN,54,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,29351,29351.0
+LC25,LC25,exact,"identical name; Sup_Table_1 row 159 (instance LC25_R, 27 cells, VPN)",56,VPN,27,0,glutamate,glutamate,1-to-1,glutamate,FISH (Long  et al),This study,yes,visual_projection,glutamate,1.0,0,30787,30787.0
+LC26,LC26,exact,"identical name; Sup_Table_1 row 160 (instance LC26_R, 37 cells, VPN)",75,VPN,37,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,33419,33419.0
+LC27,LC27,exact,"identical name; Sup_Table_1 row 161 (instance LC27_R, 23 cells, VPN)",46,VPN,23,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,14626,14626.0
+LC28,LC28,exact,"identical name; Sup_Table_1 row 162 (instance LC28_R, 31 cells, VPN)",62,VPN,31,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,42422,42422.0
+LC29,LC29,exact,"identical name; Sup_Table_1 row 163 (instance LC29_R, 19 cells, VPN)",40,VPN,19,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,14022,14022.0
+LC30,LC30,exact,"identical name; Sup_Table_1 row 164 (instance LC30_R, 30 cells, VPN)",57,VPN,30,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,glutamate,1.0,0,9819,9819.0
+LC31a,LC31a,exact,"identical name; Sup_Table_1 row 165 (instance LC31a_R, 16 cells, VPN)",32,VPN,16,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,25149,25149.0
+LC31b,LC31b,exact,"identical name; Sup_Table_1 row 166 (instance LC31b_R, 6 cells, VPN)",10,VPN,6,0,unclear,acetylcholine,1-to-2,,,,,visual_projection,acetylcholine,1.0,0,20518,20518.0
+LC33,LC33,exact,"identical name; Sup_Table_1 row 167 (instance LC33_R, 16 cells, VPN)",32,VPN,16,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,35989,35989.0
+LC34,LC34,exact,"identical name; Sup_Table_1 row 168 (instance LC34_R, 6 cells, VPN)",10,VPN,6,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6066,6066.0
+LC35a,LC35a,exact,"identical name; Sup_Table_1 row 169 (instance LC35a_R, 5 cells, VPN)",10,VPN,5,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,10335,10335.0
+LC35b,LC35b,exact,"identical name; Sup_Table_1 row 170 (instance LC35b_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,2360,2360.0
+LC36,LC36,exact,"identical name; Sup_Table_1 row 171 (instance LC36_R, 16 cells, VPN)",32,VPN,16,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,22236,22236.0
+LC37,LC37,exact,"identical name; Sup_Table_1 row 172 (instance LC37_R, 8 cells, VPN)",15,VPN,8,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,15585,15585.0
+LC39a,LC39a,exact,"identical name; Sup_Table_1 row 173 (instance LC39a_R, 3 cells, VPN)",6,VPN,3,0,glutamate,glutamate,2-to-1,,,,,visual_projection,glutamate,1.0,0,6789,6789.0
+LC39b,LC39b,exact,"identical name; Sup_Table_1 row 174 (instance LC39b_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,2-to-1,,,,,visual_projection,glutamate,1.0,0,2308,2308.0
+LC40,LC40,exact,"identical name; Sup_Table_1 row 175 (instance LC40_R, 15 cells, VPN)",34,VPN,15,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,20099,20099.0
+LC41,LC41,exact,"identical name; Sup_Table_1 row 176 (instance LC41_R, 6 cells, VPN)",13,VPN,6,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7994,7994.0
+LC43,LC43,exact,"identical name; Sup_Table_1 row 177 (instance LC43_R, 6 cells, VPN)",14,VPN,6,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6591,6591.0
+LC44,LC44,exact,"identical name; Sup_Table_1 row 178 (instance LC44_R, 3 cells, VPN)",5,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3198,3198.0
+LC46b,LC46b,exact,"identical name; Sup_Table_1 row 179 (instance LC46b_R, 5 cells, VPN)",10,VPN,5,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4478,4478.0
+Li11a,Li11a,exact,"identical name; Sup_Table_1 row 180 (instance Li11a_R, 2 cells, ONIN)",4,ONIN,2,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,22493,22493.0
+Li11b,Li11b,exact,"identical name; Sup_Table_1 row 181 (instance Li11b_R, 2 cells, ONIN)",4,ONIN,2,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,15279,15279.0
+Li12,Li12,exact,"identical name; Sup_Table_1 row 182 (instance Li12_R, 2 cells, ONIN)",4,ONIN,2,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,40252,40252.0
+Li13,Li13,exact,"identical name; Sup_Table_1 row 183 (instance Li13_R, 33 cells, ONIN)",65,ONIN,33,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,89278,89278.0
+Li14,Li14,exact,"identical name; Sup_Table_1 row 184 (instance Li14_R, 112 cells, ONIN)",217,ONIN,112,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,160253,160253.0
+Li15,Li15,exact,"identical name; Sup_Table_1 row 185 (instance Li15_R, 21 cells, ONIN)",41,ONIN,21,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,44468,44468.0
+Li16,Li16,exact,"identical name; Sup_Table_1 row 186 (instance Li16_R, 2 cells, ONIN)",4,ONIN,2,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,58241,58241.0
+Li17,Li17,exact,"identical name; Sup_Table_1 row 187 (instance Li17_R, 10 cells, ONIN)",22,ONIN,10,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,83644,83644.0
+Li18a,Li18a,exact,"identical name; Sup_Table_1 row 188 (instance Li18a_R, 23 cells, ONIN)",49,ONIN,23,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,33278,33278.0
+Li18b,Li18b,exact,"identical name; Sup_Table_1 row 189 (instance Li18b_R, 17 cells, ONIN)",31,ONIN,17,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,8514,8514.0
+Li19,Li19,exact,"identical name; Sup_Table_1 row 190 (instance Li19_R, 26 cells, ONIN)",51,ONIN,26,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,76257,76257.0
+Li20,Li20,exact,"identical name; Sup_Table_1 row 191 (instance Li20_R, 21 cells, ONIN)",40,ONIN,21,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,54682,54682.0
+Li21,Li21,exact,"identical name; Sup_Table_1 row 192 (instance Li21_R, 105 cells, ONIN)",207,ONIN,105,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,151744,151744.0
+Li22,Li22,exact,"identical name; Sup_Table_1 row 193 (instance Li22_R, 119 cells, ONIN)",232,ONIN,119,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,49365,49365.0
+Li23,Li23,exact,"identical name; Sup_Table_1 row 194 (instance Li23_R, 60 cells, ONIN)",119,ONIN,60,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,72296,72296.0
+Li25,Li25,exact,"identical name; Sup_Table_1 row 195 (instance Li25_R, 60 cells, ONIN)",117,ONIN,60,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,206320,206320.0
+Li26,Li26,exact,"identical name; Sup_Table_1 row 196 (instance Li26_R, 18 cells, ONIN)",38,ONIN,18,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,80659,80659.0
+Li27,Li27,exact,"identical name; Sup_Table_1 row 197 (instance Li27_R, 58 cells, ONIN)",113,ONIN,58,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,42000,42000.0
+Li28,Li28,exact,"identical name; Sup_Table_1 row 198 (instance Li28_R, 6 cells, ONIN)",13,ONIN,6,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,20530,20530.0
+Li29,Li29,exact,"identical name; Sup_Table_1 row 199 (instance Li29_R, 4 cells, ONIN)",8,ONIN,4,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,41336,41336.0
+Li30,Li30,exact,"identical name; Sup_Table_1 row 200 (instance Li30_R, 6 cells, ONIN)",10,ONIN,6,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,46619,46619.0
+Li31,Li31,exact,"identical name; Sup_Table_1 row 201 (instance Li31_R, 1 cells, ONIN)",2,ONIN,1,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,20873,20873.0
+Li32,Li32,exact,"identical name; Sup_Table_1 row 202 (instance Li32_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,82400,82400.0
+Li33,Li33,exact,"identical name; Sup_Table_1 row 203 (instance Li33_R, 1 cells, ONIN)",2,ONIN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,59949,59949.0
+Li34a,Li34a,exact,"identical name; Sup_Table_1 row 204 (instance Li34a_R, 34 cells, ONIN)",68,ONIN,34,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,49967,49967.0
+Li34b,Li34b,exact,"identical name; Sup_Table_1 row 205 (instance Li34b_R, 30 cells, ONIN)",60,ONIN,30,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,26200,26200.0
+Li35,Li35,exact,"identical name; Sup_Table_1 row 206 (instance Li35_R, 13 cells, ONIN)",27,ONIN,13,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,12855,12855.0
+Li36,Li36,exact,"identical name; Sup_Table_1 row 207 (instance Li36_R, 1 cells, ONIN)",2,ONIN,1,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,4506,4506.0
+Li37,Li37,exact,"identical name; Sup_Table_1 row 208 (instance Li37_R, 1 cells, ONIN)",2,ONIN,1,0,glutamate,,unmatched,,,,,ol_intrinsic,glutamate,1.0,0,4449,4449.0
+LLPC1,LLPC1,exact,"identical name; Sup_Table_1 row 209 (instance LLPC1_R, 142 cells, VPN)",285,VPN,142,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,visual_projection,acetylcholine,1.0,0,172299,172299.0
+LLPC2,LLPC2,exact,"identical name; Sup_Table_1 row 210 (instance LLPC2_R, 125 cells, VPN)",250,VPN,125,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,88511,88511.0
+LLPC3,LLPC3,exact,"identical name; Sup_Table_1 row 211 (instance LLPC3_R, 112 cells, VPN)",219,VPN,112,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,100355,100355.0
+LLPC4,LLPC4,exact,"identical name; Sup_Table_1 row 212 (instance LLPC4_R, 3 cells, VPN)",6,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4735,4735.0
+LOLP1,LOLP1,exact,"identical name; Sup_Table_1 row 213 (instance LOLP1_R, 32 cells, ONCN)",69,ONCN,32,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,135024,135024.0
+LoVC2,LoVC2,exact,"identical name; Sup_Table_1 row 214 (instance LoVC2_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,12547,12547.0
+LoVC4,LoVC4,exact,"identical name; Sup_Table_1 row 215 (instance LoVC4_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,9447,9447.0
+LoVC5,LoVC5,exact,"identical name; Sup_Table_1 row 216 (instance LoVC5_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,10643,10643.0
+LoVC6,LoVC6,exact,"identical name; Sup_Table_1 row 217 (instance LoVC6_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,12100,12100.0
+LoVC7,LoVC7,exact,"identical name; Sup_Table_1 row 218 (instance LoVC7_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,15844,15844.0
+LoVC13,LoVC13,exact,"identical name; Sup_Table_1 row 219 (instance LoVC13_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,6614,6614.0
+LoVC15,LoVC15,exact,"identical name; Sup_Table_1 row 220 (instance LoVC15_R, 3 cells, VCN)",6,VCN,3,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,21966,21966.0
+LoVC16,LoVC16,exact,"identical name; Sup_Table_1 row 221 (instance LoVC16_R, 2 cells, VCN)",4,VCN,2,0,glutamate,gaba,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,102105,102105.0
+LoVC17,LoVC17,exact,"identical name; Sup_Table_1 row 222 (instance LoVC17_R, 2 cells, VCN)",5,VCN,2,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,10078,10078.0
+LoVC18,LoVC18,exact,"identical name; Sup_Table_1 row 223 (instance LoVC18_R, 2 cells, VCN)",4,VCN,2,0,dopamine,dopamine,1-to-1,dopamine,antibody staining of genetically marked cells,Mao and Davis 2009,no,visual_centrifugal,dopamine,1.0,0,0,29667.0
+LoVC19,LoVC19,exact,"identical name; Sup_Table_1 row 224 (instance LoVC19_R, 2 cells, VCN)",4,VCN,2,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,40615,40615.0
+LoVC24,LoVC24,exact,"identical name; Sup_Table_1 row 225 (instance LoVC24_R, 3 cells, VCN)",10,VCN,3,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,8119,8119.0
+LoVC26,LoVC26,exact,"identical name; Sup_Table_1 row 226 (instance LoVC26_R, 3 cells, VCN)",6,VCN,3,0,glutamate,gaba,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,3905,3905.0
+LoVCLo1,LoVCLo1,exact,"identical name; Sup_Table_1 row 227 (instance LoVCLo1_R, 1 cells, VCN)",2,VCN,1,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,12620,12620.0
+LoVCLo2,LoVCLo2,exact,"identical name; Sup_Table_1 row 228 (instance LoVCLo2_R, 1 cells, VCN)",2,VCN,1,1,unclear,serotonin,1-to-1,,,,,visual_centrifugal,unknown,1.0,2,0,14808.0
+LoVCLo3,LoVCLo3,exact,"identical name; Sup_Table_1 row 229 (instance LoVCLo3_R, 1 cells, VCN)",2,VCN,1,1,octopamine,octopamine,1-to-1,octopamine,antibody staining of genetically marked cells,Busch et al 2009,no,visual_centrifugal,octopamine,1.0,0,0,40059.0
+LoVP1,LoVP1,exact,"identical name; Sup_Table_1 row 230 (instance LoVP1_R, 27 cells, VPN)",52,VPN,27,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,26340,26340.0
+LoVP2,LoVP2,exact,"identical name; Sup_Table_1 row 231 (instance LoVP2_R, 23 cells, VPN)",44,VPN,23,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,17965,17965.0
+LoVP3,LoVP3,exact,"identical name; Sup_Table_1 row 232 (instance LoVP3_R, 6 cells, VPN)",12,VPN,6,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3368,3368.0
+LoVP4,LoVP4,exact,"identical name; Sup_Table_1 row 233 (instance LoVP4_R, 5 cells, VPN)",12,VPN,5,0,unclear,acetylcholine,3-to-1,,,,,visual_projection,acetylcholine,1.0,0,2864,2864.0
+LoVP5,LoVP5,exact,"identical name; Sup_Table_1 row 234 (instance LoVP5_R, 12 cells, VPN)",27,VPN,12,0,acetylcholine,acetylcholine,3-to-1,,,,,visual_projection,acetylcholine,1.0,0,8432,8432.0
+LoVP6,LoVP6,exact,"identical name; Sup_Table_1 row 235 (instance LoVP6_R, 11 cells, VPN)",22,VPN,11,0,acetylcholine,acetylcholine,3-to-1,,,,,visual_projection,acetylcholine,1.0,0,16774,16774.0
+LoVP7,LoVP7,exact,"identical name; Sup_Table_1 row 236 (instance LoVP7_R, 12 cells, VPN)",20,VPN,12,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,4651,4651.0
+LoVP8,LoVP8,exact,"identical name; Sup_Table_1 row 237 (instance LoVP8_R, 9 cells, VPN)",22,VPN,9,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4843,4843.0
+LoVP9,LoVP9,exact,"identical name; Sup_Table_1 row 238 (instance LoVP9_R, 6 cells, VPN)",13,VPN,6,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,1632,1632.0
+LoVP10,LoVP10,exact,"identical name; Sup_Table_1 row 239 (instance LoVP10_R, 9 cells, VPN)",15,VPN,9,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,6487,6487.0
+LoVP11,LoVP11,exact,"identical name; Sup_Table_1 row 240 (instance LoVP11_R, 4 cells, VPN)",8,VPN,4,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,2446,2446.0
+LoVP12,LoVP12,exact,"identical name; Sup_Table_1 row 241 (instance LoVP12_R, 19 cells, VPN)",42,VPN,19,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7589,7589.0
+LoVP13,LoVP13,exact,"identical name; Sup_Table_1 row 242 (instance LoVP13_R, 24 cells, VPN)",51,VPN,24,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,10055,10055.0
+LoVP14,LoVP14,exact,"identical name; Sup_Table_1 row 243 (instance LoVP14_R, 9 cells, VPN)",19,VPN,9,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,21651,21651.0
+LoVP16,LoVP16,exact,"identical name; Sup_Table_1 row 244 (instance LoVP16_R, 5 cells, VPN)",11,VPN,5,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,10723,10723.0
+LoVP17,LoVP17,exact,"identical name; Sup_Table_1 row 245 (instance LoVP17_R, 4 cells, VPN)",8,VPN,4,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6503,6503.0
+LoVP18,LoVP18,exact,"identical name; Sup_Table_1 row 246 (instance LoVP18_R, 6 cells, VPN)",12,VPN,6,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,15323,15323.0
+LoVP19,LoVP19,exact,"identical name; Sup_Table_1 row 247 (instance LoVP19_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,6-to-6,,,,,visual_projection,acetylcholine,1.0,0,598,598.0
+LoVP20,LoVP20,exact,"identical name; Sup_Table_1 row 248 (instance LoVP20_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,6-to-6,,,,,visual_projection,acetylcholine,1.0,0,1644,1644.0
+LoVP21,LoVP21,exact,"identical name; Sup_Table_1 row 249 (instance LoVP21_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,6-to-6,,,,,visual_projection,acetylcholine,1.0,0,2008,2008.0
+LoVP22,LoVP22,exact,"identical name; Sup_Table_1 row 250 (instance LoVP22_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,6-to-6,,,,,visual_projection,acetylcholine,1.0,0,1724,1724.0
+LoVP23,LoVP23,exact,"identical name; Sup_Table_1 row 251 (instance LoVP23_R, 3 cells, VPN)",6,VPN,3,0,unclear,acetylcholine,6-to-6,,,,,visual_projection,acetylcholine,1.0,0,4504,4504.0
+LoVP24,LoVP24,exact,"identical name; Sup_Table_1 row 252 (instance LoVP24_R, 4 cells, VPN)",8,VPN,4,0,unclear,acetylcholine,1-to-2,,,,,visual_projection,acetylcholine,1.0,0,3993,3993.0
+LoVP25,LoVP25,exact,"identical name; Sup_Table_1 row 253 (instance LoVP25_R, 3 cells, VPN)",6,VPN,3,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4699,4699.0
+LoVP26,LoVP26,exact,"identical name; Sup_Table_1 row 254 (instance LoVP26_R, 6 cells, VPN)",12,VPN,6,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,11412,11412.0
+LoVP27,LoVP27,exact,"identical name; Sup_Table_1 row 255 (instance LoVP27_R, 5 cells, VPN)",10,VPN,5,0,acetylcholine,acetylcholine,6-to-6,,,,,visual_projection,acetylcholine,1.0,0,4337,4337.0
+LoVP28,LoVP28,exact,"identical name; Sup_Table_1 row 256 (instance LoVP28_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2713,2713.0
+LoVP29,LoVP29,exact,"identical name; Sup_Table_1 row 257 (instance LoVP29_R, 1 cells, VPN)",2,VPN,1,0,unclear,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,3233,3233.0
+LoVP30,LoVP30,exact,"identical name; Sup_Table_1 row 258 (instance LoVP30_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,2398,2398.0
+LoVP31,LoVP31,exact,"identical name; Sup_Table_1 row 259 (instance LoVP31_R, 1 cells, VPN)",1,VPN,1,0,unclear,,unmatched,,,,,visual_projection,acetylcholine,1.0,0,1563,1563.0
+LoVP32,LoVP32,exact,"identical name; Sup_Table_1 row 260 (instance LoVP32_R, 3 cells, VPN)",6,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6810,6810.0
+LoVP33,LoVP33,exact,"identical name; Sup_Table_1 row 261 (instance LoVP33_R, 3 cells, VPN)",6,VPN,3,0,unclear,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,2985,2985.0
+LoVP34,LoVP34,exact,"identical name; Sup_Table_1 row 262 (instance LoVP34_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2778,2778.0
+LoVP35,LoVP35,exact,"identical name; Sup_Table_1 row 263 (instance LoVP35_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3114,3114.0
+LoVP36,LoVP36,exact,"identical name; Sup_Table_1 row 264 (instance LoVP36_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,4645,4645.0
+LoVP37,LoVP37,exact,"identical name; Sup_Table_1 row 265 (instance LoVP37_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,2278,2278.0
+LoVP38,LoVP38,exact,"identical name; Sup_Table_1 row 266 (instance LoVP38_R, 2 cells, VPN)",4,VPN,2,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3289,3289.0
+LoVP39,LoVP39,exact,"identical name; Sup_Table_1 row 267 (instance LoVP39_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6390,6390.0
+LoVP40,LoVP40,exact,"identical name; Sup_Table_1 row 268 (instance LoVP40_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,5306,5306.0
+LoVP41,LoVP41,exact,"identical name; Sup_Table_1 row 269 (instance LoVP41_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2772,2772.0
+LoVP42,LoVP42,exact,"identical name; Sup_Table_1 row 270 (instance LoVP42_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5496,5496.0
+LoVP43,LoVP43,exact,"identical name; Sup_Table_1 row 271 (instance LoVP43_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3066,3066.0
+LoVP44,LoVP44,exact,"identical name; Sup_Table_1 row 272 (instance LoVP44_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2961,2961.0
+LoVP45,LoVP45,exact,"identical name; Sup_Table_1 row 273 (instance LoVP45_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,5225,5225.0
+LoVP46,LoVP46,exact,"identical name; Sup_Table_1 row 274 (instance LoVP46_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,6932,6932.0
+LoVP47,LoVP47,exact,"identical name; Sup_Table_1 row 275 (instance LoVP47_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,5030,5030.0
+LoVP48,LoVP48,exact,"identical name; Sup_Table_1 row 276 (instance LoVP48_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4472,4472.0
+LoVP49,LoVP49,exact,"identical name; Sup_Table_1 row 277 (instance LoVP49_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6113,6113.0
+LoVP50,LoVP50,exact,"identical name; Sup_Table_1 row 278 (instance LoVP50_R, 4 cells, VPN)",7,VPN,4,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,13040,13040.0
+LoVP51,LoVP51,exact,"identical name; Sup_Table_1 row 279 (instance LoVP51_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3572,3572.0
+LoVP52,LoVP52,exact,"identical name; Sup_Table_1 row 280 (instance LoVP52_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,1530,1530.0
+LoVP53,LoVP53,exact,"identical name; Sup_Table_1 row 281 (instance LoVP53_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7116,7116.0
+LoVP54,LoVP54,exact,"identical name; Sup_Table_1 row 282 (instance LoVP54_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,11034,11034.0
+LoVP55,LoVP55,exact,"identical name; Sup_Table_1 row 283 (instance LoVP55_R, 2 cells, VPN)",4,VPN,2,0,unclear,,unmatched,,,,,visual_projection,acetylcholine,1.0,0,1927,1927.0
+LoVP56,LoVP56,exact,"identical name; Sup_Table_1 row 284 (instance LoVP56_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3343,3343.0
+LoVP57,LoVP57,exact,"identical name; Sup_Table_1 row 285 (instance LoVP57_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2488,2488.0
+LoVP58,LoVP58,exact,"identical name; Sup_Table_1 row 286 (instance LoVP58_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,1966,1966.0
+LoVP59,LoVP59,exact,"identical name; Sup_Table_1 row 287 (instance LoVP59_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6804,6804.0
+LoVP60,LoVP60,exact,"identical name; Sup_Table_1 row 288 (instance LoVP60_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2745,2745.0
+LoVP61,LoVP61,exact,"identical name; Sup_Table_1 row 289 (instance LoVP61_R, 2 cells, VPN)",4,VPN,2,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3007,3007.0
+LoVP62,LoVP62,exact,"identical name; Sup_Table_1 row 290 (instance LoVP62_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4470,4470.0
+LoVP63,LoVP63,exact,"identical name; Sup_Table_1 row 291 (instance LoVP63_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7098,7098.0
+LoVP64,LoVP64,exact,"identical name; Sup_Table_1 row 292 (instance LoVP64_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3754,3754.0
+LoVP65,LoVP65,exact,"identical name; Sup_Table_1 row 293 (instance LoVP65_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2328,2328.0
+LoVP66,LoVP66,exact,"identical name; Sup_Table_1 row 294 (instance LoVP66_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2173,2173.0
+LoVP67,LoVP67,exact,"identical name; Sup_Table_1 row 295 (instance LoVP67_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3683,3683.0
+LoVP68,LoVP68,exact,"identical name; Sup_Table_1 row 296 (instance LoVP68_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5915,5915.0
+LoVP69,LoVP69,exact,"identical name; Sup_Table_1 row 297 (instance LoVP69_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5503,5503.0
+LoVP70,LoVP70,exact,"identical name; Sup_Table_1 row 298 (instance LoVP70_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4242,4242.0
+LoVP71,LoVP71,exact,"identical name; Sup_Table_1 row 299 (instance LoVP71_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4023,4023.0
+LoVP72,LoVP72,exact,"identical name; Sup_Table_1 row 300 (instance LoVP72_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2878,2878.0
+LoVP73,LoVP73,exact,"identical name; Sup_Table_1 row 301 (instance LoVP73_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5340,5340.0
+LoVP74,LoVP74,exact,"identical name; Sup_Table_1 row 302 (instance LoVP74_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7649,7649.0
+LoVP75,LoVP75,exact,"identical name; Sup_Table_1 row 303 (instance LoVP75_R, 3 cells, VPN)",5,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4266,4266.0
+LoVP76,LoVP76,exact,"identical name; Sup_Table_1 row 304 (instance LoVP76_R, 2 cells, VPN)",4,VPN,2,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,7231,7231.0
+LoVP77,LoVP77,exact,"identical name; Sup_Table_1 row 305 (instance LoVP77_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,2436,2436.0
+LoVP78,LoVP78,exact,"identical name; Sup_Table_1 row 306 (instance LoVP78_R, 1 cells, VPN)",3,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3296,3296.0
+LoVP79,LoVP79,exact,"identical name; Sup_Table_1 row 307 (instance LoVP79_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4444,4444.0
+LoVP80,LoVP80,exact,"identical name; Sup_Table_1 row 308 (instance LoVP80_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,2031,2031.0
+LoVP81,LoVP81,exact,"identical name; Sup_Table_1 row 309 (instance LoVP81_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,1785,1785.0
+LoVP82,LoVP82,exact,"identical name; Sup_Table_1 row 310 (instance LoVP82_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3203,3203.0
+LoVP83,LoVP83,exact,"identical name; Sup_Table_1 row 311 (instance LoVP83_R, 3 cells, VPN)",7,VPN,3,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,6863,6863.0
+LoVP84,LoVP84,exact,"identical name; Sup_Table_1 row 312 (instance LoVP84_R, 4 cells, VPN)",7,VPN,4,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,2609,2609.0
+LoVP85,LoVP85,exact,"identical name; Sup_Table_1 row 313 (instance LoVP85_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5758,5758.0
+LoVP86,LoVP86,exact,"identical name; Sup_Table_1 row 314 (instance LoVP86_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4378,4378.0
+LoVP88,LoVP88,exact,"identical name; Sup_Table_1 row 315 (instance LoVP88_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4924,4924.0
+LoVP89,LoVP89,exact,"identical name; Sup_Table_1 row 316 (instance LoVP89_R, 2 cells, VPN)",5,VPN,2,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5707,5707.0
+LoVP90a,LoVP90a,exact,"identical name; Sup_Table_1 row 317 (instance LoVP90a_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7489,7489.0
+LoVP90b,LoVP90b,exact,"identical name; Sup_Table_1 row 318 (instance LoVP90b_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6943,6943.0
+LoVP90c,LoVP90c,exact,"identical name; Sup_Table_1 row 319 (instance LoVP90c_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6362,6362.0
+LoVP91,LoVP91,exact,"identical name; Sup_Table_1 row 320 (instance LoVP91_R, 1 cells, VPN)",2,VPN,1,0,unclear,gaba,1-to-1,,,,,cb_intrinsic,gaba,1.0,0,6333,6333.0
+LoVP92,LoVP92,exact,"identical name; Sup_Table_1 row 321 (instance LoVP92_R, 6 cells, VPN)",13,VPN,6,0,gaba,,unmatched,,,,,visual_projection,acetylcholine,1.0,0,9431,9431.0
+LoVP93,LoVP93,exact,"identical name; Sup_Table_1 row 322 (instance LoVP93_R, 6 cells, VPN)",12,VPN,6,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7180,7180.0
+LoVP94,LoVP94,exact,"identical name; Sup_Table_1 row 323 (instance LoVP94_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,1255,1255.0
+LoVP95,LoVP95,exact,"identical name; Sup_Table_1 row 324 (instance LoVP95_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,1938,1938.0
+LoVP96,LoVP96,exact,"identical name; Sup_Table_1 row 325 (instance LoVP96_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,11657,11657.0
+LoVP97,LoVP97,exact,"identical name; Sup_Table_1 row 326 (instance LoVP97_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,6968,6968.0
+LoVP98,LoVP98,exact,"identical name; Sup_Table_1 row 327 (instance LoVP98_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,1608,1608.0
+LoVP99,LoVP99,exact,"identical name; Sup_Table_1 row 328 (instance LoVP99_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3247,3247.0
+LoVP100,LoVP100,exact,"identical name; Sup_Table_1 row 329 (instance LoVP100_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,9470,9470.0
+LoVP101,LoVP101,exact,"identical name; Sup_Table_1 row 330 (instance LoVP101_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,17506,17506.0
+LoVP102,LoVP102,exact,"identical name; Sup_Table_1 row 331 (instance LoVP102_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,21035,21035.0
+LoVP103,LoVP103,exact,"identical name; Sup_Table_1 row 332 (instance LoVP103_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4857,4857.0
+LoVP105,LoVP105,exact,"identical name; Sup_Table_1 row 333 (instance LoVP105_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,1246,1246.0
+LoVP106,LoVP106,exact,"identical name; Sup_Table_1 row 334 (instance LoVP106_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6486,6486.0
+LoVP107,LoVP107,exact,"identical name; Sup_Table_1 row 335 (instance LoVP107_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4368,4368.0
+LoVP108,LoVP108,exact,"identical name; Sup_Table_1 row 336 (instance LoVP108_R, 2 cells, VPN)",3,VPN,2,0,gaba,unclear,1-to-1,,,,,visual_projection,gaba,1.0,0,7011,7011.0
+LPC1,LPC1,exact,"identical name; Sup_Table_1 row 337 (instance LPC1_R, 109 cells, VPN)",224,VPN,109,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,visual_projection,acetylcholine,1.0,0,119941,119941.0
+LPC2,LPC2,exact,"identical name; Sup_Table_1 row 338 (instance LPC2_R, 78 cells, VPN)",154,VPN,78,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,73208,73208.0
+LPi2b,LPi2b,exact,"identical name; Sup_Table_1 row 339 (instance LPi2b_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),Zhao et al 2023,no,ol_intrinsic,gaba,1.0,0,57226,57226.0
+LPi2c,LPi2c,exact,"identical name; Sup_Table_1 row 340 (instance LPi2c_R, 27 cells, ONIN)",54,ONIN,27,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,99102,99102.0
+LPi2d,LPi2d,exact,"identical name; Sup_Table_1 row 341 (instance LPi2d_R, 26 cells, ONIN)",61,ONIN,26,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,29957,29957.0
+LPi2e,LPi2e,exact,"identical name; Sup_Table_1 row 342 (instance LPi2e_R, 46 cells, ONIN)",95,ONIN,46,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,74446,74446.0
+LPi3a,LPi3a,exact,"identical name; Sup_Table_1 row 343 (instance LPi3a_R, 63 cells, ONIN)",123,ONIN,63,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,66677,66677.0
+LPi3b,LPi3b,exact,"identical name; Sup_Table_1 row 344 (instance LPi3b_R, 22 cells, ONIN)",46,ONIN,22,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,22209,22209.0
+LPi3c,LPi3c,exact,"identical name; Sup_Table_1 row 345 (instance LPi3c_R, 6 cells, ONIN)",11,ONIN,6,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,4286,4286.0
+LPi4a,LPi4a,exact,"identical name; Sup_Table_1 row 346 (instance LPi4a_R, 17 cells, ONIN)",34,ONIN,17,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,14322,14322.0
+LPi4b,LPi4b,exact,"identical name; Sup_Table_1 row 347 (instance LPi4b_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,85357,85357.0
+LPi12,LPi12,exact,"identical name; Sup_Table_1 row 348 (instance LPi12_R, 2 cells, ONIN)",4,ONIN,2,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,82543,82543.0
+LPi14,LPi14,exact,"identical name; Sup_Table_1 row 349 (instance LPi14_R, 16 cells, ONIN)",33,ONIN,16,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,5350,5350.0
+LPi21,LPi21,exact,"identical name; Sup_Table_1 row 350 (instance LPi21_R, 1 cells, ONIN)",2,ONIN,1,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,89509,89509.0
+LPi34,LPi34,exact,"identical name; Sup_Table_1 row 351 (instance LPi34_R, 58 cells, ONIN)",119,ONIN,58,0,glutamate,gaba,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,69322,69322.0
+LPi43,LPi43,exact,"identical name; Sup_Table_1 row 352 (instance LPi43_R, 33 cells, ONIN)",61,ONIN,33,0,glutamate,gaba,1-to-1,glutamate,antibody staining of genetically marked cells,Mauss et al 2015,yes,ol_intrinsic,glutamate,1.0,0,81903,81903.0
+LPi3412,LPi3412,exact,"identical name; Sup_Table_1 row 353 (instance LPi3412_R, 57 cells, ONIN)",104,ONIN,57,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,68302,68302.0
+LPLC1,LPLC1,exact,"identical name; Sup_Table_1 row 354 (instance LPLC1_R, 66 cells, VPN)",134,VPN,66,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,visual_projection,acetylcholine,1.0,0,133519,133519.0
+LPLC2,LPLC2,exact,"identical name; Sup_Table_1 row 355 (instance LPLC2_R, 91 cells, VPN)",185,VPN,91,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,visual_projection,acetylcholine,1.0,0,186652,186652.0
+LPLC4,LPLC4,exact,"identical name; Sup_Table_1 row 356 (instance LPLC4_R, 49 cells, VPN)",97,VPN,49,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,123947,123947.0
+LPT21,LPT21,exact,"identical name; Sup_Table_1 row 357 (instance LPT21_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,8284,8284.0
+LPT22,LPT22,exact,"identical name; Sup_Table_1 row 358 (instance LPT22_R, 1 cells, VPN)",2,VPN,1,0,gaba,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,13739,13739.0
+LPT23,LPT23,exact,"identical name; Sup_Table_1 row 359 (instance LPT23_R, 3 cells, VPN)",6,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,48371,48371.0
+LPT26,LPT26,exact,"identical name; Sup_Table_1 row 360 (instance LPT26_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5988,5988.0
+LPT27,LPT27,exact,"identical name; Sup_Table_1 row 361 (instance LPT27_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5574,5574.0
+LPT28,LPT28,exact,"identical name; Sup_Table_1 row 362 (instance LPT28_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5750,5750.0
+LPT29,LPT29,exact,"identical name; Sup_Table_1 row 363 (instance LPT29_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3145,3145.0
+LPT30,LPT30,exact,"identical name; Sup_Table_1 row 364 (instance LPT30_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5281,5281.0
+LPT31,LPT31,exact,"identical name; Sup_Table_1 row 365 (instance LPT31_R, 4 cells, VPN)",8,VPN,4,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,12223,12223.0
+LPT49,LPT49,exact,"identical name; Sup_Table_1 row 366 (instance LPT49_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7262,7262.0
+LPT50,LPT50,exact,"identical name; Sup_Table_1 row 367 (instance LPT50_R, 1 cells, VPN)",2,VPN,1,1,gaba,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,11061,11061.0
+LPT51,LPT51,exact,"identical name; Sup_Table_1 row 368 (instance LPT51_R, 2 cells, VPN)",4,VPN,2,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,11872,11872.0
+LPT52,LPT52,exact,"identical name; Sup_Table_1 row 369 (instance LPT52_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6025,6025.0
+LPT53,LPT53,exact,"identical name; Sup_Table_1 row 370 (instance LPT53_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,11826,11826.0
+LPT54,LPT54,exact,"identical name; Sup_Table_1 row 371 (instance LPT54_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,30134,30134.0
+LPT60,LPT60,exact,"identical name; Sup_Table_1 row 372 (instance LPT60_R, 1 cells, VCN)",2,VCN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,15429,15429.0
+LPT100,LPT100,exact,"identical name; Sup_Table_1 row 373 (instance LPT100_R, 19 cells, VPN)",40,VPN,19,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,13115,13115.0
+LPT101,LPT101,exact,"identical name; Sup_Table_1 row 374 (instance LPT101_R, 6 cells, VPN)",11,VPN,6,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,FISH (Long  et al),This study,no,visual_projection,acetylcholine,1.0,0,3482,3482.0
+LPT110,LPT110,exact,"identical name; Sup_Table_1 row 375 (instance LPT110_R, 1 cells, VCN)",2,VCN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,5297,5297.0
+LPT111,LPT111,exact,"identical name; Sup_Table_1 row 376 (instance LPT111_R, 51 cells, VCN)",101,VCN,51,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,81568,81568.0
+LPT112,LPT112,exact,"identical name; Sup_Table_1 row 377 (instance LPT112_R, 20 cells, VCN)",39,VCN,20,0,gaba,gaba,2-to-1,,,,,visual_centrifugal,gaba,1.0,0,20275,20275.0
+LPT113,LPT113,exact,"identical name; Sup_Table_1 row 378 (instance LPT113_R, 12 cells, VCN)",22,VCN,12,0,gaba,gaba,2-to-1,,,,,visual_centrifugal,gaba,1.0,0,18084,18084.0
+LPT114,LPT114,exact,"identical name; Sup_Table_1 row 379 (instance LPT114_R, 11 cells, VCN)",22,VCN,11,0,gaba,gaba,3-to-1,,,,,visual_centrifugal,gaba,1.0,0,54257,54257.0
+LPT115,LPT115,exact,"identical name; Sup_Table_1 row 380 (instance LPT115_R, 3 cells, VCN)",6,VCN,3,0,gaba,gaba,3-to-1,,,,,visual_centrifugal,gaba,1.0,0,6952,6952.0
+LPT116,LPT116,exact,"identical name; Sup_Table_1 row 381 (instance LPT116_R, 5 cells, VCN)",11,VCN,5,0,gaba,gaba,3-to-1,,,,,visual_centrifugal,gaba,1.0,0,11309,11309.0
+LT1a,LT1a,exact,"identical name; Sup_Table_1 row 382 (instance LT1a_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,17558,17558.0
+LT1b,LT1b,exact,"identical name; Sup_Table_1 row 383 (instance LT1b_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,21201,21201.0
+LT1c,LT1c,exact,"identical name; Sup_Table_1 row 384 (instance LT1c_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,11927,11927.0
+LT1d,LT1d,exact,"identical name; Sup_Table_1 row 385 (instance LT1d_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,24725,24725.0
+LT11,LT11,exact,"identical name; Sup_Table_1 row 386 (instance LT11_R, 1 cells, VPN)",2,VPN,1,0,gaba,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,19821,19821.0
+LT34,LT34,exact,"identical name; Sup_Table_1 row 387 (instance LT34_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,13681,13681.0
+LT37,LT37,exact,"identical name; Sup_Table_1 row 388 (instance LT37_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,18590,18590.0
+LT39,LT39,exact,"identical name; Sup_Table_1 row 389 (instance LT39_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,27467,27467.0
+LT40,LT40,exact,"identical name; Sup_Table_1 row 390 (instance LT40_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,10743,10743.0
+LT41,LT41,exact,"identical name; Sup_Table_1 row 391 (instance LT41_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,8577,8577.0
+LT42,LT42,exact,"identical name; Sup_Table_1 row 392 (instance LT42_R, 1 cells, VCN)",2,VCN,1,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,25533,25533.0
+LT43,LT43,exact,"identical name; Sup_Table_1 row 393 (instance LT43_R, 2 cells, VPN)",4,VPN,2,0,gaba,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,7806,7806.0
+LT47,LT47,exact,"identical name; Sup_Table_1 row 394 (instance LT47_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,1700,1700.0
+LT51,LT51,exact,"identical name; Sup_Table_1 row 395 (instance LT51_R, 11 cells, VPN)",22,VPN,11,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,50230,50230.0
+LT52,LT52,exact,"identical name; Sup_Table_1 row 396 (instance LT52_R, 17 cells, VPN)",34,VPN,17,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,71237,71237.0
+LT54,LT54,exact,"identical name; Sup_Table_1 row 397 (instance LT54_R, 1 cells, VPN)",2,VPN,1,1,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,4916,4916.0
+LT55,LT55,exact,"identical name; Sup_Table_1 row 398 (instance LT55_R, 1 cells, VPN)",2,VPN,1,1,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,7560,7560.0
+LT56,LT56,exact,"identical name; Sup_Table_1 row 399 (instance LT56_R, 1 cells, VCN)",2,VCN,1,0,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,29141,29141.0
+LT58,LT58,exact,"identical name; Sup_Table_1 row 400 (instance LT58_R, 1 cells, ONCN)",2,ONCN,1,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,37223,37223.0
+LT59,LT59,exact,"identical name; Sup_Table_1 row 401 (instance LT59_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2217,2217.0
+LT60,LT60,exact,"identical name; Sup_Table_1 row 402 (instance LT60_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5918,5918.0
+LT61a,LT61a,exact,"identical name; Sup_Table_1 row 403 (instance LT61a_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,8179,8179.0
+LT61b,LT61b,exact,"identical name; Sup_Table_1 row 404 (instance LT61b_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,12780,12780.0
+LT62,LT62,exact,"identical name; Sup_Table_1 row 405 (instance LT62_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,18261,18261.0
+LT63,LT63,exact,"identical name; Sup_Table_1 row 406 (instance LT63_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,12087,12087.0
+LT64,LT64,exact,"identical name; Sup_Table_1 row 407 (instance LT64_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2245,2245.0
+LT65,LT65,exact,"identical name; Sup_Table_1 row 408 (instance LT65_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7573,7573.0
+LT66,LT66,exact,"identical name; Sup_Table_1 row 409 (instance LT66_R, 1 cells, VPN)",2,VPN,1,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,10708,10708.0
+LT67,LT67,exact,"identical name; Sup_Table_1 row 410 (instance LT67_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4843,4843.0
+LT68,LT68,exact,"identical name; Sup_Table_1 row 411 (instance LT68_R, 2 cells, VPN)",4,VPN,2,0,glutamate,gaba,1-to-1,,,,,visual_projection,glutamate,1.0,0,4616,4616.0
+LT69,LT69,exact,"identical name; Sup_Table_1 row 412 (instance LT69_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3352,3352.0
+LT70,LT70,exact,"identical name; Sup_Table_1 row 413 (instance LT70_R, 6 cells, VCN)",11,VCN,6,0,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,8529,8529.0
+LT72,LT72,exact,"identical name; Sup_Table_1 row 414 (instance LT72_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6744,6744.0
+LT73,LT73,exact,"identical name; Sup_Table_1 row 415 (instance LT73_R, 2 cells, VPN)",3,VPN,2,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,4683,4683.0
+LT74,LT74,exact,"identical name; Sup_Table_1 row 416 (instance LT74_R, 3 cells, VPN)",6,VPN,3,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,9271,9271.0
+LT75,LT75,exact,"identical name; Sup_Table_1 row 417 (instance LT75_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4847,4847.0
+LT76,LT76,exact,"identical name; Sup_Table_1 row 418 (instance LT76_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6152,6152.0
+LT77,LT77,exact,"identical name; Sup_Table_1 row 419 (instance LT77_R, 3 cells, VPN)",6,VPN,3,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,9680,9680.0
+LT78,LT78,exact,"identical name; Sup_Table_1 row 420 (instance LT78_R, 4 cells, VPN)",8,VPN,4,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,14308,14308.0
+LT79,LT79,exact,"identical name; Sup_Table_1 row 421 (instance LT79_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,17232,17232.0
+LT80,LT80,exact,"identical name; Sup_Table_1 row 422 (instance LT80_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6334,6334.0
+LT81,LT81,exact,"identical name; Sup_Table_1 row 423 (instance LT81_R, 6 cells, VPN)",11,VPN,6,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4609,4609.0
+LT82a,LT82a,exact,"identical name; Sup_Table_1 row 424 (instance LT82a_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,15592,15592.0
+LT82b,LT82b,exact,"identical name; Sup_Table_1 row 425 (instance LT82b_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5553,5553.0
+LT83,LT83,exact,"identical name; Sup_Table_1 row 426 (instance LT83_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,21066,21066.0
+LT84,LT84,exact,"identical name; Sup_Table_1 row 427 (instance LT84_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6431,6431.0
+LT85,LT85,exact,"identical name; Sup_Table_1 row 428 (instance LT85_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5159,5159.0
+LT86,LT86,exact,"identical name; Sup_Table_1 row 429 (instance LT86_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,12758,12758.0
+LT87,LT87,exact,"identical name; Sup_Table_1 row 430 (instance LT87_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,19681,19681.0
+LT88,LT88,exact,"identical name; Sup_Table_1 row 431 (instance LT88_R, 1 cells, ONCN)",2,ONCN,1,0,glutamate,gaba,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,11387,11387.0
+MeLo1,MeLo1,exact,"identical name; Sup_Table_1 row 432 (instance MeLo1_R, 63 cells, ONCN)",123,ONCN,63,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,122875,122875.0
+MeLo2,MeLo2,exact,"identical name; Sup_Table_1 row 433 (instance MeLo2_R, 71 cells, ONCN)",145,ONCN,71,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,81226,81226.0
+MeLo3a,MeLo3a,exact,"identical name; Sup_Table_1 row 434 (instance MeLo3a_R, 57 cells, ONCN)",107,ONCN,57,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,34359,34359.0
+MeLo3b,MeLo3b,exact,"identical name; Sup_Table_1 row 435 (instance MeLo3b_R, 40 cells, ONCN)",81,ONCN,40,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,38096,38096.0
+MeLo4,MeLo4,exact,"identical name; Sup_Table_1 row 436 (instance MeLo4_R, 34 cells, ONCN)",68,ONCN,34,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,27594,27594.0
+MeLo5,MeLo5,exact,"identical name; Sup_Table_1 row 437 (instance MeLo5_R, 19 cells, ONCN)",37,ONCN,19,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,8642,8642.0
+MeLo6,MeLo6,exact,"identical name; Sup_Table_1 row 438 (instance MeLo6_R, 30 cells, ONCN)",62,ONCN,30,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,25750,25750.0
+MeLo7,MeLo7,exact,"identical name; Sup_Table_1 row 439 (instance MeLo7_R, 48 cells, ONCN)",96,ONCN,48,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,60178,60178.0
+MeLo8,MeLo8,exact,"identical name; Sup_Table_1 row 440 (instance MeLo8_R, 23 cells, ONCN)",47,ONCN,23,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,241114,241114.0
+MeLo9,MeLo9,exact,"identical name; Sup_Table_1 row 441 (instance MeLo9_R, 42 cells, ONCN)",82,ONCN,42,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,246819,246819.0
+MeLo10,MeLo10,exact,"identical name; Sup_Table_1 row 442 (instance MeLo10_R, 30 cells, ONCN)",61,ONCN,30,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,135656,135656.0
+MeLo11,MeLo11,exact,"identical name; Sup_Table_1 row 443 (instance MeLo11_R, 27 cells, ONCN)",50,ONCN,27,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,42719,42719.0
+MeLo12,MeLo12,exact,"identical name; Sup_Table_1 row 444 (instance MeLo12_R, 25 cells, ONCN)",50,ONCN,25,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,75384,75384.0
+MeLo13,MeLo13,exact,"identical name; Sup_Table_1 row 445 (instance MeLo13_R, 37 cells, ONCN)",73,ONCN,37,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,96897,96897.0
+MeLo14,MeLo14,exact,"identical name; Sup_Table_1 row 446 (instance MeLo14_R, 20 cells, ONCN)",39,ONCN,20,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,85700,85700.0
+MeTu1,MeTu1,exact,"identical name; Sup_Table_1 row 447 (instance MeTu1_R, 124 cells, VPN)",250,VPN,124,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,visual_projection,acetylcholine,0.996,1,124187,124187.0
+MeTu2a,MeTu2a,exact,"identical name; Sup_Table_1 row 448 (instance MeTu2a_R, 36 cells, VPN)",70,VPN,36,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,17683,17683.0
+MeTu2b,MeTu2b,exact,"identical name; Sup_Table_1 row 449 (instance MeTu2b_R, 16 cells, VPN)",31,VPN,16,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,9268,9268.0
+MeTu3a,MeTu3a,exact,"identical name; Sup_Table_1 row 450 (instance MeTu3a_R, 18 cells, VPN)",42,VPN,18,0,acetylcholine,acetylcholine,3-to-1,,,,,visual_projection,acetylcholine,1.0,0,24505,24505.0
+MeTu3b,MeTu3b,exact,"identical name; Sup_Table_1 row 451 (instance MeTu3b_R, 42 cells, VPN)",80,VPN,42,0,acetylcholine,acetylcholine,3-to-1,,,,,visual_projection,acetylcholine,1.0,0,38875,38875.0
+MeTu3c,MeTu3c,exact,"identical name; Sup_Table_1 row 452 (instance MeTu3c_R, 91 cells, VPN)",173,VPN,91,0,acetylcholine,acetylcholine,3-to-1,,,,,visual_projection,acetylcholine,1.0,0,67401,67401.0
+MeTu4a,MeTu4a,exact,"identical name; Sup_Table_1 row 453 (instance MeTu4a_R, 49 cells, VPN)",95,VPN,49,0,acetylcholine,acetylcholine,6-to-1,,,,,visual_projection,acetylcholine,1.0,0,41099,41099.0
+MeTu4b,MeTu4b,exact,"identical name; Sup_Table_1 row 454 (instance MeTu4b_R, 16 cells, VPN)",32,VPN,16,0,acetylcholine,acetylcholine,6-to-1,,,,,visual_projection,acetylcholine,1.0,0,5476,5476.0
+MeTu4c,MeTu4c,exact,"identical name; Sup_Table_1 row 455 (instance MeTu4c_R, 41 cells, VPN)",87,VPN,41,0,acetylcholine,acetylcholine,6-to-1,,,,,visual_projection,acetylcholine,1.0,0,37843,37843.0
+MeTu4d,MeTu4d,exact,"identical name; Sup_Table_1 row 456 (instance MeTu4d_R, 20 cells, VPN)",40,VPN,20,0,acetylcholine,acetylcholine,6-to-1,,,,,visual_projection,acetylcholine,1.0,0,9099,9099.0
+MeTu4e,MeTu4e,exact,"identical name; Sup_Table_1 row 457 (instance MeTu4e_R, 25 cells, VPN)",51,VPN,25,0,acetylcholine,acetylcholine,6-to-1,,,,,visual_projection,acetylcholine,1.0,0,10323,10323.0
+MeTu4f,MeTu4f,exact,"identical name; Sup_Table_1 row 458 (instance MeTu4f_R, 28 cells, VPN)",56,VPN,28,0,acetylcholine,acetylcholine,6-to-1,,,,,visual_projection,acetylcholine,1.0,0,18513,18513.0
+MeVC20,MeVC20,exact,"identical name; Sup_Table_1 row 459 (instance MeVC20_R, 2 cells, VCN)",4,VCN,2,0,glutamate,glutamate,2-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,visual_centrifugal,glutamate,1.0,0,12816,12816.0
+MeVC21,MeVC21,exact,"identical name; Sup_Table_1 row 460 (instance MeVC21_R, 3 cells, VCN)",6,VCN,3,0,glutamate,serotonin,1-to-1,glutamate,FISH (Long  et al),This study,no,visual_centrifugal,glutamate,1.0,0,7090,7090.0
+MeVC22,MeVC22,exact,"identical name; Sup_Table_1 row 461 (instance MeVC22_R, 2 cells, VCN)",4,VCN,2,0,glutamate,glutamate,1-to-1,glutamate,FISH (Long  et al),This study,no,visual_centrifugal,glutamate,1.0,0,14834,14834.0
+MeVC23,MeVC23,exact,"identical name; Sup_Table_1 row 462 (instance MeVC23_R, 1 cells, VCN)",2,VCN,1,0,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,19255,19255.0
+MeVC24,MeVC24,exact,"identical name; Sup_Table_1 row 463 (instance MeVC24_R, 1 cells, VCN)",2,VCN,1,0,glutamate,glutamate,2-to-1,,,,,visual_centrifugal,glutamate,1.0,0,6401,6401.0
+MeVC25,MeVC25,exact,"identical name; Sup_Table_1 row 464 (instance MeVC25_R, 1 cells, VCN)",2,VCN,1,0,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,54437,54437.0
+MeVCMe1,MeVCMe1,exact,"identical name; Sup_Table_1 row 465 (instance MeVCMe1_R, 2 cells, VCN)",4,VCN,2,2,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,98165,98165.0
+MeVP1,MeVP1,exact,"identical name; Sup_Table_1 row 466 (instance MeVP1_R, 59 cells, VPN)",122,VPN,59,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,61012,61012.0
+MeVP2,MeVP2,exact,"identical name; Sup_Table_1 row 467 (instance MeVP2_R, 36 cells, VPN)",76,VPN,36,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,21032,21032.0
+MeVP3,MeVP3,exact,"identical name; Sup_Table_1 row 468 (instance MeVP3_R, 35 cells, VPN)",69,VPN,35,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,35792,35792.0
+MeVP4,MeVP4,exact,"identical name; Sup_Table_1 row 469 (instance MeVP4_R, 22 cells, VPN)",40,VPN,22,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,44733,44733.0
+MeVP5,MeVP5,exact,"identical name; Sup_Table_1 row 470 (instance MeVP5_R, 9 cells, VPN)",17,VPN,9,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5099,5099.0
+MeVP6,MeVP6,exact,"identical name; Sup_Table_1 row 471 (instance MeVP6_R, 49 cells, VPN)",99,VPN,49,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,37426,37426.0
+MeVP7,MeVP7,exact,"identical name; Sup_Table_1 row 472 (instance MeVP7_R, 12 cells, VPN)",23,VPN,12,0,acetylcholine,acetylcholine,4-to-1,,,,,visual_projection,acetylcholine,1.0,0,19982,19982.0
+MeVP8,MeVP8,exact,"identical name; Sup_Table_1 row 473 (instance MeVP8_R, 6 cells, VPN)",13,VPN,6,0,acetylcholine,acetylcholine,4-to-1,,,,,visual_projection,acetylcholine,1.0,0,12669,12669.0
+MeVP9,MeVP9,exact,"identical name; Sup_Table_1 row 474 (instance MeVP9_R, 5 cells, VPN)",12,VPN,5,0,acetylcholine,acetylcholine,4-to-1,,,,,visual_projection,acetylcholine,1.0,0,18659,18659.0
+MeVP10,MeVP10,exact,"identical name; Sup_Table_1 row 475 (instance MeVP10_R, 33 cells, VPN)",61,VPN,33,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,27436,27436.0
+MeVP11,MeVP11,exact,"identical name; Sup_Table_1 row 476 (instance MeVP11_R, 30 cells, VPN)",55,VPN,30,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,FISH (Long  et al),This study,no,visual_projection,acetylcholine,1.0,0,20503,20503.0
+MeVP12,MeVP12,exact,"identical name; Sup_Table_1 row 477 (instance MeVP12_R, 18 cells, VPN)",27,VPN,18,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,14564,14564.0
+MeVP14,MeVP14,exact,"identical name; Sup_Table_1 row 478 (instance MeVP14_R, 17 cells, VPN)",33,VPN,17,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,visual_projection,acetylcholine,1.0,0,14035,14035.0
+MeVP15,MeVP15,exact,"identical name; Sup_Table_1 row 479 (instance MeVP15_R, 11 cells, VPN)",24,VPN,11,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6923,6923.0
+MeVP16,MeVP16,exact,"identical name; Sup_Table_1 row 480 (instance MeVP16_R, 4 cells, VPN)",8,VPN,4,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3252,3252.0
+MeVP17,MeVP17,exact,"identical name; Sup_Table_1 row 481 (instance MeVP17_R, 7 cells, VPN)",14,VPN,7,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,34104,34104.0
+MeVP18,MeVP18,exact,"identical name; Sup_Table_1 row 482 (instance MeVP18_R, 3 cells, VPN)",6,VPN,3,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,15637,15637.0
+MeVP20,MeVP20,exact,"identical name; Sup_Table_1 row 483 (instance MeVP20_R, 3 cells, VPN)",4,VPN,3,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,glutamate,1.0,0,1907,1907.0
+MeVP21,MeVP21,exact,"identical name; Sup_Table_1 row 484 (instance MeVP21_R, 3 cells, VPN)",6,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,8989,8989.0
+MeVP22,MeVP22,exact,"identical name; Sup_Table_1 row 485 (instance MeVP22_R, 2 cells, VPN)",3,VPN,2,0,gaba,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,2759,2759.0
+MeVP23,MeVP23,exact,"identical name; Sup_Table_1 row 486 (instance MeVP23_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,7011,7011.0
+MeVP24,MeVP24,exact,"identical name; Sup_Table_1 row 487 (instance MeVP24_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6679,6679.0
+MeVP25,MeVP25,exact,"identical name; Sup_Table_1 row 488 (instance MeVP25_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4750,4750.0
+MeVP26,MeVP26,exact,"identical name; Sup_Table_1 row 489 (instance MeVP26_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,12962,12962.0
+MeVP27,MeVP27,exact,"identical name; Sup_Table_1 row 490 (instance MeVP27_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3502,3502.0
+MeVP28,MeVP28,exact,"identical name; Sup_Table_1 row 491 (instance MeVP28_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5989,5989.0
+MeVP29,MeVP29,exact,"identical name; Sup_Table_1 row 492 (instance MeVP29_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7151,7151.0
+MeVP30,MeVP30,exact,"identical name; Sup_Table_1 row 493 (instance MeVP30_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3743,3743.0
+MeVP31,MeVP31,exact,"identical name; Sup_Table_1 row 494 (instance MeVP31_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,1371,1371.0
+MeVP32,MeVP32,exact,"identical name; Sup_Table_1 row 495 (instance MeVP32_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,4674,4674.0
+MeVP33,MeVP33,exact,"identical name; Sup_Table_1 row 496 (instance MeVP33_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6274,6274.0
+MeVP34,MeVP34,exact,"identical name; Sup_Table_1 row 497 (instance MeVP34_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2846,2846.0
+MeVP35,MeVP35,exact,"identical name; Sup_Table_1 row 498 (instance MeVP35_R, 1 cells, VPN)",2,VPN,1,0,unclear,gaba,1-to-1,,,,,visual_projection,glutamate,1.0,0,1529,1529.0
+MeVP36,MeVP36,exact,"identical name; Sup_Table_1 row 499 (instance MeVP36_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6880,6880.0
+MeVP38,MeVP38,exact,"identical name; Sup_Table_1 row 500 (instance MeVP38_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,7246,7246.0
+MeVP39,MeVP39,exact,"identical name; Sup_Table_1 row 501 (instance MeVP39_R, 1 cells, VPN)",2,VPN,1,0,unclear,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,1273,1273.0
+MeVP40,MeVP40,exact,"identical name; Sup_Table_1 row 502 (instance MeVP40_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,2439,2439.0
+MeVP41,MeVP41,exact,"identical name; Sup_Table_1 row 503 (instance MeVP41_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5538,5538.0
+MeVP42,MeVP42,exact,"identical name; Sup_Table_1 row 504 (instance MeVP42_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,2-to-1,,,,,visual_projection,acetylcholine,1.0,0,2077,2077.0
+MeVP43,MeVP43,exact,"identical name; Sup_Table_1 row 505 (instance MeVP43_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5909,5909.0
+MeVP45,MeVP45,exact,"identical name; Sup_Table_1 row 506 (instance MeVP45_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,8562,8562.0
+MeVP46,MeVP46,exact,"identical name; Sup_Table_1 row 507 (instance MeVP46_R, 2 cells, VPN)",4,VPN,2,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,4977,4977.0
+MeVP47,MeVP47,exact,"identical name; Sup_Table_1 row 508 (instance MeVP47_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5198,5198.0
+MeVP48,MeVP48,exact,"identical name; Sup_Table_1 row 509 (instance MeVP48_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,2554,2554.0
+MeVP49,MeVP49,exact,"identical name; Sup_Table_1 row 510 (instance MeVP49_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,4610,4610.0
+MeVP50,MeVP50,exact,"identical name; Sup_Table_1 row 511 (instance MeVP50_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,2311,2311.0
+MeVP51,MeVP51,exact,"identical name; Sup_Table_1 row 512 (instance MeVP51_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,13677,13677.0
+MeVP52,MeVP52,exact,"identical name; Sup_Table_1 row 513 (instance MeVP52_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6335,6335.0
+MeVP53,MeVP53,exact,"identical name; Sup_Table_1 row 514 (instance MeVP53_R, 1 cells, VPN)",2,VPN,1,0,gaba,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,10724,10724.0
+MeVP54,MeVP54,exact,"identical name; Sup_Table_1 row 515 (instance MeVP54_R, 2 cells, VPN)",4,VPN,2,0,unclear,glutamate,2-to-1,,,,,visual_projection,glutamate,1.0,0,2395,2395.0
+MeVP55,MeVP55,exact,"identical name; Sup_Table_1 row 516 (instance MeVP55_R, 2 cells, VPN)",4,VPN,2,0,unclear,glutamate,2-to-1,,,,,visual_projection,glutamate,1.0,0,2357,2357.0
+MeVP56,MeVP56,exact,"identical name; Sup_Table_1 row 517 (instance MeVP56_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,7251,7251.0
+MeVP57,MeVP57,exact,"identical name; Sup_Table_1 row 518 (instance MeVP57_R, 1 cells, VPN)",1,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,2829,2829.0
+MeVP58,MeVP58,exact,"identical name; Sup_Table_1 row 519 (instance MeVP58_R, 3 cells, VPN)",6,VPN,3,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3788,3788.0
+MeVP59,MeVP59,exact,"identical name; Sup_Table_1 row 520 (instance MeVP59_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,acetylcholine,4-to-1,,,,,visual_projection,acetylcholine,1.0,0,8731,8731.0
+MeVP60,MeVP60,exact,"identical name; Sup_Table_1 row 521 (instance MeVP60_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,5166,5166.0
+MeVP61,MeVP61,exact,"identical name; Sup_Table_1 row 522 (instance MeVP61_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,2193,2193.0
+MeVP62,MeVP62,exact,"identical name; Sup_Table_1 row 523 (instance MeVP62_R, 3 cells, VPN)",6,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,14985,14985.0
+MeVP63,MeVP63,exact,"identical name; Sup_Table_1 row 524 (instance MeVP63_R, 1 cells, VPN)",2,VPN,1,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,visual_projection,gaba,1.0,0,1769,1769.0
+MeVP64,MeVP64,exact,"identical name; Sup_Table_1 row 525 (instance MeVP64_R, 1 cells, VPN)",1,VPN,1,0,glutamate,,unmatched,,,,,visual_projection,glutamate,1.0,0,1177,1177.0
+MeVPaMe1,MeVPaMe1,exact,"identical name; Sup_Table_1 row 526 (instance MeVPaMe1_R, 1 cells, VPN)",2,VPN,1,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,9476,9476.0
+MeVPaMe2,MeVPaMe2,exact,"identical name; Sup_Table_1 row 527 (instance MeVPaMe2_R, 1 cells, VPN)",2,VPN,1,1,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,3571,3571.0
+MeVPLo1,MeVPLo1,exact,"identical name; Sup_Table_1 row 528 (instance MeVPLo1_R, 2 cells, VPN)",4,VPN,2,2,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,24895,24895.0
+MeVPLo2,MeVPLo2,exact,"identical name; Sup_Table_1 row 529 (instance MeVPLo2_R, 7 cells, VPN)",14,VPN,7,6,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,12890,12890.0
+MeVPLp1,MeVPLp1,exact,"identical name; Sup_Table_1 row 530 (instance MeVPLp1_R, 1 cells, VPN)",2,VPN,1,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,14512,14512.0
+MeVPLp2,MeVPLp2,exact,"identical name; Sup_Table_1 row 531 (instance MeVPLp2_R, 1 cells, VPN)",2,VPN,1,1,glutamate,unclear,1-to-1,glutamate,EASI-FISH (Eddison et al),Zhao et al 2023,no,ol_intrinsic,glutamate,1.0,0,7866,7866.0
+MeVPMe1,MeVPMe1,exact,"identical name; Sup_Table_1 row 532 (instance MeVPMe1_R, 6 cells, VPN)",12,VPN,6,6,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,59577,59577.0
+MeVPMe2,MeVPMe2,exact,"identical name; Sup_Table_1 row 533 (instance MeVPMe2_R, 5 cells, VPN)",10,VPN,5,5,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,81143,81143.0
+MeVPMe3,MeVPMe3,exact,"identical name; Sup_Table_1 row 534 (instance MeVPMe3_R, 1 cells, VPN)",2,VPN,1,1,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,7758,7758.0
+MeVPMe4,MeVPMe4,exact,"identical name; Sup_Table_1 row 535 (instance MeVPMe4_R, 1 cells, VPN)",3,VPN,1,2,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,10083,10083.0
+MeVPMe5,MeVPMe5,exact,"identical name; Sup_Table_1 row 536 (instance MeVPMe5_R, 10 cells, VPN)",19,VPN,10,9,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,28467,28467.0
+MeVPMe6,MeVPMe6,exact,"identical name; Sup_Table_1 row 537 (instance MeVPMe6_R, 1 cells, VPN)",2,VPN,1,1,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,8023,8023.0
+MeVPMe7,MeVPMe7,exact,"identical name; Sup_Table_1 row 538 (instance MeVPMe7_R, 1 cells, VPN)",2,VPN,1,1,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,5524,5524.0
+MeVPMe8,MeVPMe8,exact,"identical name; Sup_Table_1 row 539 (instance MeVPMe8_R, 2 cells, VPN)",4,VPN,2,1,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,7990,7990.0
+MeVPMe9,MeVPMe9,exact,"identical name; Sup_Table_1 row 540 (instance MeVPMe9_R, 6 cells, VPN)",12,VPN,6,6,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,18307,18307.0
+MeVPMe10,MeVPMe10,exact,"identical name; Sup_Table_1 row 541 (instance MeVPMe10_R, 2 cells, VPN)",4,VPN,2,2,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,10621,10621.0
+MeVPMe11,MeVPMe11,exact,"identical name; Sup_Table_1 row 542 (instance MeVPMe11_R, 1 cells, VPN)",2,VPN,1,1,glutamate,gaba,1-to-1,,,,,visual_projection,glutamate,1.0,0,5656,5656.0
+MeVPMe12,MeVPMe12,exact,"identical name; Sup_Table_1 row 543 (instance MeVPMe12_R, 2 cells, VPN)",4,VPN,2,2,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,31082,31082.0
+MeVPMe13,MeVPMe13,exact,"identical name; Sup_Table_1 row 544 (instance MeVPMe13_R, 1 cells, VPN)",2,VPN,1,1,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,28606,28606.0
+MeVPOL1,MeVPOL1,exact,"identical name; Sup_Table_1 row 545 (instance MeVPOL1_R, 1 cells, VPN)",2,VPN,1,1,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,42324,42324.0
+Mi1,Mi1,exact,"identical name; Sup_Table_1 row 546 (instance Mi1_R, 887 cells, ONIN)",1773,ONIN,887,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,2406777,2406777.0
+Mi2,Mi2,exact,"identical name; Sup_Table_1 row 547 (instance Mi2_R, 492 cells, ONIN)",986,ONIN,492,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,263506,263506.0
+Mi4,Mi4,exact,"identical name; Sup_Table_1 row 548 (instance Mi4_R, 889 cells, ONIN)",1772,ONIN,889,0,gaba,gaba,1-to-1,gaba,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,gaba,1.0,0,908716,908716.0
+Mi9,Mi9,exact,"identical name; Sup_Table_1 row 549 (instance Mi9_R, 889 cells, ONIN)",1775,ONIN,889,0,glutamate,glutamate,1-to-1,glutamate,antibody staining of genetically marked cells,Takemura 2017,yes,ol_intrinsic,glutamate,1.0,0,855103,855103.0
+Mi10,Mi10,exact,"identical name; Sup_Table_1 row 550 (instance Mi10_R, 222 cells, ONIN)",444,ONIN,222,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,253240,253240.0
+Mi13,Mi13,exact,"identical name; Sup_Table_1 row 551 (instance Mi13_R, 453 cells, ONIN)",910,ONIN,453,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,248247,248247.0
+Mi14,Mi14,exact,"identical name; Sup_Table_1 row 552 (instance Mi14_R, 155 cells, ONIN)",315,ONIN,155,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,124305,124305.0
+Mi15,Mi15,exact,"identical name; Sup_Table_1 row 553 (instance Mi15_R, 582 cells, ONIN)",1151,ONIN,582,0,acetylcholine,acetylcholine,1-to-1,acetylcholine+dopamine,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_intrinsic,acetylcholine,1.0,0,323996,323996.0
+Mi16,Mi16,exact,"identical name; Sup_Table_1 row 554 (instance Mi16_R, 101 cells, ONIN)",191,ONIN,101,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,38767,38767.0
+Mi17,Mi17,exact,"identical name; Sup_Table_1 row 555 (instance Mi17_R, 97 cells, ONIN)",189,ONIN,97,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,26755,26755.0
+Mi18,Mi18,exact,"identical name; Sup_Table_1 row 556 (instance Mi18_R, 36 cells, ONIN)",69,ONIN,36,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,98739,98739.0
+Mi19,Mi19,exact,"identical name; Sup_Table_1 row 557 (instance Mi19_R, 5 cells, ONIN)",12,ONIN,5,0,serotonin,dopamine,1-to-1,serotonin,EASI-FISH (Eddison et al),This study,yes,ol_intrinsic,unknown,1.0,12,0,24996.0
+Mi20,Mi20,exact,"identical name; Sup_Table_1 row 558 (instance Mi20_R, 1 cells, ONIN)",2,ONIN,1,0,glutamate,,unmatched,,,,,ol_intrinsic,glutamate,1.0,0,4908,4908.0
+Nod1,Nod1,exact,"identical name; Sup_Table_1 row 559 (instance Nod1_R, 2 cells, VPN)",4,VPN,2,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,FISH (Long  et al),This study,no,visual_projection,acetylcholine,1.0,0,11437,11437.0
+Nod2,Nod2,exact,"identical name; Sup_Table_1 row 560 (instance Nod2_R, 1 cells, VPN)",2,VPN,1,0,unclear,gaba,1-to-1,,,,,visual_projection,gaba,1.0,0,5963,5963.0
+Nod3,Nod3,exact,"identical name; Sup_Table_1 row 561 (instance Nod3_R, 1 cells, VPN)",2,VPN,1,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5864,5864.0
+Nod4,Nod4,exact,"identical name; Sup_Table_1 row 562 (instance Nod4_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,FISH (Long  et al),This study,no,visual_projection,acetylcholine,1.0,0,7603,7603.0
+Nod5,Nod5,exact,"identical name; Sup_Table_1 row 563 (instance Nod5_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,5790,5790.0
+OA-AL2i1,OA-AL2i1,exact,"identical name; Sup_Table_1 row 564 (instance OA-AL2i1_R, 1 cells, VCN)",2,VCN,1,0,octopamine,octopamine,1-to-1,octopamine,antibody staining of genetically marked cells,Busch et al 2009,yes,visual_centrifugal,octopamine,1.0,0,0,49845.0
+OA-AL2i2,OA-AL2i2,exact,"identical name; Sup_Table_1 row 565 (instance OA-AL2i2_R, 2 cells, VCN)",4,VCN,2,0,octopamine,octopamine,1-to-1,octopamine,antibody staining of genetically marked cells,Busch et al 2009,yes,visual_centrifugal,octopamine,1.0,0,0,56142.0
+OA-AL2i3,OA-AL2i3,exact,"identical name; Sup_Table_1 row 566 (instance OA-AL2i3_R, 2 cells, VCN)",4,VCN,2,0,octopamine,octopamine,1-to-1,octopamine,antibody staining of genetically marked cells,Busch et al 2009,yes,visual_centrifugal,octopamine,1.0,0,0,31642.0
+OA-AL2i4,OA-AL2i4,exact,"identical name; Sup_Table_1 row 567 (instance OA-AL2i4_R, 1 cells, VCN)",2,VCN,1,0,octopamine,octopamine,1-to-1,octopamine,antibody staining of genetically marked cells,Busch et al 2009,yes,visual_centrifugal,octopamine,1.0,0,0,22713.0
+OA-ASM1,OA-ASM1,exact,"identical name; Sup_Table_1 row 568 (instance OA-ASM1_R, 2 cells, VCN)",4,VCN,2,2,octopamine,dopamine,1-to-1,octopamine,antibody staining of genetically marked cells,Busch et al 2009,no,visual_centrifugal,octopamine,1.0,0,0,40967.0
+OLVC1,OLVC1,exact,"identical name; Sup_Table_1 row 569 (instance OLVC1_R, 1 cells, VCN)",2,VCN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,12056,12056.0
+OLVC5,OLVC5,exact,"identical name; Sup_Table_1 row 570 (instance OLVC5_R, 1 cells, VCN)",2,VCN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,27249,27249.0
+PLP_TBD1,PLP_TBD1,exact,"identical name; Sup_Table_1 row 571 (instance PLP_TBD1_R, 1 cells, other)",1,other,1,0,unclear,,unmatched,,,,,cb_intrinsic,glutamate,1.0,0,1437,1437.0
+PLP021,PLP021,exact,"identical name; Sup_Table_1 row 572 (instance PLP021_R, 2 cells, other)",4,other,2,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,4177,4177.0
+PLP032,PLP032,exact,"identical name; Sup_Table_1 row 573 (instance PLP032_R, 1 cells, other)",2,other,1,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,15257,15257.0
+PLP036,PLP036,exact,"identical name; Sup_Table_1 row 574 (instance PLP036_R, 1 cells, other)",2,other,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,2090,2090.0
+PLP069,PLP069,exact,"identical name; Sup_Table_1 row 575 (instance PLP069_R, 2 cells, other)",4,other,2,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,5075,5075.0
+PLP080,PLP080,exact,"identical name; Sup_Table_1 row 576 (instance PLP080_R, 1 cells, other)",2,other,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,6684,6684.0
+PLP150,PLP150,exact,"identical name; Sup_Table_1 row 577 (instance PLP150_R, 6 cells, other)",11,other,6,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,13424,13424.0
+PLP211,PLP211,exact,"identical name; Sup_Table_1 row 578 (instance PLP211_R, 1 cells, other)",2,other,1,0,unclear,dopamine,1-to-1,,,,,cb_intrinsic,unknown,1.0,2,0,18178.0
+PLP231,PLP231,exact,"identical name; Sup_Table_1 row 579 (instance PLP231_R, 2 cells, other)",4,other,2,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,10041,10041.0
+Pm1,Pm1,exact,"identical name; Sup_Table_1 row 580 (instance Pm1_R, 121 cells, ONIN)",246,ONIN,121,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,169388,169388.0
+Pm2a,Pm2a,exact,"identical name; Sup_Table_1 row 581 (instance Pm2a_R, 109 cells, ONIN)",219,ONIN,109,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,358858,358858.0
+Pm2b,Pm2b,exact,"identical name; Sup_Table_1 row 582 (instance Pm2b_R, 65 cells, ONIN)",124,ONIN,65,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,305145,305145.0
+Pm3,Pm3,exact,"identical name; Sup_Table_1 row 583 (instance Pm3_R, 36 cells, ONIN)",69,ONIN,36,0,gaba,gaba,1-to-1,gaba,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,gaba,1.0,0,232585,232585.0
+Pm4,Pm4,exact,"identical name; Sup_Table_1 row 584 (instance Pm4_R, 85 cells, ONIN)",168,ONIN,85,0,gaba,gaba,1-to-1,gaba,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,gaba,1.0,0,354340,354340.0
+Pm5,Pm5,exact,"identical name; Sup_Table_1 row 585 (instance Pm5_R, 94 cells, ONIN)",182,ONIN,94,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,147555,147555.0
+Pm6,Pm6,exact,"identical name; Sup_Table_1 row 586 (instance Pm6_R, 24 cells, ONIN)",50,ONIN,24,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,77713,77713.0
+Pm7,Pm7,exact,"identical name; Sup_Table_1 row 587 (instance Pm7_R, 14 cells, ONIN)",28,ONIN,14,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,52909,52909.0
+Pm8,Pm8,exact,"identical name; Sup_Table_1 row 588 (instance Pm8_R, 20 cells, ONIN)",39,ONIN,20,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,96271,96271.0
+Pm9,Pm9,exact,"identical name; Sup_Table_1 row 589 (instance Pm9_R, 27 cells, ONIN)",54,ONIN,27,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,171451,171451.0
+Pm10,Pm10,exact,"identical name; Sup_Table_1 row 590 (instance Pm10_R, 37 cells, ONIN)",74,ONIN,37,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,215303,215303.0
+Pm11,Pm11,exact,"identical name; Sup_Table_1 row 591 (instance Pm11_R, 2 cells, ONIN)",4,ONIN,2,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,46100,46100.0
+Pm12,Pm12,exact,"identical name; Sup_Table_1 row 592 (instance Pm12_R, 2 cells, ONIN)",4,ONIN,2,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,79859,79859.0
+Pm13,Pm13,exact,"identical name; Sup_Table_1 row 593 (instance Pm13_R, 1 cells, ONIN)",2,ONIN,1,0,glutamate,gaba,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,21568,21568.0
+PS272,PS272,exact,"identical name; Sup_Table_1 row 594 (instance PS272_R, 2 cells, other)",4,other,2,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,7642,7642.0
+PVLP046,PVLP046,exact,"identical name; Sup_Table_1 row 595 (instance PVLP046_R, 5 cells, other)",14,other,5,6,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,19255,19255.0
+R1-R6,R1-R6,exact,"identical name; Sup_Table_1 row 596 (instance R1-R6_R, 2265 cells, ONIN)",3377,ONIN,2265,0,histamine,acetylcholine,1-to-1,histamine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_sensory,histamine,1.0,0,248839,248839.0
+R7d,R7d,exact,"identical name; Sup_Table_1 row 597 (instance R7d_R, 42 cells, ONIN)",82,ONIN,42,0,histamine,glutamate,3-to-1,,,,,ol_sensory,histamine,1.0,0,16809,16809.0
+R7p,R7p,exact,"identical name; Sup_Table_1 row 598 (instance R7p_R, 95 cells, ONIN)",332,ONIN,95,0,histamine,glutamate,3-to-1,histamine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_sensory,histamine,1.0,0,47957,47957.0
+R7y,R7y,exact,"identical name; Sup_Table_1 row 599 (instance R7y_R, 244 cells, ONIN)",482,ONIN,244,0,histamine,glutamate,3-to-1,histamine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_sensory,histamine,1.0,0,62534,62534.0
+R8d,R8d,exact,"identical name; Sup_Table_1 row 600 (instance R8d_R, 41 cells, ONIN)",76,ONIN,41,0,histamine,acetylcholine,3-to-1,,,,,ol_sensory,histamine,1.0,0,11972,11972.0
+R8p,R8p,exact,"identical name; Sup_Table_1 row 601 (instance R8p_R, 95 cells, ONIN)",330,ONIN,95,0,histamine,acetylcholine,3-to-1,histamine+acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_sensory,histamine,1.0,0,60298,60298.0
+R8y,R8y,exact,"identical name; Sup_Table_1 row 602 (instance R8y_R, 245 cells, ONIN)",481,ONIN,245,0,histamine,acetylcholine,3-to-1,histamine+acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_sensory,histamine,1.0,0,84125,84125.0
+s-LNv,s-LNv,exact,"identical name; Sup_Table_1 row 603 (instance s-LNv_R, 4 cells, VPN)",8,VPN,4,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,982,982.0
+SLP249,SLP249,exact,"identical name; Sup_Table_1 row 604 (instance SLP249_R, 2 cells, VPN)",4,VPN,2,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,4255,4255.0
+SLP250,SLP250,exact,"identical name; Sup_Table_1 row 605 (instance SLP250_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,4498,4498.0
+SLP359,SLP359,exact,"identical name; Sup_Table_1 row 606 (instance SLP359_R, 1 cells, other)",4,other,1,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,3311,3311.0
+SMP200,SMP200,exact,"identical name; Sup_Table_1 row 607 (instance SMP200_R, 1 cells, other)",2,other,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,3363,3363.0
+SMP217,SMP217,exact,"identical name; Sup_Table_1 row 608 (instance SMP217_R, 2 cells, VPN)",6,VPN,2,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,1830,1830.0
+SMP528,SMP528,exact,"identical name; Sup_Table_1 row 609 (instance SMP528_R, 1 cells, other)",2,other,1,0,unclear,glutamate,1-to-1,,,,,cb_intrinsic,glutamate,1.0,0,5116,5116.0
+T1,T1,exact,"identical name; Sup_Table_1 row 610 (instance T1_R, 892 cells, ONCN)",1777,ONCN,892,0,unclear,acetylcholine,1-to-1,unclear,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_intrinsic,histamine,1.0,0,7372,7372.0
+T2,T2,exact,"identical name; Sup_Table_1 row 611 (instance T2_R, 822 cells, ONCN)",1630,ONCN,822,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, FACS-sorted cells)",Konstantinides et al 2018,yes,ol_intrinsic,acetylcholine,1.0,0,684093,684093.0
+T2a,T2a,exact,"identical name; Sup_Table_1 row 612 (instance T2a_R, 939 cells, ONCN)",1872,ONCN,939,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,0.999,1,798819,798819.0
+T3,T3,exact,"identical name; Sup_Table_1 row 613 (instance T3_R, 976 cells, ONCN)",1940,ONCN,976,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, FACS-sorted cells)",Konstantinides et al 2018,yes,ol_intrinsic,acetylcholine,1.0,0,584470,584470.0
+T4a,T4a,exact,"identical name; Sup_Table_1 row 614 (instance T4a_R, 849 cells, ONCN)",1684,ONCN,849,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,514588,514588.0
+T4b,T4b,exact,"identical name; Sup_Table_1 row 615 (instance T4b_R, 846 cells, ONCN)",1690,ONCN,846,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,452934,452934.0
+T4c,T4c,exact,"identical name; Sup_Table_1 row 616 (instance T4c_R, 883 cells, ONCN)",1778,ONCN,883,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,558128,558128.0
+T4d,T4d,exact,"identical name; Sup_Table_1 row 617 (instance T4d_R, 859 cells, ONCN)",1709,ONCN,859,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,457982,457982.0
+T5a,T5a,exact,"identical name; Sup_Table_1 row 618 (instance T5a_R, 838 cells, ONCN)",1664,ONCN,838,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,558400,558400.0
+T5b,T5b,exact,"identical name; Sup_Table_1 row 619 (instance T5b_R, 852 cells, ONCN)",1715,ONCN,852,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,481902,481902.0
+T5c,T5c,exact,"identical name; Sup_Table_1 row 620 (instance T5c_R, 858 cells, ONCN)",1720,ONCN,858,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,581444,581444.0
+T5d,T5d,exact,"identical name; Sup_Table_1 row 621 (instance T5d_R, 808 cells, ONCN)",1620,ONCN,808,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,463223,463223.0
+Tlp11,Tlp11,exact,"identical name; Sup_Table_1 row 622 (instance Tlp11_R, 32 cells, ONCN)",68,ONCN,32,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,61775,61775.0
+Tlp12,Tlp12,exact,"identical name; Sup_Table_1 row 623 (instance Tlp12_R, 68 cells, ONCN)",139,ONCN,68,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,150050,150050.0
+Tlp13,Tlp13,exact,"identical name; Sup_Table_1 row 624 (instance Tlp13_R, 58 cells, ONCN)",115,ONCN,58,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,144018,144018.0
+Tlp14,Tlp14,exact,"identical name; Sup_Table_1 row 625 (instance Tlp14_R, 30 cells, ONCN)",58,ONCN,30,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,99964,99964.0
+Tm1,Tm1,exact,"identical name; Sup_Table_1 row 626 (instance Tm1_R, 890 cells, ONCN)",1777,ONCN,890,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,1724891,1724891.0
+Tm2,Tm2,exact,"identical name; Sup_Table_1 row 627 (instance Tm2_R, 883 cells, ONCN)",1766,ONCN,883,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,1167723,1167723.0
+Tm3,Tm3,exact,"identical name; Sup_Table_1 row 628 (instance Tm3_R, 1037 cells, ONCN)",2054,ONCN,1037,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,1570534,1570534.0
+Tm4,Tm4,exact,"identical name; Sup_Table_1 row 629 (instance Tm4_R, 833 cells, ONCN)",1670,ONCN,833,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,1146459,1146459.0
+Tm5Y,Tm5Y,exact,"identical name; Sup_Table_1 row 630 (instance Tm5Y_R, 463 cells, ONCN)",898,ONCN,463,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,438245,438245.0
+Tm5a,Tm5a,exact,"identical name; Sup_Table_1 row 631 (instance Tm5a_R, 307 cells, ONCN)",624,ONCN,307,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,209454,209454.0
+Tm5b,Tm5b,exact,"identical name; Sup_Table_1 row 632 (instance Tm5b_R, 262 cells, ONCN)",522,ONCN,262,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,181655,181655.0
+Tm5c,Tm5c,exact,"identical name; Sup_Table_1 row 633 (instance Tm5c_R, 374 cells, ONCN)",750,ONCN,374,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,332054,332054.0
+Tm6,Tm6,exact,"identical name; Sup_Table_1 row 634 (instance Tm6_R, 770 cells, ONCN)",1526,ONCN,770,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,367913,367913.0
+Tm9,Tm9,exact,"identical name; Sup_Table_1 row 635 (instance Tm9_R, 887 cells, ONCN)",1771,ONCN,887,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,360617,360617.0
+Tm12,Tm12,exact,"identical name; Sup_Table_1 row 636 (instance Tm12_R, 494 cells, ONCN)",967,ONCN,494,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,282916,282916.0
+Tm16,Tm16,exact,"identical name; Sup_Table_1 row 637 (instance Tm16_R, 197 cells, ONCN)",396,ONCN,197,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,266195,266195.0
+Tm20,Tm20,exact,"identical name; Sup_Table_1 row 638 (instance Tm20_R, 876 cells, ONCN)",1762,ONCN,876,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,574407,574407.0
+Tm23,Tm23,exact,"identical name; Sup_Table_1 row 639 (instance Tm23_R, 16 cells, ONIN)",33,ONIN,16,0,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,49088,49088.0
+Tm24,Tm24,exact,"identical name; Sup_Table_1 row 640 (instance Tm24_R, 115 cells, ONIN)",245,ONIN,115,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,124956,124956.0
+Tm26,Tm26,exact,"identical name; Sup_Table_1 row 641 (instance Tm26_R, 50 cells, ONCN)",103,ONCN,50,0,acetylcholine,,unmatched,,,,,ol_intrinsic,acetylcholine,1.0,0,40748,40748.0
+Tm29,Tm29,exact,"identical name; Sup_Table_1 row 642 (instance Tm29_R, 276 cells, ONCN)",544,ONCN,276,0,glutamate,acetylcholine,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,no,ol_intrinsic,glutamate,1.0,0,159931,159931.0
+Tm30,Tm30,exact,"identical name; Sup_Table_1 row 643 (instance Tm30_R, 61 cells, ONCN)",124,ONCN,61,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,43320,43320.0
+Tm31,Tm31,exact,"identical name; Sup_Table_1 row 644 (instance Tm31_R, 55 cells, ONCN)",120,ONCN,55,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,83719,83719.0
+Tm32,Tm32,exact,"identical name; Sup_Table_1 row 645 (instance Tm32_R, 59 cells, ONCN)",125,ONCN,59,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,77375,77375.0
+Tm33,Tm33,exact,"identical name; Sup_Table_1 row 646 (instance Tm33_R, 139 cells, ONCN)",280,ONCN,139,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,72175,72175.0
+Tm34,Tm34,exact,"identical name; Sup_Table_1 row 647 (instance Tm34_R, 88 cells, ONCN)",174,ONCN,88,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,58176,58176.0
+Tm35,Tm35,exact,"identical name; Sup_Table_1 row 648 (instance Tm35_R, 43 cells, ONCN)",86,ONCN,43,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,45406,45406.0
+Tm36,Tm36,exact,"identical name; Sup_Table_1 row 649 (instance Tm36_R, 77 cells, ONCN)",155,ONCN,77,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,59373,59373.0
+Tm37,Tm37,exact,"identical name; Sup_Table_1 row 650 (instance Tm37_R, 268 cells, ONCN)",559,ONCN,268,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,292254,292254.0
+Tm38,Tm38,exact,"identical name; Sup_Table_1 row 651 (instance Tm38_R, 116 cells, ONCN)",223,ONCN,116,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,146260,146260.0
+Tm39,Tm39,exact,"identical name; Sup_Table_1 row 652 (instance Tm39_R, 200 cells, ONCN)",426,ONCN,200,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,184704,184704.0
+Tm40,Tm40,exact,"identical name; Sup_Table_1 row 653 (instance Tm40_R, 83 cells, ONCN)",180,ONCN,83,0,acetylcholine,acetylcholine,3-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,53124,53124.0
+TmY3,TmY3,exact,"identical name; Sup_Table_1 row 654 (instance TmY3_R, 409 cells, ONCN)",824,ONCN,409,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,acetylcholine,1.0,0,344805,344805.0
+TmY4,TmY4,exact,"identical name; Sup_Table_1 row 655 (instance TmY4_R, 288 cells, ONCN)",562,ONCN,288,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,250235,250235.0
+TmY5a,TmY5a,exact,"identical name; Sup_Table_1 row 656 (instance TmY5a_R, 678 cells, ONCN)",1364,ONCN,678,0,glutamate,glutamate,1-to-1,glutamate,"RNASeq (bulk, TAPIN)",Davis et al 2020,yes,ol_intrinsic,glutamate,1.0,0,712606,712606.0
+TmY9a,TmY9a,exact,"identical name; Sup_Table_1 row 657 (instance TmY9a_R, 230 cells, ONCN)",471,ONCN,230,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,239253,239253.0
+TmY9b,TmY9b,exact,"identical name; Sup_Table_1 row 658 (instance TmY9b_R, 266 cells, ONCN)",515,ONCN,266,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,240559,240559.0
+TmY10,TmY10,exact,"identical name; Sup_Table_1 row 659 (instance TmY10_R, 278 cells, ONCN)",552,ONCN,278,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,295718,295718.0
+TmY13,TmY13,exact,"identical name; Sup_Table_1 row 660 (instance TmY13_R, 211 cells, ONCN)",432,ONCN,211,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,268481,268481.0
+TmY14,TmY14,exact,"identical name; Sup_Table_1 row 661 (instance TmY14_R, 234 cells, ONCN)",477,ONCN,234,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,0.438,91,106591,132799.0
+TmY15,TmY15,exact,"identical name; Sup_Table_1 row 662 (instance TmY15_R, 110 cells, ONCN)",209,ONCN,110,0,gaba,gaba,1-to-1,gaba,antibody staining of genetically marked cells,Takemura et al 2017,yes,ol_intrinsic,gaba,1.0,0,310732,310732.0
+TmY16,TmY16,exact,"identical name; Sup_Table_1 row 663 (instance TmY16_R, 80 cells, ONCN)",168,ONCN,80,0,glutamate,gaba,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,144398,144398.0
+TmY17,TmY17,exact,"identical name; Sup_Table_1 row 664 (instance TmY17_R, 200 cells, ONCN)",395,ONCN,200,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,"EASI-FISH (Eddison et al), FISH (Long  et al)",This study,no,ol_intrinsic,acetylcholine,1.0,0,316097,316097.0
+TmY18,TmY18,exact,"identical name; Sup_Table_1 row 665 (instance TmY18_R, 694 cells, ONCN)",1367,ONCN,694,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,287435,287435.0
+TmY19a,TmY19a,exact,"identical name; Sup_Table_1 row 666 (instance TmY19a_R, 43 cells, ONCN)",86,ONCN,43,0,gaba,gaba,1-to-3,,,,,ol_intrinsic,gaba,1.0,0,200009,200009.0
+TmY19b,TmY19b,exact,"identical name; Sup_Table_1 row 667 (instance TmY19b_R, 17 cells, ONCN)",36,ONCN,17,0,gaba,gaba,1-to-1,gaba,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,gaba,1.0,0,79328,79328.0
+TmY20,TmY20,exact,"identical name; Sup_Table_1 row 668 (instance TmY20_R, 167 cells, ONCN)",343,ONCN,167,0,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,acetylcholine,1.0,0,177486,177486.0
+TmY21,TmY21,exact,"identical name; Sup_Table_1 row 669 (instance TmY21_R, 189 cells, ONCN)",372,ONCN,189,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,190397,190397.0
+vCal1,vCal1,exact,"identical name; Sup_Table_1 row 670 (instance vCal1_R, 1 cells, VPN)",2,VPN,1,0,unclear,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,5480,5480.0
+vCal2,vCal2,exact,"identical name; Sup_Table_1 row 671 (instance vCal2_R, 1 cells, VPN)",2,VPN,1,0,glutamate,glutamate,1-to-1,,,,,visual_projection,glutamate,1.0,0,4435,4435.0
+vCal3,vCal3,exact,"identical name; Sup_Table_1 row 672 (instance vCal3_R, 1 cells, VPN)",2,VPN,1,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,10024,10024.0
+VLP_TBD1,VLP_TBD1,exact,"identical name; Sup_Table_1 row 673 (instance VLP_TBD1_R, 1 cells, other)",2,other,1,0,unclear,acetylcholine,1-to-1,,,,,cb_intrinsic,acetylcholine,1.0,0,1792,1792.0
+VS,VS,exact,"identical name; Sup_Table_1 row 674 (instance VS_R, 9 cells, VPN)",18,VPN,9,0,acetylcholine,acetylcholine,1-to-8,acetylcholine,EASI-FISH (Eddison et al),Zhao et al 2023,no,visual_projection,acetylcholine,1.0,0,8090,8090.0
+VSm,VSm,exact,"identical name; Sup_Table_1 row 675 (instance VSm_R, 2 cells, VPN)",4,VPN,2,0,unclear,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,9231,9231.0
+VST1,VST1,exact,"identical name; Sup_Table_1 row 676 (instance VST1_R, 3 cells, VPN)",5,VPN,3,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,3344,3344.0
+VST2,VST2,exact,"identical name; Sup_Table_1 row 677 (instance VST2_R, 4 cells, VPN)",7,VPN,4,0,acetylcholine,acetylcholine,1-to-1,,,,,visual_projection,acetylcholine,1.0,0,6839,6839.0
+Y3,Y3,exact,"identical name; Sup_Table_1 row 678 (instance Y3_R, 322 cells, ONCN)",627,ONCN,322,0,acetylcholine,acetylcholine,1-to-1,,,,,ol_intrinsic,acetylcholine,1.0,0,560136,560136.0
+Y11,Y11,exact,"identical name; Sup_Table_1 row 679 (instance Y11_R, 76 cells, ONCN)",153,ONCN,76,0,glutamate,glutamate,1-to-1,glutamate,EASI-FISH (Eddison et al),This study,no,ol_intrinsic,glutamate,1.0,0,183403,183403.0
+Y12,Y12,exact,"identical name; Sup_Table_1 row 680 (instance Y12_R, 89 cells, ONCN)",186,ONCN,89,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,159656,159656.0
+Y13,Y13,exact,"identical name; Sup_Table_1 row 681 (instance Y13_R, 99 cells, ONCN)",193,ONCN,99,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,162967,162967.0
+Y14,Y14,exact,"identical name; Sup_Table_1 row 682 (instance Y14_R, 104 cells, ONCN)",208,ONCN,104,0,glutamate,glutamate,1-to-1,,,,,ol_intrinsic,glutamate,1.0,0,132831,132831.0
+5-HTPMPV01,5-HTPMPV01,exact,"identical name; Sup_Table_1 row 683 (instance 5-HTPMPV01_L, 0 cells, VCN)",2,VCN,0,1,unclear,unclear,1-to-1,,,,,cb_intrinsic,serotonin,1.0,0,0,10066.0
+CL357,CL357,exact,"identical name; Sup_Table_1 row 690 (instance CL357_L, 0 cells, other)",2,other,0,1,unclear,unclear,1-to-1,unclear,EASI-FISH (Eddison et al),This study,no,cb_intrinsic,serotonin,1.0,0,0,4824.0
+CT1,CT1,exact,"identical name; Sup_Table_1 row 691 (instance CT1_L, 0 cells, ONCN)",2,ONCN,0,1,gaba,gaba,1-to-1,gaba,antibody staining of genetically marked cells,Takemura et al 2017,no,ol_intrinsic,gaba,1.0,0,253693,253693.0
+DCH,DCH,exact,"identical name; Sup_Table_1 row 693 (instance DCH_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,39951,39951.0
+DNc02,DNc02,exact,"identical name; Sup_Table_1 row 695 (instance DNc02_L, 0 cells, other)",2,other,0,1,unclear,dopamine,1-to-1,,,,,descending_neuron,unknown,1.0,2,0,7027.0
+Li38,Li38,exact,"identical name; Sup_Table_1 row 704 (instance Li38_L, 0 cells, ONIN)",2,ONIN,0,1,gaba,unclear,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,35585,35585.0
+Li39,Li39,exact,"identical name; Sup_Table_1 row 705 (instance Li39_L, 0 cells, ONIN)",2,ONIN,0,1,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,103859,103859.0
+LoVC1,LoVC1,exact,"identical name; Sup_Table_1 row 706 (instance LoVC1_L, 0 cells, VCN)",2,VCN,0,1,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,12719,12719.0
+LoVC3,LoVC3,exact,"identical name; Sup_Table_1 row 707 (instance LoVC3_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,10977,10977.0
+LoVC9,LoVC9,exact,"identical name; Sup_Table_1 row 708 (instance LoVC9_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,6800,6800.0
+LoVC11,LoVC11,exact,"identical name; Sup_Table_1 row 709 (instance LoVC11_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,20996,20996.0
+LoVC12,LoVC12,exact,"identical name; Sup_Table_1 row 710 (instance LoVC12_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,13138,13138.0
+LoVC14,LoVC14,exact,"identical name; Sup_Table_1 row 711 (instance LoVC14_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,14885,14885.0
+LoVC20,LoVC20,exact,"identical name; Sup_Table_1 row 712 (instance LoVC20_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,cb_intrinsic,gaba,1.0,0,15968,15968.0
+LoVC21,LoVC21,exact,"identical name; Sup_Table_1 row 713 (instance LoVC21_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,14069,14069.0
+LoVC22,LoVC22,exact,"identical name; Sup_Table_1 row 714 (instance LoVC22_L, 0 cells, VCN)",4,VCN,0,2,dopamine,dopamine,1-to-1,dopamine,antibody staining of genetically marked cells,Mao and Davis 2009,yes,visual_centrifugal,dopamine,1.0,0,0,27115.0
+LoVC23,LoVC23,exact,"identical name; Sup_Table_1 row 715 (instance LoVC23_L, 0 cells, VCN)",4,VCN,0,2,gaba,gaba,1-to-1,gaba,FISH (Long  et al),This study,no,cb_intrinsic,gaba,1.0,0,3286,3286.0
+LoVC25,LoVC25,exact,"identical name; Sup_Table_1 row 716 (instance LoVC25_L, 0 cells, VCN)",22,VCN,0,9,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,25696,25696.0
+LoVC27,LoVC27,exact,"identical name; Sup_Table_1 row 717 (instance LoVC27_L, 0 cells, VCN)",10,VCN,0,5,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,8069,8069.0
+LoVC28,LoVC28,exact,"identical name; Sup_Table_1 row 718 (instance LoVC28_L, 0 cells, VCN)",3,VCN,0,2,glutamate,glutamate,2-to-1,,,,,visual_centrifugal,glutamate,1.0,0,3256,3256.0
+LoVC29,LoVC29,exact,"identical name; Sup_Table_1 row 719 (instance LoVC29_L, 0 cells, VCN)",4,VCN,0,2,glutamate,glutamate,2-to-1,,,,,visual_centrifugal,glutamate,1.0,0,3351,3351.0
+LPT57,LPT57,exact,"identical name; Sup_Table_1 row 724 (instance LPT57_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,19342,19342.0
+LPT59,LPT59,exact,"identical name; Sup_Table_1 row 725 (instance LPT59_L, 0 cells, VCN)",2,VCN,0,1,glutamate,unclear,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,16230,16230.0
+LT33,LT33,exact,"identical name; Sup_Table_1 row 726 (instance LT33_L, 0 cells, ONIN)",2,ONIN,0,1,gaba,gaba,1-to-1,,,,,ol_intrinsic,gaba,1.0,0,36885,36885.0
+LT35,LT35,exact,"identical name; Sup_Table_1 row 727 (instance LT35_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,18736,18736.0
+LT36,LT36,exact,"identical name; Sup_Table_1 row 728 (instance LT36_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,25053,25053.0
+LT46,LT46,exact,"identical name; Sup_Table_1 row 729 (instance LT46_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,14341,14341.0
+mALD1,mALD1,exact,"identical name; Sup_Table_1 row 733 (instance mALD1_L, 0 cells, other)",2,other,0,1,gaba,gaba,1-to-1,,,,,cb_intrinsic,gaba,1.0,0,23508,23508.0
+MeVC1,MeVC1,exact,"identical name; Sup_Table_1 row 734 (instance MeVC1_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,57151,57151.0
+MeVC2,MeVC2,exact,"identical name; Sup_Table_1 row 735 (instance MeVC2_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,26463,26463.0
+MeVC3,MeVC3,exact,"identical name; Sup_Table_1 row 736 (instance MeVC3_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,13991,13991.0
+MeVC4a,MeVC4a,exact,"identical name; Sup_Table_1 row 737 (instance MeVC4a_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,32344,32344.0
+MeVC4b,MeVC4b,exact,"identical name; Sup_Table_1 row 738 (instance MeVC4b_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,34378,34378.0
+MeVC5,MeVC5,exact,"identical name; Sup_Table_1 row 739 (instance MeVC5_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,10466,10466.0
+MeVC6,MeVC6,exact,"identical name; Sup_Table_1 row 740 (instance MeVC6_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,11624,11624.0
+MeVC7a,MeVC7a,exact,"identical name; Sup_Table_1 row 741 (instance MeVC7a_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,5148,5148.0
+MeVC7b,MeVC7b,exact,"identical name; Sup_Table_1 row 742 (instance MeVC7b_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,6050,6050.0
+MeVC8,MeVC8,exact,"identical name; Sup_Table_1 row 743 (instance MeVC8_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,7000,7000.0
+MeVC9,MeVC9,exact,"identical name; Sup_Table_1 row 744 (instance MeVC9_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,11033,11033.0
+MeVC10,MeVC10,exact,"identical name; Sup_Table_1 row 745 (instance MeVC10_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,8047,8047.0
+MeVC11,MeVC11,exact,"identical name; Sup_Table_1 row 746 (instance MeVC11_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,visual_centrifugal,acetylcholine,1.0,0,83848,83848.0
+MeVC12,MeVC12,exact,"identical name; Sup_Table_1 row 747 (instance MeVC12_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,acetylcholine,EASI-FISH (Eddison et al),This study,no,visual_centrifugal,acetylcholine,1.0,0,9227,9227.0
+MeVC26,MeVC26,exact,"identical name; Sup_Table_1 row 748 (instance MeVC26_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,6079,6079.0
+MeVC27,MeVC27,exact,"identical name; Sup_Table_1 row 749 (instance MeVC27_L, 0 cells, VCN)",6,VCN,0,3,unclear,dopamine,1-to-1,unclear,EASI-FISH (Eddison et al),This study,no,visual_centrifugal,unknown,1.0,6,0,5447.0
+OLVC2,OLVC2,exact,"identical name; Sup_Table_1 row 772 (instance OLVC2_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,20336,20336.0
+OLVC3,OLVC3,exact,"identical name; Sup_Table_1 row 773 (instance OLVC3_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,13254,13254.0
+OLVC4,OLVC4,exact,"identical name; Sup_Table_1 row 774 (instance OLVC4_L, 0 cells, VCN)",2,VCN,0,1,unclear,dopamine,1-to-1,unclear,EASI-FISH (Eddison et al),This study,no,visual_centrifugal,unknown,1.0,2,0,3596.0
+OLVC6,OLVC6,exact,"identical name; Sup_Table_1 row 775 (instance OLVC6_L, 0 cells, VCN)",2,VCN,0,1,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,2780,2780.0
+OLVC7,OLVC7,exact,"identical name; Sup_Table_1 row 776 (instance OLVC7_L, 0 cells, VCN)",6,VCN,0,3,glutamate,glutamate,1-to-1,,,,,visual_centrifugal,glutamate,1.0,0,7152,7152.0
+V1,V1,exact,"identical name; Sup_Table_1 row 778 (instance V1_L, 0 cells, VCN)",2,VCN,0,1,acetylcholine,acetylcholine,1-to-1,,,,,visual_centrifugal,acetylcholine,1.0,0,4580,4580.0
+VCH,VCH,exact,"identical name; Sup_Table_1 row 779 (instance VCH_L, 0 cells, VCN)",2,VCN,0,1,gaba,gaba,1-to-1,,,,,visual_centrifugal,gaba,1.0,0,36342,36342.0
+,Cm_unclear,unmatched,"MaleCNS 'Cm_unclear' bin spans 39 Nern Cm subtypes whose predictions disagree (gaba 20, glutamate 12, acetylcholine 6, unclear 1); no class-level label",1,,0,0,,,,,,,,ol_intrinsic,acetylcholine,1.0,0,830,830.0
+,LA_ME_unclear,unmatched,MaleCNS 'LA_ME_unclear' is a region / class bin with no Nern type of that prefix,3,,0,0,,,,,,,,ol_intrinsic,acetylcholine,1.0,0,799,799.0
+LC10a|LC10b|LC10c-1|LC10c-2|LC10d|LC10e,LC10_unclear,class,"MaleCNS 'LC10_unclear' bin = unresolved subtype of LC10; all 5 called Nern subtypes (LC10a, LC10b, LC10c-1, LC10d, LC10e) predicted acetylcholine (Sup_Table_1); 1 subtype(s) unclear (LC10c-2)",11,VPN,474,0,acetylcholine,,,,,,,visual_projection,acetylcholine,1.0,0,3207,3207.0
+LLPC1|LLPC2|LLPC3|LLPC4,LLPC_unclear,class,"MaleCNS 'LLPC_unclear' bin = unresolved subtype of LLPC; all 4 called Nern subtypes (LLPC1, LLPC2, LLPC3, LLPC4) predicted acetylcholine (Sup_Table_1)",1,VPN,382,0,acetylcholine,,,,,,,visual_projection,acetylcholine,1.0,0,573,573.0
+,LOP_LO_unclear,unmatched,MaleCNS 'LOP_LO_unclear' is a region / class bin with no Nern type of that prefix,2,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,2046,2046.0
+,LOP_ME_unclear,unmatched,MaleCNS 'LOP_ME_unclear' is a region / class bin with no Nern type of that prefix,4,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,1212,1212.0
+,LOP_unclear,unmatched,MaleCNS 'LOP_unclear' is a region / class bin with no Nern type of that prefix,4,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,1171,1171.0
+,LO_LOP_unclear,unmatched,MaleCNS 'LO_LOP_unclear' is a region / class bin with no Nern type of that prefix,1,,0,0,,,,,,,,ol_intrinsic,acetylcholine,1.0,0,463,463.0
+,LO_ME_unclear,unmatched,MaleCNS 'LO_ME_unclear' is a region / class bin with no Nern type of that prefix,2,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,1015,1015.0
+,LO_unclear,unmatched,MaleCNS 'LO_unclear' is a region / class bin with no Nern type of that prefix,14,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,6424,6424.0
+LPC1|LPC2,LPC_unclear,class,"MaleCNS 'LPC_unclear' bin = unresolved subtype of LPC; all 2 called Nern subtypes (LPC1, LPC2) predicted acetylcholine (Sup_Table_1)",2,VPN,187,0,acetylcholine,,,,,,,visual_projection,acetylcholine,1.0,0,823,823.0
+LPLC1|LPLC2|LPLC4,LPLC_unclear,class,"MaleCNS 'LPLC_unclear' bin = unresolved subtype of LPLC; all 3 called Nern subtypes (LPLC1, LPLC2, LPLC4) predicted acetylcholine (Sup_Table_1)",1,VPN,206,0,acetylcholine,,,,,,,visual_projection,acetylcholine,1.0,0,554,554.0
+,LPi_unclear,unmatched,"MaleCNS 'LPi_unclear' bin spans 15 Nern LPi subtypes whose predictions disagree (glutamate 11, gaba 4); no class-level label",4,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,1962,1962.0
+,Li_unclear,unmatched,"MaleCNS 'Li_unclear' bin spans 31 Nern Li subtypes whose predictions disagree (gaba 20, glutamate 8, acetylcholine 3); no class-level label",3,,0,0,,,,,,,,ol_intrinsic,gaba,0.667,0,2363,2363.0
+,LoVP109,unmatched,"Sup_Table_7 row 734 note: 'LoVP109 (named based on LM data, not found in OL dataset)'",1,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,3865,3865.0
+,LoVP_unclear,unmatched,"MaleCNS 'LoVP_unclear' bin spans 107 Nern LoVP subtypes whose predictions disagree (unclear 63, acetylcholine 29, glutamate 13, gaba 2); no class-level label",12,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,4121,4121.0
+,LopVC_unclear,unmatched,MaleCNS 'LopVC_unclear' is a region / class bin with no Nern type of that prefix,1,,0,0,,,,,,,,visual_centrifugal,glutamate,1.0,0,358,358.0
+,LpMe_unclear,unmatched,MaleCNS 'LpMe_unclear' is a region / class bin with no Nern type of that prefix,2,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,682,682.0
+,ME_LOP_unclear,unmatched,MaleCNS 'ME_LOP_unclear' is a region / class bin with no Nern type of that prefix,1,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,511,511.0
+,ME_LO_unclear,unmatched,MaleCNS 'ME_LO_unclear' is a region / class bin with no Nern type of that prefix,4,,0,0,,,,,,,,ol_intrinsic,glutamate,0.5,0,2773,2773.0
+,ME_unclear,unmatched,MaleCNS 'ME_unclear' is a region / class bin with no Nern type of that prefix,25,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,8114,8114.0
+MeTu4a|MeTu4b|MeTu4c|MeTu4d|MeTu4e|MeTu4f,MeTu4_unclear,class,"MaleCNS 'MeTu4_unclear' bin = unresolved subtype of MeTu4; all 6 called Nern subtypes (MeTu4a, MeTu4b, MeTu4c, MeTu4d, MeTu4e, MeTu4f) predicted acetylcholine (Sup_Table_1)",2,VPN,179,0,acetylcholine,,,,,,,visual_projection,acetylcholine,1.0,0,854,854.0
+,MeVC_unclear,unmatched,"MaleCNS 'MeVC_unclear' bin spans 22 Nern MeVC subtypes whose predictions disagree (acetylcholine 15, glutamate 6, unclear 1); no class-level label",1,,0,0,,,,,,,,visual_centrifugal,glutamate,1.0,0,1150,1150.0
+MeVP6,MeVP6_unclear,class,MaleCNS 'MeVP6_unclear' bin = unresolved subtype of MeVP6; all 1 called Nern subtypes (MeVP6) predicted glutamate (Sup_Table_1),2,VPN,49,0,glutamate,,,,,,,visual_projection,glutamate,1.0,0,1145,1145.0
+,MeVP_unclear,unmatched,"MaleCNS 'MeVP_unclear' bin spans 60 Nern MeVP subtypes whose predictions disagree (acetylcholine 27, unclear 24, glutamate 6, gaba 3); no class-level label",1,,0,0,,,,,,,,visual_projection,glutamate,1.0,0,719,719.0
+,OCC01b,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_centrifugal,acetylcholine,1.0,0,386,386.0
+,OCC02a,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,6,,0,0,,,,,,,,visual_centrifugal,unknown,1.0,6,0,58.0
+,OCC02b,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,16,,0,0,,,,,,,,visual_centrifugal,unknown,1.0,16,0,31.0
+,OCG01a,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,glutamate,1.0,0,2002,2002.0
+,OCG01b,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,6640,6640.0
+,OCG01c,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,glutamate,1.0,0,2697,2697.0
+,OCG01d,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,6706,6706.0
+,OCG01e,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,4817,4817.0
+,OCG01f,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,glutamate,1.0,0,4348,4348.0
+,OCG02b,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,5961,5961.0
+,OCG02c,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,4,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,5964,5964.0
+,OCG03,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,2901,2901.0
+,OCG06,unmatched,ocellar type; the ocelli are outside the Nern 2025 optic-lobe inventory,2,,0,0,,,,,,,,visual_centrifugal,acetylcholine,1.0,0,1439,1439.0
+,OLVp_unclear,unmatched,MaleCNS 'OLVp_unclear' is a region / class bin with no Nern type of that prefix,1,,0,0,,,,,,,,visual_projection,acetylcholine,1.0,0,446,446.0
+PVLP046,PVLP046_unclear,class,MaleCNS 'PVLP046_unclear' bin = unresolved subtype of PVLP046; all 1 called Nern subtypes (PVLP046) predicted gaba (Sup_Table_1),1,other,5,6,gaba,,,,,,,visual_centrifugal,gaba,1.0,0,536,536.0
+,Pm7_Li28,unmatched,MaleCNS composite of Pm7 (gaba) and Li28 (gaba); not a Nern type,2,,0,0,,,,,,,,ol_intrinsic,gaba,1.0,0,2555,2555.0
+,Pm_unclear,unmatched,"MaleCNS 'Pm_unclear' bin spans 14 Nern Pm subtypes whose predictions disagree (gaba 12, glutamate 2); no class-level label",1,,0,0,,,,,,,,ol_intrinsic,gaba,1.0,0,1386,1386.0
+R7d|R7p|R7y|R8d|R8p|R8y,R7R8_unclear,class,"MaleCNS 'R7R8_unclear' bin = unresolved subtype of R7/R8; all 6 called Nern subtypes (R7d, R7p, R7y, R8d, R8p, R8y) predicted histamine (Sup_Table_1)",85,ONIN,762,0,histamine,,,,,,,ol_sensory,histamine,1.0,0,473,473.0
+R7d|R7p|R7y,R7_unclear,class,"MaleCNS 'R7_unclear' bin = unresolved subtype of R7; all 3 called Nern subtypes (R7d, R7p, R7y) predicted histamine (Sup_Table_1)",404,ONIN,381,0,histamine,,,,,,,ol_sensory,histamine,1.0,0,49275,49275.0
+R8d|R8p|R8y,R8_unclear,class,"MaleCNS 'R8_unclear' bin = unresolved subtype of R8; all 3 called Nern subtypes (R8d, R8p, R8y) predicted histamine (Sup_Table_1)",442,ONIN,381,0,histamine,,,,,,,ol_sensory,histamine,1.0,0,65050,65050.0
+T4a|T4b|T4c|T4d,T4_unclear,class,"MaleCNS 'T4_unclear' bin = unresolved subtype of T4; all 4 called Nern subtypes (T4a, T4b, T4c, T4d) predicted acetylcholine (Sup_Table_1)",4,ONCN,3437,0,acetylcholine,,,,,,,ol_intrinsic,acetylcholine,1.0,0,668,668.0
+T5a,T5a_unclear,class,MaleCNS 'T5a_unclear' bin = unresolved subtype of T5a; all 1 called Nern subtypes (T5a) predicted acetylcholine (Sup_Table_1),1,ONCN,838,0,acetylcholine,,,,,,,ol_intrinsic,unknown,1.0,1,0,107.0
+Tm3,Tm3_unclear,class,MaleCNS 'Tm3_unclear' bin = unresolved subtype of Tm3; all 1 called Nern subtypes (Tm3) predicted acetylcholine (Sup_Table_1),1,ONCN,1037,0,acetylcholine,,,,,,,ol_intrinsic,acetylcholine,1.0,0,118,118.0
+,TmY_unclear,unmatched,"MaleCNS 'TmY_unclear' bin spans 16 Nern TmY subtypes whose predictions disagree (acetylcholine 10, glutamate 3, gaba 3); no class-level label",4,,0,0,,,,,,,,ol_intrinsic,acetylcholine,1.0,0,1705,1705.0
+,Tm_unclear,unmatched,"MaleCNS 'Tm_unclear' bin spans 28 Nern Tm subtypes whose predictions disagree (acetylcholine 19, glutamate 7, gaba 2); no class-level label",4,,0,0,,,,,,,,ol_intrinsic,acetylcholine,1.0,0,2021,2021.0
+,Y_unclear,unmatched,"MaleCNS 'Y_unclear' bin spans 5 Nern Y subtypes whose predictions disagree (glutamate 4, acetylcholine 1); no class-level label",1,,0,0,,,,,,,,ol_intrinsic,acetylcholine,1.0,0,467,467.0
+,aMe_unclear,unmatched,"MaleCNS 'aMe_unclear' bin spans 25 Nern aMe subtypes whose predictions disagree (acetylcholine 9, glutamate 8, unclear 6, gaba 2); no class-level label",1,,0,0,,,,,,,,ol_intrinsic,glutamate,1.0,0,332,332.0

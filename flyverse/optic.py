@@ -35,7 +35,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
-from .connectome import Connectome, PHOTORECEPTOR_TYPES
+from .connectome import Connectome, PHOTORECEPTOR_TYPES, ReceptorSigns
 from .retina import Retina
 from .device import resolve, sparse_matrix
 from . import metal, cuda
@@ -112,10 +112,17 @@ def _mv(M, x: torch.Tensor) -> torch.Tensor:
 
 class OpticLobe:
     def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1,
-                 metal_kernels: bool | None = None, cuda_kernels: bool | None = None, cuda_sparse: str = "torch"):
+                 metal_kernels: bool | None = None, cuda_kernels: bool | None = None, cuda_sparse: str = "torch",
+                 receptor: ReceptorSigns | None = None, receptor_gain: dict | None = None):
         """metal_kernels: custom Metal kernels for the sparse products and the substep (flyverse/metal.py);
-        None = automatically on MPS when available."""
+        None = automatically on MPS when available.
+        receptor: an optional connectome.receptor_signs(c, ...) (LIFParams.receptor_model): every optic-lobe edge
+        (rate <-> rate, photoreceptor -> rate, spiking -> rate, rate -> spiking) takes abs(count) x the row's fast
+        sign (x the gain-class factor `receptor_gain`, {class: factor}, when given) instead of sign(NT_pre) x count;
+        unmatched edges are unchanged. The normalisation denominators (in_syn / in_syn_l2 of the neuron table) are
+        the unmodified totals. The rate model has no slow term: the receptor table's slow signs are not used here."""
         self.c, self.r, self.p = c, retina, params or OpticParams()
+        self.receptor = receptor
         self.B = int(batch)
         self.device = resolve(device)
         self.metal = metal.use(self.device, metal_kernels)
@@ -135,6 +142,11 @@ class OpticLobe:
         self.n_rate, self.n_pr, self.n_spk = len(self.rate_idx), len(self.pr_idx), len(self.spk_idx)
 
         W = c.W.tocsr()                                   # (post, pre) signed counts
+        if receptor is not None:
+            if len(receptor.fast_sign) != W.nnz:
+                raise ValueError("receptor signs are not aligned with this connectome's W")
+            W = W.copy()
+            W.data = np.abs(W.data) * receptor.fast_factor(receptor_gain)     # unmatched edges: identical to W.data
         tot = c.neurons.in_syn.to_numpy()
         Wn = (sp.diags(1.0 / np.maximum(tot, 1.0)) @ W).tocsr()      # L1: fractions of total input
         if self.p.norm == "l2":

@@ -1137,6 +1137,39 @@ edge_len 20 mm added to the suite, and the optic layer's own hand-crafted measur
 normalisation, drive clip) audited the way the LIF's were; the odour gate at the 40 cm foraging start (channel 12.5 Hz
 against a 13 Hz gate) and cross-channel specificity; an NT-rescue counterfactual through the LIF sections.
 
+## Session 10: receptor-expression integration, round 1
+
+The plan of `docs/NT_INTEGRATION.md` was executed end to end by a 17-agent workflow (GPU work on the cluster
+through `scripts/cluster_run.py`): five transcriptomic / typing sources acquired and pinned (55 files,
+`flyverse/data/manifest.json`, `scripts/fetch_data.py --external all`), mapped to MaleCNS type names with
+confidence tiers, a per-type (transmitter x receptor) -> sign / gain table derived (607 profiled types), an optional
+model stage `LIFParams.receptor_model` implemented (off byte-identical; `sign` / `sign+gain` / `full`), scored on the
+benchmark suite and the optic probes, and adversarially verified. Section 7 of `docs/NT_INTEGRATION.md` has the
+detail; `docs/audits/receptor_verification.md` the skeptics' text.
+
+The scientific result is null and informative. (1) Coverage: the receptor route decides 25.7 % of synapses, and
+almost none of the populations behind the open questions -- Tm5Y, TmY21, LC11, DNp04 / LPT, DNa02, PFL3, hDelta, the
+sweet interneurons -- have a receptor profile in any source; the optic lobe's object pathway is out of reach of
+the present data. (2) Where the data do reach, they confirm the current sign for the loom, optomotor and compass
+populations (LC4 / LPLC2 / LPi34 / T4 / T5 / HSN / HSE / EPG all GluCl-dominant for glutamate; the ExR -> EPG loop
+that `cx_wedge` found is fast inhibition by the E-PG driver data) -- the compass remains a gain / dynamics
+question. (3) The one structural change the data propose, glutamate as excitatory onto medulla cells with NMDA /
+kainate receptors (Mi4, L3, Mi9, T2a), moves the figure signal onto Mi4 (z 0 -> 3) but not down the pathway, and
+breaks the Shiu-rules sugar -> MN9 replication; and 59 % of those flips are tertile-rank calls that the
+absolute-level rule does not make, so the effect is not yet a finding. (4) The slow term as built is a
+classical-metabotropic current rather than the monoamine tone the plan wanted, and storms at its first-guess
+scale; it needs the per-class redesign before assay 7 (hunger) can be attempted.
+
+Errors caught by verification: Davis 2020's KaiR1D column was a different gene (CG8916); single-nucleus dropout
+profiles were allowed to silence ~180 k synapses on the photoreceptor -> medulla stage; Pm1 / Tm29 / typing
+tier inflation; misquoted ranges. None affects the current default model (the stage is off). Round 2 fixes the
+tables, scores the other net rules, runs the moving-ball object sweep, searches for the missing optic profiles,
+applies the supported transmitter labels (TmY14 glutamate, Mi19 serotonin, aMe8 ACh; T1 histamine unsupported)
+as an override table, and tests the GLNO sign in the compass.
+
+Infrastructure notes from the round: `cluster_run.py --fetch` now accumulates; two budgeted jobs starting in the
+same second once came up without CUDA (a node-agent race, reported); the round used ~5.0 M agent tokens.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
