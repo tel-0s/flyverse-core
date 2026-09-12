@@ -7,6 +7,12 @@ Several commands in one call are a BATCH: one run directory, one job per command
 run concurrently (each takes one GPU-share; the manager packs several onto a GPU), waited on together. Give
 each command its own output file names. Prefer one batch call to a sequence of single calls.
 
+For SWEEPS OF THE ROOM SIMULATION (seeds x programs), prefer the batched simulator to many single-fly jobs: one job
+running `python scripts/batch_sustain.py --batch 16 --seeds ... --program ... --json out/x.json` steps 16 independent
+rooms through one FlyBrain(batch=16) (see docs/BATCH_SIM.md; ~4x the aggregate throughput of 16 scalar processes, and
+one process's worth of GPU memory). Use --cuda-sparse torch with batches (warp CSR is batch-1 only). Several batched
+jobs in one call (one per program, say) are still a batch in the sense above.
+
 What it does for each call: (1) collects the files that differ from origin/main here (unpushed commits, modified and
 untracked files that are not git-ignored), (2) copies them over a fresh per-run copy of the cluster's
 checkout (venv and connectome cache are shared by symlink), (3) submits the command as a job with one
