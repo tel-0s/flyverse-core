@@ -47,6 +47,41 @@ NT_SIGN = {
 # Type-name overrides applied when the prediction is unknown: antennal-lobe local neurons are GABAergic
 # as a class (a minority are glutamatergic/cholinergic, which the prediction would normally have caught).
 UNKNOWN_NT_OVERRIDE_REGEX = {r"^(lLN|v2LN|v3LN|il3LN|l2LN|vLN|LN)": "gaba"}
+# Type-level transmitter overrides applied AFTER the MaleCNS consensus (and after the unknown-NT regex above) to the
+# cells of the type that have NO usable fast label -- consensus 'unknown' or a monoamine, i.e. sign 0 under NT_SIGN;
+# cells with a classical consensus (ACh / GABA / glutamate / histamine) keep it. From the receptor-integration
+# cross-check (docs/audits/receptor_nt_disagreements.md section 4, docs/audits/receptor_sources_nern2025.md;
+# docs/NT_INTEGRATION.md round 2). Each entry names its evidence. Applied by compile_connectome(); whether it is part
+# of the default cache is decided by a benchmark run (the round-2 rule: adopt only if no suite check changes status)
+# -- see docs/audits/nt_audit.md and the TYPE_NT_OVERRIDE_DEFAULT switch below.
+TYPE_NT_OVERRIDE = {
+    # 477 cells: 209 glutamate, 177 acetylcholine, 91 'unknown' (sign 0; 26,208 raw output synapses) in the consensus.
+    # Transcriptome: Davie 2018 cluster 'TmY14' VGlut fraction 0.98, FCA 2022 and Özel 2021 TmY14 clusters VGlut on;
+    # Nern 2025 Sup. Table 1 TmY14 = glutamate. Three transcriptome sources + the EM classifier agree. Only the 91
+    # unknown cells are relabelled; the 177 cells with an acetylcholine consensus keep it (relabelling them would flip
+    # the sign of 177 cells' output and is a separate decision, not taken here).
+    "TmY14": "glutamate",
+    # 12 cells, all 'unknown' (24,996 raw output synapses; FlyWire label dopamine). Nern 2025 predicts serotonin and
+    # validated it by EASI-FISH (Sup. Table 1, validated_nt). Serotonin is sign 0 under NT_SIGN, so the weights do not
+    # change until a working slow term exists; the label is set so the receptor model's monoamine columns apply.
+    "Mi19": "serotonin",
+    # 4 cells, 3 'unknown' + 1 serotonin (7,238 raw output synapses). Nern 2025 predicts acetylcholine (aMe8 in the
+    # optic-lobe classifier's scope); no transcriptome profile exists for the type.
+    "aMe8": "acetylcholine",
+    # NOT overridden: T1 (1,777 cells) keeps the MaleCNS consensus 'histamine' (confidence 0.51) although the label is
+    # marker-silent in all four transcriptome sources (Davis 2020 T1 Hdc 0.61 / ChAT 3.04 / VGlut 2.48 / Gad1 1.59 TPM;
+    # Özel 2021 P(on) 0 for ChAT / VAChT / Gad1 / VGlut / Hdc; Davie 2018 and FCA 2022 fractions < 0.2) and Nern 2025
+    # says 'unclear' -- no source supports an alternative label, so there is nothing to replace it with.
+}
+# Whether compile_connectome() applies TYPE_NT_OVERRIDE when no explicit table is passed (the default cache). Decided
+# in round 2 (docs/audits/nt_audit.md): adopted. The override relabels 107 cells (91 TmY14 + 12 Mi19 + 4 aMe8), changes
+# the sign of 95 cells' output (33,446 raw synapses; sign-0 share 2.203 % -> 2.176 %), and the cluster benchmark
+# (--seeds 0,1,2, out/rm_ntov.json vs out/rm_off.json) shows every check at the same status as the reference off run
+# (26 PASS / 1 FAIL walk.power_max / 2 KNOWN GAP); the only status difference against a concurrent baseline run
+# (out/rm_base_r2.json) is loom_escape, whose GF peak straddles its 33 Hz threshold run-to-run in both conditions
+# (out/lo_base_*.json, lo_ov_*.json). A scratch cache without the table: load(cache_dir=..., rebuild=True,
+# type_nt_override={}). Existing caches (local cache/, the cluster's shared cache) carry the table only once rebuilt.
+TYPE_NT_OVERRIDE_DEFAULT = True
 
 PHOTORECEPTOR_TYPES = ["R1-R6", "R7y", "R7p", "R7d", "R7_unclear",
                        "R8y", "R8p", "R8d", "R8_unclear", "R7R8_unclear"]
@@ -60,6 +95,13 @@ TRANSMITTERS = ["acetylcholine", "gaba", "glutamate", "histamine", "dopamine", "
 RECEPTOR_TIERS = ["fallback", "pre_unknown", "nt_class", "class", "fuzzy", "alias", "exact"]   # int8 codes 0..6
 GAIN_CLASSES = ["none", "low", "mid", "high"]                                                   # int8 codes 0..3
 RECEPTOR_NET_RULES = ("class", "abs", "nonmda")
+# Slow-term classes (int8 codes 0..2), decided by the PRESYNAPTIC transmitter of the entry: the classical transmitters'
+# metabotropic receptors (mAChR-A/-B, GABA-B, mGluR) and the monoamine receptors (Dop1R/DopEcR/Dop2R, Oamb/Octbeta/
+# Octalpha2R, 5-HT1/2/7) get separate scales and time constants in LIFParams (docs/audits/slow_term.md); 'none' = no
+# slow sign. Histamine has no slow group, so it never carries a class.
+SLOW_CLASSES = ["none", "metabotropic_classical", "monoamine"]
+SLOW_CLASS_OF_TRANSMITTER = {"acetylcholine": 1, "gaba": 1, "glutamate": 1, "histamine": 1,
+                             "dopamine": 2, "octopamine": 2, "serotonin": 2}
 SIGN0_COUNTS_FILE = "sign0_counts.npz"
 
 
@@ -77,6 +119,8 @@ class ReceptorSigns:
     tier: int8 codes into RECEPTOR_TIERS. matched = the sign came from the table (tier nt_class or better).
     count: synapse count per entry (float32): abs(W.data), plus the raw count for explicit-zero entries when
         sign-0 counts were available (see sign0_counts()); None when receptor_signs(with_counts=False).
+    slow_class: int8 codes into SLOW_CLASSES (0 wherever slow_sign == 0; else 1 for a classical presynaptic
+        transmitter, 2 for a monoamine).
     """
     fast_sign: np.ndarray
     slow_sign: np.ndarray
@@ -87,6 +131,7 @@ class ReceptorSigns:
     net_rule: str
     nt_class_fallback: bool
     table_path: str
+    slow_class: np.ndarray | None = None
 
     @property
     def matched(self) -> np.ndarray:
@@ -101,11 +146,17 @@ class ReceptorSigns:
             f = f * g[self.fast_gain]
         return f
 
-    def slow_factor(self, gain: dict | None = None) -> np.ndarray:
+    def slow_factor(self, gain: dict | None = None, slow_class: str | None = None) -> np.ndarray:
+        """Per-entry slow multiplier: slow_sign (x the gain-class factor when `gain` is given), restricted to the
+        entries of one SLOW_CLASSES name when `slow_class` is given (the others become 0)."""
         f = self.slow_sign.astype(np.float32)
         if gain:
             g = np.array([float(gain.get(k, 1.0)) for k in GAIN_CLASSES], dtype=np.float32)
             f = f * g[self.slow_gain]
+        if slow_class is not None:
+            if self.slow_class is None:
+                raise ValueError("this ReceptorSigns carries no slow_class codes")
+            f = f * (self.slow_class == SLOW_CLASSES.index(slow_class)).astype(np.float32)
         return f
 
     def coverage(self, W: sp.csr_matrix) -> pd.DataFrame:
@@ -207,8 +258,11 @@ def receptor_signs(c: "Connectome", table_path=None, net_rule: str = "class", nt
             rescued = sign0_counts(c, W=W)
             if rescued is not None:
                 count[zero] = rescued[zero]
+    # slow class per entry from the presynaptic transmitter (0 where there is no slow sign)
+    class_of_nt = np.array([SLOW_CLASS_OF_TRANSMITTER[t] for t in TRANSMITTERS] + [0], dtype=np.int8)
+    slow_class = np.where(slow_sign != 0, class_of_nt[pre_nt], 0).astype(np.int8)
     return ReceptorSigns(fast_sign, slow_sign, fast_gain, slow_gain, tier, count, net_rule, nt_class_fallback,
-                         str(RECEPTOR_TABLE if table_path is None else table_path))
+                         str(RECEPTOR_TABLE if table_path is None else table_path), slow_class)
 
 
 def build_sign0_counts(ref: "Connectome", cache_dir: Path = CACHE_DIR, verbose: bool = True) -> Path:
@@ -364,7 +418,9 @@ def _nt_table() -> pd.DataFrame:
     return pd.DataFrame({"bodyId": nt.body, "nt": best.fillna("unknown")})
 
 
-def compile_connectome(min_weight: int = 1, verbose: bool = True) -> Connectome:
+def compile_connectome(min_weight: int = 1, verbose: bool = True, type_nt_override: dict | None = None) -> Connectome:
+    """type_nt_override: {type: nt} applied to the type's sign-0 cells after the consensus (None = TYPE_NT_OVERRIDE if
+    TYPE_NT_OVERRIDE_DEFAULT else nothing; pass {} for none, TYPE_NT_OVERRIDE to force it)."""
     t0 = time.time()
     log = print if verbose else (lambda *a, **k: None)
 
@@ -382,6 +438,15 @@ def compile_connectome(min_weight: int = 1, verbose: bool = True) -> Connectome:
         m = (neurons.nt == "unknown") & neurons.type.fillna("").str.match(pat)
         neurons.loc[m, "nt"] = nt
         log(f"unknown-NT override {pat} -> {nt}: {int(m.sum())} neurons")
+    if type_nt_override is None:
+        type_nt_override = TYPE_NT_OVERRIDE if TYPE_NT_OVERRIDE_DEFAULT else {}
+    no_fast_label = neurons.nt.map(NT_SIGN).fillna(0.0) == 0.0          # unknown or monoamine: sign 0
+    for t, nt in type_nt_override.items():
+        m = (neurons.type == t) & no_fast_label & (neurons.nt != nt)
+        was = neurons.loc[m, "nt"].value_counts().to_dict()
+        neurons.loc[m, "nt"] = nt
+        log(f"type-NT override {t} -> {nt}: {int(m.sum())} of {int((neurons.type == t).sum())} neurons relabelled (from {was}); "
+            f"kept: {neurons.loc[(neurons.type == t) & ~m, 'nt'].value_counts().to_dict()}")
     neurons["sign"] = neurons.nt.map(NT_SIGN).fillna(0.0).astype(np.float32)
     log("nt counts:", neurons.nt.value_counts().to_dict())
 
@@ -456,10 +521,11 @@ def save(c: Connectome, cache_dir: Path = CACHE_DIR) -> None:
             (cache_dir / name).unlink(missing_ok=True)
 
 
-def load(cache_dir: Path = CACHE_DIR, rebuild: bool = False, verbose: bool = True) -> Connectome:
+def load(cache_dir: Path = CACHE_DIR, rebuild: bool = False, verbose: bool = True,
+         type_nt_override: dict | None = None) -> Connectome:
     cache_dir = Path(cache_dir)
     if rebuild or not (cache_dir / "W_post_pre.npz").exists():
-        c = compile_connectome(verbose=verbose)
+        c = compile_connectome(verbose=verbose, type_nt_override=type_nt_override)
         save(c, cache_dir)
         return c
     neurons = pd.read_parquet(cache_dir / "neurons.parquet")

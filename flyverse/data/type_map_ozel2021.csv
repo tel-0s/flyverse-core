@@ -2,232 +2,237 @@
 # (GEO GSE142787, Supplementary Table 1 annotations) -> MaleCNS v1.0 cell types (cache/neurons.parquet).
 # Built by scripts/build_ozel2021_tables.py; provenance and coverage in docs/audits/receptor_sources_ozel2021.md.
 # tier: exact = author annotation is the MaleCNS type name (unstarred); alias = documented renaming (none needed);
-# fuzzy = author-starred (less confident) annotation, a 'likely' assignment, or a subtype letter not shown to correspond;
-# class = source cluster pools several MaleCNS types or is a subdivision of one; unmatched = no evidenced MaleCNS type.
+# fuzzy = author-starred (less confident) annotation, a 'likely' assignment, a subtype letter not shown to correspond,
+# or a name-only match whose identity with the MaleCNS type is contested (Tm29); class = source cluster pools several
+# MaleCNS types (incl. Pm1 -> Pm1/Pm5/Pm6 per Nern 2025 Sup_Table_7) or is a subdivision of one; unmatched = no evidenced type.
+# flag: name_collision = Özel/FCA 'Tm29' vs MaleCNS Tm29 (= FlyWire Tm5d / CB3851, glutamate; FCA Tm29 cholinergic);
+# minor_split = Schlegel Dm11 = MaleCNS Dm11 + Dm-DRA2 (33 cells, not added). Empty otherwise.
 # source_name = the author's annotation (cluster number when unannotated); source_cluster = ST1 / GEO column id;
 # n_cells_malecns = cells of malecns_type in MaleCNS; malecns_nt = the model's transmitter label (mode).
-source_name,malecns_type,tier,evidence,n_cells_malecns,source_cluster,malecns_superclass,malecns_nt
-T1,T1,exact,"ST1: 'Clear match to T1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 1+2 merged (OOBE 0.14)",1777,1,ol_intrinsic,histamine
-PR,R1-R6,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,3377,3,ol_sensory,histamine
-PR,R7R8_unclear,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,85,3,ol_sensory,histamine
-PR,R7_unclear,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,404,3,ol_sensory,histamine
-PR,R7d,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,82,3,ol_sensory,histamine
-PR,R7p,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,332,3,ol_sensory,histamine
-PR,R7y,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,482,3,ol_sensory,histamine
-PR,R8_unclear,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,442,3,ol_sensory,histamine
-PR,R8d,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,76,3,ol_sensory,histamine
-PR,R8p,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,330,3,ol_sensory,histamine
-PR,R8y,class,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,481,3,ol_sensory,histamine
-4,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,4,,
-5,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,5,,
-T2,T2,exact,"ST1: 'Clear match to T2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1630,6,ol_intrinsic,acetylcholine
-T3,T3,exact,"ST1: 'Clear match to T3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1940,7,ol_intrinsic,acetylcholine
-Lawf2,Lawf2,exact,"ST1: 'Clear match to Lawf2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",383,8,ol_intrinsic,acetylcholine
-Dm4,Dm4,exact,"ST1: 'Clear match to Dm4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",99,9,ol_intrinsic,glutamate
-10,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,10,,
-11,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,11,,
-Dm12,Dm12,exact,"ST1: 'Clear match to Dm12 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",276,12,ol_intrinsic,glutamate
-13,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,13,,
-Dm1,Dm1,exact,"ST1: 'Clear match to Dm1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",80,14,ol_intrinsic,glutamate
-Dm10,Dm10,exact,"ST1: 'Clear match to Dm10 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",626,15,ol_intrinsic,gaba
-16,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,16,,
-17,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,17,,
-18,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,18,,
-Dm8,Dm8a,class,"ST1: 'Clear match to Dm8 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS splits Dm8 into Dm8a (FlyWire yDm8) and Dm8b (pDm8) by connectivity (Nern 2025 ED Fig. 5); the cluster contains both",572,19,ol_intrinsic,glutamate
-Dm8,Dm8b,class,"ST1: 'Clear match to Dm8 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS splits Dm8 into Dm8a (FlyWire yDm8) and Dm8b (pDm8) by connectivity (Nern 2025 ED Fig. 5); the cluster contains both",532,19,ol_intrinsic,glutamate
-20,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,20,,
-21,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,21,,
-22,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,22,,
-23,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,23,,
-24,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,24,,
-26,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,26,,
-LC14,LC14a-1,class,"ST1: only cluster expressing atonal (mixture modelling), the marker of LC14 / LC14b; 'the cluster might be impure, maybe because of subtypes LC14/LC14b' -> MaleCNS LC14a-1, LC14a-2, LC14b",30,27,ol_intrinsic,acetylcholine
-LC14,LC14a-2,class,"ST1: only cluster expressing atonal (mixture modelling), the marker of LC14 / LC14b; 'the cluster might be impure, maybe because of subtypes LC14/LC14b' -> MaleCNS LC14a-1, LC14a-2, LC14b",15,27,ol_intrinsic,acetylcholine
-LC14,LC14b,class,"ST1: only cluster expressing atonal (mixture modelling), the marker of LC14 / LC14b; 'the cluster might be impure, maybe because of subtypes LC14/LC14b' -> MaleCNS LC14a-1, LC14a-2, LC14b",43,27,ol_intrinsic,acetylcholine
-28,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,28,,
-29,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,29,,
-30,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,30,,
-Mi15,Mi15,exact,"ST1: 'Clear match to Mi15 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1151,31,ol_intrinsic,acetylcholine
-32,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,32,,
-Mi9,Mi9,exact,"ST1: 'Clear match to Mi9 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1775,33,ol_intrinsic,glutamate
-Tm5c,Tm5c,exact,"ST1: 'Clear match to Tm5c transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",750,34,ol_intrinsic,glutamate
-36,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,36,,
-37,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,37,,
-38,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,38,,
-39,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,39,,
-40,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,40,,
-41,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,41,,
-TmY5a,TmY5a,exact,"ST1: 'Clear match to TmY5a transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1364,42,ol_intrinsic,glutamate
-43,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,43,,
-44,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,44,,
-45,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,45,,
-46,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,46,,
-47,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,47,,
-48,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,48,,
-49,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,49,,
-50,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,50,,
-51,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,51,,
-52,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,52,,
-53,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,53,,
-54,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,54,,
-Tm29,Tm29,exact,"ST1: 'Clear match to Tm29 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS Tm29 = FlyWire Tm5d (flywireType column), same name in Özel",544,55,ol_intrinsic,glutamate
-56,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,56,,
-57,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,57,,
-58,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,58,,
-59,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,59,,
-T2a,T2a,exact,ST1: only unidentified cluster expressing the T2a markers acj6 and ap (mixture modelling) with a unicolumnar-sized cluster; main text lists T2a among marker-identified clusters,1872,60,ol_intrinsic,acetylcholine
-Tm20,Tm20,exact,"ST1: 'Clear match to Tm20 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1762,61,ol_intrinsic,acetylcholine
-62,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,62,,
-63,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,63,,
-LC12*,LC12,fuzzy,"ST1 (author-starred = less confident): LC12 is cut+, Acj6+, toy+, beat-1c+, kn- (Extended Data Fig. 4); only cluster matching by mixture modelling",498,64,visual_projection,acetylcholine
-65,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,65,,
-LLPC1,LLPC1,exact,"ST1: 'Clear match to LLPC1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",285,66,visual_projection,acetylcholine
-67,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,67,,
-68,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,68,,
-69,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,69,,
-TmY8*,,unmatched,no TmY8 type in MaleCNS / Nern 2025 (FlyWire and hemibrain columns contain no TmY8 either); author-starred annotation by CG42458+ / vvl+,0,70,,
-71,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,71,,
-LPC1,LPC1,exact,"ST1: 'Clear match to LPC1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",224,72,visual_projection,acetylcholine
-73,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,73,,
-74,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,74,,
-TmY4*,TmY4,fuzzy,ST1 (author-starred): TmY4 is D+/vvl-/toy- (Extended Data Fig. 4) and DIP-gamma+; only clusters 75 and 164 (=Mi4) match by mixture modelling; 'very likely to correspond to TmY4',562,75,ol_intrinsic,acetylcholine
-76,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,76,,
-LC10a,LC10a,exact,"ST1: 'Clear match to LC10a transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",275,77,visual_projection,acetylcholine
-LC10d,LC10d,exact,"ST1: 'Clear match to LC10d transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); the LC10d bulk transcriptome was of lower quality in Davis 2020",214,78,visual_projection,acetylcholine
-LC10b,LC10b,exact,"Methods: 'LC10b transcriptome correlated best with cluster 79, but also well though more weakly with clusters 93, 78 (LC10d) and 77 (LC10a)'; assigned LC10b by best correlation",95,79,visual_projection,acetylcholine
-80,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,80,,
-81,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,81,,
-82,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,82,,
-83,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,83,,
-84,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,84,,
-85,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,85,,
-86,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,86,,
-87,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,87,,
-90,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,90,,
-91,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,91,,
-92,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,92,,
-93 (likely LC10c),LC10c-1,fuzzy,ST1 / Methods: 'cluster 93 likely being LC10c' (second-best correlate of the LC10b transcriptome); MaleCNS splits LC10c into LC10c-1 / LC10c-2 by connectivity (Nern 2025),130,93,visual_projection,acetylcholine
-93 (likely LC10c),LC10c-2,fuzzy,ST1 / Methods: 'cluster 93 likely being LC10c' (second-best correlate of the LC10b transcriptome); MaleCNS splits LC10c into LC10c-1 / LC10c-2 by connectivity (Nern 2025),125,93,visual_projection,acetylcholine
-94,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,94,,
-95,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,95,,
-96,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,96,,
-98,,unmatched,ST1: 'very likely to be a LC cell: second best match for LC16' -- no type,0,98,,
-99,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,99,,
-LC16,LC16,exact,ST1: 'Clear match to LC16 transcriptome'; Methods: best match with a correlation gap of only 0.03 (below the 0.05 criterion used elsewhere),182,100,visual_projection,acetylcholine
-101,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,101,,
-102,,unmatched,ST1: possible multiplets including central-brain neurons,0,102,,
-103,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,103,,
-Tm5ab,Tm5a,class,"ST1: 'Clear match to Tm5ab transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); the Tm5a/b driver-line transcriptome pools both types (Davis 2020), MaleCNS separates Tm5a and Tm5b by connectivity",624,104,ol_intrinsic,acetylcholine
-Tm5ab,Tm5b,class,"ST1: 'Clear match to Tm5ab transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); the Tm5a/b driver-line transcriptome pools both types (Davis 2020), MaleCNS separates Tm5a and Tm5b by connectivity",522,104,ol_intrinsic,acetylcholine
-105,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,105,,
-106,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,106,,
-L4,L4,exact,"ST1: 'Clear match to L4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1769,107,ol_intrinsic,acetylcholine
-L2,L2,exact,"ST1: 'Clear match to L2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1779,108,ol_intrinsic,acetylcholine
-L1,L1,exact,"ST1: 'Clear match to L1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1776,109,ol_intrinsic,glutamate
-L3,L3,exact,"ST1: 'Clear match to L3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1772,110,ol_intrinsic,acetylcholine
-LC17*,LC17,fuzzy,"ST1 (author-starred): LC17 is Acj6+, toy+, kn+ (Extended Data Fig. 4) and beat-VI+; only cluster matching by mixture modelling",353,111,visual_projection,acetylcholine
-112,,unmatched,"ST1: best match for Kenyon cells (Davis 2020) -- central-brain contamination, not an optic-lobe type; not mapped to MaleCNS KC types because the cluster is described as possibly mixed",0,112,,
-Lawf1,Lawf1,exact,"ST1: 'Clear match to Lawf1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",361,113,ol_intrinsic,acetylcholine
-114,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,114,,
-115,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,115,,
-116,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,116,,
-L5,L5,exact,"ST1: 'Clear match to L5 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1787,117,ol_intrinsic,acetylcholine
-Tm2,Tm2,exact,"ST1: 'Clear match to Tm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1766,118,ol_intrinsic,acetylcholine
-TmY3,TmY3,exact,"ST1: 'Clear match to TmY3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",824,119,ol_intrinsic,acetylcholine
-120,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,120,,
-123,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,123,,
-124,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,124,,
-Tm4,Tm4,exact,"ST1: 'Clear match to Tm4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1670,125,ol_intrinsic,acetylcholine
-Tm3,Tm3,exact,"ST1: 'Clear match to Tm3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 126+127 merged (OOBE 0.23)",2054,126,ol_intrinsic,acetylcholine
-Dm2,Dm2,exact,"ST1: 'Clear match to Dm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1452,128,ol_intrinsic,acetylcholine
-129,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,129,,
-Dm11,Dm11,exact,"ST1: 'Clear match to Dm11 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",158,136,ol_intrinsic,glutamate
-TmY14*,TmY14,fuzzy,"ST1 (author-starred): TmY14 is kn+, DIP-gamma+, toy+, D-, dac- (Extended Data Fig. 4); only cluster matching by mixture modelling; VGlut+ as expected for TmY14 (Raghu & Borst 2011); DIP-beta discrepancy noted by the authors",477,137,visual_projection,glutamate
-138,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,138,,
-139,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,139,,
-Tm1,Tm1,exact,"ST1: 'Clear match to Tm1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 140+141 merged (OOBE 0.14)",1777,140,ol_intrinsic,acetylcholine
-Mi1,Mi1,exact,"ST1: 'Clear match to Mi1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 142+143 merged (OOBE 0.14)",1773,142,ol_intrinsic,acetylcholine
-Dm9,Dm9,exact,"ST1: 'Clear match to Dm9 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",273,144,ol_intrinsic,glutamate
-Lai,Lai,exact,"ST1: 'Clear match to Lai transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",84,145,ol_intrinsic,glutamate
-146,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,146,,
-LC4,LC4,exact,"ST1: 'Clear match to LC4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",126,147,visual_projection,acetylcholine
-LPLC1,LPLC1,exact,"ST1: 'Clear match to LPLC1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",134,148,visual_projection,acetylcholine
-149,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,149,,
-LPLC2,LPLC2,exact,"ST1: 'Clear match to LPLC2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",185,150,visual_projection,acetylcholine
-Pm3*,Pm3,fuzzy,"ST1 (author-starred) / Methods: the Pm3 bulk transcriptome 'correlated best, but weakly, with cluster 151', verified by previously described Pm3 markers (Extended Data Fig. 3c, mixture modelling); hemibrain name Pm3 retained in MaleCNS",69,151,ol_intrinsic,gaba
-Pm4,Pm4,exact,"ST1: 'Clear match to Pm4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); hemibrain name Pm4 retained in MaleCNS",168,152,ol_intrinsic,gaba
-153,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,153,,
-154,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,154,,
-155,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,155,,
-156,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,156,,
-157,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,157,,
-158,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,158,,
-159,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,159,,
-160,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,160,,
-161,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,161,,
-162,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,162,,
-Pm1,Pm1,exact,"ST1: only cluster hth+, svp+, tsh+, Lim3+ by mixture modelling, the Pm1 markers of Erclik et al. 2017; hemibrain name Pm1 retained in MaleCNS (hemibrainType column)",246,163,ol_intrinsic,gaba
-Mi4,Mi4,exact,"ST1: 'Clear match to Mi4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1772,164,ol_intrinsic,gaba
-C3,C3,exact,"ST1: 'Clear match to C3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1779,165,ol_intrinsic,gaba
-166,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,166,,
-167,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,167,,
-168,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,168,,
-170,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,170,,
-171,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,171,,
-172,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,172,,
-173,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,173,,
-174,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,174,,
-Pm2,Pm2a,class,"ST1: 'Clear match to Pm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS splits hemibrain Pm2 into Pm2a / Pm2b by connectivity (Nern 2025 ED Fig. 2e-h; the Pm2 driver labels the group '[Pm2]')",219,175,ol_intrinsic,gaba
-Pm2,Pm2b,class,"ST1: 'Clear match to Pm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS splits hemibrain Pm2 into Pm2a / Pm2b by connectivity (Nern 2025 ED Fig. 2e-h; the Pm2 driver labels the group '[Pm2]')",124,175,ol_intrinsic,gaba
-176,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,176,,
-177,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,177,,
-178,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,178,,
-179,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,179,,
-180,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,180,,
-181,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,181,,
-C2,C2,exact,"ST1: 'Clear match to C2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1745,182,ol_intrinsic,gaba
-183,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,183,,
-184,,unmatched,unannotated neuronal cluster (no type assigned by the authors),0,184,,
-G01,,unmatched,glia / low-quality cluster ('G01'),0,185,,
-G/LQ1,,unmatched,glia / low-quality cluster ('G/LQ1'),0,186,,
-G02,,unmatched,glia / low-quality cluster ('G02'),0,187,,
-G14ab,,unmatched,glia / low-quality cluster ('G14ab'),0,188,,
-G16/LQ,,unmatched,glia / low-quality cluster ('G16/LQ'),0,189,,
-G/LQ2,,unmatched,glia / low-quality cluster ('G/LQ2'),0,190,,
-191,,unmatched,ST1: neither glia nor optic-lobe neuron,0,191,,
-LQ,,unmatched,ST1: ambient RNA / low quality,0,192,,
-G/LQ3,,unmatched,glia / low-quality cluster ('G/LQ3'),0,196,,
-G/LQ4,,unmatched,glia / low-quality cluster ('G/LQ4'),0,197,,
-G03,,unmatched,glia / low-quality cluster ('G03'),0,198,,
-G04,,unmatched,glia / low-quality cluster ('G04'),0,199,,
-G05,,unmatched,glia / low-quality cluster ('G05'),0,200,,
-G06,,unmatched,glia / low-quality cluster ('G06'),0,201,,
-G07,,unmatched,glia / low-quality cluster ('G07'),0,202,,
-G08,,unmatched,glia / low-quality cluster ('G08'),0,203,,
-G09,,unmatched,glia / low-quality cluster ('G09'),0,204,,
-G10,,unmatched,glia / low-quality cluster ('G10'),0,205,,
-G11,,unmatched,glia / low-quality cluster ('G11'),0,206,,
-G12,,unmatched,glia / low-quality cluster ('G12'),0,207,,
-G13,,unmatched,glia / low-quality cluster ('G13'),0,208,,
-221,,unmatched,"ST1: split of cluster 97 at P70, 'likely another LC neuron' -- no type",0,221,,
-LC6,LC6,exact,"ST1: backprojection from P70; 'Clear match to LC6 transcriptome' (cluster 97 split into 221 / 222 at P70, 222 = LC6)",124,222,visual_projection,acetylcholine
-Dm3a,Dm3a,class,"ST1: Dm3 subtype from P70 backprojection. Özel could not assign the two orthogonal Dm3 arbor orientations to anatomical directions (ED Fig. 7d, 'Dm3x / Dm3y'); MaleCNS has three Dm3 types (Dm3a = FlyWire Dm3p, Dm3b = Dm3q, Dm3c = Dm3v; Nern 2025). Subtype letters are NOT assumed to correspond; mapped to the Dm3 family",1204,225,ol_intrinsic,glutamate
-Dm3a,Dm3b,class,"ST1: Dm3 subtype from P70 backprojection. Özel could not assign the two orthogonal Dm3 arbor orientations to anatomical directions (ED Fig. 7d, 'Dm3x / Dm3y'); MaleCNS has three Dm3 types (Dm3a = FlyWire Dm3p, Dm3b = Dm3q, Dm3c = Dm3v; Nern 2025). Subtype letters are NOT assumed to correspond; mapped to the Dm3 family",1137,225,ol_intrinsic,glutamate
-Dm3a,Dm3c,class,"ST1: Dm3 subtype from P70 backprojection. Özel could not assign the two orthogonal Dm3 arbor orientations to anatomical directions (ED Fig. 7d, 'Dm3x / Dm3y'); MaleCNS has three Dm3 types (Dm3a = FlyWire Dm3p, Dm3b = Dm3q, Dm3c = Dm3v; Nern 2025). Subtype letters are NOT assumed to correspond; mapped to the Dm3 family",787,225,ol_intrinsic,glutamate
-Dm3b,Dm3a,class,as 225: Dm3 subtype letter not transferable; mapped to the Dm3 family,1204,226,ol_intrinsic,glutamate
-Dm3b,Dm3b,class,as 225: Dm3 subtype letter not transferable; mapped to the Dm3 family,1137,226,ol_intrinsic,glutamate
-Dm3b,Dm3c,class,as 225: Dm3 subtype letter not transferable; mapped to the Dm3 family,787,226,ol_intrinsic,glutamate
-Tm9v,Tm9,class,"ST1: ventral Tm9 (Wnt4+) from P70 backprojection; MaleCNS has a single Tm9 type (dorsal / ventral halves could be split by hex column, not done here)",1771,227,ol_intrinsic,acetylcholine
-Tm9d,Tm9,class,ST1: dorsal Tm9 (Wnt10+) from P70 backprojection; MaleCNS Tm9 is one type,1771,228,ol_intrinsic,acetylcholine
-88a,,unmatched,unannotated subdivision of cluster 88,0,229,,
-88b,,unmatched,unannotated subdivision of cluster 88,0,230,,
-169a,,unmatched,unannotated subdivision of cluster 169,0,231,,
-169b,,unmatched,unannotated subdivision of cluster 169,0,232,,
-T4-5a/b,T4a,class,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1684,234,ol_intrinsic,acetylcholine
-T4-5a/b,T4b,class,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1690,234,ol_intrinsic,acetylcholine
-T4-5a/b,T5a,class,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1664,234,ol_intrinsic,acetylcholine
-T4-5a/b,T5b,class,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1715,234,ol_intrinsic,acetylcholine
-T4-5c/d,T4c,class,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1778,235,ol_intrinsic,acetylcholine
-T4-5c/d,T4d,class,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1709,235,ol_intrinsic,acetylcholine
-T4-5c/d,T5c,class,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1720,235,ol_intrinsic,acetylcholine
-T4-5c/d,T5d,class,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1620,235,ol_intrinsic,acetylcholine
+source_name,malecns_type,tier,flag,evidence,n_cells_malecns,source_cluster,malecns_superclass,malecns_nt
+T1,T1,exact,,"ST1: 'Clear match to T1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 1+2 merged (OOBE 0.14)",1777,1,ol_intrinsic,histamine
+PR,R1-R6,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,3377,3,ol_sensory,histamine
+PR,R7R8_unclear,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,85,3,ol_sensory,histamine
+PR,R7_unclear,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,404,3,ol_sensory,histamine
+PR,R7d,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,82,3,ol_sensory,histamine
+PR,R7p,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,332,3,ol_sensory,histamine
+PR,R7y,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,482,3,ol_sensory,histamine
+PR,R8_unclear,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,442,3,ol_sensory,histamine
+PR,R8d,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,76,3,ol_sensory,histamine
+PR,R8p,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,330,3,ol_sensory,histamine
+PR,R8y,class,,ST1: 'Clear match to photoreceptors transcriptome; contains photoreceptor cells R1 to R8' -> all MaleCNS ol_sensory photoreceptor types; not resolved to R1-6 / R7 / R8 / pale / yellow,481,3,ol_sensory,histamine
+4,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,4,,
+5,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,5,,
+T2,T2,exact,,"ST1: 'Clear match to T2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1630,6,ol_intrinsic,acetylcholine
+T3,T3,exact,,"ST1: 'Clear match to T3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1940,7,ol_intrinsic,acetylcholine
+Lawf2,Lawf2,exact,,"ST1: 'Clear match to Lawf2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",383,8,ol_intrinsic,acetylcholine
+Dm4,Dm4,exact,,"ST1: 'Clear match to Dm4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",99,9,ol_intrinsic,glutamate
+10,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,10,,
+11,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,11,,
+Dm12,Dm12,exact,,"ST1: 'Clear match to Dm12 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",276,12,ol_intrinsic,glutamate
+13,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,13,,
+Dm1,Dm1,exact,,"ST1: 'Clear match to Dm1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",80,14,ol_intrinsic,glutamate
+Dm10,Dm10,exact,,"ST1: 'Clear match to Dm10 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",626,15,ol_intrinsic,gaba
+16,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,16,,
+17,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,17,,
+18,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,18,,
+Dm8,Dm8a,class,,"ST1: 'Clear match to Dm8 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS splits Dm8 into Dm8a (FlyWire yDm8) and Dm8b (pDm8) by connectivity (Nern 2025 ED Fig. 5); the cluster contains both",572,19,ol_intrinsic,glutamate
+Dm8,Dm8b,class,,"ST1: 'Clear match to Dm8 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS splits Dm8 into Dm8a (FlyWire yDm8) and Dm8b (pDm8) by connectivity (Nern 2025 ED Fig. 5); the cluster contains both",532,19,ol_intrinsic,glutamate
+20,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,20,,
+21,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,21,,
+22,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,22,,
+23,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,23,,
+24,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,24,,
+26,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,26,,
+LC14,LC14a-1,class,,"ST1: only cluster expressing atonal (mixture modelling), the marker of LC14 / LC14b; 'the cluster might be impure, maybe because of subtypes LC14/LC14b' -> MaleCNS LC14a-1, LC14a-2, LC14b",30,27,ol_intrinsic,acetylcholine
+LC14,LC14a-2,class,,"ST1: only cluster expressing atonal (mixture modelling), the marker of LC14 / LC14b; 'the cluster might be impure, maybe because of subtypes LC14/LC14b' -> MaleCNS LC14a-1, LC14a-2, LC14b",15,27,ol_intrinsic,acetylcholine
+LC14,LC14b,class,,"ST1: only cluster expressing atonal (mixture modelling), the marker of LC14 / LC14b; 'the cluster might be impure, maybe because of subtypes LC14/LC14b' -> MaleCNS LC14a-1, LC14a-2, LC14b",43,27,ol_intrinsic,acetylcholine
+28,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,28,,
+29,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,29,,
+30,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,30,,
+Mi15,Mi15,exact,,"ST1: 'Clear match to Mi15 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1151,31,ol_intrinsic,acetylcholine
+32,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,32,,
+Mi9,Mi9,exact,,"ST1: 'Clear match to Mi9 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1775,33,ol_intrinsic,glutamate
+Tm5c,Tm5c,exact,,"ST1: 'Clear match to Tm5c transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",750,34,ol_intrinsic,glutamate
+36,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,36,,
+37,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,37,,
+38,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,38,,
+39,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,39,,
+40,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,40,,
+41,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,41,,
+TmY5a,TmY5a,exact,,"ST1: 'Clear match to TmY5a transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1364,42,ol_intrinsic,glutamate
+43,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,43,,
+44,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,44,,
+45,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,45,,
+46,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,46,,
+47,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,47,,
+48,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,48,,
+49,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,49,,
+50,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,50,,
+51,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,51,,
+52,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,52,,
+53,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,53,,
+54,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,54,,
+Tm29,Tm29,fuzzy,name_collision,"ST1: 'Clear match to Tm29 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); NAME COLLISION (round-2 demotion exact -> fuzzy): the match rests on the name of a 2018 driver line called 'Tm29' (Konstantinides 2018), and MaleCNS Tm29 is FlyWire Tm5d (Matsliah) / CB3851 (Schlegel, 373 cells, also lumps Tm39 / Tm40) with no hemibrain name (Nern 2025 Sup_Table_7); whether that driver labels Nern-2025 Tm29 is not evidenced in the sources used; FCA 'transmedullary neuron Tm29' is cholinergic (VAChT 1.24, ChAT 0.47, VGlut 0.18) while MaleCNS Tm29 is glutamate 100 % (544 cells) and Sup_Table_7 FW_transmitter_pred for CB3851 is acetylcholine; Özel cluster 55 itself is VGlut P(ON) 1.00, which agrees with MaleCNS but is weak support",544,55,ol_intrinsic,glutamate
+56,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,56,,
+57,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,57,,
+58,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,58,,
+59,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,59,,
+T2a,T2a,exact,,ST1: only unidentified cluster expressing the T2a markers acj6 and ap (mixture modelling) with a unicolumnar-sized cluster; main text lists T2a among marker-identified clusters,1872,60,ol_intrinsic,acetylcholine
+Tm20,Tm20,exact,,"ST1: 'Clear match to Tm20 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1762,61,ol_intrinsic,acetylcholine
+62,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,62,,
+63,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,63,,
+LC12*,LC12,fuzzy,,"ST1 (author-starred = less confident): LC12 is cut+, Acj6+, toy+, beat-1c+, kn- (Extended Data Fig. 4); only cluster matching by mixture modelling",498,64,visual_projection,acetylcholine
+65,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,65,,
+LLPC1,LLPC1,exact,,"ST1: 'Clear match to LLPC1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",285,66,visual_projection,acetylcholine
+67,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,67,,
+68,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,68,,
+69,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,69,,
+TmY8*,,unmatched,,no TmY8 type in MaleCNS / Nern 2025 (FlyWire and hemibrain columns contain no TmY8 either); author-starred annotation by CG42458+ / vvl+,0,70,,
+71,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,71,,
+LPC1,LPC1,exact,,"ST1: 'Clear match to LPC1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",224,72,visual_projection,acetylcholine
+73,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,73,,
+74,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,74,,
+TmY4*,TmY4,fuzzy,,ST1 (author-starred): TmY4 is D+/vvl-/toy- (Extended Data Fig. 4) and DIP-gamma+; only clusters 75 and 164 (=Mi4) match by mixture modelling; 'very likely to correspond to TmY4',562,75,ol_intrinsic,acetylcholine
+76,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,76,,
+LC10a,LC10a,exact,,"ST1: 'Clear match to LC10a transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",275,77,visual_projection,acetylcholine
+LC10d,LC10d,exact,,"ST1: 'Clear match to LC10d transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); the LC10d bulk transcriptome was of lower quality in Davis 2020",214,78,visual_projection,acetylcholine
+LC10b,LC10b,exact,,"Methods: 'LC10b transcriptome correlated best with cluster 79, but also well though more weakly with clusters 93, 78 (LC10d) and 77 (LC10a)'; assigned LC10b by best correlation",95,79,visual_projection,acetylcholine
+80,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,80,,
+81,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,81,,
+82,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,82,,
+83,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,83,,
+84,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,84,,
+85,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,85,,
+86,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,86,,
+87,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,87,,
+90,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,90,,
+91,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,91,,
+92,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,92,,
+93 (likely LC10c),LC10c-1,fuzzy,,ST1 / Methods: 'cluster 93 likely being LC10c' (second-best correlate of the LC10b transcriptome); MaleCNS splits LC10c into LC10c-1 / LC10c-2 by connectivity (Nern 2025),130,93,visual_projection,acetylcholine
+93 (likely LC10c),LC10c-2,fuzzy,,ST1 / Methods: 'cluster 93 likely being LC10c' (second-best correlate of the LC10b transcriptome); MaleCNS splits LC10c into LC10c-1 / LC10c-2 by connectivity (Nern 2025),125,93,visual_projection,acetylcholine
+94,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,94,,
+95,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,95,,
+96,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,96,,
+98,,unmatched,,ST1: 'very likely to be a LC cell: second best match for LC16' -- no type,0,98,,
+99,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,99,,
+LC16,LC16,exact,,ST1: 'Clear match to LC16 transcriptome'; Methods: best match with a correlation gap of only 0.03 (below the 0.05 criterion used elsewhere),182,100,visual_projection,acetylcholine
+101,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,101,,
+102,,unmatched,,ST1: possible multiplets including central-brain neurons,0,102,,
+103,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,103,,
+Tm5ab,Tm5a,class,,"ST1: 'Clear match to Tm5ab transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); the Tm5a/b driver-line transcriptome pools both types (Davis 2020), MaleCNS separates Tm5a and Tm5b by connectivity",624,104,ol_intrinsic,acetylcholine
+Tm5ab,Tm5b,class,,"ST1: 'Clear match to Tm5ab transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); the Tm5a/b driver-line transcriptome pools both types (Davis 2020), MaleCNS separates Tm5a and Tm5b by connectivity",522,104,ol_intrinsic,acetylcholine
+105,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,105,,
+106,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,106,,
+L4,L4,exact,,"ST1: 'Clear match to L4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1769,107,ol_intrinsic,acetylcholine
+L2,L2,exact,,"ST1: 'Clear match to L2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1779,108,ol_intrinsic,acetylcholine
+L1,L1,exact,,"ST1: 'Clear match to L1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1776,109,ol_intrinsic,glutamate
+L3,L3,exact,,"ST1: 'Clear match to L3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1772,110,ol_intrinsic,acetylcholine
+LC17*,LC17,fuzzy,,"ST1 (author-starred): LC17 is Acj6+, toy+, kn+ (Extended Data Fig. 4) and beat-VI+; only cluster matching by mixture modelling",353,111,visual_projection,acetylcholine
+112,,unmatched,,"ST1: best match for Kenyon cells (Davis 2020) -- central-brain contamination, not an optic-lobe type; not mapped to MaleCNS KC types because the cluster is described as possibly mixed",0,112,,
+Lawf1,Lawf1,exact,,"ST1: 'Clear match to Lawf1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",361,113,ol_intrinsic,acetylcholine
+114,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,114,,
+115,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,115,,
+116,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,116,,
+L5,L5,exact,,"ST1: 'Clear match to L5 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1787,117,ol_intrinsic,acetylcholine
+Tm2,Tm2,exact,,"ST1: 'Clear match to Tm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1766,118,ol_intrinsic,acetylcholine
+TmY3,TmY3,exact,,"ST1: 'Clear match to TmY3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",824,119,ol_intrinsic,acetylcholine
+120,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,120,,
+123,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,123,,
+124,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,124,,
+Tm4,Tm4,exact,,"ST1: 'Clear match to Tm4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1670,125,ol_intrinsic,acetylcholine
+Tm3,Tm3,exact,,"ST1: 'Clear match to Tm3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 126+127 merged (OOBE 0.23)",2054,126,ol_intrinsic,acetylcholine
+Dm2,Dm2,exact,,"ST1: 'Clear match to Dm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1452,128,ol_intrinsic,acetylcholine
+129,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,129,,
+Dm11,Dm11,exact,minor_split,"ST1: 'Clear match to Dm11 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); minor split: FlyWire/Schlegel Dm11 (74/77 cells) = MaleCNS Dm11 (158 cells, 46,109 out-syn; Matsliah Dm11) + Dm-DRA2 (33 cells, 7,110 out-syn; Matsliah DmDRA2) per Nern 2025 Sup_Table_7; Dm-DRA2 is not added to the map (13 % of the pair's output synapses; both glutamate)",158,136,ol_intrinsic,glutamate
+TmY14*,TmY14,fuzzy,,"ST1 (author-starred): TmY14 is kn+, DIP-gamma+, toy+, D-, dac- (Extended Data Fig. 4); only cluster matching by mixture modelling; VGlut+ as expected for TmY14 (Raghu & Borst 2011); DIP-beta discrepancy noted by the authors",477,137,visual_projection,glutamate
+138,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,138,,
+139,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,139,,
+Tm1,Tm1,exact,,"ST1: 'Clear match to Tm1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 140+141 merged (OOBE 0.14)",1777,140,ol_intrinsic,acetylcholine
+Mi1,Mi1,exact,,"ST1: 'Clear match to Mi1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); clusters 142+143 merged (OOBE 0.14)",1773,142,ol_intrinsic,acetylcholine
+Dm9,Dm9,exact,,"ST1: 'Clear match to Dm9 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",273,144,ol_intrinsic,glutamate
+Lai,Lai,exact,,"ST1: 'Clear match to Lai transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",84,145,ol_intrinsic,glutamate
+146,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,146,,
+LC4,LC4,exact,,"ST1: 'Clear match to LC4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",126,147,visual_projection,acetylcholine
+LPLC1,LPLC1,exact,,"ST1: 'Clear match to LPLC1 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",134,148,visual_projection,acetylcholine
+149,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,149,,
+LPLC2,LPLC2,exact,,"ST1: 'Clear match to LPLC2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",185,150,visual_projection,acetylcholine
+Pm3*,Pm3,fuzzy,,"ST1 (author-starred) / Methods: the Pm3 bulk transcriptome 'correlated best, but weakly, with cluster 151', verified by previously described Pm3 markers (Extended Data Fig. 3c, mixture modelling); MaleCNS Pm3 = FlyWire Matsliah Pm09 / Schlegel CB3856 (Nern 2025 Sup_Table_7; no FlyWire or hemibrain 'Pm3' name)",69,151,ol_intrinsic,gaba
+Pm4,Pm4,exact,,"ST1: 'Clear match to Pm4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); MaleCNS Pm4 = FlyWire Matsliah Pm05 / Schlegel Pm4 (Nern 2025 Sup_Table_7)",168,152,ol_intrinsic,gaba
+153,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,153,,
+154,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,154,,
+155,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,155,,
+156,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,156,,
+157,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,157,,
+158,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,158,,
+159,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,159,,
+160,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,160,,
+161,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,161,,
+162,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,162,,
+Pm1,Pm1,class,,"ST1: only cluster hth+, svp+, tsh+, Lim3+ by mixture modelling, the Pm1 markers of Erclik et al. 2017; the 2020-era Pm1 (FlyWire/Schlegel 'Pm1', 245/231 cells) is a THREE-way MaleCNS split per Nern 2025 Sup_Table_7: Pm1 (Matsliah Pm01, 121 cells in the Nern optic-lobe volume; 246 cells / 169,388 out-syn in MaleCNS), Pm5 (Matsliah Pm02, 94; 182 / 147,555) and Pm6 (Matsliah Pm06, 24; 50 / 77,713); tiered class like Pm2 -> Pm2a/Pm2b (round-2 correction of a round-1 'exact' row)",246,163,ol_intrinsic,gaba
+Pm1,Pm5,class,,"ST1: only cluster hth+, svp+, tsh+, Lim3+ by mixture modelling, the Pm1 markers of Erclik et al. 2017; the 2020-era Pm1 (FlyWire/Schlegel 'Pm1', 245/231 cells) is a THREE-way MaleCNS split per Nern 2025 Sup_Table_7: Pm1 (Matsliah Pm01, 121 cells in the Nern optic-lobe volume; 246 cells / 169,388 out-syn in MaleCNS), Pm5 (Matsliah Pm02, 94; 182 / 147,555) and Pm6 (Matsliah Pm06, 24; 50 / 77,713); tiered class like Pm2 -> Pm2a/Pm2b (round-2 correction of a round-1 'exact' row)",182,163,ol_intrinsic,gaba
+Pm1,Pm6,class,,"ST1: only cluster hth+, svp+, tsh+, Lim3+ by mixture modelling, the Pm1 markers of Erclik et al. 2017; the 2020-era Pm1 (FlyWire/Schlegel 'Pm1', 245/231 cells) is a THREE-way MaleCNS split per Nern 2025 Sup_Table_7: Pm1 (Matsliah Pm01, 121 cells in the Nern optic-lobe volume; 246 cells / 169,388 out-syn in MaleCNS), Pm5 (Matsliah Pm02, 94; 182 / 147,555) and Pm6 (Matsliah Pm06, 24; 50 / 77,713); tiered class like Pm2 -> Pm2a/Pm2b (round-2 correction of a round-1 'exact' row)",50,163,ol_intrinsic,gaba
+Mi4,Mi4,exact,,"ST1: 'Clear match to Mi4 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1772,164,ol_intrinsic,gaba
+C3,C3,exact,,"ST1: 'Clear match to C3 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1779,165,ol_intrinsic,gaba
+166,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,166,,
+167,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,167,,
+168,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,168,,
+170,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,170,,
+171,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,171,,
+172,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,172,,
+173,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,173,,
+174,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,174,,
+Pm2,Pm2a,class,,"ST1: 'Clear match to Pm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); FlyWire/Schlegel Pm2 = MaleCNS Pm2a (Matsliah Pm03) + Pm2b (Matsliah Pm08) per Nern 2025 Sup_Table_7 (connectivity split, Nern 2025 ED Fig. 2e-h; the Pm2 driver labels the group '[Pm2]')",219,175,ol_intrinsic,gaba
+Pm2,Pm2b,class,,"ST1: 'Clear match to Pm2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05); FlyWire/Schlegel Pm2 = MaleCNS Pm2a (Matsliah Pm03) + Pm2b (Matsliah Pm08) per Nern 2025 Sup_Table_7 (connectivity split, Nern 2025 ED Fig. 2e-h; the Pm2 driver labels the group '[Pm2]')",124,175,ol_intrinsic,gaba
+176,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,176,,
+177,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,177,,
+178,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,178,,
+179,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,179,,
+180,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,180,,
+181,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,181,,
+C2,C2,exact,,"ST1: 'Clear match to C2 transcriptome (Extended Data Fig. 3)' (Pearson correlation with the driver-line bulk transcriptome of Konstantinides 2018 / Davis 2020, best-vs-second gap >= 0.05)",1745,182,ol_intrinsic,gaba
+183,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,183,,
+184,,unmatched,,unannotated neuronal cluster (no type assigned by the authors),0,184,,
+G01,,unmatched,,glia / low-quality cluster ('G01'),0,185,,
+G/LQ1,,unmatched,,glia / low-quality cluster ('G/LQ1'),0,186,,
+G02,,unmatched,,glia / low-quality cluster ('G02'),0,187,,
+G14ab,,unmatched,,glia / low-quality cluster ('G14ab'),0,188,,
+G16/LQ,,unmatched,,glia / low-quality cluster ('G16/LQ'),0,189,,
+G/LQ2,,unmatched,,glia / low-quality cluster ('G/LQ2'),0,190,,
+191,,unmatched,,ST1: neither glia nor optic-lobe neuron,0,191,,
+LQ,,unmatched,,ST1: ambient RNA / low quality,0,192,,
+G/LQ3,,unmatched,,glia / low-quality cluster ('G/LQ3'),0,196,,
+G/LQ4,,unmatched,,glia / low-quality cluster ('G/LQ4'),0,197,,
+G03,,unmatched,,glia / low-quality cluster ('G03'),0,198,,
+G04,,unmatched,,glia / low-quality cluster ('G04'),0,199,,
+G05,,unmatched,,glia / low-quality cluster ('G05'),0,200,,
+G06,,unmatched,,glia / low-quality cluster ('G06'),0,201,,
+G07,,unmatched,,glia / low-quality cluster ('G07'),0,202,,
+G08,,unmatched,,glia / low-quality cluster ('G08'),0,203,,
+G09,,unmatched,,glia / low-quality cluster ('G09'),0,204,,
+G10,,unmatched,,glia / low-quality cluster ('G10'),0,205,,
+G11,,unmatched,,glia / low-quality cluster ('G11'),0,206,,
+G12,,unmatched,,glia / low-quality cluster ('G12'),0,207,,
+G13,,unmatched,,glia / low-quality cluster ('G13'),0,208,,
+221,,unmatched,,"ST1: split of cluster 97 at P70, 'likely another LC neuron' -- no type",0,221,,
+LC6,LC6,exact,,"ST1: backprojection from P70; 'Clear match to LC6 transcriptome' (cluster 97 split into 221 / 222 at P70, 222 = LC6)",124,222,visual_projection,acetylcholine
+Dm3a,Dm3a,class,,"ST1: Dm3 subtype from P70 backprojection. Özel could not assign the two orthogonal Dm3 arbor orientations to anatomical directions (ED Fig. 7d, 'Dm3x / Dm3y'); MaleCNS has three Dm3 types (Dm3a = FlyWire Dm3p, Dm3b = Dm3q, Dm3c = Dm3v; Nern 2025). Subtype letters are NOT assumed to correspond; mapped to the Dm3 family",1204,225,ol_intrinsic,glutamate
+Dm3a,Dm3b,class,,"ST1: Dm3 subtype from P70 backprojection. Özel could not assign the two orthogonal Dm3 arbor orientations to anatomical directions (ED Fig. 7d, 'Dm3x / Dm3y'); MaleCNS has three Dm3 types (Dm3a = FlyWire Dm3p, Dm3b = Dm3q, Dm3c = Dm3v; Nern 2025). Subtype letters are NOT assumed to correspond; mapped to the Dm3 family",1137,225,ol_intrinsic,glutamate
+Dm3a,Dm3c,class,,"ST1: Dm3 subtype from P70 backprojection. Özel could not assign the two orthogonal Dm3 arbor orientations to anatomical directions (ED Fig. 7d, 'Dm3x / Dm3y'); MaleCNS has three Dm3 types (Dm3a = FlyWire Dm3p, Dm3b = Dm3q, Dm3c = Dm3v; Nern 2025). Subtype letters are NOT assumed to correspond; mapped to the Dm3 family",787,225,ol_intrinsic,glutamate
+Dm3b,Dm3a,class,,as 225: Dm3 subtype letter not transferable; mapped to the Dm3 family,1204,226,ol_intrinsic,glutamate
+Dm3b,Dm3b,class,,as 225: Dm3 subtype letter not transferable; mapped to the Dm3 family,1137,226,ol_intrinsic,glutamate
+Dm3b,Dm3c,class,,as 225: Dm3 subtype letter not transferable; mapped to the Dm3 family,787,226,ol_intrinsic,glutamate
+Tm9v,Tm9,class,,"ST1: ventral Tm9 (Wnt4+) from P70 backprojection; MaleCNS has a single Tm9 type (dorsal / ventral halves could be split by hex column, not done here)",1771,227,ol_intrinsic,acetylcholine
+Tm9d,Tm9,class,,ST1: dorsal Tm9 (Wnt10+) from P70 backprojection; MaleCNS Tm9 is one type,1771,228,ol_intrinsic,acetylcholine
+88a,,unmatched,,unannotated subdivision of cluster 88,0,229,,
+88b,,unmatched,,unannotated subdivision of cluster 88,0,230,,
+169a,,unmatched,,unannotated subdivision of cluster 169,0,231,,
+169b,,unmatched,,unannotated subdivision of cluster 169,0,232,,
+T4-5a/b,T4a,class,,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1684,234,ol_intrinsic,acetylcholine
+T4-5a/b,T4b,class,,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1690,234,ol_intrinsic,acetylcholine
+T4-5a/b,T5a,class,,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1664,234,ol_intrinsic,acetylcholine
+T4-5a/b,T5b,class,,"ST1: T4/T5 subdivision a/b projected from P50 (OOBE 7 % vs class 235 in adults); pools T4a, T4b, T5a, T5b",1715,234,ol_intrinsic,acetylcholine
+T4-5c/d,T4c,class,,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1778,235,ol_intrinsic,acetylcholine
+T4-5c/d,T4d,class,,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1709,235,ol_intrinsic,acetylcholine
+T4-5c/d,T5c,class,,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1720,235,ol_intrinsic,acetylcholine
+T4-5c/d,T5d,class,,"ST1: T4/T5 subdivision c/d projected from P50; pools T4c, T4d, T5c, T5d",1620,235,ol_intrinsic,acetylcholine

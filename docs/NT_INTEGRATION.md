@@ -233,11 +233,46 @@ EPG / PEN / Delta7 entries -- the compass is a gain / dynamics question, not a r
    `scripts/build_davis2020_tables.py`, `build_central_agg_davie.py`, `build_central_agg_fca.py`,
    `build_central_map.py`; paths to be fixed); several quoted numbers were misread (see the record).
 
-**Round 2 (launched):** fix the tables and rebuild (KaiR1D, tier rule "a single-nucleus none never silences a
-group another source has on", Pm1 / Tm29 / typing rows); score `abs` and `nonmda` and the NT-class fallback on the
-cluster; write and run the moving-ball object sweep (`scripts/probe_object_sweep.py`) under off / sign; search
-Kurmangaliyev 2020 (GSE156455) and Ozel's unannotated clusters for Tm5Y / TmY21 / TmY13 / LC11 / Y3 profiles;
-apply the supported transmitter labels as a `TYPE_NT_OVERRIDE` table and test the GLNO sign in the compass; redesign
-the slow term (per-class scale and tau, monoamine-only default, multiplicative variant, optic-lobe term) and sweep it
-on the four runaway-sensitive checks before any hunger experiment. Stop-gap retirement with the receptor model on
-(step 8) waits for a mode that is at least neutral on the suite.
+**Round 2 (done; `docs/audits/receptor_verification.md` round-2 section):** every round-1 table correction was
+applied and the tables rebuilt (KaiR1D = CG3822; Pm1 / Tm29 / typing tiers; a silence needs >= 2 agreeing sources and
+a single-nucleus "none" never outranks a whole-cell profile: silenced classical edges 286,600 -> 83,473 synapses, all
+histamine; Kurmangaliyev 2020 added as a sixth source). Findings:
+
+1. **Hypothesis (a) is closed on the receptor route.** Tm5Y, TmY21, TmY13, LC11, Y3, Li19 and Tm32 have no profile in
+   any of the six sources (Kurmangaliyev's 199 clusters carry none of them; no marker exists to key Ozel's 106
+   unannotated clusters); the lookup decides 0 input synapses of LC11 / Tm5Y / TmY21 / TmY13 and changes 0 exact-tier
+   inputs of LC10a/b, LC16, LPLC2, LC4, T3 under any rule; and the moving-ball assay (`scripts/probe_object_sweep.py`,
+   `docs/audits/object_sweep.md`) shows no object signal at LC11 / LC10a under off, sign-class, sign-abs or with T2/T3
+   rectified ((ball - none) best-cell drive 0.03-0.48 mV vs a 7 mV threshold; the per-run pass/fail is a coin flip at
+   the 1 Hz criterion). The object item becomes a medulla -> lobula wiring / dynamics question with that script and
+   `probe_figure_ground.py` as benchmarks.
+2. **The first suite-neutral receptor mode:** `receptor_model='sign'` with the absolute-level net rule (`abs`; 127,462
+   glutamate flips + 83,473 histamine silencings = 0.17 % of |W|) scores 27 PASS / 0 FAIL / 2 known gaps in four of four
+   suite runs against off's 26/1/2 and 24/3/2; it raises the pinned loom GF 19 -> 37 Hz and demo escapes to 12/12 seeds
+   (off 3/12), with one measured cost (legacy loom.GF_peak -10 Hz, still PASS). It changes 0 entries of the object
+   pathway, the optomotor readout or the compass core. **Not yet adopted**: 26 of its 40 +1 rows are contradicted by
+   another source (Tm9: Davis alone vs three sources at -1; L1; 24 ER ring rows), no run holds Tm9 at -1, and the
+   builder has no "contested flip" rule -- round 3. `class` (Shiu sugar storm, contradicted Mi9 / L3 / Tm9 flips),
+   `nonmda` (ON pathway inverted) and the class-baseline fallback (21/6/2) are not candidates.
+3. **Transmitter labels adopted (data-driven, default model changed):** `TYPE_NT_OVERRIDE` in `connectome.py` --
+   TmY14 glutamate (three transcriptome sources + Nern 2025), Mi19 serotonin (EASI-FISH validated), aMe8 acetylcholine
+   -- applied to those types' sign-0 cells: 107 cells, 95 output signs, 33,446 raw synapses (0.027 %); sign-0 share
+   2.203 -> 2.176 %. Adopted because a three-seed suite run shows no check changing status; the local `cache/` was
+   rebuilt (backup `out/cache_pre_override/`), the cluster's shared cache is rebuilt with the same code. T1's histamine
+   label (conf 0.51) is unsupported by five sources but is not changed (1,777 cells; a fifth source, FlyWire top_nt,
+   says ACh 873 / GABA 439 / His 0). The type-majority rule for the other ~496 unknown presynaptic cells is undecided.
+4. **Compass:** the receptor model is dynamically inert on the ring (sign-class bit-identical to base in 6/6 runs; the
+   ExR4/ExR5/ExR6/Delta7 -> EPG glutamate, 9.1 % of EPG's input, is fast GluCl inhibition by the E-PG driver data). The
+   silent GLNO <-> PEN loop matters: GLNO glutamatergic abolishes the bump at gE 1.75 in 6/6 seeds, cholinergic holds it
+   in 6/6; both EM predictions (MaleCNS T-bars 51 % Glu; FlyWire GABA 3/4) favour inhibitory, so the cx_wedge gains
+   were tuned against a silent GLNO -- a GLNO=gaba gain scan is the next compass experiment (`docs/audits/cx_glno.md`).
+5. **Slow term redesigned** (`docs/audits/slow_term.md`): per-class scale and tau (classical metabotropic default 0;
+   monoamine only), additive / gain / threshold modes, an optic-lobe term; the round-1 runaway is gone (the class split,
+   not the scale). Four unit-gain settings pass the four runaway-sensitive checks -- on the class fast weights, whose
+   control fails Shiu; never run on abs weights; 'gain' acts on the net input (disinhibits net-inhibited targets); the
+   KC-direction story did not survive verification. It stays an experiment flag for assay 7, not a default.
+
+**Round 3 (next):** a symmetric "contested flip" rule and rebuild; re-score abs with and without the Tm9 row; adopt
+`sign`/`abs` as the default only if 27/0/2 holds in 3/3 with the contested flips removed (then step 8 -- LPi x4, GF
+x0.3, AL LN override -- under the new default); the GLNO=gaba compass scan; the slow term on abs weights; an
+object-sweep null and replicates; and the remaining reporting debt listed in the verification record.

@@ -1,8 +1,11 @@
 # Type map: Nern et al. 2025 optic-lobe inventory -> MaleCNS v1.0 type names. Built by scripts/build_type_map_nern2025.py.
 # Source: Nern A, Loesche F, Takemura S-y, et al. (2025) Connectome-driven neural inventory of a complete visual system. Nature 641, 1225-1237. doi:10.1038/s41586-025-08746-0 (CC BY 4.0); Supplementary Tables 1, 5, 7 (MOESM4 zip), hashes in docs/audits/receptor_sources_nern2025.md.
-# tier: exact = identical type name in both inventories; class = MaleCNS '<prefix>_unclear' bin whose Nern subtypes all carry one prediction;
+# tier: exact = identical type name in both inventories (the 684 optic-lobe-superclass rows are verified same cells: identical counts and figure bodyIds;
+#       the 48 central rows are same-name only -- MaleCNS v1.0 has partly re-annotated those cells since the optic-lobe release, e.g. AOTU056's figure
+#       bodyId 66210 is typed AOTU058 in MaleCNS); class = MaleCNS '<prefix>_unclear' bin whose Nern subtypes all carry one prediction;
 #       unmatched = MaleCNS optic-lobe-superclass type with no Nern counterpart (evidence says why). No alias / fuzzy rows were needed: all 732 Nern names are MaleCNS names.
-# nern_nt: Sup_Table_1 'predicted neurotransmitter' (EM synapse classifier trained on 59 optic-lobe types; 'unclear' = low confidence, not independently confirmed).
+# nern_nt: Sup_Table_1 'predicted neurotransmitter' (EM synapse classifier trained on optic-lobe ground-truth types: 59 per the paper / gt_count.csv,
+#       60 rows with Part_of_training_data = yes in Sup_Table_5 -- unreconciled; 'unclear' = low confidence, not independently confirmed).
 # fw_nt: Sup_Table_7 FlyWire prediction for the matched FlyWire type (Eckstein et al. 2024 classifier, female brain). validated_*: Sup_Table_5 experimental transmitter
 #       (FISH / bulk RNA-seq / antibody); validated_in_training = yes means the type was classifier ground truth, so it is not an independent check of nern_nt.
 # malecns_*: from cache/neurons.parquet (model nt after the AL-LN override; mode over the type's cells, share of cells with that mode, cells with nt = unknown);

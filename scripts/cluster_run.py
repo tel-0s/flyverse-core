@@ -170,7 +170,8 @@ def main() -> int:
     # 5. fetch results
     for p in args.fetch:
         dst = os.path.join(ROOT, p); os.makedirs(os.path.dirname(dst.rstrip("/\\")) or ".", exist_ok=True)
-        rc = subprocess.run(["scp", "-q", "-r", f"{cfg['ssh']}:{rdir}/{p}", dst], capture_output=True, text=True).returncode
+        src = f"{cfg['ssh']}:{rdir}/{p.rstrip('/')}/." if p.endswith("/") else f"{cfg['ssh']}:{rdir}/{p}"   # dir/. copies the contents
+        rc = subprocess.run(["scp", "-q", "-r", src, dst], capture_output=True, text=True).returncode
         print(f"fetched {p}" if rc == 0 else f"FETCH FAILED {p}")
     print(f"{len(jobs)} job(s), {failed} failed  ({(time.time() - t0) / 60:.1f} min)  run dir {rdir}")
     return 1 if failed else 0

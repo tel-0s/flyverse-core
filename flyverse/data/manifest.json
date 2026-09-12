@@ -379,6 +379,74 @@
     }
    ],
    "unpack": "nern2025_41586_2025_8746_MOESM4_ESM.zip -> nern2025_MOESM4/"
+  },
+  "kurmangaliyev2020": {
+   "citation": "Kurmangaliyev, Yoo, Valdes-Aleman, Sanfilippo & Zipursky 2020, Neuron 108:1045-1057, doi:10.1016/j.neuron.2020.10.006; GEO GSE156455",
+   "licence": "GEO public data (cite); Neuron article Elsevier / Cell Press (paywalled, not redistributed)",
+   "notes_doc": "docs/audits/receptor_sources_profiles.md",
+   "files": [
+    {
+     "path": "GSE156455_README.txt",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_README.txt",
+     "sha256": "b22202fd63a90f749d56070de4bf6b6c1783043ed3ca841a27b5335c672660fd",
+     "size_mb": 0.0
+    },
+    {
+     "path": "GSE156455_features_main.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_features_main.tsv.gz",
+     "sha256": "cb711bf0fa8c11fe5b9983865796055aacd91feb44744e44540272a6b26ebb6a",
+     "size_mb": 0.1
+    },
+    {
+     "path": "GSE156455_barcodes_main.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_barcodes_main.tsv.gz",
+     "sha256": "d78d99277c9a5357708f52f09b121ddd0669ff45a8ba6a84ab097f62754d59b7",
+     "size_mb": 1.3
+    },
+    {
+     "path": "GSE156455_matrix_main.mtx.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_matrix_main.mtx.gz",
+     "sha256": "e34a0728501cb8a40713b24c861f261fe293900cf113ab92f2ed522791b5f81e",
+     "size_mb": 1054.5
+    },
+    {
+     "path": "GSE156455_metadata_main.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_metadata_main.tsv.gz",
+     "sha256": "a312e1ef40819ff0d988cb0de00231fa5fbae3ddd3befd90b05031140c24f2c1",
+     "size_mb": 2.1
+    },
+    {
+     "path": "GSE156455_tsne_main.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_tsne_main.tsv.gz",
+     "sha256": "300814d76db74d7b29061675ab63fb59b7ed7ba2c65af44e25bd168b7ff0fb85",
+     "size_mb": 3.5
+    },
+    {
+     "path": "GSE156455_features_early.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_features_early.tsv.gz",
+     "sha256": "cb711bf0fa8c11fe5b9983865796055aacd91feb44744e44540272a6b26ebb6a",
+     "size_mb": 0.1
+    },
+    {
+     "path": "GSE156455_barcodes_early.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_barcodes_early.tsv.gz",
+     "sha256": "66da85b3bafbc7bec7b92d0a7a01840c936af5840ad596895f3e6cdb442a5652",
+     "size_mb": 0.2
+    },
+    {
+     "path": "GSE156455_metadata_early.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/suppl/GSE156455_metadata_early.tsv.gz",
+     "sha256": "e01230c01278d7491e65d54b49157bede03c2627503f45fe5ccb5caa3ac1c63f",
+     "size_mb": 0.3
+    },
+    {
+     "path": "GSE156455_family.soft.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE156nnn/GSE156455/soft/GSE156455_family.soft.gz",
+     "sha256": "d0688afd3ba63864e0be7a8da57bd63977a65d18b6b67ce4588c0b1ab249452b",
+     "size_mb": 0.0
+    }
+   ],
+   "unpack": "none; scripts/build_kurmangaliyev2020_tables.py streams GSE156455_matrix_main.mtx.gz (1.0 GB) once and caches per-cell counts of the 54 genes in _percell_54genes.npz next to it (git-ignored). GSE156455_matrix_early.mtx.gz (152 MB, 0-24 h APF) is not needed."
   }
  }
 }

@@ -5,8 +5,9 @@ Inputs (git-ignored, see docs/audits/receptor_sources_nern2025.md for URLs and h
       one row per instance (681 right-side + 97 left-side instances of 732 types): cell type, no. of cells,
       main group, predicted neurotransmitter (ACh / Glu / GABA / His / OA / 5HT / Dop / unclear).
   .../Sup_Table_5_Neurotransmitter_validation_final.xlsx
-      148 experimentally validated types (FISH / bulk RNA-seq / antibody), the classifier's ground truth
-      (Part_of_training_data = yes) plus new validation data (no).
+      148 rows / 147 distinct names (Tm29 twice) of experimentally validated types (FISH / bulk RNA-seq / antibody),
+      the classifier's ground truth (Part_of_training_data = yes, 60 rows; the paper and gt_count.csv say 59
+      types -- unreconciled) plus new validation data (no, 88 rows).
   .../Sup_Table_7_MatchingCellTypes_final.xlsx
       optic-lobe type -> FlyWire (Matsliah 2024 optic-lobe names, Schlegel 2024 whole-brain names) and
       hemibrain names, match cardinality, and both datasets' transmitter predictions.
@@ -14,9 +15,17 @@ Inputs (git-ignored, see docs/audits/receptor_sources_nern2025.md for URLs and h
       sign-0 (monoamine / unknown) edges are explicit zeros).
   optional: the raw MaleCNS weights feather (uncapped, unsigned synapse counts) for a second weighting.
 
+  optional: data/external/typing/schlegel2024_Supplemental_file1_neuron_annotations.tsv (flywire_annotations v3.1.0,
+      commit 8587524, 2026-07-21) to flag FlyWire alias names absent from that release.
+
 Outputs:
   flyverse/data/type_map_nern2025.csv   source_name, malecns_type, tier, evidence, n_cells_malecns + NT columns
-  flyverse/data/type_aliases_nern2025.csv   malecns_type, alias, system, tier, evidence (Sup_Table_7 + MaleCNS annotation columns)
+  flyverse/data/type_aliases_nern2025.csv   malecns_type, alias, system, tier, flag, evidence (Sup_Table_7 + MaleCNS annotation columns)
+      flag (round 2, verify:tables:nern2025): conflict_nern7_vs_malecns = the type's Sup_Table_7 FlyWire name and its
+      MaleCNS majority flywireType name different types (25 types: Cm -> Sm off-by-one series, Li shifts, AOTU056, LoVP19, ...);
+      conflict_nern7_vs_malecns_notation = the two differ as strings but are the same names written differently or a
+      parent / subtype split (22 types; 47 string mismatches in all); absent_sd1_v3.1.0 = no element of the alias is a
+      cell_type of flywire_annotations v3.1.0 (only when the SD1 file above is present); '' = no caveat.
   stdout: coverage by tier (types / cells / output synapses) and the NT cross-check tables, pasted into
           docs/audits/receptor_sources_nern2025.md.
 
@@ -42,6 +51,7 @@ RAW_WEIGHTS = Path(os.environ.get("FLYVERSE_DATA_DIR", r"D:\Datasets\male-cns-co
     "connectome-weights-male-cns-v1.0-minconf-0.5.feather"
 OUT_MAP = ROOT / "flyverse/data/type_map_nern2025.csv"
 OUT_ALIAS = ROOT / "flyverse/data/type_aliases_nern2025.csv"  # type_aliases.csv is owned by build_type_map_typing.py
+SD1_V31 = ROOT / "data/external/typing/schlegel2024_Supplemental_file1_neuron_annotations.tsv"  # flywire_annotations v3.1.0
 
 OL_SUPERCLASSES = ["ol_intrinsic", "visual_projection", "ol_sensory", "visual_centrifugal"]
 SOURCE_CITATION = ("Nern A, Loesche F, Takemura S-y, et al. (2025) Connectome-driven neural inventory of a complete "
@@ -242,10 +252,57 @@ def build_type_map(src, t5, t7, neurons):
     return df
 
 
+def t7_vs_malecns_conflicts(t7, neurons):
+    """Types whose Sup_Table_7 FlyWire name (Schlegel_type / Matsliah_type) and MaleCNS majority flywireType differ as
+    strings (the verify:tables:nern2025 rule, 47 types). Returns (conflict, notation): `conflict` = no name element in
+    common and not a parent / subtype pair (different types named); `notation` = same names written differently
+    ('LTe49a,b,d,e,f' vs 'LTe49a,LTe49b,...') or a parent / subtype split ('MeTu2' vs 'MeTu2a')."""
+    typed = neurons[(neurons.type != "") & neurons.flywireType.notna()]
+    fw_major = {t: s.value_counts().index[0] for t, s in typed.groupby("type").flywireType}
+    conflict, notation = {}, {}
+    n_compared = 0
+    for r in t7.itertuples():
+        t = r.OL_type
+        cols = [str(v).strip() for v in (r.Schlegel_type, r.Matsliah_type) if pd.notna(v) and str(v).strip()]
+        if t not in fw_major or not cols:
+            continue
+        n_compared += 1
+        mv = fw_major[t]
+        if mv in cols:
+            continue
+        t7_elems = set()
+        for c in cols:
+            t7_elems |= {x.strip() for x in re.split(r"[,+]", c) if x.strip()}
+        mv_elems = {x.strip() for x in re.split(r"[,/]", mv) if x.strip()}
+        if mv_elems & t7_elems or any(re.fullmatch(re.escape(c) + r"[a-z]", mv) for c in cols):
+            notation[t] = (cols, mv)
+        else:
+            conflict[t] = (cols, mv)
+    return conflict, notation, n_compared
+
+
 def build_aliases(t7, neurons):
     rows = []
     systems = [("Matsliah_type", "flywire_matsliah2024", "Matsliah"), ("Schlegel_type", "flywire_schlegel2024", None),
                ("hemibrain_type", "hemibrain", None)]
+    conflict, notation, n_compared = t7_vs_malecns_conflicts(t7, neurons)
+    fw_v31 = None
+    if SD1_V31.exists():
+        fw_v31 = set(pd.read_csv(SD1_V31, sep="\t", low_memory=False, usecols=["cell_type"]).cell_type.dropna())
+
+    def flag_of(t, alias, system):
+        f = []
+        if system in ("flywire_matsliah2024", "flywire_schlegel2024", "malecns_flywireType"):
+            if t in conflict:
+                f.append("conflict_nern7_vs_malecns")
+            elif t in notation:
+                f.append("conflict_nern7_vs_malecns_notation")
+            if fw_v31 is not None and alias != t:
+                elems = {x.strip() for x in re.split(r"[,+/]", alias) if x.strip()} | {alias}
+                if not (elems & fw_v31):
+                    f.append("absent_sd1_v3.1.0")
+        return ";".join(f)
+
     for _, r in t7.iterrows():
         for col, system, _ in systems:
             a = r[col]
@@ -262,7 +319,8 @@ def build_aliases(t7, neurons):
                 ev += "; composite alias string (several source types)"
             if pd.notna(r.get("Notes")) and str(r.Notes).strip():
                 ev += "; note: " + str(r.Notes).strip().replace("\n", " ")
-            rows.append(dict(malecns_type=r.OL_type, alias=a, system=system, tier=tier, evidence=ev))
+            rows.append(dict(malecns_type=r.OL_type, alias=a, system=system, tier=tier,
+                             flag=flag_of(r.OL_type, a, system), evidence=ev))
     # MaleCNS's own per-cell annotation columns, summarised per type (majority string, share of annotated cells)
     for col, system in [("flywireType", "malecns_flywireType"), ("hemibrainType", "malecns_hemibrainType")]:
         sub = neurons[(neurons.type != "") & neurons[col].notna() & (neurons[col].astype(str).str.strip() != "")]
@@ -280,8 +338,17 @@ def build_aliases(t7, neurons):
             ev = f"MaleCNS v1.0 annotation column {col}: majority value in {vc.iloc[0]}/{n_ann} annotated cells ({n_tot} cells in type)"
             if len(vc) > 1:
                 ev += "; other values: " + "; ".join(f"{k} {v}" for k, v in vc.iloc[1:4].items())
-            rows.append(dict(malecns_type=t, alias=a, system=system, tier=tier, evidence=ev))
-    return pd.DataFrame(rows)
+            rows.append(dict(malecns_type=t, alias=a, system=system, tier=tier, flag=flag_of(t, a, system), evidence=ev))
+    df = pd.DataFrame(rows)
+    print(f"\n## Sup_Table_7 FlyWire name vs MaleCNS majority flywireType: {n_compared} types compared, "
+          f"{len(conflict) + len(notation)} differ as strings; {len(conflict)} name different types (flag conflict_nern7_vs_malecns), "
+          f"{len(notation)} are notation / parent-subtype differences (flag conflict_nern7_vs_malecns_notation)")
+    for t, (cols, mv) in conflict.items():
+        print(f"  conflict  {t:12s} Sup_Table_7 {cols}  MaleCNS flywireType {mv!r}")
+    print("  notation  " + ", ".join(notation))
+    if fw_v31 is None:
+        print(f"  (SD1 v3.1.0 not found at {SD1_V31}; absent_sd1_v3.1.0 flags not computed)")
+    return df
 
 
 def write_csv(df: pd.DataFrame, path: Path, header_lines: list[str]):
@@ -297,6 +364,13 @@ def coverage(df_map, neurons, W, raw_edges):
     neurons["tier"] = neurons.type.map(tier_of).fillna("unmatched")
     neurons.loc[neurons.type == "", "tier"] = "untyped"
     neurons["group"] = np.where(neurons.superclass.isin(OL_SUPERCLASSES), neurons.superclass, "central_or_vnc")
+    # matched cells that the four-superclass filter puts in 'central_or_vnc' although they are optic-lobe cells
+    # (superclass '<x>_tbc'): named here so the 'central_or_vnc class' row is not read as a central cell
+    tbc = neurons[(neurons.group == "central_or_vnc") & neurons.tier.isin(["exact", "class"]) &
+                  neurons.superclass.fillna("").str.endswith("_tbc")]
+    if len(tbc):
+        print("\n## Matched cells with a '_tbc' superclass counted under central_or_vnc: " +
+              "; ".join(f"{r.type} ({r.superclass}, tier {r.tier})" for r in tbc.itertuples()))
     tiers = ["exact", "class", "unmatched", "untyped"]
     out = []
     for grp, g in list(neurons.groupby("group")) + [("ALL", neurons)]:
@@ -307,6 +381,18 @@ def coverage(df_map, neurons, W, raw_edges):
                             cells_frac=len(s) / tot_c, out_syn_W=s.out_syn_W.sum(), out_syn_W_frac=s.out_syn_W.sum() / tot_w,
                             out_syn_raw=s.out_syn_raw.sum(), out_syn_raw_frac=s.out_syn_raw.sum() / tot_r if tot_r else np.nan))
     cov = pd.DataFrame(out)
+    # 'unclear' Nern labels: cells and output synapses of the exact types whose nern_nt is unclear (doc section 7 recount)
+    ol_mask = neurons.superclass.isin(OL_SUPERCLASSES)
+    ol_raw = neurons.loc[ol_mask, "out_syn_raw"].sum()
+    unc_types = set(df_map[(df_map.tier == "exact") & (df_map.nern_nt == "unclear")].malecns_type)
+    unc_cells = neurons[neurons.type.isin(unc_types)]
+    unc_ol = df_map[(df_map.tier == "exact") & (df_map.nern_nt == "unclear") & df_map.malecns_superclass.isin(OL_SUPERCLASSES)]
+    unc_ol_cells = neurons[neurons.type.isin(set(unc_ol.malecns_type))]
+    print(f"\n## Nern 'unclear' exact types: {len(unc_types)} types, {len(unc_cells):,} MaleCNS cells (all superclasses), "
+          f"{int(unc_cells.out_syn_raw.sum()):,} raw out syn = {unc_cells.out_syn_raw.sum() / ol_raw:.2%} of the {int(ol_raw):,} "
+          f"OL-superclass raw output synapses; the {len(unc_ol)} OL-superclass ones: {len(unc_ol_cells):,} cells, "
+          f"{int(unc_ol_cells.out_syn_raw.sum()):,} raw = {unc_ol_cells.out_syn_raw.sum() / ol_raw:.2%}; "
+          f"the other {len(unc_types) - len(unc_ol)} unclear types are central ({len(unc_cells) - len(unc_ol_cells):,} cells)")
     # edges with both pre and post matched (exact or class)
     matched = neurons.tier.isin(["exact", "class"]).to_numpy()
     pre_ol = neurons.superclass.isin(OL_SUPERCLASSES).to_numpy()
@@ -315,7 +401,8 @@ def coverage(df_map, neurons, W, raw_edges):
     both = matched[Wc.row] & matched[Wc.col]
     edge = {"W_all_both_matched": a[both].sum() / a.sum(),
             "W_olpre_both_matched": a[both & pre_ol[Wc.col]].sum() / a[pre_ol[Wc.col]].sum(),
-            "W_olpre_pre_matched": a[matched[Wc.col] & pre_ol[Wc.col]].sum() / a[pre_ol[Wc.col]].sum()}
+            "W_olpre_pre_matched": a[matched[Wc.col] & pre_ol[Wc.col]].sum() / a[pre_ol[Wc.col]].sum(),
+            "W_all_pre_matched": a[matched[Wc.col]].sum() / a.sum()}
     if raw_edges is not None:
         pre, post, wt = raw_edges
         both = matched[pre] & matched[post]
@@ -365,11 +452,14 @@ def crosscheck(df_map, neurons):
 
 def main():
     src, left, contradictions, t5, t7 = load_source()
-    print(f"Sup_Table_1: {len(src)} right-side types, {len(left)} left-side instances, L/R NT contradictions: {len(contradictions)}")
+    n_r = int((src.side == "R").sum())
+    print(f"Sup_Table_1: {n_r + len(left)} rows = {n_r} _R + {len(left)} _L instances; {len(src)} distinct types "
+          f"({n_r} with a right-side row, {len(src) - n_r} left-only); L/R NT contradictions: {len(contradictions)}")
     if len(contradictions):
         print(contradictions[["type", "nt_L", "nt_R"]].to_string(index=False))
     print("Sup_Table_1 NT:", src.nt_norm.value_counts().to_dict())
-    print(f"Sup_Table_5: {len(t5)} rows, {t5.type.nunique()} types; in Sup_Table_1: {t5.type.isin(src.index).sum()}; "
+    print(f"Sup_Table_5: {len(t5)} rows, {t5.type.nunique()} distinct names; rows in Sup_Table_1: {t5.type.isin(src.index).sum()} "
+          f"({t5[t5.type.isin(src.index)].type.nunique()} distinct names; Tm29 twice); "
           f"not in Sup_Table_1: {sorted(set(t5.type) - set(src.index))}")
     print("Sup_Table_5 method:", t5.method.value_counts().to_dict())
     print("Sup_Table_5 training:", t5.training.value_counts().to_dict())
@@ -379,9 +469,12 @@ def main():
     write_csv(df_map, OUT_MAP, [
         "Type map: Nern et al. 2025 optic-lobe inventory -> MaleCNS v1.0 type names. Built by scripts/build_type_map_nern2025.py.",
         "Source: " + SOURCE_CITATION + "; Supplementary Tables 1, 5, 7 (MOESM4 zip), hashes in docs/audits/receptor_sources_nern2025.md.",
-        "tier: exact = identical type name in both inventories; class = MaleCNS '<prefix>_unclear' bin whose Nern subtypes all carry one prediction;",
+        "tier: exact = identical type name in both inventories (the 684 optic-lobe-superclass rows are verified same cells: identical counts and figure bodyIds;",
+        "      the 48 central rows are same-name only -- MaleCNS v1.0 has partly re-annotated those cells since the optic-lobe release, e.g. AOTU056's figure",
+        "      bodyId 66210 is typed AOTU058 in MaleCNS); class = MaleCNS '<prefix>_unclear' bin whose Nern subtypes all carry one prediction;",
         "      unmatched = MaleCNS optic-lobe-superclass type with no Nern counterpart (evidence says why). No alias / fuzzy rows were needed: all 732 Nern names are MaleCNS names.",
-        "nern_nt: Sup_Table_1 'predicted neurotransmitter' (EM synapse classifier trained on 59 optic-lobe types; 'unclear' = low confidence, not independently confirmed).",
+        "nern_nt: Sup_Table_1 'predicted neurotransmitter' (EM synapse classifier trained on optic-lobe ground-truth types: 59 per the paper / gt_count.csv,",
+        "      60 rows with Part_of_training_data = yes in Sup_Table_5 -- unreconciled; 'unclear' = low confidence, not independently confirmed).",
         "fw_nt: Sup_Table_7 FlyWire prediction for the matched FlyWire type (Eckstein et al. 2024 classifier, female brain). validated_*: Sup_Table_5 experimental transmitter",
         "      (FISH / bulk RNA-seq / antibody); validated_in_training = yes means the type was classifier ground truth, so it is not an independent check of nern_nt.",
         "malecns_*: from cache/neurons.parquet (model nt after the AL-LN override; mode over the type's cells, share of cells with that mode, cells with nt = unknown);",
@@ -396,6 +489,9 @@ def main():
         "system malecns_flywireType / malecns_hemibrainType: the MaleCNS v1.0 per-cell annotation columns (CC BY, male-cns.janelia.org), majority value per type.",
         "tier: exact = alias identical to the MaleCNS name (1-to-1 / >=90% of annotated cells); alias = different name, 1-to-1 or >=90% of annotated cells;",
         "      fuzzy = n-to-1 / 1-to-n match, composite alias string, or majority < 90% (evidence gives the cardinality or the shares).",
+        "flag: conflict_nern7_vs_malecns = the type's Sup_Table_7 FlyWire name and MaleCNS majority flywireType name different types (Cm -> Sm off-by-one, Li shifts,",
+        "      AOTU056, LoVP19, ...); conflict_nern7_vs_malecns_notation = same names written differently or a parent / subtype split; absent_sd1_v3.1.0 = no element",
+        "      of the alias is a cell_type in flywire_annotations v3.1.0 (commit 8587524, 2026-07-21); empty = no caveat. Do not trust tier 'alias' on a flagged row.",
     ])
     print(f"\nwrote {OUT_MAP} ({len(df_map)} rows: {df_map.tier.value_counts().to_dict()})")
     print(f"wrote {OUT_ALIAS} ({len(df_alias)} rows: {df_alias.groupby(['system', 'tier']).size().to_dict()})")

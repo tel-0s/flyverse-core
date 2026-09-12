@@ -3,7 +3,10 @@
 Source key `nern2025`. Written 2026-09-11 by the acquire / map task of the NT-integration workflow
 (`docs/NT_INTEGRATION.md`, step 1-2). Everything below is reproducible with
 `PYTHONIOENCODING=utf-8 python scripts/build_type_map_nern2025.py` (CPU, ~30 s; needs the raw MaleCNS weights
-feather for the `out_syn_raw` column, otherwise it falls back to `c.W`).
+feather for the `out_syn_raw` column, otherwise it falls back to `c.W`). **Round 2 (2026-09-11, task fix:typing):**
+the verify:tables:nern2025 corrections of `receptor_verification.md` are applied (section 8 lists them); the type map's
+data rows are byte-identical to round 1, the alias table gains a `flag` column, and the script now prints the
+section-7 recount, the Sup_Table_1 row arithmetic and the Sup_Table_7-vs-MaleCNS conflicts.
 
 ## 1. Citation and licence
 
@@ -44,7 +47,7 @@ article HTML itself redirects to an IdP; only the article page, not the files, i
 
 | file | URL | size (bytes) | SHA-256 |
 |---|---|---|---|
-| `nature_esm/41586_2025_8746_MOESM1_ESM.pdf` (Supplementary Information: Supplementary Fig. 1, the 70-page per-type catalogue) | https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-025-08746-0/MediaObjects/41586_2025_8746_MOESM1_ESM.pdf | 64,469,458 | `a142a82b327a48092d064d245c2bb9d995b0b7a4ee1231af5fbbb01628665d6f` |
+| `nature_esm/41586_2025_8746_MOESM1_ESM.pdf` (Supplementary Information: 72 PDF pages = cover + the 70-page per-type catalogue of Supplementary Fig. 1 + end matter) | https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-025-08746-0/MediaObjects/41586_2025_8746_MOESM1_ESM.pdf | 64,469,458 | `a142a82b327a48092d064d245c2bb9d995b0b7a4ee1231af5fbbb01628665d6f` |
 | `nature_esm/41586_2025_8746_MOESM2_ESM.pdf` (Reporting Summary, 3 pp.) | .../41586_2025_8746_MOESM2_ESM.pdf | 2,633,126 | `709af476b254271f70fe3ae4cc29921a9fc07e05faa1aa781930368e151205cd` |
 | `nature_esm/41586_2025_8746_MOESM3_ESM.pdf` (Peer Review File, 39 pp.) | .../41586_2025_8746_MOESM3_ESM.pdf | 602,033 | `7d960c1c6bdf0f244aae2d4fc71aac9dc5d58339121b649c72c59029a21e73d3` |
 | `nature_esm/41586_2025_8746_MOESM4_ESM.zip` (Supplementary Tables 1-7 + guide) | .../41586_2025_8746_MOESM4_ESM.zip | 687,758 | `ef34f64c74e157fdec06312e3a1d6e567ae48a383944dd99a3f854e7ba593c93` |
@@ -71,15 +74,18 @@ the per-type consensus in Sup_Table_1 is what the plan asks for).
 
 ## 3. What the tables contain and how the labels were made
 
-**Sup_Table_1** (778 rows = 732 right-side types `*_R` + 97 left-side instances `*_L` of 46 bilateral types; 51
-types exist only as `_L` rows): `cell type`, `instance`, `no. of cells`, `main groups` (ONIN 149, ONCN 95, VPN
+**Sup_Table_1** (778 rows = 681 right-side instances `*_R` + 97 left-side instances `*_L`; 732 distinct types: 681
+with a right-side row, 51 only as `_L` rows, 46 bilateral types with both -- round 1 wrote "732 `_R` + 97 `_L`", which
+does not sum to 778): `cell type`, `instance`, `no. of cells`, `main groups` (ONIN 149, ONCN 95, VPN
 385, VCN 110, other 39 rows), `bodyId in figures`, `predicted neurotransmitter` in {ACh 273, Glu 175, GABA 130,
 His 8, OA 8, 5HT 3, Dop 2, unclear 179} (row counts; per type: ACh 257, Glu 158, GABA 127, His 8, OA 6, 5HT 2,
 Dop 2, unclear 172). Left and right instances of the same type never disagree (0 contradictions).
 
 Prediction method (Methods, "Neurotransmitter prediction"): a 3-D CNN on 640 nm EM cubes classifies each of
-7,014,581 presynapses into 7 transmitters, trained on 59 ground-truth types (Sup_Table_5 `Part_of_training_data`
-= yes; 60 rows), 70/10/20 split by neuron. Per-cell-type label = most frequent presynaptic class if the type has
+7,014,581 presynapses into 7 transmitters, trained on ground-truth optic-lobe types -- **59** per the paper's Methods
+and `gt_count.csv` (types per NT sum to 59), but Sup_Table_5 marks `Part_of_training_data` = yes on **60** rows / 60
+distinct names; the gap is unreconciled (the Methods count R8p + R8y as one type, but those rows are training = no,
+so that does not explain it) -- 70/10/20 split by neuron. Per-cell-type label = most frequent presynaptic class if the type has
 >= 100 presynapses and confidence >= 0.5, else `unclear`. **Consensus rule:** types predicted Dop / OA / 5HT
 without high-confidence experimental support in Sup_Table_5 are set to `unclear` (the monoamines were
 under-represented in training and over-predicted). The `predicted neurotransmitter` column of Sup_Table_1 is
@@ -88,8 +94,9 @@ held-out data (confusion_df.csv diagonal): ACh 0.933, Glu 0.879, GABA 0.893, His
 5HT 0.893. There is **no per-type confidence column** in the supplement; the only confidence tiers available
 per type are (i) called vs `unclear`, (ii) in the ground-truth set or not, (iii) experimentally validated or not.
 
-**Sup_Table_5** (148 rows, 147 distinct names; 146 are Sup_Table_1 types plus the bracket groups `[Cm11]` =
-one or more of Cm11a-d and `[Pm2]` = Pm2a/b): `Cell Type`, `Driver line used`, `Observed signal (new FISH data
+**Sup_Table_5** (148 rows, 147 distinct names; 146 rows / 145 distinct names are Sup_Table_1 types -- Tm29 appears
+twice, TAPIN and EASI-FISH -- plus the bracket groups `[Cm11]` = one or more of Cm11a-d and `[Pm2]` = Pm2a/b):
+`Cell Type`, `Driver line used`, `Observed signal (new FISH data
 only)`, `Method` (EASI-FISH 62, bulk TAPIN RNA-seq 57, antibody 15, FISH 9, FACS RNA-seq 2, ...), `Inferred
 transmitter` (ACh 60, Glu 37, GABA 29, OA 6, His 3, His+ACh 3, 5HT 2, Dop 2, ACh+Dop 1, unclear 5),
 `Reference(s)`, `Part_of_training_data` (yes 60 / no 88), `Notes`. Rows with `yes` are the classifier's
@@ -118,7 +125,13 @@ Tiers used:
   names are MaleCNS names (MaleCNS adopted the Nern nomenclature), so no `alias` or `fuzzy` mapping was needed
   and none was made. 684 of the 732 are MaleCNS optic-lobe-superclass types; 48 are central types that Nern
   lists because they have optic-lobe arbors (VCN / `other`: OA-AL2i1-3, OA-ASM1, 5-HTPMPV03, DNp11, PLP*,
-  KCg-s1, ...); 157 cells.
+  KCg-s1, ...); 157 cells. **Same name is not verified same cells for the 48 central rows:** MaleCNS v1.0 has
+  partly re-annotated those cells since the optic-lobe release -- AOTU056's figure bodyId 66210 is typed AOTU058 in
+  MaleCNS v1.0 (AOTU056 5 cells R in Nern vs 3 R in MaleCNS; AOTU058 2 vs 4), and 19 of the 681 right-side
+  instances differ in cell count (AN09A005, LAL048, PVLP046, SMP217, SLP359, MeTu3a/b, ...). The 684
+  OL-superclass rows are verified (identical counts and figure bodyIds: 777/778 figure bodyIds exist in
+  `neurons.parquet` with the identical type, 662/681 right-side instances have exactly the MaleCNS somaSide = R
+  count). No NT consequence: every re-annotated central type is `unclear` or agrees.
 - **class** (13 rows, 957 cells): MaleCNS `<prefix>_unclear` bins (cells whose subtype could not be resolved)
   mapped to the set of Nern subtypes of that prefix when every *called* subtype carries the same prediction and
   at least half of the subtypes are called: `LC10_unclear` (LC10a/b/c-1/c-2/d/e, 5 ACh + 1 unclear),
@@ -138,7 +151,7 @@ Tiers used:
 
 ### `flyverse/data/type_aliases_nern2025.csv` (14,180 rows)
 
-`malecns_type, alias, system, tier, evidence`. Systems: `flywire_matsliah2024` (230 rows), `flywire_schlegel2024`
+`malecns_type, alias, system, tier, flag, evidence`. Systems: `flywire_matsliah2024` (230 rows), `flywire_schlegel2024`
 (649), `hemibrain` (333) from Sup_Table_7; `malecns_flywireType` (8,137) and `malecns_hemibrainType` (4,831)
 from the MaleCNS v1.0 per-cell annotation columns (majority value per type, all superclasses). Tier: `exact`
 = alias identical to the MaleCNS name (Sup_Table_7 1-to-1, or >= 90 % of annotated cells); `alias` = different
@@ -147,6 +160,22 @@ name, 1-to-1 / >= 90 %; `fuzzy` = n-to-1 or 1-to-n match, composite alias string
 331 / 68; hemibrain 133 / 109 / 91; malecns_flywireType 4,550 / 2,706 / 881; malecns_hemibrainType 3,805 /
 784 / 242. (The plan's unsuffixed `type_aliases.csv` is written by `scripts/build_type_map_typing.py`, the
 typing-source task; this file is the Nern-specific contribution and should be merged there.)
+
+**`flag` column (round 2):** `conflict_nern7_vs_malecns` -- the type's Sup_Table_7 FlyWire name (Schlegel_type /
+Matsliah_type) and its MaleCNS majority `flywireType` name different types: 25 types / 58 rows (Tm40 CB3851 vs
+Tm40; the Cm -> Sm off-by-one series Cm20 Sm17 vs Sm18, Cm29 Sm37 vs Sm36, Cm30-Cm35 likewise; the Li shifts Li31 /
+Li32 / Li33 / Li38 / Li39; AOTU056 CB1558 vs CB2216; AOTU058 CB1329 vs AOTU058; CL357; SMP217 CB1791 vs SMP217;
+LoVP19 LTe49a,b,d,e,f vs LC46; LoVP90a-c LT42x vs LTe42x; LT82a/b vs LT82). `conflict_nern7_vs_malecns_notation` --
+the two strings differ but are the same names written differently or a parent / subtype split: 22 types / 44 rows
+(LoVP20-24, LoVP27 `LTe49a,b,d,e,f` vs `LTe49a,LTe49b,...`; MeTu2a/b, MeTu3a-c, MeTu4a-f `MeTu2` vs `MeTu2a`;
+TmY19a, Cm8, 5thsLNv_LNd6, LC31b, VS). Together these are the verification record's 47 of 719 types (6.5 %) whose
+MaleCNS `flywireType` majority equals neither FlyWire column. `absent_sd1_v3.1.0` -- no element of the alias is a
+`cell_type` of flywire_annotations v3.1.0 (commit 8587524, 2026-07-21; computed only when
+`data/external/typing/schlegel2024_Supplemental_file1_neuron_annotations.tsv` is present): 497 rows. Flag counts
+by system / tier: flywire_matsliah2024 alias 13 / fuzzy 3; flywire_schlegel2024 exact 2 / alias 78 / fuzzy 42;
+malecns_flywireType exact 14 / alias 281 / fuzzy 127 (both sides of a conflicting pair are flagged, including the
+MaleCNS-side row when it equals the type name). Tiers are unchanged; a downstream join must not trust tier `alias`
+on a flagged row.
 
 No `expression_nern2025.csv`: the source has no expression data (EM connectome + literature / FISH transmitter
 calls only).
@@ -181,21 +210,27 @@ edges are explicit zeros); `out_syn_raw` = uncapped MaleCNS synapse counts on th
 | ALL | unmatched | 11,006 | 59,274 | 35.47 % | 66,625,564 | 54.87 % | 68,800,581 | 55.41 % |
 | ALL | untyped | - | 2,605 | 1.56 % | 900,071 | 0.74 % | 961,345 | 0.77 % |
 
+The one `central_or_vnc` / `class` cell is an `LC10_unclear` cell of superclass `visual_projection_tbc`, i.e. an
+optic-lobe cell that the four-superclass filter leaves outside `OL_SUPERCLASSES`, not a central cell (one `ME_unclear`
+cell in the unmatched row is likewise `visual_projection_tbc`); the script now prints these.
+
 Optic-lobe superclasses together (105,252 cells): exact 104,113 (98.92 %), class 956 (0.91 %), unmatched 145
 (0.14 %), untyped 38 (0.04 %); by raw output synapses (54,130,575): exact + class 54,035,166 = 99.82 %.
 
 Edge-level (both presynaptic and postsynaptic type at tier exact or class): 91.9 % of the synapses whose
 presynaptic cell is in an optic-lobe superclass (`c.W`: 91.99 %, raw: 91.93 %; the remaining 8 % go to
 central-brain targets outside the inventory), 99.82 % of those synapses have the presynaptic type matched;
-over the whole CNS 40.7 % (`c.W`) / 40.2 % (raw) of synapses have both ends matched and 43.8 % have the
-presynaptic end matched. Central-brain coverage is by construction near zero (0.25 % of cells): this source
-covers the optic lobe only.
+over the whole CNS 40.7 % (`c.W`) / 40.2 % (raw) of synapses have both ends matched and 43.8 % (raw, 0.4381) /
+44.4 % (`c.W`, 0.4439) have the presynaptic end matched. Central-brain coverage is by construction near zero
+(0.25 % of cells): this source covers the optic lobe only.
 
 By confidence tier of the *transmitter label* (745 exact + class rows): called (not `unclear`) 573 types,
-`unclear` 172. Among the 697 optic-lobe-superclass exact + class types, the 131 `unclear` ones hold 3,452
-cells and 1,888,216 raw output synapses (3.49 % of the 54.13 M OL-superclass output synapses; the other 41
-`unclear` types are central). Experimentally validated (Sup_Table_5, any method): 145 matched types, 60 of
-them classifier ground truth and 85 outside the training set (the independent check).
+`unclear` 172. The 172 `unclear` exact types hold 3,593 MaleCNS cells (all superclasses) with 2,142,809 raw
+output synapses = 3.96 % of the 54,130,575 OL-superclass output synapses (the verification record's recount gives
+2,142,921, 112 synapses apart, the same 3.96 %); among the 697 optic-lobe-superclass exact + class types, the 131
+`unclear` ones hold 3,452 cells and 1,888,216 raw output synapses (3.49 %); the other 41 `unclear` types are
+central (141 cells). Experimentally validated (Sup_Table_5, any method): 145 matched types (146 rows, Tm29 twice),
+60 of them classifier ground truth and 85 outside the training set (the independent check).
 
 ## 6. Transmitter cross-check (per type, exact + class rows; a type counts when both labels are called)
 
@@ -228,10 +263,13 @@ vs Glu -1 is a sign flip today).
 Nern-vs-FlyWire disagreements are dominated by FlyWire calling GABA where Nern calls glutamate (Dm1, Dm6, Dm9
 [FW: ACh], Dm12, Dm16, Dm19, Dm20, Cm7, Cm9, Cm25, Cm34, Mi13, TmY16, LPi34, LPi43, LPi3412, Lai, Pm12, Pm13,
 Li36, LoVC16, LoVC26, LT88, LT68, MeVPMe10/11, aMe17c) and by the photoreceptors (FlyWire has no histamine
-class: R1-R6 / R8 -> ACh, R7 -> Glu, HBeyelet -> Glu). Where Sup_Table_5 arbitrates (Dm1, Dm9, Dm12, Dm19,
-Tm29, TmY16, LPi34, LPi43, Lai, R1-R6, R7p/y, Mi19, OA-ASM1, 5-HTPMPV03, MeVC21, 5thsLNv_LNd6) Nern and MaleCNS
-are right and FlyWire wrong in every case. The FlyWire label is therefore the weakest of the three for optic
-types and should not out-vote the two male-volume labels.
+class: R1-R6 / R8 -> ACh, R7 -> Glu, HBeyelet -> Glu). Of the 21 FlyWire-vs-validation misses, the male-volume
+labels (Nern and MaleCNS) match the experiment in **17** (Dm1, Dm9, Dm12, Dm19, Tm29, TmY16, LPi34, LPi43, Lai,
+R1-R6, R7p, R7y, Mi19, OA-ASM1, 5-HTPMPV03, MeVC21, 5thsLNv_LNd6); the other 4 are the co-transmission rows (Mi15
+ACh vs validated ACh+Dop; R8p, R8y, HBeyelet ACh / Glu vs validated His+ACh) where Nern and MaleCNS fail the same
+string comparison (they call ACh / His), so FlyWire's ACh for Mi15 is as partially right as Nern's. Round 1 wrote
+"in every one of the 21 cases"; the correct score is 17 of 21. The FlyWire label is still the weakest of the three
+for optic types and should not out-vote the two male-volume labels.
 
 Rescue of model `unknown` cells: 141 unknown-NT cells sit in 16 matched types; Nern calls 6 of them / 109 cells:
 **TmY14** (91 unknown of 477 cells; Nern glutamate, FlyWire glutamate; MaleCNS per-body votes Glu 209 / ACh 177 /
@@ -270,13 +308,41 @@ and the experimental data do not support (T1 expresses none of the standard mark
 - No per-type confidence number exists in the supplement; `unclear` is the only confidence flag. neuPrint
   `optic-lobe:v1.0` carries per-body confidence (`predictedNt`, `celltypePredictedNt`, `consensusNt`) if a
   numeric tier is needed later (token required).
-- Nern `unclear` types: 172 of 732 (3,258 MaleCNS cells, 2.6 % of OL-superclass output synapses), mostly small
-  VPN / VCN types and the monoamine-suspect types set to unclear by the consensus rule.
+- Nern `unclear` types: 172 of 732 = 3,593 MaleCNS cells / 2,142,809 raw output synapses = 3.96 % of the
+  OL-superclass output (the 131 OL-superclass ones: 3,452 cells / 1,888,216 / 3.49 %; section 5), mostly small
+  VPN / VCN types and the monoamine-suspect types set to unclear by the consensus rule. (Round 1's "3,258 cells,
+  2.6 %" here was not reproducible and contradicted section 5.)
 - Sup_Table_7 matches are "preliminary" (paper's word); n-to-1 rows are `fuzzy` in the alias table. The
-  MaleCNS annotation columns (`flywireType` / `hemibrainType`) are a second, larger alias source and agree with
-  Sup_Table_7 where both exist (e.g. Tm5Y = FlyWire Tm5f).
+  MaleCNS annotation columns (`flywireType` / `hemibrainType`) are a second, larger alias source; of the 719
+  types with both a Sup_Table_7 FlyWire name and a MaleCNS `flywireType` majority, 47 (6.5 %) agree with neither
+  FlyWire column -- 25 name different types (the systematic Cm -> Sm off-by-one series, the Li31-39 shifts,
+  AOTU056 CB1558 vs CB2216, LoVP19 LTe49* vs LC46, ...) and 22 are notation / subtype-split differences; both
+  sides are flagged in `type_aliases_nern2025.csv` (`flag` column, section 4). Where they agree (e.g. Tm5Y =
+  FlyWire Tm5f) the alias is corroborated.
 - The MaleCNS `ground_truth` column overrides the classifier for Tm31 / Pm12 / Li22 (GABA vs Glu) and LC30
   (Glu vs ACh); its provenance should be traced before either side is adopted.
 - The bracket groups `[Cm11]` (ACh) and `[Pm2]` (GABA, "probably Pm2a") in Sup_Table_5 were not expanded into
   per-subtype validation rows.
 - Sex: same male volume as MaleCNS, so no sex caveat for this source (the FlyWire column is female).
+
+## 8. Round-2 changes (verify:tables:nern2025 corrections applied; old -> new)
+
+All values from this run of `scripts/build_type_map_nern2025.py` versus the round-1 doc (git HEAD c0332e3).
+
+| item | round 1 | round 2 |
+|---|---|---|
+| section 7 `unclear` recount | 172 types, 3,258 cells, 2.6 % of OL-superclass output | **172 types = 3,593 cells / 2,142,809 raw = 3.96 %** (record: 2,142,921, same %); **131 OL-superclass = 3,452 / 1,888,216 / 3.49 %** (41 central, 141 cells) |
+| section 3 Sup_Table_1 arithmetic | "778 rows = 732 `_R` + 97 `_L`" | **681 `_R` + 97 `_L` rows, 732 distinct types** (681 with an R row, 51 L-only, 46 bilateral); script stdout relabelled |
+| FlyWire vs validation misses arbitrated | "Nern and MaleCNS right, FlyWire wrong in every one of the 21" | **17 of 21**; 4 co-transmission rows (Mi15, R8p, R8y, HBeyelet) fail the same string comparison on all three sides |
+| Sup_Table_5 in the inventory | "146 are Sup_Table_1 types" | **146 rows / 145 distinct names** (Tm29 twice); 145 map rows carry a validation label (unchanged) |
+| MOESM1 | "70-page catalogue" | **72 PDF pages** (cover + 70-page catalogue + end matter) |
+| the 48 central exact rows | "exact" read as verified | **same name, not verified same cells** (AOTU056 bodyId 66210 typed AOTU058 in MaleCNS; 19/681 right-side instances differ in count); the 684 OL-superclass rows are verified |
+| presynaptic-end match, whole CNS | "43.8 %" (weighting unstated) | **43.8 % raw (0.4381) / 44.4 % `c.W` (0.4439)**; the script now prints `W_all_pre_matched` |
+| classifier ground truth | "59 ground-truth types (60 rows)" as if consistent | **59 (paper, gt_count.csv) vs 60 (Sup_Table_5 training = yes rows / names): unreconciled**; CSV header comment says so |
+| `central_or_vnc` class cell | unexplained | `LC10_unclear`, superclass `visual_projection_tbc` (an OL cell outside the four-superclass filter); one `ME_unclear` cell likewise |
+| annotation columns vs Sup_Table_7 | "agree where both exist" | 719 compared, **47 differ** (25 different types incl. the Cm -> Sm off-by-one series, 22 notation / subtype splits); flagged in `type_aliases_nern2025.csv` |
+| `type_aliases_nern2025.csv` | 5 columns | 6 columns (`flag`): conflict_nern7_vs_malecns 58 rows, _notation 44, absent_sd1_v3.1.0 497; 14,180 rows and every tier unchanged |
+| `type_map_nern2025.csv` | 784 rows | 784 rows, data byte-identical; header comment states the 59-vs-60 gap and the same-name caveat for the central rows |
+
+Not changed: coverage table (section 5), the five cross-check tables (section 6), the class / unmatched rules, the
+watch-list, and every file hash in section 2.
