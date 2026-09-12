@@ -366,7 +366,8 @@ def sec_walk(ctx):
     w, info = world.make_room()
     w.spheres.append(world.Sphere((9, 9, 9), (0.03,) * 3, "black")); loom_idx = len(w.spheres) - 1
     dirs_b, wts = r.ray_directions(); wts_t = torch.from_numpy(wts).float().to(w.device)
-    lif = ctx.lif(); rs = brain._receptor(c, lif)                                     # the receptor lookup reaches the rate lobe too
+    lif = ctx.lif(); rs = brain._receptor(c, lif, with_counts=lif.receptor_model == "full")   # the receptor lookup reaches the rate lobe too
+                                                                                     # (with_counts: the "full" slow term needs the per-edge counts)
     ol = optic.OpticLobe(c, r, ctx.optic_params(), receptor=rs, receptor_gain=brain._receptor_gain(lif)); ol.relax()
     b = brain.Brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
     fly = body.FlyState(x=-0.3, y=0.0, z=info["table_top_z"], heading=0.0)
@@ -444,7 +445,7 @@ def sec_motion(ctx):
     from probe_motion import DIRS, grating
     c = ctx.c; types = c.neurons.type.fillna("").to_numpy()
     r = retina.build_retina(c)
-    lif = ctx.lif(); rs = brain._receptor(c, lif)
+    lif = ctx.lif(); rs = brain._receptor(c, lif, with_counts=lif.receptor_model == "full")
     ol = optic.OpticLobe(c, r, ctx.optic_params(), receptor=rs, receptor_gain=brain._receptor_gain(lif)); ol.relax(); rt = types[ol.rate_idx]
     b = brain.Brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
     if b.p.prune_frozen:
@@ -759,6 +760,11 @@ def main():
     ap.add_argument("--json", type=str, default="", help="write every measured number and the check table to this file")
     ap.add_argument("--fast", action="store_true", help="shorter recordings and one seed (~half the runtime)")
     ap.add_argument("--eager", action="store_true", help="demo sections on the torch path (default: cuda_kernels + cuda_graphs + event_driven + warp CSR)")
+    ap.add_argument("--deterministic", action="store_true",
+                    help="torch.use_deterministic_algorithms(True) + cudnn.benchmark off: every op must have a deterministic "
+                         "implementation or it raises (the section then reports MISSING with the op in the traceback). "
+                         "EXPORT CUBLAS_WORKSPACE_CONFIG=:4096:8 in the command; the script sets it if unset, which is only "
+                         "safe before the first cuBLAS call.")
     ap.add_argument("--seeds", default="0,1", help="seeds for the demo loom-escape section (default 0,1; --fast keeps the first)")
     ap.add_argument("--std-u", type=float, default=None)
     ap.add_argument("--std-tau", type=float, default=None)
@@ -794,6 +800,19 @@ def main():
                     help="gain-class factors of 'sign+gain' / 'full' as low,mid,high (default 0.5,1,1.5); '1,1,1' = the 'sign' fast weights under 'full'")
     args = ap.parse_args()
     t_all = time.time()
+    det_cfg = {"flag": bool(args.deterministic), "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG")}
+    if args.deterministic:
+        # cuBLAS needs its workspace pinned BEFORE the first handle is created; the command should export it.
+        if not os.environ.get("CUBLAS_WORKSPACE_CONFIG"):
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+            det_cfg["cublas_workspace_config"] = ":4096:8"
+            print("--deterministic: CUBLAS_WORKSPACE_CONFIG was unset; set to :4096:8 in-process "
+                  "(export it in the command to be safe)", flush=True)
+        torch.use_deterministic_algorithms(True)
+        torch.backends.cudnn.benchmark = False
+        det_cfg["torch"] = torch.__version__
+        print(f"--deterministic: torch.use_deterministic_algorithms(True), cudnn.benchmark off, "
+              f"CUBLAS_WORKSPACE_CONFIG={os.environ['CUBLAS_WORKSPACE_CONFIG']} (torch {torch.__version__})", flush=True)
     ctx = Context(args)
     lif, op = ctx.lif(), ctx.optic_params()
     if lif.receptor_model is not None:      # the coverage the model runs under (connectome.receptor_signs' tier summary) -- from the LIFParams in force, not the flag
@@ -826,6 +845,7 @@ def main():
               "type_path_gain": brain.DEFAULT_TYPE_PATH_GAIN if lif.type_path_gain is None else lif.type_path_gain,
               "optic": {"gain_out_mv": op.gain_out_mv, "pair_gain": optic.DEFAULT_PAIR_GAIN if op.pair_gain is None else op.pair_gain},
               "fast": ctx.fast, "backend": "native (cuda_kernels, cuda_graphs, event_driven, warp)" if ctx.native else "eager torch",
+              "deterministic": det_cfg,
               "seeds": ctx.seeds, "device": str(torch.cuda.get_device_name(0)) if torch.cuda.is_available() else "cpu",
               "gf_hz": float(body.Flight().gf_hz), "neurons": int(ctx.c.n),
               "cache_dir": str(ctx.cache_dir or connectome.CACHE_DIR),

@@ -173,6 +173,8 @@ Protocol: 1 s on a 10 Hz Poisson background (all 46 EPG), wedges 0-3 (L1 R8 L2 R
 at +40 Hz for 2 s, 5 s free. "in / out" = mean EPG Hz inside / outside the driven wedges (cells > 22 Hz in
 brackets); vs = circular vector strength of the EPG rate profile (0 uniform, 1 one wedge). Delta7 gain on
 Delta7 -> EPG only unless "D7->PEN x gD". Full rows in `cx_wedge_sim.json`, profiles in `cx_wedge_sim_profiles.png`.
+Each row is a single run at a single seed: the gain window read off this table is superseded by the six-seed
+replication at the end of this section (and, for the closed GLNO loop, by `docs/audits/cx_glno.md` section 5).
 
 | gE | gD | variant | before pulse | 0.5 s after | 2 s | 5 s | PEN / D7 / ER-ExR at 5 s | verdict |
 |---|---|---|---|---|---|---|---|---|
@@ -201,6 +203,40 @@ Delta7 -> EPG only unless "D7->PEN x gD". Full rows in `cx_wedge_sim.json`, prof
 Bump width at 5 s (wedges above half the peak / above 22 Hz): 3-4 / 4-5 in every stable run, i.e. 70-110 deg,
 matching the linear estimate that the narrowest confinable bump is 2 tiles (90 deg). Rest-of-brain mean rate
 0.00-0.05 Hz in every run: nothing spreads outside the compass. Wall time 15-27 s per 8 s run on the shared 4090.
+
+**The window read off this table is a seed-0 statement; replaced by the six-seed result (round 4).** Every row above
+is one run at one seed, and "a persistent bump at gE 1.75-2.0 with gD 15-40" is what one seed showed. The same
+protocol re-run with six seeds per point on the silent ring (GLNO sign 0, i.e. this table's condition, on the adopted
+`TYPE_NT_OVERRIDE` cache; the seed-0 rows reproduce -- gE 2 / gD 15 seed 0 gives 201.0 / 10.2 Hz, 11 and 1 cells above
+22 Hz, vs 0.76, PEN 48.7 / Delta7 101.2 / ER-ExR 9.6, i.e. the 49 / 101 / 10 of the row above) gives, as seeds with a
+confined bump at 5 s:
+
+| gD \ gE | 1.75 | 2 | 2.25 | 2.5 |
+|---|---|---|---|---|
+| 8 | 6/6 | 4/6 | 2/3 | 0/3 |
+| 15 | 2/3 | 6/6 | 4/6 | 2/3 |
+| 25 | 0/3 | 6/6 | 6/6 | 6/6 |
+| 40 | 0/3 | 1/3 | 1/3 | 3/3 |
+
+So three of the four corners of "gE 1.75-2 with gD 15-40" fail on replication: gE 1.75 / gD 25 and 1.75 / 40 are dead
+in 3/3 seeds (in 7.4-11.5 Hz, 0 of 11 cells above 22 Hz, PEN 1.3-12.2 Hz), gE 2 / gD 40 holds 1 of 3, and gE 1.75 /
+gD 15 holds 2 of 3 (the seed-1 run jumps off the driven tile to centre 4.1). The corrected silent-ring statement: the
+LIF holds a confined, persistent bump at **every one of six seeds at gE 1.75 / gD 8, gE 2 / gD 15, gE 2 / gD 25,
+gE 2.25 / gD 25 and gE 2.5 / gD 25** (rho = gD / gE^2 between 2.6 and 6.25; bump 167-244 Hz, outside 8.9-11.4 Hz,
+vs 0.72-0.80), and at 3 of 3 seeds at gE 2.5 / gD 40, the only other point with no failure. The failures outside that
+set are of two kinds. (a) A spontaneous pre-pulse bump elsewhere that the 40 Hz pulse cannot displace, at low rho:
+gE 2.5 / gD 8 in 3/3 seeds (in 7-10 Hz, out 111-114 Hz with 14-16 of 35 cells above 22 Hz), gE 2.5 / gD 15 and
+gE 2.25 / gD 8-15 at seed 0, gE 2 / gD 8 at seed 0. (b) A jump off the driven tile (in 42-83 Hz, out 41-58 Hz, centre
+4.0-4.1) or an outright death, at high rho: every gE 1.75 point with gD >= 15 except the seed-0 and seed-2 runs at
+gD 15, gE 2 / gD 40 at seeds 1-2, gE 2.25 / gD 40 at seeds 1-2, plus the isolated jumps at gE 2 / gD 8 seed 2 and
+gE 2.25 / gD 15 seed 4.
+Two further caveats from the same grid: the persistence rule's "<= 3 of 35 outside cells above 22 Hz" half is a
+property of the background realisation, not of the gains -- among 97 confined runs the outside count is exactly 1 / 3
+/ 2 / 2 / 2 / 4 for seeds 0-5 whatever gE, gD and the GLNO sign are -- so seed 5 scores "no" at every point; and the
+runs are deterministic given (config, gains, seed) (27 repeated keys across independent jobs and independent from-raw
+compiles, 0 differing metric fields). Data and the full table: `out/cx_glno_r4_seeds.{md,csv}`,
+`docs/audits/cx_glno.md` section 5, which also gives the closed-loop (GLNO = gaba) column at every point and the three
+operating points robust to the GLNO sign (gE 2 / gD 15, gE 2.25 / gD 25, gE 2.5 / gD 25).
 
 ## 7. What this says about the model
 

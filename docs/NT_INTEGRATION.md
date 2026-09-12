@@ -1,7 +1,9 @@
 # Neurotransmitter and receptor data integration
 
-Status: **round 1 done -- built, scored on the cluster, adversarially verified; null result, corrections
-pending -- round 2 in progress** (section 7). This page records the question that prompted it, what data
+Status: **rounds 1-4 done; the receptor plan is closing** (section 7): the receptor-derived sign stage is the
+default for the share of weight the data decide; the data are exhausted; a short closing round (evidence rewrite,
+the take-off check on the right instrument, the GF-damping adoption run) and then the thread hands over to the
+dynamics questions. This page records the question that prompted it, what data
 exist, what the model does today, what we need, the task outline, and what each round found. Numbers in
 sections 1-6 come from `docs/audits/nt_audit.md`; round-1 numbers from `docs/audits/receptor_*.md`.
 
@@ -280,8 +282,9 @@ histamine; Kurmangaliyev 2020 added as a sixth source). Findings:
    L1, 24 ER ring rows): 48,295 entries = 179,944 |W| synapses = 0.148 % (30,916 glutamate flips onto iGluR targets,
    17,379 two-source histamine silencings); 95 % of the changed weight lands on optic rate units (T1, Dm9, Mi4, Mi1),
    8,833 synapses on spiking cells (KCg-m, DN1 clock, KCa'b', OA silencings). `None` reproduces the previous weights
-   byte for byte (md5-pinned test). Evidence: 27/0/2 in 10 of 10 suite runs vs off 26/1/2 and 24/3/2, no check worse
-   in status than any off run; demo loom escapes 12/12 vs 3/12; bitter 3 seeds 139.9 / 138.9 / 131.5 vs 123.5 / 122.0
+   byte for byte (md5-pinned test). Evidence as corrected in round 4 (the round-3 '27/0/2 in 10 of 10' was measured
+   with the benchmark's walk / motion sections half applied): 26/1/2 in 11 of 11 fully-applied suite runs, equal to
+   off's best tally, no check worse in status than any off run; demo loom escapes 12/12 vs 3/12; bitter 3 seeds 139.9 / 138.9 / 131.5 vs 123.5 / 122.0
    / 114.7; figure-ground and object sweep within scatter. Costs on record: legacy loom.GF_peak 27-32 vs 37-44 Hz
    (PASS), KC_active 816 vs 1426, spontaneous take-offs 24 vs 3 in 16 flies x 5 min (U 226, p 7.7e-5; one batch),
    pinned-loom escape at the 33 Hz threshold in 2 of 6 runs (round-2 table 5/5 at 37 Hz; off 0/5 at 19). The
@@ -308,11 +311,46 @@ histamine; Kurmangaliyev 2020 added as a sixth source). Findings:
    +22 to +29). Hypothesis (a) stays closed; the object item is a separate plan entry (medulla -> lobula small-field
    wiring / dynamics; `probe_object_sweep.py --null` and `probe_figure_ground.py` are its benchmarks).
 
-**Round 4 (next):** (1) re-score default x3 and off x3 with the fixed benchmark (off must reproduce the round-2 off
-values; the default gives the first fully-applied walk / legacy-loom / motion numbers); (2) isolate the 8,833
-Brain-side synapses (hold KC, hold DN1) to attribute taste 5.85 -> 10.93, Shiu 123 -> 140, walk.power_max 73 -> 46;
-(3) spontaneous take-offs with a feeding-capable sustain (--energy 0.9, 3 batches x 16 flies per condition); (4)
-reporting debt (done in this commit except the generators listed in the record); (5) step 8 continued
-(gf_damping_dnp70, LPi x2 / x3) under the corrected benchmark; (6) seed-matched compass grid completed for both GLNO
-conditions; (7) the type-majority NT rule for the ~496 unknown presynaptic cells; (8) slow-term determinism and a
-DopEcR arm.
+**Round 4 (done; `docs/audits/receptor_verification.md` round-4 section):**
+
+1. **Re-score with the fixed benchmark (the round-3 caveat resolved AGAINST the round-3 headline).** Fully applied,
+   the default is 26 PASS / 1 FAIL / 2 known gaps in 11 of 11 suite runs (the FAIL is walk.power_max 79.5 Hz against
+   a hand-set 50 Hz bound), equal to off's best tally (off 26/1/2 x3, 24/3/2 x1; walk.power_max 73.2). "No check worse
+   in status than any off run" still holds; the default stays, justified in kind (expression-derived sign, contested
+   flips removed, reversible) and as "not worse", not as "better on the suite". The three round-3 numbers were
+   half-applied artefacts: walk.power_max 46.10 PASS -> 79.47 FAIL (6.3 Hz worse than off); the "-10 Hz loom cost"
+   is a +10-14 Hz gain; motion.min_dsi 0.17 -> 0.23. Off is again producible from the shipped scripts and reproduces
+   the round-2 off values bit for bit.
+2. **Attribution:** neither the KC nor the DN1-clock flips carry the taste rise (10.93 under both holds); DN1 carries
+   65 % of the Shiu rise; walk.power_max is non-monotone in the applied flips; the taste rise is most plausibly fan-in
+   normalisation from the optic-side synapses (untested).
+3. **Take-offs replicate** (74 vs 11 hops over 48 flies x 300 s in 3/3 brain RNGs, p 1.4e-9; 95 vs 16 over four) and
+   are NOT all spontaneous: at seed 0, 10 GF-escape + 14 voluntary vs off 2 + 0; the default's walking-GF tail is
+   higher (median 33.0 vs 28.5 Hz, 8/16 vs 2/16 rows at the 33 Hz escape threshold). Feeding at --energy 0.9 produces
+   meals but cannot rank the models. The scored hop check is owed, with a voluntary/escape split and a voluntary-only
+   reference.
+4. **Step 8 under the corrected benchmark:** all three round-3 verdicts withdrawn. The GF x0.3 damping CAN be retired
+   (no_gf_damping 27/0/2 with walk.power_max 48.48 in 10/10 draws across two batches; damping DNp70 alone is
+   inert -- the four inhibitory inputs are the whole effect); not adopted yet -- to be adopted alone with its own suite
+   run and hop batches, since restoring 2,899 |W| of inhibition onto DNp01 is the one experiment that could move the
+   take-off cost. LPi x4 cannot be retired (x1 fails; x2 is the only passing point of a non-monotone scan); the AL LN
+   override cannot be retired.
+5. **Compass:** three operating points robust to the GLNO sign (gE 2 / gD 15, 2.25 / 25, 2.5 / 25; 6/6 confined in both
+   conditions); the shipped receptor default changes 0 ring-core entries and is byte-identical to off on the ring.
+   The compass thread is now dynamics work.
+6. **Type-majority rule:** proposes 3 types / 36 cells / 0 synapses; not adopted; cannot replace the 27-cell AL LN regex
+   (the majority alone would contradict it in 6 of 8 types) and cannot reach the ~496 unknown cells (95 of 99 types
+   without any independent call). Closes the session-9 open item negatively.
+7. **Slow term:** `--deterministic` is not the tool -- the CSR x dense product is non-deterministic under the flag
+   (per-op probe); the walk.power_max cost is the term (-27 Hz), not the dop1r1 signs (+3 Hz); assay 7 stays blocked
+   because the term-off reference itself fails walk.power_max. Parked; no native slow kernel.
+
+**Round 5 (closing; launched):** (a) the take-off check on the right instrument -- an escape / voluntary split in
+`batch_sustain`'s JSON, 3 + 3 batches live and 3 + 3 at gf_hz = 1e9, a voluntary-only reference, and a scored
+`hops` section for benchmark.py; (b) the GF-damping adoption run -- no-flag suite x3 on the edited default plus the
+same hop batches under it (the experiment that links the walk.power_max FAIL to the behavioural cost); (c) the
+Brain-side vs optic-side hold to settle the taste attribution. Then the receptor thread hands over to the dynamics
+questions (compass with senses, PEN L/R shift, PFN -> hDelta -> PFL3; medulla -> lobula small-field wiring; a
+metabolism that lets feeding rank models). The data are exhausted: six sources, 25.7 % of the weight decided, the
+object-pathway types unprofiled everywhere, the ring inert, 95 of 99 unknown-NT types unreachable -- a round 6 of
+receptor work would have nothing to measure.

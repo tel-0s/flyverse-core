@@ -79,7 +79,7 @@ once (2.3 s), a `Brain` builds in ~3 s, a native demo `Sim` in ~6 s. JSON: `out/
 | odour.apple_channel_clean_hz          | 4.43     | 3.40      | <= 6      | PASS      | 8     |
 | compass.wedge_cells_persisting        | 0        | 0         | >= 6      | KNOWN GAP | 8     |
 
-24 pass, 3 fail, 2 known gap, 0 missing.
+26 pass, 1 fail (walk.power_max_hz, 79.5 Hz against a hand-set 50 Hz bound), 2 known gap, 0 missing at the round-4 defaults (receptor_model 'sign' / 'abs'; the walk and motion sections build the optic lobe with the receptor lookup since round 4; 5.3-12 min on a shared B200). The session-9 tally at the pre-receptor defaults was 24 pass, 3 fail, 2 known gap.
 
 Section detail from the same run:
 

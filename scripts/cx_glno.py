@@ -28,6 +28,19 @@ same gD grid and `base` at gE 2 / gD 15 from the shared cache (--no-scratch; it 
   python scripts/cluster_run.py --name r3-glno-gaba --minutes 20 \
     "python -c 'import torch; assert torch.cuda.is_available()' && python scripts/cx_glno.py --run gaba --gains 1.75:8,1.75:15,1.75:25,1.75:40 --out out/cx_glno_gaba_gE1.75.json > out/cx_glno_gaba_gE1.75.txt; cat out/cx_glno_gaba_gE1.75.txt" ... --fetch out/
   python scripts/cx_glno.py --report --files "out/cx_glno_gaba_*.json" "out/cx_glno_glu_gE*.json" out/cx_glno_base_r3.json --table cx_glno_gaba_table
+
+Round 4 (docs/audits/cx_glno.md section 5): the seed-matched grid completed so that both GLNO conditions have six
+seeds at every candidate operating point (batch `r4-glno-d04de8`, 3 jobs, 8.3 min):
+  python scripts/cluster_run.py --name r4-glno --minutes 25 \
+    "python -c 'import torch; assert torch.cuda.is_available()' && python scripts/cx_glno.py --run base --no-scratch --gains 2.25:8,2.25:15,2.25:25,2.25:40 --seeds 0,1,2 --out out/r4_base_gE2.25.json > out/r4_base_gE2.25.txt; cat out/r4_base_gE2.25.txt" \
+    "... --run gaba --gains 2:8,2:15,2.25:15,2.25:25,2.5:25 --seeds 3,4,5 --out out/r4_gaba_s345b.json ..." \
+    "... --run base --no-scratch --gains 2:8,2.25:15,2.25:25 --seeds 3,4,5 --out out/r4_base_s345b.json ..." --fetch out/
+  python scripts/cx_glno.py --seed-table --files "out/cx_glno_gaba_gE*.json" "out/cx_glno_base*.json" "out/sk_base_*.json" \
+    "out/sk_gaba_*.json" "out/r4_base_*.json" "out/r4_gaba_*.json" --table cx_glno_r4_seeds
+--seed-table de-duplicates (config, gE, gD, seed) across files (a repeated key is a determinism check: it prints the
+differing metric fields), counts persistence by the shipped rule (in_above >= 8 of 11 AND out_above <= 3 of 35) next to
+the `boundary` count (confined but out_above = 4), and prints the outside-above-22-Hz count per seed over every
+confined run -- which is constant within a seed whatever the gains and the GLNO sign are.
 """
 from __future__ import annotations
 
@@ -266,6 +279,90 @@ def report(out_dir: Path, configs=None, files=None, table="cx_glno_table"):
     return df
 
 
+def seed_table(out_dir: Path, files, table="cx_glno_seed_table", seeds=None):
+    """Round 4: the seed-matched grid over BOTH GLNO conditions, one row per (gE, gD, config) over all seeds found.
+
+    Rows from several JSONs are de-duplicated on (config, gE, gD, seed); a repeated key is first compared field by
+    field (everything metrics() returns except wall_s) and the mismatches are printed -- repeated keys are
+    independent reruns of the same command, so 0 differing fields is the determinism check.
+    Persistence is the shipped criterion (in_above >= 8 of 11 AND out_above <= 3 of 35); `boundary` counts the runs
+    that fail ONLY the 3/35 half with a confined bump (in_above >= 8, out_above == 4), the case the round-3 skeptic
+    found at seed 5 in both conditions.
+    """
+    paths = []
+    for pat in files or []:
+        paths += sorted(Path().glob(pat)) if any(ch in pat for ch in "*?[") else [Path(pat)]
+    rows, dups, ndup = {}, [], 0
+    for p in paths:
+        if not p.exists():
+            print(f"missing {p}"); continue
+        for r in json.load(open(p)):
+            m = metrics(r)
+            if seeds is not None and m["seed"] not in seeds:
+                continue
+            key = (m["config"], m["gE"], m["gD"], m["seed"])
+            if key in rows:
+                ndup += 1
+                diff = {k: (rows[key][0][k], m[k]) for k in m if k != "wall_s" and rows[key][0][k] != m[k]}
+                dups.append((key, rows[key][1], str(p), len(diff), diff))
+            else:
+                rows[key] = (m, str(p))
+    if not rows:
+        print("no rows"); return None
+    print(f"{len(rows)} unique (config, gE, gD, seed) rows from {len(paths)} files; {ndup} repeated keys")
+    for key, p1, p2, nd, diff in dups:
+        print(f"  repeat {key}: {p1} vs {p2} -- {nd} differing metric fields" + (f" {diff}" if diff else " (identical)"))
+    df = pd.DataFrame([m for m, _ in rows.values()])
+    df["src"] = [p for _, p in rows.values()]
+    df["in_n"] = [int(s.split("/")[0]) for s in df.in_above]
+    df["out_n"] = [int(s.split("/")[0]) for s in df.out_above]
+    df["boundary"] = (df.in_n >= 8) & (df.out_n == 4)
+    df = df.sort_values(["gE", "gD", "config", "seed"]).reset_index(drop=True)
+    pd.set_option("display.width", 320); pd.set_option("display.max_columns", 40)
+    print(df[["gE", "gD", "config", "seed", "bump_hz", "out_hz", "in_above", "out_above", "persist", "boundary", "vs",
+              "centre", "pen", "delta7", "glno", "src"]].to_string(index=False))
+
+    def joins(s):
+        return "/".join(str(x) for x in s)
+
+    summ = df.groupby(["gE", "gD", "config"], sort=True).agg(
+        n=("seed", "size"), seeds=("seed", joins), persist=("persist", lambda s: int((s == "yes").sum())),
+        boundary=("boundary", "sum"), in_n=("in_n", joins), out_n=("out_n", joins),
+        bump_hz=("bump_hz", joins), bump_mean=("bump_hz", "mean"), bump_min=("bump_hz", "min"), bump_max=("bump_hz", "max"),
+        out_mean=("out_hz", "mean"), vs_mean=("vs", "mean"), vs_min=("vs", "min"),
+        pen=("pen", "mean"), pen_min=("pen", "min"), pen_max=("pen", "max"),
+        delta7=("delta7", "mean"), d7_min=("delta7", "min"), d7_max=("delta7", "max"),
+        glno=("glno", "mean"), glno_min=("glno", "min"), glno_max=("glno", "max")).reset_index()
+    summ["rho"] = (summ.gD / summ.gE ** 2).round(2)
+    print("\nper (gE, gD, config):")
+    print(summ.to_string(index=False))
+    hdr = ["gE", "gD", "rho", "config", "seeds", "persist (3/35 rule)", "boundary (in>=8, out=4)", "in >22 Hz (/11, per seed)",
+           "out >22 Hz (/35, per seed)", "bump Hz at 5 s (per seed)", "bump mean", "out Hz", "vs (mean; min)", "PEN", "Delta7", "GLNO"]
+    lines = ["| " + " | ".join(hdr) + " |", "|" + "---|" * len(hdr)]
+    for _, r in summ.iterrows():
+        lines.append(f"| {r.gE} | {r.gD:.0f} | {r.rho} | {r.config} | {r.seeds} | {r.persist}/{r.n} | {int(r.boundary)} | {r.in_n} | {r.out_n} | "
+                     f"{r.bump_hz} | {r.bump_mean:.0f} ({r.bump_min:.0f}-{r.bump_max:.0f}) | {r.out_mean:.1f} | {r.vs_mean:.2f}; {r.vs_min:.2f} | "
+                     f"{r.pen:.1f} ({r.pen_min:.1f}-{r.pen_max:.1f}) | {r.delta7:.1f} ({r.d7_min:.1f}-{r.d7_max:.1f}) | {r.glno:.1f} ({r.glno_min:.1f}-{r.glno_max:.1f}) |")
+    # the 3/35 half of the criterion vs the seed: for every CONFINED run (in_above >= 8) the outside count is a
+    # property of the background realisation alone, so the rule fails at one seed in six whatever the gains are
+    conf = df[df.in_n >= 8]
+    per_seed = conf.groupby("seed").out_n.agg(["min", "max", "size"])
+    print("\nout >22 Hz among the confined runs (in >22 Hz >= 8 of 11), by seed:")
+    print(per_seed.to_string())
+    const = bool((per_seed["min"] == per_seed["max"]).all())
+    print(f"outside count constant within each seed across every (gE, gD, config): {const}"
+          f"; seeds failing out <= 3: {sorted(per_seed.index[per_seed['min'] > 3].tolist())}")
+    md = "## Seed-matched grid, both GLNO conditions (one row per gE x gD x config)\n\n" + "\n".join(lines) + "\n"
+    md += ("\nOutside cells > 22 Hz among the confined runs (in > 22 Hz >= 8 of 11), by seed: " +
+           ", ".join(f"seed {s} {r['min']}-{r['max']} ({int(r['size'])} runs)" for s, r in per_seed.iterrows()) +
+           f"; constant within each seed across every (gE, gD, config): {const}.\n")
+    (out_dir / f"{table}.md").write_text(md, encoding="utf-8")
+    df.to_csv(out_dir / f"{table}.csv", index=False)
+    summ.to_csv(out_dir / f"{table}_summary.csv", index=False)
+    print(f"\n-> {out_dir / (table + '.md')}, {out_dir / (table + '.csv')}, {out_dir / (table + '_summary.csv')}")
+    return df, summ
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", choices=list(CONFIGS), default=None, help="run one config on the GPU (all gains x seeds)")
@@ -279,6 +376,10 @@ def main():
     ap.add_argument("--configs", default=None, help="comma-separated subset for --report")
     ap.add_argument("--files", nargs="*", default=None, help="--report: explicit JSON paths / globs instead of out/cx_glno_<config>.json")
     ap.add_argument("--table", default="cx_glno_table", help="--report: output basename under out/")
+    ap.add_argument("--seed-table", action="store_true",
+                    help="round-4 seed-matched grid from --files: one row per (gE, gD, config) over every seed found, "
+                         "persistence by the 3/35 rule plus the boundary count, with a determinism check on repeated keys (CPU)")
+    ap.add_argument("--only-seeds", default=None, help="--seed-table: keep only these seeds (comma-separated)")
     ap.add_argument("--no-scratch", action="store_true",
                     help="--run: a config without an override reads the default (shared) cache instead of compiling into out/cache_<hash>/")
     a = ap.parse_args()
@@ -298,6 +399,9 @@ def main():
         print(f"-> {OUT / 'cx_glno_receptor_check.json'}")
     if a.report:
         report(OUT, a.configs.split(",") if a.configs else None, files=a.files, table=a.table)
+    if a.seed_table:
+        seed_table(OUT, a.files, table=a.table if a.table != "cx_glno_table" else "cx_glno_seed_table",
+                   seeds=[int(s) for s in a.only_seeds.split(",")] if a.only_seeds else None)
 
 
 if __name__ == "__main__":

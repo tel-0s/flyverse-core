@@ -1137,3 +1137,242 @@ histamine silencings), never isolated.
 * Pinned loom on the round-3 table: round-2 table 37 Hz with escape in 5 of 5 runs; new table 28-35 Hz with escape in 2 of 6 (GF 33-34 at the 33.0 Hz threshold); the spread is run-to-run.
 * A.1's bullet on `probe_object_sweep.py` was stale within the round: that script now has `--receptor-model {default,off,sign}` (default 'default') and applies 'off' explicitly; the same fix is now in benchmark.py, probe_figure_ground.py and screen_rotation.py (below).
 * **The headline caveat found by the round-3 critic:** `scripts/benchmark.py`'s legacy `walk` and `motion` sections built their optic lobe without the receptor lookup, so `walk.*` (including `walk.power_max_hz`, the one FAIL -> PASS), the legacy `loom.GF_peak_hz` (the one quantified cost) and `motion.*` were measured with the Brain under abs and the rate optic lobe under NT_SIGN -- 8,833 of the default's 179,944 changed synapses (KC, DN1 clock, OA silencings) in force and the 44,463 optic entries absent. Every room section, `room_demo`, `batch_sustain` and the probes ran the model as shipped. Fixed (the sections now pass `receptor=` / `receptor_gain=` like `fly.py`), and `--receptor-model off` -- which had become a silent no-op after the default change -- now sets `receptor_model=None` explicitly while `default` leaves LIFParams alone; the JSON header records the LIFParams used. The re-score (round 4, item 1) decides whether 27/0/2, walk.power_max 46.10 and the -10 Hz loom cost are properties of the shipped model; until then they are not to be quoted as such. Structurally the -10 Hz legacy-loom cost cannot come from T1 / Dm9 / the histamine silencings (absent in that section); it is a Brain-side effect of the KC / DN1 / OA entries.
+
+## Round 4: take-offs and feeding
+
+Round-3 item: "the one behavioural change no check scores -- spontaneous take-offs 24 vs 3 in 16 flies x 5 min -- was measured once and
+should be replicated with a feeding-capable sustain before the default is relied on by the sustain / RL work"
+(`receptor_verification.md` round-3 critic, assessment and follow-up 3). This section settles it with 48 flies per condition over three
+independent brain RNGs, plus a fixed-seed rerun pair that measures the run-to-run scatter the round-3 single batch could not.
+
+### S.0 Protocol and provenance
+
+`scripts/batch_sustain.py --batch 16 --program cx --fruit apple --fence --minutes 5 --energy 0.9 --cuda-graphs --cuda-kernels
+--event-driven --cuda-sparse torch --seed <k> --seeds <16 env seeds>`, six jobs in one cluster batch (run dir
+`/mnt/beegfs/neurome/runs/r4-sustain-f2857e`, 6 jobs, 0 failed, 44.2 min; every job log prints `cuda ok NVIDIA B200` and
+`device=cuda`), then a two-job fixed-seed replicate batch (`r4-sustain-rep-c6d643`, 2 jobs, 0 failed, 25.7 min). No `--cache-dir`:
+every job used the cluster's shared `TYPE_NT_OVERRIDE` cache. 30,000 frames = 300 simulated s per job; start energy 0.9 (round 3 used
+the 0.4 default, at which every fly of both conditions sat at energy 0 from t = 80 s and nothing ate).
+
+| job | brain seed (`--seed`) | environment seeds | flag | header line printed | wall s | fly-s/wall-s |
+|---|---|---|---|---|---|---|
+| `out/r4_sustain_default_1.json` | 0 | 0-15 | (none) | `receptor model sign (abs); fast sign changed on 48,295 of 25,578,600 entries` | 1,792.7 | 2.68 |
+| `out/r4_sustain_default_2.json` | 1 | 16-31 | (none) | same | 1,793.0 | 2.68 |
+| `out/r4_sustain_default_3.json` | 2 | 32-47 | (none) | same | 2,553.2 | 1.88 |
+| `out/r4_sustain_off_1.json` | 0 | 0-15 | `--receptor-model off` | `receptor model None (None); fast sign changed on 0 of 25,578,600 entries` | 1,018.0 | 4.71 |
+| `out/r4_sustain_off_2.json` | 1 | 16-31 | `--receptor-model off` | same | 2,556.9 | 1.88 |
+| `out/r4_sustain_off_3.json` | 2 | 32-47 | `--receptor-model off` | same | 2,565.9 | 1.87 |
+| `out/r4_sustain_default_1b.json` | 0 | 0-15 | (none) -- rerun of batch 1 | same as default | 1,471.1 | 3.26 |
+| `out/r4_sustain_off_1b.json` | 0 | 0-15 | `--receptor-model off` -- rerun of batch 1 | same as off | 1,471.3 | 3.26 |
+
+**Flag semantics confirmed before the runs** (`batch_sustain.py` lines 33-50, 84-86; local CPU smoke test
+`--batch 1 --seeds 0 --program cx --fruit apple --fence --minutes 0.002 --energy 0.9 --device cpu`,
+`out/r4_smoke_{default,off}.json`): `--receptor-model default` (the default value) leaves `LIFParams` untouched and the run prints
+`sign (abs); 48,295`; `--receptor-model off` sets `receptor_model=None` and prints `None (None); 0`. Both JSONs record
+`receptor = {model, net_rule, fast_sign_changed_entries}` taken from the constructed `LIFParams`, not from the flag, so the condition
+labels above are checkable in the files. No change to `batch_sustain.py` was needed. Each batch pair shares its environment seeds and
+its brain seed, so `default_k` vs `off_k` is seed-matched; the three batches differ in both brain RNG and environment seeds and are
+therefore three independent replications of the contrast, not three samples of one.
+Generator: `scripts/compare_sustain_runs.py` (logs `out/r4_sustain_compare.log`, `out/r4_sustain_replicate.log`,
+`out/r4_sustain_energy.log`, `out/r4_hopcheck_power.log`). It reproduces the round-3 batch exactly from
+`out/r3_sustain_{default,off}.json` (hops 24 vs 3, U 225.5, two-sided asymptotic p 7.73822e-05, exact 1.06239e-04), i.e. the
+round-3 numbers as the verification record recomputed them, not the `0.0003` the round-3 text printed.
+
+### S.1 Hops (spontaneous take-offs): per batch
+
+Per fly over 300 s; no looming object is ever presented in these rooms and `escape_gating` is off, so every airborne transition is
+spontaneous. p = two-sided Mann-Whitney over the 16 vs 16 flies of that seed-matched pair (asymptotic / exact, scipy 1.17.0).
+
+| batch | brain seed | env seeds | default total (mean +- sd) | off total (mean +- sd) | U | p asym | p exact |
+|---|---|---|---|---|---|---|---|
+| 1 | 0 | 0-15 | 21 (1.313 +- 1.078) | 1 (0.063 +- 0.250) | 233.5 | 9.40e-06 | 1.87e-05 |
+| 2 | 1 | 16-31 | 26 (1.625 +- 1.258) | 7 (0.438 +- 0.727) | 198.5 | 4.92e-03 | 7.49e-03 |
+| 3 | 2 | 32-47 | 27 (1.688 +- 1.401) | 3 (0.188 +- 0.403) | 213.5 | 4.62e-04 | 9.05e-04 |
+| **pooled 48 v 48** | 0,1,2 | 0-47 | **74 (1.542 +- 1.237)** | **11 (0.229 +- 0.515)** | **1914.5** | **1.35e-09** | **3.94e-09** |
+
+Per-fly vectors (default / off): batch 1 `[1,3,1,0,1,4,3,1,1,1,1,1,1,1,0,1]` / `[0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0]`; batch 2
+`[0,2,2,3,0,1,1,0,2,3,1,3,4,2,2,0]` / `[0,0,2,1,0,0,1,0,1,2,0,0,0,0,0,0]`; batch 3 `[0,1,0,2,0,2,4,1,4,0,2,2,4,2,1,2]` /
+`[0,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0]`. Pooled histograms (flies with 0,1,2,3,4 hops): default `[10,17,11,5,5]`, off `[39,7,2,0,0]`;
+fraction of flies with >= 1 hop 0.792 vs 0.188, with >= 2 hops 0.438 vs 0.042.
+
+**The excess replicates across all three brain RNGs.** Default exceeds off in 3 of 3 seed-matched pairs at p < 0.01 each, and the
+per-batch means do not overlap between conditions (default 1.313 / 1.625 / 1.688, range 0.375; off 0.063 / 0.438 / 0.188, range 0.375;
+Kruskal-Wallis across the three batches within a condition H 0.994 p 0.608 for default, H 3.540 p 0.170 for off -- no detectable
+brain-seed effect within either condition). Pooled rate 1.542 vs 0.229 hops per fly per 5 min = 5.14e-03 vs 7.64e-04 hops per fly-second,
+a factor **6.73**. Round 3's single batch (24 vs 3 at energy 0.4) is inside both pooled distributions.
+
+**Run-to-run scatter at fixed seeds** (`r4-sustain-rep-c6d643`, brain seed 0 and environment seeds 0-15, the identical command rerun):
+default 21 -> 17 hops (1.313 -> 1.063 per fly), off 1 -> 0. The batched rollout is **not** deterministic (event-driven CUDA atomics;
+`docs/BATCH_SIM.md` says so, and meals moved 2 -> 1 and mean final energy 0.058 -> 0.000 across the same default pair), but the
+within-condition scatter (17-21 default, 0-1 off) is an order of magnitude smaller than the between-condition gap. Pooled over the two
+seed-0 default batches vs the two seed-0 off batches (32 v 32): 1.188 +- 0.998 vs 0.031 +- 0.177, U 900.0, p asym 2.92e-09,
+exact 2.07e-08.
+
+### S.2 Feeding, energy, path, distance: pooled 48 v 48
+
+| per fly (n = 48 each) | default | off | U | p asym | p exact |
+|---|---|---|---|---|---|
+| hops | 1.5417 +- 1.2370 (total 74) | 0.2292 +- 0.5153 (total 11) | 1914.5 | 1.35e-09 | 3.94e-09 |
+| meals | 0.2292 +- 0.4722 (total 11; 2 / 5 / 4 per batch) | 0.1667 +- 0.3766 (total 8; 1 / 4 / 3) | 1204.0 | 0.577 | 0.707 |
+| final energy (t = 300 s) | 0.0478 +- 0.1337 | 0.0055 +- 0.0353 | 1253.0 | 0.124 | 0.463 |
+| minimum energy over the run | 0.0120 +- 0.0551 | 0.0038 +- 0.0238 | 1202.0 | 0.387 | 0.718 |
+| path (m) | 3.6765 +- 0.1674 | 3.6003 +- 0.1203 | 1566.0 | 2.45e-03 | 2.21e-03 |
+| final distance to nearest fruit (cm) | 20.96 +- 11.98 | 22.51 +- 11.44 | 941.0 | 0.123 | 0.123 |
+
+Per-batch means, default then off: meals 0.125 / 0.313 / 0.250 vs 0.063 / 0.250 / 0.188; final energy 0.058 / 0.023 / 0.063 vs
+0.000 / 0.015 / 0.001; path 3.683 / 3.687 / 3.659 vs 3.604 / 3.599 / 3.598 (default longer in 3 of 3, and in the fixed-seed rerun pair
+3.666 vs 3.570; per-batch p 0.052 / 0.080 / 0.169, only the pooled test clears 0.05); distance 20.88 / 20.67 / 21.33 vs
+23.10 / 23.85 / 20.58 (default nearer in 2 of 3; n.s. pooled). Mode fractions, mean over 48 flies: default exploring 0.501, surging
+0.300, searching 0.115, casting 0.078, feeding 0.0071; off 0.498 / 0.308 / 0.112 / 0.079 / 0.0036.
+
+**The feeding assay is no longer degenerate but still does not rank the two models.** At `--energy 0.9` the mean energy trace is
+0.853 / 0.756 / ~0.62 / ~0.50 / ~0.35 at t = 10 / 30 / 60 / 90 / 120 s in both conditions (the drain is a body-model constant, identical
+to three decimals at 10 and 30 s in all six jobs); the first flies reach 0 between t = 120 and 180 s, and at t = 300 s 13-15 of 16 flies
+are at 0 under default and 15-16 of 16 under off (off batch 1 has every fly at 0 from t = 270 s). 19 meals were eaten in total
+(11 default, 8 off) against 0 in round 3, so flies do find and eat the apple -- but a meal is a rare event (0.17-0.23 per fly per 5 min),
+it fluctuates run-to-run at fixed seeds (2 -> 1), and the Mann-Whitney on meals, final energy and minimum energy returns p 0.12-0.72.
+Ranking models on feeding needs either a longer horizon (the 300 s window ends after most flies have starved) or a metabolism whose
+drain does not consume 0.9 of energy in ~150 s; `--energy 0.9` fixes only the round-3 "nothing ever eats" degeneracy.
+
+Round-3 statements that do **not** replicate: "ends slightly farther from the fruit" (round 3 default 23.1 vs off 19.1 cm, n.s.; round 4
+default 20.96 vs off 22.51 cm, n.s. -- the sign flips, so that was noise). Round-3 statements that do: the take-off excess, and
+"walks farther" (+2.1 % here, p 2.4e-03, same direction in 3 of 3 batches and in the rerun pair; +2.4 % p 1.4e-03 in round 3).
+
+### S.3 Proposed spontaneous-hop check for `benchmark.py` (proposal only -- nothing added)
+
+The cost is real, replicated and seed-matched, so it should be scored rather than noted in prose. **The existing instrument cannot score
+it.** `sec_walk_gf` (`scripts/benchmark.py` lines 516-535) already counts `voluntary_takeoffs` with `sim.flight.gf_hz = 1e9`, i.e. exactly
+spontaneous hops, and it is **0 in all 13 round-2 / round-3 suite JSONs** -- `out/r3_default_{1,2,3}.json`, `r3_default_flagged.json`,
+`r3_abs_c{1,2,3}.json`, `sk3_abs_c4.json`, `sk3_default_4.json`, `sk3_offflag.json`, `rm2_off{,_r2,_r3}.json`,
+`skeptic2/rm_off_r4.json` -- under both models, because 15 fly-seconds at the default's 5.14e-03 hops/fly-s expects 0.077 hops. The
+section needs fly-seconds, which means the batched rollout.
+
+Proposal: a new opt-in section `hops` built on `BatchSim` (the same object `batch_sustain.py` drives), reporting
+`hops.per_1000_fly_s` plus the raw total, with the reference taken from the off runs of S.1:
+
+* **Reference (from the off condition, three brain RNGs, 14,400 fly-s):** `0.76 hops per 1,000 fly-s` (11 hops / 48 flies / 300 s;
+  per batch 1, 7, 3, and 0 in the fixed-seed rerun). Shipped default for comparison: `5.14 per 1,000 fly-s` (74 hops; per batch 21, 26,
+  27, and 17 in the rerun). Round-1 `receptor_model='full'` as the ceiling: 31 voluntary take-offs in 15 s of one fly =
+  2,070 per 1,000 fly-s (`receptor_verification.md`, `verify:score` claim 9).
+* **Two candidate entries, because one bound cannot do both jobs** (Poisson power table in `out/r4_hopcheck_power.log`):
+  1. a storm guard both models pass -- `Ref(0.8, "<", 50, "10", note="spontaneous take-offs per 1,000 fly-s in a room with no looming
+     object; off 0.76, sign/abs 5.14, receptor_model full 2,070")`. It separates every sane model from the round-1 storms by ~40x and
+     would have caught `sign+gain` / `full` in round 1.
+  2. a `gap=True` entry that records the 6.73x excess without turning the suite red --
+     `Ref(0.8, "<", 2.0, "10", gap=True, note="the sign/abs default hops 6.7x more often than off (5.14 vs 0.76 per 1,000 fly-s,
+     48 flies x 5 min x 3 brain RNGs, p 1.4e-09); KNOWN GAP until the DN-excitability cost is paid down")`. Under the existing `Ref`
+     semantics the shipped default then prints KNOWN GAP, not FAIL, exactly like `object.LC10a_flip_hz`.
+  A single strict bound (e.g. `< 2.0` without `gap`) would make the shipped default FAIL and move the suite to 27/1/2; that is a
+  default-policy decision for the round-4 owner, not something this section takes.
+* **Cost of the instrument** (Poisson power at the two measured rates, best total-count bound at each size):
+  16 flies x 300 s = 4,800 fly-s -> E 24.7 vs 3.7, bound 11, P(default passes) 7e-04 / P(off fails) 1.5e-03, ~25-43 min wall;
+  16 x 150 s = 2,400 fly-s -> E 12.3 vs 1.8, bound 6, 0.017 / 0.011, ~12-21 min;
+  16 x 60 s = 960 fly-s -> E 4.9 vs 0.7, bound 3, 0.130 / 0.038 -- too weak.
+  So the check needs >= ~2,400 fly-s, i.e. 12-21 min on a shared B200, more than the whole native suite (9.6 min). The recommendation is
+  therefore a **separate opt-in section** (`--sections hops`, excluded from the default run and from `--fast`) rather than a 30th member
+  of the scored set, with `scripts/batch_sustain.py --batch 16 --minutes 2.5` as the reference implementation and the numbers above as its
+  reference; promote it into the default suite only if the suite's time budget grows.
+
+### S.4 What this settles and what it leaves open
+
+Settled: the round-3 take-off finding is not a one-batch artefact. The `sign` / `abs` default takes off spontaneously 6.73x as often as
+the presynaptic-sign model (5.14 vs 0.76 hops per 1,000 fly-s; 74 vs 11 hops over 48 flies x 5 min per condition; p 1.35e-09 asymptotic /
+3.94e-09 exact), the excess appears in 3 of 3 independent brain RNGs at p < 0.01 each with non-overlapping per-batch means, and the
+within-condition run-to-run scatter at fixed seeds (17-21 vs 0-1 hops) is far smaller than the gap. The 2 % longer path replicates; the
+round-3 distance-to-fruit difference does not. Feeding at `--energy 0.9` produces meals (19 across 96 fly-rollouts vs 0 at
+`--energy 0.4`) but cannot rank the models (p 0.58 meals, 0.12 final energy) and still ends with almost every fly starved.
+
+Open: (1) which of the default's 8,833 Brain-side synapses drives the excess -- the same KC / DN1 / OA entries the round-3 critic
+narrowed the legacy-loom cost to; a hold-DN experiment would attribute it (round-4 item 2); (2) whether the excess is GF / DNp
+excitability specifically (`walk.GF_max_hz` 8.52 vs 4.63 and 12/12 vs 3/12 demo-loom escapes point that way) or a general motor-drive
+effect -- the mode fractions differ by less than 0.008, so it is not a change in the search program's structure; (3) whether a
+feeding-capable protocol exists at all under the present metabolism (S.2); (4) the check in S.3 is proposed, not added.
+
+## Round 4: re-score with the fixed benchmark (the evidence statement that supersedes A.5)
+
+`scripts/benchmark.py`'s legacy walk / motion sections now build the optic lobe with the receptor lookup and
+`--receptor-model off` sets `receptor_model=None` explicitly; the JSON header records the LIFParams used. Batch
+`r4-rescore-680005` (default x3, off x3, holdKC x2, holdDN1 x2; fetched md5-verified) plus the skeptic's fourth
+replicates (`out/sk4_default_4.json`, `out/sk4_off_4.json`); table by `scripts/compare_suite_runs.py --round4`
+(`out/r4_compare.log`, `out/r4_suite_table.md`).
+
+# Round-4 re-score: benchmark suite with the fixed walk / motion sections and an explicit off
+
+| check | criterion | r4 default x3 (fixed benchmark) | r4 off x3 | r3 default x3 (half-applied) | r2 off x4 | holdKC x2 | holdDN1 x2 |
+|---|---|---|---|---|---|---|---|
+| rest.spikes_per_step | < 5 | 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P | 0.00 P / 0.00 P |
+| taste.MN9_hz | > 2 | 10.93 P / 10.93 P / 10.93 P | 5.85 P / 5.85 P / 5.85 P | 10.93 P / 10.93 P / 10.93 P | 5.85 P / 5.85 P / 5.85 P / 5.85 P | 10.93 P / 10.93 P | 10.93 P / 10.93 P |
+| smell.PN_hz | < 100 | 7.86 P / 7.86 P / 7.86 P | 11.19 P / 11.19 P / 11.19 P | 7.86 P / 7.86 P / 7.86 P | 11.19 P / 11.19 P / 11.19 P / 11.19 P | 11.64 P / 11.64 P | 10.64 P / 10.64 P |
+| smell.KC_active | > 0 | 816.00 P / 816.00 P / 816.00 P | 1426.00 P / 1426.00 P / 1426.00 P | 816.00 P / 816.00 P / 816.00 P | 1426.00 P / 1426.00 P / 1426.00 P / 1426.00 P | 1155.00 P / 1155.00 P | 1109.00 P / 1109.00 P |
+| dn.DNa02_L_leg_asym_hz | > 0.3 | 2.58 P / 2.58 P / 2.58 P | 2.58 P / 2.58 P / 2.58 P | 2.58 P / 2.58 P / 2.58 P | 2.58 P / 2.58 P / 2.58 P / 2.58 P | absent / absent | absent / absent |
+| dn.MDN_top_hz | < 250 | 153.00 P / 153.00 P / 153.00 P | 153.00 P / 153.00 P / 153.00 P | 153.00 P / 153.00 P / 153.00 P | 153.00 P / 153.00 P / 153.00 P / 153.00 P | absent / absent | absent / absent |
+| dn.DNp09_top_hz | < 250 | 152.00 P / 152.00 P / 152.00 P | 152.00 P / 152.00 P / 152.00 P | 152.00 P / 152.00 P / 152.00 P | 152.00 P / 152.00 P / 152.00 P / 152.00 P | absent / absent | absent / absent |
+| walk.GF_max_hz | < 38 | 4.61 P / 4.61 P / 4.61 P | 4.63 P / 4.63 P / 4.63 P | 8.52 P / 8.52 P / 8.52 P | 4.63 P / 4.63 P / 4.63 P / 4.63 P | 8.41 P / 8.41 P | 4.72 P / 4.72 P |
+| walk.power_max_hz | < 50 | 79.47 F / 79.47 F / 79.47 F | 73.18 F / 73.18 F / 73.18 F | 46.10 P / 46.10 P / 46.10 P | 73.18 F / 73.18 F / 73.18 F / 73.18 F | 55.63 F / 55.63 F | 59.04 F / 59.04 F |
+| walk.power_sustained_hz | < 50 | 37.89 P / 37.89 P / 37.89 P | 31.44 P / 31.58 P / 31.44 P | 21.36 P / 21.36 P / 21.36 P | 31.58 P / 31.58 P / 31.44 P / 31.58 P | 23.68 P / 23.68 P | 30.75 P / 30.75 P |
+| loom.GF_peak_hz | >= 20 | 50.38 P / 50.38 P / 50.86 P | 40.13 P / 38.16 P / 40.83 P | 28.10 P / 31.90 P / 28.04 P | 43.88 P / 36.94 P / 36.74 P / 38.00 P | 49.01 P / 49.01 P | 48.72 P / 53.76 P |
+| loom.escape_cm | notnone 0 | 3.50 P / 3.50 P / 3.50 P | 3.50 P / 3.50 P / 3.50 P | 3.50 P / 3.50 P / 3.50 P | 3.50 P / 3.50 P / 3.50 P / 3.50 P | 3.50 P / 3.50 P | 3.50 P / 3.50 P |
+| rotate.DNp20_flip_hz | < -2 | -32.24 P / -34.04 P / -31.90 P | -16.89 P / -32.09 P / -27.55 P | -22.02 P / -31.72 P / -29.60 P | -13.27 P / -26.23 P / -26.63 P / -31.72 P | -36.29 P / -45.89 P | -27.79 P / -34.68 P |
+| motion.min_dsi | >= 0.1 | 0.23 P / 0.23 P / 0.23 P | 0.17 P / 0.17 P / 0.17 P | 0.17 P / 0.17 P / 0.17 P | 0.17 P / 0.17 P / 0.17 P / 0.17 P | absent / absent | absent / absent |
+| motion.correct_directions | == 8 | 8.00 P / 8.00 P / 8.00 P | 8.00 P / 8.00 P / 8.00 P | 8.00 P / 8.00 P / 8.00 P | 8.00 P / 8.00 P / 8.00 P / 8.00 P | absent / absent | absent / absent |
+| loom_escape.GF_peak_hz | >= 33 | 49.39 P / 49.92 P / 52.95 P | 32.26 F / 34.47 P / 33.95 P | 53.43 P / 51.37 P / 46.87 P | 35.18 P / 31.01 F / 35.50 P / 28.65 F | absent / absent | absent / absent |
+| loom_escape.escapes | >= 1 | 3.00 P / 3.00 P / 3.00 P | 0.00 F / 1.00 P / 1.00 P | 3.00 P / 3.00 P / 3.00 P | 2.00 P / 0.00 F / 1.00 P / 0.00 F | absent / absent | absent / absent |
+| walk_gf.p99_hz | < 38 | 22.28 P / 18.31 P / 20.35 P | 22.52 P / 23.59 P / 17.81 P | 16.40 P / 22.59 P / 26.59 P | 22.20 P / 19.34 P / 19.97 P / 22.64 P | absent / absent | absent / absent |
+| rotation.group_flip_hz | <= -3 | -9.61 P / -10.18 P / -10.39 P | -7.15 P / -7.08 P / -7.06 P | -9.81 P / -10.05 P / -8.94 P | -7.00 P / -7.17 P / -7.52 P / -7.98 P | absent / absent | absent / absent |
+| object.LC10a_flip_hz | abs>= 1.0 | 0.00 G / 0.01 G / -0.00 G | -0.00 G / 0.00 G / 0.01 G | 0.00 G / 0.00 G / 0.00 G | 0.00 G / 0.00 G / 0.01 G / 0.00 G | absent / absent | absent / absent |
+| bitter.calibrated_sugar_MN9_hz | > 2 | 5.52 P / 5.52 P / 5.52 P | 4.57 P / 4.57 P / 4.57 P | 5.52 P / 5.52 P / 5.52 P | 4.57 P / 4.57 P / 4.57 P / 4.57 P | 5.52 P / 5.52 P | 5.52 P / 5.52 P |
+| bitter.calibrated_sugar_bitter_MN9_hz | < 1 | 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P / 0.00 P / 0.00 P | 0.00 P / 0.00 P | 0.00 P / 0.00 P |
+| bitter.shiu_sugar_MN9_hz | > 50 | 139.90 P / 139.90 P / 139.90 P | 123.54 P / 123.54 P / 123.54 P | 139.90 P / 139.90 P / 139.90 P | 123.54 P / 123.54 P / 123.54 P / 123.54 P | 139.90 P / 139.90 P | 129.27 P / 129.27 P |
+| bitter.shiu_sugar_bitter_MN9_hz | < 10 | 0.82 P / 0.82 P / 0.82 P | 2.12 P / 2.12 P / 2.12 P | 0.82 P / 0.82 P / 0.82 P | 2.12 P / 2.12 P / 2.12 P / 2.12 P | 0.00 P / 0.00 P | 0.82 P / 0.82 P |
+| wind.DNp18_flip_hz | >= 15 | 46.61 P / 45.18 P / 46.21 P | 45.22 P / 45.93 P / 44.40 P | 45.21 P / 45.15 P / 45.60 P | 46.50 P / 43.87 P / 47.21 P / 45.91 P | absent / absent | absent / absent |
+| wind.DNp33_flip_hz | <= -15 | -49.68 P / -49.50 P / -49.79 P | -50.24 P / -50.26 P / -49.58 P | -49.71 P / -50.00 P / -50.20 P | -49.76 P / -49.89 P / -50.10 P / -49.99 P | absent / absent | absent / absent |
+| odour.apple_channel_8cm_hz | >= 10 | 17.44 P / 17.44 P / 17.42 P | 17.54 P / 17.42 P / 17.47 P | 17.55 P / 17.35 P / 17.44 P | 17.50 P / 17.42 P / 17.50 P / 17.48 P | absent / absent | absent / absent |
+| odour.apple_channel_clean_hz | <= 6 | 4.28 P / 4.63 P / 4.47 P | 4.42 P / 4.36 P / 4.36 P | 4.67 P / 4.50 P / 4.49 P | 4.44 P / 4.58 P / 4.40 P / 4.42 P | absent / absent | absent / absent |
+| compass.wedge_cells_persisting | >= 6 | 0.00 G / 0.00 G / 0.00 G | 0.00 G / 0.00 G / 0.00 G | 0.00 G / 0.00 G / 0.00 G | 0.00 G / 0.00 G / 0.00 G / 0.00 G | absent / absent | absent / absent |
+
+**Result.** Fully applied, the default scores **26 PASS / 1 FAIL / 2 KNOWN GAP in 11 of 11 draws** (r4_default x3,
+sk4_default_4, r4_ntmaj x3 -- W byte-identical to the shipped cache -- retire_r4 baselines x3, sk4_retire baseline),
+the FAIL always `walk.power_max_hz` (79.4650 in 15 draws, 80.0928 in 3; bound < 50). Off: 26/1/2 x3 and 24/3/2 x1 in
+round 4 (walk.power_max 73.1827 in 7/7; r4_off_1 also fails loom_escape). The adoption criterion -- no check worse
+in status than any off run -- **holds** (strict and lenient lists empty), but the tally equals off's best rather than
+exceeding it. Off reproduces the round-2 off values bit for bit on the 15 bit-stable checks, so off is off again.
+
+**The round-3 headline numbers were half-applied artefacts and are void:** 27/0/2; walk.power_max 46.10 PASS (fully
+applied 79.47 FAIL, 6.3 Hz *worse* than off, both FAIL); the "-10 Hz legacy loom cost" (fully applied 50.4-54.3 vs
+off 35.0-40.8 Hz: a +10-14 Hz *gain*); walk.GF_max 8.52 (4.61 vs off 4.63); motion.min_dsi 0.17 -> 0.23 (T4a 0.42
+vs 0.17). Unchanged and bit-stable: taste.MN9 10.93 vs 5.85, KC_active 816 vs 1426, Shiu 139.90 vs 123.54,
+calibrated 5.52 vs 4.57; demo loom escapes 3/3 at 47.6-52.9 Hz vs 0-1/3 at 32.3-38.2.
+
+**Attribution (hold tables).** Neither the KC flips (2,834 entries / 5,018 syn) nor the DN1 clock flips (875 /
+3,533) carry taste 5.85 -> 10.93 (10.9342 under both holds); DN1 carries 65 % of Shiu (129.27 of the 123.54 ->
+139.90); walk.power_max is non-monotone in the number of applied flips (79.47 / holdKC 55.63 / holdDN1 59.04 /
+off 73.18) and cannot be attributed additively; KC_active 816 / 1155 / 1109 / 1426 shows the groups interact.
+After both holds 123 entries / 282 syn of Brain-side change remain, so the taste rise is most plausibly a
+fan-in-normalisation effect of the 171,111 optic-side synapses inside the Brain (untested).
+
+**Where the default stands.** Justified in kind (expression-derived sign, contested flips removed, no fitted
+parameter, byte-for-byte reversible: `receptor_rules.md` section 3), and "not worse in status than off"; **not**
+"better on the suite". Measured advantages: demo loom escapes, taste, Shiu, legacy loom GF, direction selectivity.
+Measured costs: KC_active 816 vs 1426; walk.power_max +6.3 Hz (both FAIL); and the room take-off excess
+(section below), ~40 % of which are GF escape jumps on room optic flow from a higher walking-GF tail -- the one
+unscored cost, and the one open threat to the default. The sentence "27/0/2 in 10 of 10 runs" is withdrawn wherever
+it appears (A.5 above, NOTES, NT_INTEGRATION).
+
+### Corrections to "Round 4: take-offs and feeding" (verify:exp:sustain)
+
+* "Spontaneous" is refuted: `batch_body.step()` launches by the GF escape route (GF >= 33 Hz) OR the voluntary route
+  (wing power >= 50 Hz for 0.3 s) and `hops` counts both. At seed 0 the default's 24 hops are 10 escape + 14 voluntary
+  vs off 2 + 0 (`scripts/probe_hop_route.py`, `out/sk4_route_default_1.json`); with the escape route disabled
+  (gf_hz = 1e9) 10 voluntary vs 0. Per-row walking-GF max: default median 33.0 Hz (8/16 rows at the 33 Hz threshold)
+  vs off 28.5 (2/16), U 214, p 1.3e-3.
+* The proposed hop check's reference (off 0.76 / default 5.14 per 1,000 fly-s) was calibrated on both routes; on the
+  instrument the check would use (voluntary only) it is default 2.08 vs off 0.00 (one seed) and must be re-derived over
+  >= 3 batches. A second unscored counter exists: `sec_loom_escape`'s `hops_before_loom` (both routes live).
+* p_exact values are invalid under the heavy ties (hops takes 5 values; final energy is 0 in 88/96): a tie-corrected
+  permutation test gives hops p 1e-5 / 4.7e-3 / 3.4e-4 per batch (conclusion unchanged), final energy p 0.072 (not
+  0.463); quote the energy comparisons as "not significant, p 0.07-0.12".
+* The +2.1 % path length is collinear with hops (OLS: condition p 0.22 once hops is in the model; zero-hop flies p
+  0.51) and is not a separate cost. Identical-seed reruns: default 17-24 hops, off 0-2 over three runs. The seed-0
+  "pooled 32 v 32" is 16 flies measured twice. Off reference over 4 batches: 0.57 per 1,000 fly-s. Wall 17-43 min.
+* The round-1 "full" ceiling is >= 2,330 hops per 1,000 fly-s (31-35 in 15 s). `out/r4_sustain_energy.log` and
+  `out/r4_hopcheck_power.log` are reproduced by `scripts/skeptic_sustain_energy_power.py`.

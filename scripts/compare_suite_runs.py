@@ -1,5 +1,10 @@
-"""Round-3 adoption comparison: the no-flag default runs against round-2 off / abs and round-3 abs runs.
-Writes out/r3_adopt_compare.log and out/r3_adopt_suite_table.md. CPU only (JSON / CSV / txt parsing)."""
+"""Suite-run comparisons for the receptor-integration rounds. CPU only (JSON / CSV / txt parsing).
+
+    python scripts/compare_suite_runs.py            # round 3: the no-flag default runs vs round-2 off / abs and round-3 abs
+                                                    #   -> out/r3_adopt_compare.log, out/r3_adopt_suite_table.md
+    python scripts/compare_suite_runs.py --round4   # round 4: fixed-benchmark default x3 vs off x3 (+ r3 half-applied, r2 off,
+                                                    #   holdKC / holdDN1) -> out/r4_compare.log, out/r4_suite_table.md
+"""
 import glob, json, os, re, sys
 import numpy as np
 import pandas as pd
@@ -23,6 +28,144 @@ def load_suite(path):
     checks = {c["key"]: c for c in d["checks"]}
     tally = {s: sum(1 for c in checks.values() if c["status"] == s) for s in ("PASS", "FAIL", "KNOWN GAP", "MISSING")}
     return d, checks, tally
+
+
+def fmt_check(c):
+    m = c["measured"]
+    return f"-- {STATUS_ABBR[c['status']]}" if m is None else f"{m:.2f} {STATUS_ABBR[c['status']]}"
+
+
+def round4():
+    """Round-4 re-score with the fixed benchmark (walk / motion sections build the optic lobe with the receptor lookup;
+    --receptor-model off sets receptor_model=None explicitly): default x3 vs off x3, with the round-3 half-applied
+    defaults and the round-2 off runs beside them, and the Brain-side hold tables (holdKC / holdDN1).
+    Writes out/r4_compare.log and out/r4_suite_table.md."""
+    G = {
+        "r4_default": sorted(glob.glob("out/r4_default_[123].json")),
+        "r4_off": sorted(glob.glob("out/r4_off_[123].json")),
+        "r3_default": sorted(glob.glob("out/r3_default_[123].json")),
+        "r2_off": ["out/rm2_off.json", "out/rm2_off_r2.json", "out/rm2_off_r3.json", "out/skeptic2/rm_off_r4.json"],
+        "holdKC": sorted(glob.glob("out/r4_holdKC_[12].json")),
+        "holdDN1": sorted(glob.glob("out/r4_holdDN1_[12].json")),
+    }
+    S = {}
+    for g, paths in G.items():
+        S[g] = []
+        for p in paths:
+            if not os.path.exists(p):
+                say(f"MISSING FILE {p}"); continue
+            d, checks, tally = load_suite(p)
+            S[g].append((p, d, checks, tally))
+            cfg = d["config"]; rc = cfg.get("receptor", {})
+            say(f"{p}: PASS {tally['PASS']} FAIL {tally['FAIL']} GAP {tally['KNOWN GAP']} MISSING {tally['MISSING']} | device {cfg.get('device')} "
+                f"backend {cfg.get('backend')} seeds {cfg.get('seeds')} cache_dir {cfg.get('cache_dir')} | receptor model {rc.get('model')} "
+                f"rule {rc.get('net_rule')} flag {rc.get('flag')} changed {rc.get('fast_sign_changed_entries')} table {os.path.basename(str(rc.get('table')))} | "
+                f"nt glu {cfg.get('nt_counts', {}).get('glutamate')} | runtime {d.get('total_runtime_s', 0) / 60:.1f} min | {d.get('date')}")
+    keys = []
+    for g in ("r4_default", "r4_off", "r3_default", "r2_off", "holdKC", "holdDN1"):
+        for _, _, checks, _ in S[g]:
+            for k in checks:
+                if k not in keys:
+                    keys.append(k)
+    # ---- per-check table + the adoption criterion (r4 default vs r4 off) ----------------------------------------
+    cols_g = ("r4_default", "r4_off", "r3_default", "r2_off", "holdKC", "holdDN1")
+    rows = ["| check | criterion | r4 default x3 (fixed benchmark) | r4 off x3 | r3 default x3 (half-applied) | r2 off x4 | holdKC x2 | holdDN1 x2 |",
+            "|---|---|---|---|---|---|---|---|"]
+    worse_best, worse_worst = [], []
+    for k in keys:
+        cols, crit = [], None
+        for g in cols_g:
+            vals = []
+            for _, _, checks, _ in S[g]:
+                if k in checks:
+                    vals.append(fmt_check(checks[k])); crit = crit or checks[k]["criterion"]
+                else:
+                    vals.append("absent")
+            cols.append(" / ".join(vals) if vals else "--")
+        rows.append(f"| {k} | {crit} | " + " | ".join(cols) + " |")
+        off_ranks = [RANK[checks[k]["status"]] for _, _, checks, _ in S["r4_off"] if k in checks]
+        for p, _, checks, _ in S["r4_default"]:
+            if k not in checks or not off_ranks:
+                continue
+            r = RANK[checks[k]["status"]]
+            offs = [c[k]["status"] for _, _, c, _ in S["r4_off"] if k in c]
+            if r < max(off_ranks):
+                worse_best.append((k, os.path.basename(p), checks[k]["status"], offs))
+            if r < min(off_ranks):
+                worse_worst.append((k, os.path.basename(p), checks[k]["status"], offs))
+    open("out/r4_suite_table.md", "w", encoding="utf-8").write(
+        "# Round-4 re-score: benchmark suite with the fixed walk / motion sections and an explicit off\n\n" + "\n".join(rows) + "\n")
+    say("\nCRITERION (r4 default x3 vs r4 off x3): status worse than the BEST off status (strict):", worse_best if worse_best else "none")
+    say("CRITERION: status worse than the WORST off status (lenient):", worse_worst if worse_worst else "none")
+    if not S["r4_default"] or not S["r4_off"]:
+        say("CRITERION: cannot be applied -- no r4 default / off JSONs found (a vacuous 'none' is NOT a pass)")
+    for g in ("r4_default", "r4_off"):
+        say(f"  {g} tallies: " + "; ".join(f"{os.path.basename(p)} {t['PASS']}/{t['FAIL']}/{t['KNOWN GAP']}" for p, _, _, t in S[g]))
+    # ---- off must reproduce round-2 off's deterministic values -------------------------------------------------------
+    say("\nOFF REPRODUCTION (r4 off vs out/rm2_off.json; deterministic Brain-only checks must be bit-identical):")
+    ref = S["r2_off"][0][2] if S["r2_off"] else {}
+    # the checks that are bit-stable run to run at fixed weights (walk.power_sustained, loom.GF_peak, rotate.DNp20 and
+    # motion.min_dsi scatter within the r2-off group itself, so they are compared as ranges elsewhere, not here)
+    det = ["rest.spikes_per_step", "taste.MN9_hz", "smell.PN_hz", "smell.KC_active", "dn.DNa02_L_leg_asym_hz", "dn.MDN_top_hz", "dn.DNp09_top_hz",
+           "walk.GF_max_hz", "walk.power_max_hz", "loom.escape_cm", "motion.correct_directions", "bitter.calibrated_sugar_MN9_hz",
+           "bitter.calibrated_sugar_bitter_MN9_hz", "bitter.shiu_sugar_MN9_hz", "bitter.shiu_sugar_bitter_MN9_hz"]
+    for p, _, checks, _ in S["r4_off"]:
+        same = [k for k in det if k in checks and k in ref and checks[k]["measured"] == ref[k]["measured"]]
+        diff = [(k, checks[k]["measured"], ref[k]["measured"]) for k in det if k in checks and k in ref and checks[k]["measured"] != ref[k]["measured"]]
+        say(f"  {os.path.basename(p)}: identical {len(same)} of {len(det)}; differing: " +
+            ("; ".join(f"{k} {a:.4f} vs {b:.4f}" for k, a, b in diff) if diff else "none"))
+    # ---- per-group value ranges for the moved checks -------------------------------------------------------------------
+    say("\nVALUES (min-max over replicates; * = identical in every replicate of the group):")
+    for k in keys:
+        line = f"  {k:38s}"
+        for g in cols_g:
+            v = [checks[k]["measured"] for _, _, checks, _ in S[g] if k in checks and checks[k]["measured"] is not None]
+            if not v:
+                line += f" | {g} --"
+            elif len(set(v)) == 1:
+                line += f" | {g} {v[0]:.4f}*"
+            else:
+                line += f" | {g} {min(v):.4f}-{max(v):.4f}"
+        say(line)
+    # ---- hold tables: which Brain-side group carries each deterministic change ---------------------------------------
+    say("\nHOLD TABLES (Brain-only sections; value under default / holdKC / holdDN1 / off):")
+    for k in ["taste.MN9_hz", "smell.PN_hz", "smell.KC_active", "walk.GF_max_hz", "walk.power_max_hz", "walk.power_sustained_hz", "loom.GF_peak_hz",
+              "loom.escape_cm", "rotate.DNp20_flip_hz", "bitter.calibrated_sugar_MN9_hz", "bitter.calibrated_sugar_bitter_MN9_hz",
+              "bitter.shiu_sugar_MN9_hz", "bitter.shiu_sugar_bitter_MN9_hz", "rest.spikes_per_step"]:
+        parts = []
+        for g in ("r4_default", "holdKC", "holdDN1", "r4_off"):
+            v = [checks[k]["measured"] for _, _, checks, _ in S[g] if k in checks]
+            parts.append(f"{g} " + (" / ".join(f"{x:.4f}" for x in v) if v else "--"))
+        say(f"  {k:38s} " + " | ".join(parts))
+    # ---- legacy walk section detail (top types, loom peak) for the default vs off -----------------------------------
+    say("\nLEGACY walk section detail (sections.walk / loom):")
+    for g in ("r4_default", "r4_off", "r3_default", "r2_off", "holdKC", "holdDN1"):
+        for p, d, _, _ in S[g]:
+            w = d["sections"].get("walk", {})
+            wk, lm = w.get("walk", {}), w.get("loom", {})
+            say(f"  {g:11s} {os.path.basename(p):22s} GF_mean {wk.get('GF_mean_hz', float('nan')):.3f} GF_max {wk.get('GF_max_hz', float('nan')):.2f} "
+                f"power_mean {wk.get('power_mean_hz', float('nan')):.2f} power_max {wk.get('power_max_hz', float('nan')):.4f} "
+                f"sustained {wk.get('power_sustained_hz', float('nan')):.2f} leg {wk.get('leg_hz', float('nan')):.2f} "
+                f"loom_peak {lm.get('GF_peak_hz', float('nan')):.4f} escape_cm {lm.get('escape_cm')} top {wk.get('top')}")
+    say("\nMOTION section (DSI per subtype):")
+    for g in ("r4_default", "r4_off", "r3_default", "r2_off"):
+        for p, d, _, _ in S[g]:
+            m = d["sections"].get("motion", {}).get("subtypes", {})
+            say(f"  {g:11s} {os.path.basename(p):22s} " + " ".join(f"{t} {v['dsi']:.4f}{'' if v.get('correct') else '!'}" for t, v in m.items()))
+    say("\nloom_escape per seed (GF_loom_peak_hz, escape, t_after_loom_s):")
+    for g in ("r4_default", "r4_off", "r3_default", "r2_off"):
+        for p, d, _, _ in S[g]:
+            le = d["sections"].get("loom_escape", {}).get("seeds", {})
+            say(f"  {g:11s} {os.path.basename(p):22s} " + "  ".join(
+                f"s{s}: {v['GF_loom_peak_hz']:.1f} {'E' if v['escape'] else '-'}" + (f"@{v['escape_info']['t_after_loom_s']:.2f}" if v.get('escape_info') else "")
+                for s, v in le.items()))
+    open("out/r4_compare.log", "w", encoding="utf-8").write("\n".join(OUT) + "\n")
+    print("\nwritten out/r4_compare.log, out/r4_suite_table.md")
+
+
+if "--round4" in sys.argv:
+    round4()
+    sys.exit(0)
 
 
 groups = {
