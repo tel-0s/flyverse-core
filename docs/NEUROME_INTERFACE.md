@@ -4,16 +4,29 @@ Reply to Neurome's request (`D:\Projects\neurome\docs\flyverse-evidence-handoff.
 source anatomy, reconstruction evidence and molecular correspondence; flyverse owns the model, its physiological
 transforms, simulation and probes. First joint case: the small-object pathway (T2, T3, Tm5Y, TmY21, TmY13, TmY5a,
 LC11, LC10a, LC10b) -- localized on our side to the medulla -> lobula stage (`docs/audits/object_sweep.md`; the
-medulla carries a moving ball at z +22 to +29, T2 / T3 / Tm5Y / TmY21 and the LC types sit at the none-vs-none null)
-and out of reach of the receptor-expression data (none of those types has a profile in any of six sources,
-`docs/NT_INTEGRATION.md` section 7).
+medulla carries a moving ball at z +22 to +29, T2 / T3 / Tm5Y / TmY21 and the LC types sit at the none-vs-none null).
+Receptor-expression coverage within that scope (corrected per Neurome's reading of `receptors_by_type.csv`, which
+matches ours): T2, T3, TmY5a, LC10a and LC10b have profiles; **Tm5Y, TmY21, TmY13 and LC11 do not**, in any of six
+sources. Of LC11's larger upstream set (below) only T2a is profiled. A profile is a cross-dataset expression
+interpretation, not a measured conductance of a MaleCNS cell.
+
+**Edge-level agreement.** Neurome's exported input distributions reproduce our compiled cache to the synapse: LC11 <-
+T3 69,205 / T2 36,917 / Tm6 24,736 / T2a 24,572 / Tm12 19,721 / TmY18 15,593 / LC11 15,491 / Li15 13,918; LC10a <-
+LC10a 25,244 / TuTuA_2 18,097 / AOTU042 14,492 / Tm5Y 14,221 / LC9 9,661 / LC10c-1 8,823 / TmY21 7,406 / LC10c-2 6,981
+(our fractions are 0.5-1 pp higher only because our denominator excludes sign-0 entries). Tm6, T2a, Tm12, TmY18 and
+Li15 -- 29 % of LC11's input outside the original probe list -- join the populations the interpretability tools trace.
 
 ## 1. What flyverse will export (read-only probe export)
 
 Implemented by the interpretability toolkit (`flyverse/interp/export.py`, CLI `scripts/interp_export.py`; see
 `docs/INTERP.md` once written). Location: `out/export/<run_id>/` with `manifest.json` plus CSV / Parquet tables,
-one directory per probe run; a run is a directory, never a mutable file. The interchange key is the **MaleCNS
-`bodyId` as a decimal string** (int64 in our cache, 167,106 unique); model indices and type names travel alongside.
+one directory per probe run; a run is a directory, never a mutable file. The interchange key is
+**(dataset.name, dataset.release, bodyId)** with matching source fingerprints -- `bodyId` as a decimal string (int64 in
+our cache, 167,106 unique); model indices and type names travel alongside. Cross-release joins require an explicit
+correspondence (unchanged / merge / split / retired / uncertain), never an unchanged number alone (Neurome's
+`evidence-bundle-v1.md`). Field conventions follow that contract where they overlap: `body_pre` / `body_post`,
+anatomical counts as `synaptic_pair_count` (uncapped, unsigned, pre -> post), coordinates with dataset space, axis
+order and physical units.
 
 `manifest.json` (provenance, all fields mandatory):
 
@@ -84,5 +97,10 @@ suite before adoption.
 
 - The schema and a checksummed example bundle (their side); we will adapt field names to the compiler's columns.
 - Whether `bodyId` alone is stable across MaleCNS releases; we key on it and record the release.
-- Cluster paths: flyverse's checkout and run directories live under `<cluster-fs>/neurome/` (flyverse/, runs/); keep
-  the two projects' run directories apart there.
+- Cluster paths: agreed -- Neurome's namespace is `<cluster-fs>/neurome/neurome-reconstruction/{runs,evidence,exports}/`;
+  flyverse keeps `<cluster-fs>/neurome/flyverse/` and `<cluster-fs>/neurome/runs/`.
+- Neurome's first bundle (`D:\Projects
+eurome\data\male_cns\small_object_v2\`, 680 MiB; `manifest.json`,
+  `observed_edges.parquet` with 1,967,026 both-Traced edges incident to the 7,149 selected bodies, 91,727 endpoint
+  bodies, a receptor-table excerpt, a 24-case fragment review packet) is accepted as read-only observations; no
+  anatomical judgment in it is reviewed and none enters the simulator graph.
