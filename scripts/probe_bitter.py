@@ -31,15 +31,21 @@ def main():
     ap.add_argument("--receptor-nt-class-fallback", action="store_true",
                     help="LIFParams.receptor_nt_class_fallback: unprofiled targets take the Davis 2020 ChAT / Gad1 / VGlut class baseline")
     ap.add_argument("--seed", type=int, default=0, help="Brain RNG seed (the Poisson GRN drive; a real replicate)")
+    ap.add_argument("--receptor-table", default=None, metavar="PATH",
+                    help="LIFParams.receptor_table: a receptors_by_type.csv other than flyverse/data/receptors_by_type.csv")
     args = ap.parse_args()
+    if args.receptor_table is not None and not os.path.isfile(args.receptor_table):
+        raise SystemExit(f"--receptor-table {args.receptor_table}: no such file")
     receptor = dict(receptor_model=None if args.receptor_model == "off" else args.receptor_model,
-                    receptor_net_rule=args.receptor_net_rule, receptor_nt_class_fallback=bool(args.receptor_nt_class_fallback))
+                    receptor_net_rule=args.receptor_net_rule, receptor_nt_class_fallback=bool(args.receptor_nt_class_fallback),
+                    receptor_table=args.receptor_table)
     c = connectome.load(verbose=False)
     if receptor["receptor_model"]:
-        rs = connectome.receptor_signs(c, net_rule=args.receptor_net_rule, nt_class_fallback=bool(args.receptor_nt_class_fallback))
+        rs = connectome.receptor_signs(c, table_path=args.receptor_table, net_rule=args.receptor_net_rule,
+                                       nt_class_fallback=bool(args.receptor_nt_class_fallback))
         cov = rs.coverage(c.W)
         m = cov[cov.tier == "matched"].iloc[0]
-        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}): matched {m.edges:,} edges = {m.edges_frac:.1%}, "
+        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}; table {rs.table_path}): matched {m.edges:,} edges = {m.edges_frac:.1%}, "
               f"{m.syn_W:,.0f} |W| synapses = {m.syn_W_frac:.1%}; fast sign changed on "
               f"{int((rs.fast_sign != np.sign(c.W.data)).sum()):,} entries")
     import torch

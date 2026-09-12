@@ -43,8 +43,15 @@ Profile selection per (type, transmitter) -- round-2 rule (docs/audits/receptor_
   (davis2020 / ozel2021 / kurmangaliyev2020) that has the group on: that profile is used instead
   ('group_on_override'); any other disagreement about 'none' falls back to NT_SIGN ('none_contested'), and so does a
   'none' carried by a single source ('none_single_source'): a silencing needs >= 2 agreeing sources.
+Round-3 rule (the symmetric case; docs/audits/receptor_verification.md, round-2 critic follow-up 1): a FLIP -- the
+  selected profile's fast net sign is the opposite of the NT_SIGN prior (a +1 on glutamate, a -1 on a +1 transmitter)
+  -- that is contradicted by >= 1 other profiled source whose net for the same variant is the prior's sign falls back
+  to NT_SIGN ('flip_contested'; --flip-rule any, the default). --flip-rule majority falls back only when the
+  contradicting sources outnumber the other sources agreeing with the flip ('flip_contested_majority');
+  --flip-rule off reproduces the round-2 table. The rule is applied per variant (class / abs / nonmda) with each
+  source's net under that variant; 'mixed' and 'none' sources neither contradict nor agree.
 
-Run:  PYTHONIOENCODING=utf-8 python scripts/build_receptor_table.py [--previous <old receptors_by_type.csv>]
+Run:  PYTHONIOENCODING=utf-8 python scripts/build_receptor_table.py [--previous <old receptors_by_type.csv>] [--flip-rule any|majority|off]
       (about 2-3 min with the raw weights; --previous adds a change section to receptor_rules.md)
 """
 from __future__ import annotations
@@ -479,6 +486,43 @@ def select_profile(cands: list[dict], min_sources: int = MIN_SOURCES_TO_SILENCE)
     return 0, NONE_CONTESTED
 
 
+FLIP_CONTESTED = "flip_contested"
+FLIP_CONTESTED_MAJORITY = "flip_contested_majority"
+FLIP_RULES = ("any", "majority", "off")
+FLIP_RULE_DEFAULT = "any"
+FLIP_FALLBACK = (FLIP_CONTESTED, FLIP_CONTESTED_MAJORITY)   # net labels of a contested flip (fast sign = the NT_SIGN prior)
+FAST_FALLBACK = NONE_FALLBACK + FLIP_FALLBACK              # every net label whose fast sign is the prior with gain class none
+
+
+def contest_flip(cands: list[dict], i: int, prior: int, rule: str = FLIP_RULE_DEFAULT) -> tuple[str | None, list[str]]:
+    """Round-3 symmetric rule for one (type, transmitter, variant): is the selected profile's FLIP contested?
+
+    cands: one entry per source profiling the type, {'source': str, 'net': '+1' | '-1' | 'mixed' | 'none'} with the
+    net computed under the SAME variant (class, abs or nonmda) as the decision; i: the candidate select_profile chose;
+    prior: cn.NT_SIGN of the transmitter (+1 / -1; 0 for the monoamines, which have no fast group).
+    A flip is a net whose sign is the opposite of the prior (a '+1' on glutamate; a '-1' on acetylcholine). Sources
+    whose net is the prior's own sign contradict it; sources at the flip's sign agree with it; 'mixed' and 'none'
+    do neither.
+    Returns (label, contradicting sources): label FLIP_CONTESTED when rule == 'any' and >= 1 source contradicts,
+    FLIP_CONTESTED_MAJORITY when rule == 'majority' and the contradicting sources outnumber the agreeing ones, else
+    None (the flip stands; the list still names any contradicting sources). rule == 'off' never contests."""
+    if rule not in FLIP_RULES:
+        raise ValueError(f"flip rule must be one of {FLIP_RULES}, got {rule!r}")
+    if rule == "off" or prior == 0 or not cands:
+        return None, []
+    net = cands[i]["net"]
+    if net not in ("+1", "-1") or int(net) == prior:
+        return None, []
+    opp = f"{prior:+d}"
+    contra = [cnd["source"] for j, cnd in enumerate(cands) if j != i and cnd["net"] == opp]
+    agree = [cnd["source"] for j, cnd in enumerate(cands) if j != i and cnd["net"] == net]
+    if not contra:
+        return None, []
+    if rule == "any":
+        return FLIP_CONTESTED, contra
+    return (FLIP_CONTESTED_MAJORITY if len(contra) > len(agree) else None), contra
+
+
 # --------------------------------------------------------------------------------------------------------------
 # 3. Connectome-side per-type numbers
 # --------------------------------------------------------------------------------------------------------------
@@ -536,7 +580,9 @@ def per_type_numbers(c: cn.Connectome, raw: np.ndarray | None) -> pd.DataFrame:
 # --------------------------------------------------------------------------------------------------------------
 # 4. Build the per-type tables
 # --------------------------------------------------------------------------------------------------------------
-def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print):
+def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print, flip_rule: str = FLIP_RULE_DEFAULT):
+    if flip_rule not in FLIP_RULES:
+        raise ValueError(f"flip_rule must be one of {FLIP_RULES}, got {flip_rule!r}")
     profs, maps = [], []
     for loader in (load_ozel, load_davis, load_central, load_kurmangaliyev):
         p, m = loader()
@@ -722,7 +768,22 @@ def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print):
                 else f"{how_c}:{'+'.join(on_sources)}"
             sel_n = how_n if how_n in ("primary", NONE_SINGLE) else f"{how_n}:{per[i_n][0].source}" if how_n == "group_on_override" \
                 else f"{how_n}:{'+'.join(a.source for a, _, fn, _ in per if fn['net'] != 'none')}"
-            alt = [f"{a.source}({a.tier}):fast={fa['net']},slow={sa['net']}" for j, (a, fa, _, sa) in enumerate(per) if j != i_c]
+            # round-3 symmetric rule: a flip contradicted by other profiled sources (per variant, each source's net
+            # under that variant) falls back to NT_SIGN with gain class none, like a contested 'none'.
+            contested = {}
+            if how_c not in NONE_FALLBACK:
+                lab, contra = contest_flip([{"source": a.source, "net": f["net"]} for a, f, _, _ in per], i_c, prior, flip_rule)
+                if lab:
+                    fast.update(net=lab, sign=prior, gain=0); contested["class"] = contra; sel_c = f"{lab}:{'+'.join(contra)}"
+                lab, contra = contest_flip([{"source": a.source, "net": f["net_abs"]} for a, f, _, _ in per], i_c, prior, flip_rule)
+                if lab:
+                    fast.update(net_abs=lab, sign_abs=prior, gain_abs=0); contested["abs"] = contra
+            if how_n not in NONE_FALLBACK:
+                lab, contra = contest_flip([{"source": a.source, "net": fn["net"]} for a, _, fn, _ in per], i_n, prior, flip_rule)
+                if lab:
+                    fast_nn.update(net=lab, sign=prior, gain=0); contested["nonmda"] = contra; sel_n = f"{lab}:{'+'.join(contra)}"
+            alt = [f"{a.source}({a.tier}):fast={fa['net']},abs={fa['net_abs']},nonmda={fn['net']},slow={sa['net']}"
+                   for j, (a, fa, fn, sa) in enumerate(per) if j != i_c]
             rec_rows.append({
                 "malecns_type": t, "transmitter": nt,
                 "fast_sign": fast["sign"], "fast_gain_class": GAIN_CLASSES[fast["gain"]],
@@ -749,6 +810,7 @@ def build_tables(c: cn.Connectome, raw: np.ndarray | None, log=print):
                 "fast_pos_val": round(fast["pos_val"], 3), "fast_neg_val": round(fast["neg_val"], 3),
                 "slow_pos_val": round(slow["pos_val"], 3), "slow_neg_val": round(slow["neg_val"], 3),
                 "alt_sources": ";".join(alt),
+                "flip_contested": ";".join(f"{v}:{'+'.join(s)}" for v, s in contested.items()),
             })
 
     for t, g in type_maps.groupby("malecns_type", sort=True):
@@ -1001,7 +1063,7 @@ def compare_tables(new: pd.DataFrame, old: pd.DataFrame) -> dict:
             d = ~np.isclose(a.to_numpy(dtype=float), b.to_numpy(dtype=float), equal_nan=True)
             d = pd.Series(d, index=both.index)
         else:
-            d = a.astype(str) != b.astype(str)
+            d = a.fillna("").astype(str) != b.fillna("").astype(str)   # an empty lead is NaN when read back from CSV
         out["changed_" + c] = int(d.sum())
         if c.startswith("fast_net") or c == "slow_net":
             changed |= d.to_numpy()
@@ -1198,7 +1260,7 @@ def write_disagreements(nt_table: pd.DataFrame, types: pd.DataFrame, nern: pd.Da
 
 def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.DataFrame, nt_table: pd.DataFrame,
                 raw_available: bool, n_edges: int, stats_ntclass: dict | None, stats_nonmda: dict | None = None,
-                prev: tuple | None = None):
+                prev: tuple | None = None, flip_rule: str = FLIP_RULE_DEFAULT):
     rec_t = rec[~rec.malecns_type.str.startswith("<")]
     L = ["# Receptor rules: transmitter -> postsynaptic response class, and the coverage of the edge lookup",
          "",
@@ -1317,7 +1379,23 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
          "mean log 2.4 -- is not enough). (iv) The `_nonmda` variant is selected separately (a profile whose "
          "only iGluR members are Nmdar1 + Nmdar2 is `none` there; `fast_selection_nonmda`, `source_nonmda`). The slow "
          "columns come from the profile selected for the class variant. `primary_source` / `primary_tier` record what "
-         "the round-1 rule (primary always) would have used; `alt_sources` lists the other candidates' net calls.",
+         "the round-1 rule (primary always) would have used; `alt_sources` lists the other candidates' net calls "
+         "(`fast=` class variant, `abs=`, `nonmda=`, `slow=`).",
+         "* **Contested flips -- round-3 rule** (`contest_flip`; docs/audits/receptor_verification.md, round-2 critic "
+         "follow-up 1), the symmetric case of (ii): a FLIP -- the selected profile's fast net is the opposite sign of "
+         "the `NT_SIGN` prior (a `+1` on glutamate; a `-1` on a +1 transmitter, which no fast group produces today) -- "
+         "stands only if no other source profiling the type contradicts it. The rule is applied per variant with each "
+         "source's net under that variant (class nets for the class columns, `_abs` nets for the abs columns, `_nonmda` "
+         "nets for the nonmda columns); a source at the prior's own sign contradicts the flip, a source at the flip's "
+         "sign agrees with it, `mixed` and `none` do neither. Two variants of the rule exist (`--flip-rule`): `any` "
+         "(**the default and the rule of this table**: >= 1 contradicting source, `fast_net*` = `flip_contested`) and "
+         "`majority` (fall back only when the contradicting sources outnumber the agreeing ones, `fast_net*` = "
+         "`flip_contested_majority`); `off` reproduces the round-2 table. A contested flip keeps the selected profile "
+         "(`tier` / `source` / `alt_sources` unchanged) but takes `fast_sign*` = the prior and `fast_gain_class*` = "
+         "`none` (factor 1), exactly like `none_contested`; the column `flip_contested` names the contradicting sources "
+         "per variant (`class:...;abs:...;nonmda:...`, empty when no variant is contested), `fast_selection` / "
+         "`fast_selection_nonmda` carry `flip_contested*:<sources>` for the class / nonmda variants. "
+         f"This table was built with `--flip-rule {flip_rule}`.",
          "* Rows `<nt=acetylcholine|gaba|glutamate>` are the Davis 2020 ChAT / Gad1 / VGlut protein-trap drivers: the "
          "receptor baseline of a whole transmitter class, usable as a fallback for unprofiled targets "
          "(`edge_lookup(..., nt_class_fallback=True)`), off by default.",
@@ -1405,7 +1483,8 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
             vc = r[col].value_counts()
             tally.append({"transmitter": nt, "column": col, "+1": int(vc.get("+1", 0)), "-1": int(vc.get("-1", 0)),
                           "mixed": int(vc.get("mixed", 0)), "none": int(vc.get("none", 0)),
-                          "none_contested": int(vc.get(NONE_CONTESTED, 0)), "none_single_source": int(vc.get(NONE_SINGLE, 0))})
+                          "none_contested": int(vc.get(NONE_CONTESTED, 0)), "none_single_source": int(vc.get(NONE_SINGLE, 0)),
+                          "flip_contested": int(vc.get(FLIP_CONTESTED, 0)) + int(vc.get(FLIP_CONTESTED_MAJORITY, 0))})
     L += [md_table(pd.DataFrame(tally)), "",
           "Source x tier of the profile deciding the fast sign (class variant); one row per (type, transmitter):", "",
           md_table(rec_t.groupby(["source", "tier"]).size().rename("rows").reset_index()), "",
@@ -1462,13 +1541,21 @@ def write_rules(stats_class: dict, stats_abs: dict, cov: pd.DataFrame, rec: pd.D
 def main():
     ap = argparse.ArgumentParser(description="build nt_by_type_transcriptome.csv / receptors_by_type.csv and the two audit docs")
     ap.add_argument("--previous", default=None, help="a previous receptors_by_type.csv: adds a change section to receptor_rules.md")
+    ap.add_argument("--flip-rule", default=FLIP_RULE_DEFAULT, choices=list(FLIP_RULES),
+                    help="round-3 contested-flip rule: 'any' (>= 1 contradicting source, default), 'majority' (contradicting > agreeing), "
+                         "'off' (round-2 behaviour)")
     args = ap.parse_args()
     t0 = time.time()
     log = print
     c = cn.load(verbose=False)
     log(f"connectome: {c.n:,} neurons, {c.W.nnz:,} edges ({time.time() - t0:.1f}s)")
     raw = load_raw_counts(c, log)
-    nt_table, rec_table, types, prof, maps = build_tables(c, raw, log)
+    nt_table, rec_table, types, prof, maps = build_tables(c, raw, log, flip_rule=args.flip_rule)
+    fc = rec_table[~rec_table.malecns_type.astype(str).str.startswith("<")]
+    for col in ("fast_net", "fast_net_abs", "fast_net_nonmda"):
+        n = int(fc[col].isin(FLIP_FALLBACK).sum())
+        log(f"flip rule {args.flip_rule}: {col} contested rows {n}: "
+            + ", ".join(f"{t}/{nt}" for t, nt in fc.loc[fc[col].isin(FLIP_FALLBACK), ['malecns_type', 'transmitter']].itertuples(index=False)))
     log(f"tables built: {len(nt_table):,} types in the NT table, {len(rec_table):,} receptor rows "
         f"({rec_table.malecns_type.nunique():,} types) ({time.time() - t0:.1f}s)")
 
@@ -1520,9 +1607,14 @@ def main():
         "'none' carried by a single source falls back the same way (fast_net = none_single_source). A silencing (fast_sign 0)",
         "therefore needs every source profiling the type to agree and at least two of them. fast_selection_nonmda /",
         "source_nonmda: the same for the nonmda variant (selected separately). n_sources: candidate sources for the type.",
+        f"Contested flips (round 3, --flip-rule {args.flip_rule}): a flip (the selected profile's fast net at the opposite sign of the",
+        "NT_SIGN prior, e.g. glutamate +1) contradicted by >= 1 other source whose net under the same variant (class / abs / nonmda)",
+        "is the prior's sign falls back to NT_SIGN the same way: fast_net* = flip_contested (rule 'any', the default) or",
+        "flip_contested_majority (rule 'majority': only when the contradicting sources outnumber those agreeing with the flip);",
+        "'mixed' / 'none' sources neither contradict nor agree; flip_contested lists the contradicting sources per variant.",
         "pool_mixed: the profile is a pooled cluster whose member types carry mixed model transmitter labels (a class prior, not",
-        "a per-type measurement); alt_sources: the other candidates' net calls. Rows '<nt=...>' are the Davis 2020 ChAT / Gad1 /",
-        "VGlut whole-class baselines (tier class), used only with edge_lookup(nt_class_fallback=True).",
+        "a per-type measurement); alt_sources: the other candidates' net calls (fast= class, abs=, nonmda=, slow=). Rows '<nt=...>'",
+        "are the Davis 2020 ChAT / Gad1 / VGlut whole-class baselines (tier class), used only with edge_lookup(nt_class_fallback=True).",
     ]
     write_csv_with_header(rec_table, OUT_RECEPTORS, rec_header)
     log(f"wrote {OUT_NT} and {OUT_RECEPTORS}")
@@ -1547,7 +1639,8 @@ def main():
         prev = (compare_tables(rec_table, old), st_prev)
         log(f"previous table {args.previous}: {len(old):,} rows; changed net calls: "
             + ", ".join(f"{k[8:]} {v}" for k, v in prev[0].items() if k.startswith("changed_")))
-    write_rules(st_class, st_abs, cov, rec_table, nt_table, raw is not None, len(edges_class), st_nt, st_nn, prev)
+    write_rules(st_class, st_abs, cov, rec_table, nt_table, raw is not None, len(edges_class), st_nt, st_nn, prev,
+                flip_rule=args.flip_rule)
     log(f"wrote {OUT_RULES} ({time.time() - t0:.1f}s)")
 
     # ---- headline numbers -----------------------------------------------------------------------------------

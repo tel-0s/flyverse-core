@@ -812,3 +812,328 @@ walking storm), and the fallback needs its class-baseline rows recomputed under 
 * "LC10a per-cell max drive" is the maximum positive (apple - none) drive; the largest-magnitude LC10a cells under class are -0.26 / -0.29 mV. "TmY21 unchanged" means TmY21's input (0 % matched, 0 flipped); its z moves -0.45 / -0.39 (off) -> -0.71 / -0.75 (class) -> -0.44 / -1.20 (abs). Mi1's 13,013 silenced input synapses are R8* 12,491 + 522 from R7 types and T1.
 * The mechanism proposed for abs's +18 Hz pinned-loom gain (the Tm9 flip) is inferred, not tested: abs also flips T1 (62,361 syn) and Dm9 (25,467); no run holds Tm9 at -1. Tm9's +1 rests on Davis alone (KaiR1D 107 TPM vs GluClalpha 0) against Kurmangaliyev / FCA / Davie at -1 -- the decisive control before step 8 adopts abs (round 3).
 * The nine pinned-loom jobs print no device line; their cache and rule are proven by the printed sign-change counts (63,380 / 257,578 = override cache). "17 jobs" for 37 outputs means the per-mode probe seeds ran as sequential commands inside one job.
+
+## Round 3: contested flips
+
+Task `rule` of the round-3 workflow (docs/NT_INTEGRATION.md section 7 "Round 3"; round-2 critic follow-up 1 in
+`receptor_verification.md`). Working tree at HEAD 743bda6 (nothing committed); the adopted TYPE_NT_OVERRIDE cache on both sides
+(local `cache/` and the cluster's shared cache, sum|W| 121,460,584, glutamate cells 29,707 in every JSON's `nt_counts`; no
+`--cache-dir`). Every number below comes from a file named next to it. Files: `scripts/build_receptor_table.py` (`contest_flip`,
+`--flip-rule any|majority|off`), `flyverse/data/receptors_by_type.csv` (rebuilt; md5 0381a446107e6050e75cc87b16d7f830),
+`docs/audits/receptor_rules.md` (rebuilt; section 3 documents the rule, section 6 the changes), `scripts/benchmark.py` /
+`probe_loom.py` / `probe_bitter.py` (`--receptor-table PATH` -> `LIFParams.receptor_table`), `tests/test_receptor_model.py`
+(32 passed; 62 passed over the four CPU files), `out/receptors_r2.csv` (the round-2 table, md5 d8557fdee6e4fad6d592870244c75432),
+`out/receptors_r3_majority.csv`, `out/r3_build.log`, `out/r3_variants.txt`, `out/r3_abs_c{1,2,3}.json`, `out/r3_loom_*.txt`,
+`out/r3_bitter_abs_s{0,1,2}.txt`, `out/r3_suite_table.md` (cluster batch `r3-abs-contested-e8980d`, 12 jobs, 0 failed, 8.7 min,
+every job printing `cuda ok NVIDIA B200`). `nt_by_type_transcriptome.csv` and `receptor_nt_disagreements.md` are unchanged by
+the rebuild (git diff empty).
+
+### R3.1 The rule
+
+`build_receptor_table.contest_flip` is the symmetric case of `none_contested`: a FLIP (the selected profile's fast net at the
+opposite sign of the `NT_SIGN` prior -- a `+1` on glutamate; a `-1` on a +1 transmitter, which no fast group produces today)
+contradicted by >= 1 other source profiling the type whose net under the SAME variant is the prior's sign falls back to
+`NT_SIGN`: `fast_net*` = `flip_contested`, `fast_sign*` = the prior, `fast_gain_class*` = `none` (factor 1); the selected profile,
+tier and source are kept. `mixed` and `none` sources neither contradict nor agree. `--flip-rule majority` falls back only when the
+contradicting sources outnumber the other sources agreeing with the flip (`flip_contested_majority`); `--flip-rule off`
+reproduces the round-2 table. The rule is evaluated per variant with each source's class / abs / nonmda net (the round-2
+`alt_sources` column listed class nets only; it now carries `fast=` (class), `abs=`, `nonmda=` and `slow=`, which changes that
+column's text in 1,785 rows), and the new column `flip_contested` names the contradicting sources per variant
+(`class:...;abs:...;nonmda:...`). A side fix: `compare_tables` compared empty lead columns as NaN vs "" and reported
+"fast_pos_lead 3170 changed" against the previous table (a CSV-to-CSV check gives 0); it now fills NaN before comparing.
+
+### R3.2 What changed in the table (`--flip-rule any`, the shipped table)
+
+Against the round-2 table (`docs/audits/receptor_rules.md` section 6; `out/r3_build.log`): 4,291 rows, 0 type / source / tier /
+slow / lead changes; every sign change is a glutamate row going +1 -> the prior -1.
+
+| variant | rows +1 -> `flip_contested` | which (`flip_contested` column) |
+|---|---|---|
+| abs | **26** | Tm9 (Davis exact KaiR1D 107.32 TPM vs GluClalpha 0.00; Kurmangaliyev / FCA / Davie exact at -1 under abs), L1 (Davis exact 45.62 vs 0.00; Kurmangaliyev exact -1 and Davie exact abs -1), and the 24 ER ring rows ER1_a/b/c, ER2_a-d, ER3a_a-d, ER3d_a-e, ER3m, ER3p_a/b, ER3w_a-c, ER4d, ER4m (FCA class Nmdar2-led 1.945 vs 0.643 against Davie class -1) -- exactly the 26 the round-2 critic counted |
+| class | 36 | Tm9, L1 (Kurmangaliyev), L3 (Ozel + FCA + Davie), Mi9 (Ozel + Kurmangaliyev + FCA), Dm11 (FCA + Davie), Lawf2, Lat3 (fuzzy), MBON11 (Davie), PAM11 / PAM12 (FCA + Davie), EL, GNG629, LB2b, LoVCLo3, DNg104 / DNg34 / DNg66 / DNge138 / DNge149 / DNge150 / DNge151 / DNge152 and the 13 OA-* rows (FCA class profiles contradicted by Davie class -1) |
+| nonmda | 36 | the class list minus Lat3 / MBON11 / Mi9 / PAM11, plus L4 (Ozel + Kurmangaliyev + FCA), Mi1 (FCA + Davie), Mi15 (FCA), Tm4 (Ozel + Kurmangaliyev + FCA) |
+
+Net-call tallies over the 4,263 type rows (`out/r3_variants.txt`; all classical transmitters): `fast_net` +1 802 -> 766,
+`fast_net_abs` +1 649 -> 623, `fast_net_nonmda` +1 804 -> 768; the silence labels are untouched (`none` 986, `none_single_source`
+1,500, `none_contested` 19) and silenced classical edges stay 17,379 entries / 83,473 syn (all histamine) in every rule and variant.
+The abs +1 rows that survive are the uncontested ones: T1 (Kurmangaliyev exact +1, Ozel / FCA / Davie `none`), Dm9, KCg-m,
+KCa'b'-ap1/ap2, KCg-s1, DN1pB / DN1pA / DN1a, Lai and the rest of the critic's 14.
+
+`--flip-rule majority` (`out/receptors_r3_majority.csv`, built in memory): abs identical to `any` (the same 26 rows -- every abs
+contradiction is unopposed); class 34 (Lat3 and Lawf2 survive at 1 agreeing vs 1 contradicting); nonmda 35 (Mi15 survives, 1 vs 1).
+`--flip-rule off` reproduces the round-2 sign / net / gain / source / tier columns in all 4,263 rows.
+
+Edge-level effect on the adopted cache (`out/r3_variants.txt`, `connectome.receptor_signs` on each table; entries / |W| synapses):
+
+| flip rule | variant | fast sign changed | glutamate flips -1 -> +1 | silenced |
+|---|---|---|---|---|
+| off (= round 2) | abs | 63,380 / 210,935 | 46,001 / 127,462 | 17,379 / 83,473 |
+| **any (shipped)** | **abs** | **48,295 / 179,944** | **30,916 / 96,471** | 17,379 / 83,473 |
+| majority | abs | 48,295 / 179,944 | 30,916 / 96,471 | 17,379 / 83,473 |
+| off | class | 257,578 / 962,932 | 240,199 / 879,459 | 17,379 / 83,473 |
+| any | class | 161,877 / 630,436 | 144,498 / 546,963 | 17,379 / 83,473 |
+| majority | class | 170,130 / 660,155 | 152,751 / 576,682 | 17,379 / 83,473 |
+| off | nonmda | 389,284 / 1,789,469 | 371,905 / 1,705,996 | 17,379 / 83,473 |
+| any | nonmda | 207,023 / 1,030,946 | 189,644 / 947,473 | 17,379 / 83,473 |
+| majority | nonmda | 218,407 / 1,084,115 | 201,028 / 1,000,642 | 17,379 / 83,473 |
+
+abs on the new table changes 179,944 |W| synapses = 0.148 % (round 2: 210,935 = 0.174 %). The 30,991 synapses (15,085 entries, all
++1 -> -1) it no longer flips are Tm9 22,946 (Dm12 12,144, Mi13 5,037, Dm3a 551, Mi9 528, Mi14 479, TmY14 454, ...), L1 2,591 (Dm9 1,026,
+Dm1 781, Lai 220, ...) and the ER ring 5,454 (ER1_a 1,183, ER4d 725, ER3a_b 554, ER2_c 543, ...; the compass task's 1,487 entries).
+Top abs flip targets now: T1 62,361 [KaiR1D], Dm9 25,467 [Nmdar2], KCg-m 3,906 [GluRIB], DN1pB 1,535, DN1pA 1,100, DN1a 898
+(`out/r3_build.log`); coverage by tier is unchanged (matched 7,654,565 edges / 31,627,236 |W| = 29.9 / 26.0 %).
+
+### R3.3 Suite: three abs replicates on the new table (`benchmark.py --seeds 0,1,2 --receptor-model sign --receptor-net-rule abs`)
+
+`out/r3_abs_c1.json`, `_c2`, `_c3`: **27 PASS / 0 FAIL / 2 KNOWN GAP in 3 of 3** (native backend, B200, `fast_sign_changed_entries`
+48,295, runtimes 5.3 / 5.4 / 7.8 min). Against the four round-2 abs runs (27/0/2 x4; `out/rm2_abs*.json`, `out/skeptic2/rm_abs_r4.json`)
+and the four off runs (26/1/2, 24/3/2, 26/1/2, 24/3/2; `out/rm2_off*.json`, `out/skeptic2/rm_off_r4.json`); full per-check table in
+`out/r3_suite_table.md`:
+
+| check | criterion | r3 abs c1 / c2 / c3 | round-2 abs x4 | off x4 |
+|---|---|---|---|---|
+| taste.MN9_hz | > 2 | 10.93 x3 | 10.93 x4 | 5.85 x4 |
+| smell.PN_hz / KC_active | < 100 / > 0 | 7.86 / 816 x3 | 7.86 / 816 x4 | 11.19 / 1426 x4 |
+| walk.GF_max_hz | < 38 | 8.52 x3 | 8.52 x4 | 4.63 x4 |
+| walk.power_max_hz | < 50 | 46.10 P x3 | 46.10 P x4 | 73.18 **F** x4 |
+| walk.power_sustained_hz | < 50 | 21.36 x3 | 21.36 x4 | 31.4-31.6 |
+| loom.GF_peak_hz (legacy) | >= 20 | **28.10 / 28.10 / 28.04** | 28.04 / 27.05 / 27.05 / 28.04 | 43.88 / 36.94 / 36.74 / 38.00 |
+| loom_escape.GF_peak_hz (demo, max of 3 seeds) | >= 33 | 48.60 / 52.21 / 48.79 | 57.21 / 66.78 / 61.35 / 73.68 | 35.18 / 31.01 F / 35.50 / 28.65 F |
+| loom_escape.escapes (of 3 seeds) | >= 1 | 3 / 3 / 3 | 3 / 3 / 3 / 3 | 2 / 0 F / 1 / 0 F |
+| walk_gf.p99_hz | < 38 | 24.24 / 20.78 / 17.18 | 23.32 / 29.34 / 25.91 / 26.50 | 22.20 / 19.34 / 19.97 / 22.64 |
+| rotation.group_flip_hz | <= -3 | -9.37 / -9.42 / -9.85 | -9.90 / -11.89 / -12.19 / -10.93 | -7.00 / -7.17 / -7.52 / -7.98 |
+| rotate.DNp20_flip_hz | < -2 | -28.87 / -31.40 / -37.56 | -36.02 / -31.40 / -31.88 / -29.85 | -13.27 / -26.23 / -26.63 / -31.72 |
+| bitter.calibrated_sugar_MN9_hz | > 2 | 5.52 x3 | 5.52 x4 | 4.57 x4 |
+| bitter.shiu_sugar_MN9_hz | > 50 | **139.90** x3 | 137.42 x4 | 123.54 x4 |
+| bitter.shiu_sugar_bitter_MN9_hz | < 10 | 0.82 x3 | 0.47 x4 | 2.12 x4 |
+| wind / odour / motion / dn / rest | -- | inside the off scatter | -- | -- |
+| object.LC10a_flip_hz, compass.wedge_cells_persisting | known gaps | 0.01-0.02 G, 0 G | same | same |
+
+Readings. (i) Every deterministic Brain-only value is bit-identical to round-2 abs except the two Shiu-rule numbers (137.42 -> 139.90,
+0.47 -> 0.82): the 26 contested rows touch nothing on the taste / smell / walking / calibrated-bitter paths. (ii) The legacy
+`loom.GF_peak_hz` cost is unchanged: 28.0-28.1 Hz with or without the Tm9 / L1 / ER rows, against off's 36.7-43.9 (seven abs runs
+27.05-28.10, four off runs 36.74-43.88, no overlap) -- so that -10 Hz is NOT the Tm9 flip; it comes from the uncontested abs flips
+(T1 / Dm9 / MB / clock) or the histamine silencings, and stays a measured cost of abs (still PASS, criterion >= 20). (iii) The demo
+loom keeps escaping in 9 of 9 seeds (peaks 40.2-52.2 Hz, escape at 0.51-0.58 s after loom onset; per seed `out/r3_abs_c*.json`
+sections.loom_escape) against off's 3 of 12 (21.5-35.5 Hz), but the peaks are lower than round-2 abs's 47.4-73.7 (9 of 12 round-2 abs
+seeds above 52.2, the r3 maximum): the contested rows carried part of the demo loom gain, and the remaining margin over the 33 Hz
+threshold is 7-19 Hz instead of 14-41. (iv) No check has a worse status in any r3 replicate than in the worst off run (`out/r3_compare.log`,
+empty `worse` list); the only checks whose value is worse than every off run in every replicate are loom.GF_peak_hz (as in round 2)
+and smell.KC_active (816 vs 1426, PASS either way, unchanged from round 2).
+
+### R3.4 Pinned loom with vs without the Tm9 row (`scripts/probe_loom.py`; batch r3-abs-contested-e8980d; escape threshold `body.Flight.gf_hz` = 33 Hz on the smoothed GF rate)
+
+| run | table (md5) | fast sign changed | DNp01 mean at t = 0.5 / 0.6 / 0.7 / 0.8 s (Hz) | escape |
+|---|---|---|---|---|
+| abs seed 0, new table (`out/r3_loom_abs_s0.txt`) | receptors_by_type.csv 0381a446 | 48,295 | 11 / **35** / 31 / 22 | **yes, t = 0.59 s, GF 33 Hz, TTMn 16** |
+| abs seed 1, new table (`out/r3_loom_abs_s1.txt`) | same | 48,295 | 12 / **28** / 25 / 20 | no (TTMn 24 at 0.8 s) |
+| abs seed 0, round-2 table (`out/r3_loom_abs_r2_s0.txt`) | out/receptors_r2_s0.csv d8557fde (Tm9 +1) | 63,380 | 14 / 35 / **37** / 29 | yes, t = 0.60 s, GF 35 Hz, TTMn 20 |
+| abs seed 1, round-2 table (`out/r3_loom_abs_r2_s1.txt`) | same | 63,380 | 14 / 35 / **37** / 29 | yes, t = 0.60 s, GF 35, TTMn 20 |
+| off seed 0 (`out/r3_loom_off_s0.txt`) | -- | -- | 16 / **19** / 7 / 6 | no |
+| off seed 1 (`out/r3_loom_off_s1.txt`) | -- | -- | 16 / **19** / 7 / 6 | no |
+
+The round-2 table (copied on the cluster from the origin/main checkout, md5 d8557fde = local `out/receptors_r2.csv`) reproduces round 2
+line for line (`out/loom2_abs_s0.txt`: 14 / 35 / 37 / 29, escape 0.60 s at GF 35) in both seeds (byte-identical probe lines, as the
+round-2 skeptic found: the seed barely decorrelates this probe); off reproduces round 2's 19 Hz in both seeds. With Tm9 / L1 / ER held
+at -1 the DNp01 peak is 35 (seed 0) / 28 (seed 1) against 37 / 37 with them and 19 / 19 off, and the escape fires in one of two seeds,
+at exactly the 33 Hz threshold. So the Tm9 flip is not the whole pinned-loom gain: removing it (with L1 and the ring) costs 2-9 Hz of
+a +18 Hz effect, and the uncontested abs flips (T1 62,361 syn [KaiR1D], Dm9 25,467 [Nmdar2], ...) plus the histamine silencings carry
+the peak from 19 to 28-35; but the pinned escape goes from certain (37 Hz, 4 of 4 runs over rounds 2-3) to marginal (1 of 2 seeds at
+33 Hz). Two seeds only; the skeptic's reruns show the probe is NOT reproducible per seed on this table (two runs of seed 0: 28 and 30 Hz, no escape; six runs pooled: 28 / 28 / 30 / 30 / 35 / 35 Hz, escape 2 of 6), so the '35 vs 28' pairing is run-to-run scatter, not a seed effect; the seed-1 value is a real second sample.
+
+### R3.5 Shiu sugar (`scripts/probe_bitter.py --receptor-model sign --receptor-net-rule abs`, 3 Poisson seeds, new table)
+
+| seed (`out/r3_bitter_abs_s*.txt`) | Shiu sugar MN9 Hz (spikes/step) | sugar + bitter | bitter | calibrated sugar / +bitter / bitter |
+|---|---|---|---|---|
+| 0 | 139.9 (127) | 0.8 | 0.0 | 5.5 / 0.0 / 0.0 |
+| 1 | 138.9 (116) | 0.0 | 0.0 | 4.3 / 0.0 / 0.0 |
+| 2 | 131.5 (119) | 0.0 | 0.0 | 3.9 / 0.0 / 0.0 |
+
+Round-2 abs on the round-2 table: 137.4 (100) / 131.1 (115) / 133.7 (121), calibrated 5.5 / 4.3 / 3.9 (`out/bitter2_abs_s*.txt`);
+off 123.5 / 122.0 / 114.7. The calibrated values are identical to round 2's per seed; the Shiu-rule values move +2.5 / +7.8 / -2.2 Hz,
+inside the 6-8 Hz seed spread of either round. Bitter suppression holds (0.0-0.8 Hz). No storm (spikes/step 116-127 vs class's 847).
+
+### R3.6 Decision and caveats
+
+**abs on the contested-flip table meets the adoption criterion as stated in the round-3 list: 27 / 0 / 2 in 3 of 3 replicates, and no
+check's status is worse than in any off run in any replicate.** Quantitatively the same two values sit below off in every replicate as
+in round 2 -- loom.GF_peak_hz 28.0-28.1 vs 36.7-43.9 (PASS, >= 20) and smell.KC_active 816 vs 1,426 (PASS) -- and neither moved
+when the 26 contested rows were removed, so the Tm9 row explains neither. What the contested rows did carry is part of the loom gain:
+the pinned peak 37 -> 35 / 28 Hz (escape 2/2 -> 1/2 at the threshold) and the demo peaks 47-74 -> 40-52 Hz (escape still 9/9 vs off
+3/12). The table now rests on 14 uncontested abs +1 rows (T1 / Dm9 / KC / clock / Lai) and 17,379 two-source histamine silencings;
+the flips it makes are contradicted by no profiled source.
+
+Caveats: three suite replicates and two pinned-loom seeds; the pinned escape at 33.0 Hz is a threshold coincidence, not a margin;
+`--flip-rule majority` would change nothing under abs (it matters only for Lat3 / Lawf2 under class and Mi15 under nonmda); the r3
+JSONs' `config.cache_dir` is the run directory's `cache` symlink to the cluster's shared cache (glutamate 29,707 cells = the
+override cache), not a `--cache-dir` path; `alt_sources` changed format (1,785 rows), which any parser of that column must follow;
+the step-8 stop-gap retirement and the default change (`LIFParams.receptor_model = 'sign'`, `receptor_net_rule = 'abs'`) are the next
+task, not this one.
+
+## Round 3: adoption
+
+Task `adopt` of the round-3 workflow (the round-2 critic's follow-up 2; docs/NT_INTEGRATION.md "Round 3"). Working tree at HEAD 743bda6
+(nothing committed). Every number below comes from a file named next to it; the cluster batch is `r3-adopt-63e3de` (13 jobs, 0 failed,
+25.2 min, every job printing `cuda ok NVIDIA B200`, the run directory's `cache` symlink to the cluster's shared override cache: every JSON
+records `nt_counts.glutamate` 29,707 and 167,106 neurons; log `out/r3_adopt_cluster.log`). The comparison was generated by a scratch script
+(`compare_r3_adopt.py`, CPU) into `out/r3_adopt_compare.log` and `out/r3_adopt_suite_table.md`.
+
+### A.1 What changed in the code
+
+* `flyverse/brain.py`: `LIFParams.receptor_model = "sign"` (was `None`) and `receptor_net_rule = "abs"` (was `"class"`); the comment block
+  records the adoption. `None` remains selectable (`RECEPTOR_MODELS` unchanged) and every other receptor field keeps its default
+  (`receptor_nt_class_fallback False`, `receptor_table None` = `flyverse/data/receptors_by_type.csv`, md5 0381a446107e6050e75cc87b16d7f830,
+  the round-3 contested-flip table).
+* `flyverse/connectome.py` `receptor_signs`: a graph whose `neurons` frame has no `nt` / `type` (or `sign`) column -- the synthetic graphs of
+  `tests/test_control.py`, `test_world.py`, `test_nt_readout.py`, which now reach the lookup through `LIFParams()` -- gets no match: every
+  entry keeps `sign(W.data)` at tier `fallback`. Without this 15 of the 30 tests in those three files failed (first failure
+  `test_control.py::SubsetTests::test_weights_invariant_with_custom_parameters`: `'DataFrame' object has no attribute 'nt'`). On the cached connectome the function is unchanged (the pinned hashes below were computed before the edit and reproduce
+  after it).
+* `tests/test_receptor_model.py`: the three tests that used `LIFParams()` as the "off" reference now say `receptor_model=None` explicitly
+  (`test_off_is_byte_identical`, `test_zero_gains_cost_nothing_and_equal_sign_gain`, `CachedConnectomeTests.test_off_identical...`, the last
+  pinned to `receptor_net_rule="class"` which it was written for); two new tests in `CachedConnectomeTests`:
+  `test_default_is_sign_abs_and_none_is_selectable` (defaults, `_receptor_key`, a Brain under `None` carries no lookup) and
+  `test_none_reproduces_previous_weights_byte_for_byte`, which pins md5 hashes of `brain._shaped_weights` (sorted CSR data + indices + indptr)
+  computed with EXPLICIT settings before the default changed (scratch `hash_weights.py`, local cache: W.data md5 e015d9d4007c4d2e71b604036c5e72e9,
+  nnz 25,578,600, sum|W| 121,460,584, glutamate cells 29,707): `receptor_model=None` -> `2e276b30b6117c1f62688b01775eda6b` (= `LIFParams()`
+  before the change, verified in the same run), `sign`/`abs` -> `f0d145d1bb81b446ebc51f89ded7bd4b` (= `LIFParams()` after the change);
+  the two differ on exactly 48,295 entries = 30,916 sign flips + 17,379 zeroed, the rule task's edge counts; the hash assertions are skipped
+  on a cache that is not the adopted override cache (nnz / sum|W| / glutamate-cell guard), the structural assertions always run.
+  `python -m pytest tests/test_receptor_model.py -q`: 34 passed (32.3 s); with `test_nt_readout.py`, `test_world.py`, `test_control.py`
+  (`SDL_VIDEODRIVER=dummy`): 64 passed.
+* `scripts/batch_sustain.py`: `--receptor-model {default,off,sign}` (default `default` = leave `LIFParams` alone; `off` sets
+  `receptor_model=None` on every `LIFParams` built afterwards, the `probe_object_sweep.patch_receptor` pattern) and `--receptor-net-rule`; the
+  run prints `receptor model <m> (<rule>); fast sign changed on N of 25,578,600 entries` and writes `receptor` into the JSON. CPU smoke test
+  (batch 1, 12 frames): `off` -> `None (None); 0 entries`, default -> `sign (abs); 48,295`.
+* `scripts/audit_nt.py` / `docs/audits/nt_audit.md`: one paragraph after "Convention audited" stating the receptor model in force by default
+  and what it changes on top of the presynaptic convention (48,295 entries: 30,916 flipped = 96,471 |W| synapses, all glutamate; 17,379 silenced
+  = 83,473 synapses, all histamine; 0 sign-0 entries un-silenced, so every count of the audit is unchanged). Regenerated: `git diff` = 2 inserted
+  lines, nothing else moved.
+* `docs/audits/receptor_rules.md`: NOT regenerated -- its sections 4a-4h are functions of the table and the cache, neither of which this task
+  changed (the rule task rebuilt both; a second build was byte-identical).
+* Not changed (not this task's files): `scripts/benchmark.py`, `probe_loom.py`, `probe_bitter.py`, `probe_object_sweep.py`,
+  `probe_figure_ground.py` keep `--receptor-model` default `"off"`. Consequence, measured below: `benchmark.py`, `probe_object_sweep.py` and
+  `probe_figure_ground.py` treat `off` as "leave `LIFParams` alone" (their `_apply_receptor` / `patch_receptor` are no-ops), so a no-flag run
+  NOW RUNS THE DEFAULT sign/abs but records `config.receptor.model: None` (benchmark) / `config.mode: "off"` (object sweep) in its JSON;
+  `probe_loom.py` and `probe_bitter.py` set `receptor_model=None` explicitly on `off`, so a no-flag run of those two is a true off run and the
+  default has to be spelled out (`--receptor-model sign --receptor-net-rule abs`, as done here). The owner of those scripts should give
+  `--receptor-model` a `default` choice and record the LIFParams actually used (open question 1 below).
+
+### A.2 Suite: three no-flag replicates on the default (`benchmark.py --seeds 0,1,2`, nothing else)
+
+`out/r3_default_{1,2,3}.json` (runtimes 6.7 / 6.8 / 7.7 min) plus `out/r3_default_flagged.json` (the same command with
+`--receptor-model sign --receptor-net-rule abs` spelled out, 6.8 min, JSON `fast_sign_changed_entries` 48,295): **27 PASS / 0 FAIL / 2 KNOWN GAP
+in 3 of 3 (4 of 4 with the flagged run)**. Against the four off runs of round 2 (`out/rm2_off*.json`, `out/skeptic2/rm_off_r4.json`: 26/1/2,
+24/3/2, 26/1/2, 24/3/2), no check has a worse status in any default replicate than in the BEST off run (strict) or the WORST off run (lenient):
+both lists empty (`out/r3_adopt_compare.log`). Full per-check table in `out/r3_adopt_suite_table.md`; the checks that move:
+
+| check | criterion | default 1 / 2 / 3 (no flags) | flagged | r3 abs c1-c3 | off x4 |
+|---|---|---|---|---|---|
+| taste.MN9_hz | > 2 | 10.93 x3 | 10.93 | 10.93 x3 | 5.85 x4 |
+| smell.PN_hz / KC_active | < 100 / > 0 | 7.86 / 816 x3 | same | same | 11.19 / 1426 |
+| walk.power_max_hz | < 50 | 46.10 P x3 | 46.10 | 46.10 x3 | 73.18 **F** x4 |
+| walk.power_sustained_hz | < 50 | 21.36 x3 | 21.36 | 21.36 | 31.4-31.6 |
+| loom.GF_peak_hz (legacy) | >= 20 | **28.10 / 31.90 / 28.04** | 27.05 | 28.10 / 28.10 / 28.04 | 43.88 / 36.94 / 36.74 / 38.00 |
+| loom_escape.GF_peak_hz (max of 3 seeds) | >= 33 | 53.43 / 51.37 / 46.87 | 47.35 | 48.60 / 52.21 / 48.79 | 35.18 / 31.01 F / 35.50 / 28.65 F |
+| loom_escape.escapes (of 3) | >= 1 | 3 / 3 / 3 | 3 | 3 / 3 / 3 | 2 / 0 F / 1 / 0 F |
+| walk_gf.p99_hz | < 38 | 16.40 / 22.59 / 26.59 | 21.31 | 24.24 / 20.78 / 17.18 | 19.34-22.64 |
+| rotation.group_flip_hz | <= -3 | -9.81 / -10.05 / -8.94 | -8.82 | -9.37 / -9.42 / -9.85 | -7.00 to -7.98 |
+| rotate.DNp20_flip_hz | < -2 | -22.02 / -31.72 / -29.60 | -39.48 | -28.87 / -31.40 / -37.56 | -13.27 to -31.72 |
+| bitter.calibrated_sugar_MN9_hz | > 2 | 5.52 x3 | 5.52 | 5.52 | 4.57 |
+| bitter.shiu_sugar_MN9_hz / +bitter | > 50 / < 10 | 139.90 / 0.82 x3 | same | same | 123.54 / 2.12 |
+| object.LC10a_flip_hz, compass.wedge_cells_persisting | known gaps | 0.00-0.01 G, 0 G | same | same | same |
+
+Readings. (i) Every deterministic Brain-only value of the no-flag runs is bit-identical to the flagged run and to the rule task's three abs runs
+(18-19 of 29 checks identical to `r3_abs_c1.json`; the 10-11 that differ are the chaotic room / native-backend sections: loom_escape,
+walk_gf, rotation, rotate, wind, odour, motion.min_dsi, object.LC10a), and the taste / walk / Shiu values are the abs values (10.93 / 46.10 /
+139.90), not the off values (5.85 / 73.18 / 123.54): the default IS in force in a no-flag run although the JSON header says `model: None`.
+(ii) The demo loom escapes in 12 of 12 seeds (per seed 40.7-53.4 Hz over the twelve seeds of the three no-flag and the flagged run, escape 0.52-0.57 s after loom onset; `sections.loom_escape.seeds`)
+against off's 3 of 12 (21.5-35.5 Hz), the round-3 abs 9 of 9 (40.2-52.2) and round-2 abs 12 of 12 (47.4-73.7). (iii) The legacy
+`loom.GF_peak_hz` cost stays: 27.05-31.90 over the four runs here (the 31.90 of replicate 2 is the first abs-weights value above 28.1 in
+11 runs over rounds 2-3: 27.05-28.10 in the other ten) against off 36.74-43.88 -- still no overlap, still PASS (>= 20), still the one
+measured cost. (iv) smell.KC_active 816 vs 1426 (PASS either way) is the other value below every off run, unchanged since round 2.
+
+### A.3 Probes on the default
+
+* **Object sweep** (`scripts/probe_object_sweep.py --seed 0 / 1`, no receptor flag = the default; `out/r3_obj_default_s{0,1}.json/.txt`,
+  JSON `config.mode` says `off`, see A.1): FAIL in both seeds, as in all 17 previous runs of the protocol (docs/audits/object_sweep.md):
+  LC11 best-cell (ball / none) drive 0.25 / 0.28 and 0.23 / 0.24 mV (off s0/s1 0.26 / 0.26, 0.23 / 0.25; abs 0.25 / 0.24, 0.30 / 0.25),
+  LC10a 0.42 / 0.48 and 0.42 / 0.38 (off 0.40 / 0.43, 0.40 / 0.51; abs 0.45 / 0.44, 0.54 / 0.49), no LC11 / LC10a cell > 1 Hz in any
+  condition, LPLC2 cells > 1 Hz 5 / 6 and 5 / 7 (off 7 / 6, 6 / 4; abs 8 / 9, 10 / 8); population mean |drive| per sweep LC11 1.71-2.05 vs
+  1.69-1.94 (none). Inside the off / abs spread on every field.
+* **Figure-ground** (`scripts/probe_figure_ground.py --seed 0`, no receptor flag = the default; `out/r3_fg_default_s0.csv/.txt`, 112 types,
+  159 apple columns): the whole figure_z column correlates with the two round-2 abs seeds at Spearman 0.948 / 0.973 (Pearson 0.972 / 0.985)
+  and with the two off seeds at 0.882 / 0.897 (0.941 / 0.955) -- the default run is an abs run. Per type (z; figure in rate units):
+  Mi4 -0.83 (abs -1.84 / -0.11; off +1.21 / +1.14), Tm5Y +0.66 (abs +0.65 / +0.64; off -0.25 / -0.03), Mi1 -8.94 (abs -11.30 / -9.45; off
+  -8.65 / -8.77), T1 +6.66 (abs +9.47 / +7.94; off +4.15 / +4.48), T5a +1.92 fig +0.048 (abs +1.93 / +1.99, fig +0.053 / +0.054; off +0.85 /
+  +0.74, fig +0.017 / +0.014), Tm9 +0.74 (abs +1.08 / +1.20; off +0.08 / +0.31), T4a -0.45 (abs -0.09 / -0.60; off +1.70 / +2.10).
+  The largest departure from both abs seeds is L1: z +14.49 against abs +18.91 / +18.74 and off +17.12 / +16.41, with the figure value
+  itself at +0.0152 vs +0.0154 / +0.0159 (abs) and +0.0163 / +0.0158 (off) -- the z moved with the background scatter, not the signal;
+  C2 -4.86 sits inside abs's own seed spread (-8.63 / -5.69). One seed only; the abs seed-to-seed spread (Mi4 -1.84 vs -0.11) is the
+  scatter to read it against, and the default sits inside it on the listed types.
+* **Pinned loom** (`probe_loom.py --receptor-model sign --receptor-net-rule abs --seed 0`, spelled out because `off` is a true off there;
+  `out/r3_loom_default_s0.txt`): same table (48,295 changed entries), escape at t = 0.59 s in both this run and the rule task's
+  `out/r3_loom_abs_s0.txt`, at GF 34 Hz / TTMn 10 here vs 33 / 16 there; DNp01 at 0.5 / 0.6 / 0.7 / 0.8 s = 12 / 31 / 28 / 16 vs 11 / 35 / 31 / 22;
+  spikes/step differ by 1-4 in seven of the 0.1-s lines. So the probe is not bit-reproducible across jobs on this table (the round-2
+  skeptic found it reproducible per seed on the round-2 table); the escape at the 33 Hz threshold holds in 2 of 2 runs of seed 0
+  (seed 1 gave 28 Hz and no escape in the rule task). Off: 19 Hz, no escape (`out/r3_loom_off_s{0,1}.txt`).
+* **Bitter** (`probe_bitter.py --receptor-model sign --receptor-net-rule abs --seed 0,1,2`; `out/r3_bitter_default_s{0,1,2}.txt`): every
+  value identical to the rule task's `out/r3_bitter_abs_s*.txt` (only the table path in the header differs): Shiu sugar 139.9 (127) /
+  138.9 (116) / 131.5 (119) Hz, sugar + bitter 0.8 / 0.0 / 0.0, bitter 0.0; calibrated 5.5 / 4.3 / 3.9, 0.0, 0.0 (off 123.5 / 122.0 / 114.7
+  and 4.6 / 5.6 / 4.5).
+
+### A.4 Sustain sweep: 16 flies x 5 min, program cx, apple, fence, default vs off
+
+`scripts/batch_sustain.py --batch 16 --seeds 0..15 --program cx --fruit apple --fence --minutes 5 --cuda-graphs --cuda-kernels --event-driven
+--cuda-sparse torch` twice, `out/r3_sustain_default.json` (receptor `sign` / `abs`, 48,295 changed) and `out/r3_sustain_off.json`
+(`--receptor-model off`: `None`, 0 changed); 30,000 frames = 300 s each, wall 1,409 / 1,414 s (3.41 / 3.39 fly-s per wall-s on a shared
+B200), start energy 0.4, same 16 environment seeds, one batched brain RNG per run.
+
+| per fly (n = 16) | default | off | Mann-Whitney p |
+|---|---|---|---|
+| meals | 0 in 16 / 16 flies | 0 in 16 / 16 | 1.00 |
+| energy at 300 s (min_energy) | 0.000 in 16 / 16 | 0.000 in 16 / 16 | 1.00 |
+| energy at 10 / 30 / 60 s (mean) | 0.350 / 0.249 / 0.095 | 0.350 / 0.250 / 0.097 | -- |
+| first frame with every fly at energy 0 | t = 80 s | t = 80 s | -- |
+| hops (take-offs) | mean 1.50, sd 0.97, median 1, range 0-3 (total 24) | mean 0.19, sd 0.54, median 0, range 0-2 (total 3; 14 flies 0) | 0.0003 |
+| path (m) | 3.918 +- 0.065 | 3.825 +- 0.088 | 0.001 |
+| final distance to fruit (cm) | 23.1 +- 8.0 (12.5-39.2) | 19.1 +- 7.4 (7.2-33.9) | 0.17 |
+| mode fractions | exploring 0.652, surging 0.209, searching 0.071, casting 0.068 | 0.601, 0.240, 0.082, 0.077 | -- |
+
+The meals / energy distribution is not worse under the default -- it is identical, and degenerate: with `--energy 0.4` and the metabolism's
+drain the energy reaches 0 in every fly of both runs at t = 80 s (the same 0.005 / s slope at 10, 30 and 60 s) and no fly of either run
+eats in 5 min, so this assay cannot rank the two models on feeding; it would need a longer horizon or a higher start energy (open
+question 3). What it does show is a behavioural difference: the default takes off 24 times across 16 flies against 3 under off
+(p = 0.0003), walks 2.4 % farther (p = 0.001) and ends slightly farther from the fruit (n.s.). The hops are the room-demo counterpart of the
+demo-loom escapes (`loom_escape.escapes` 12/12 vs 3/12) -- the descending escape pathway is more excitable on the abs weights
+(`walk.GF_max_hz` 8.52 vs 4.63, `walk_gf.p99_hz` inside the off range): spontaneous take-offs in a room with no looming object are a cost
+to watch, not a criterion of this task (the criterion named meals / energy). One batch per condition, 16 flies each; no replicate of the
+batch itself.
+
+### A.5 Decision
+
+**The default stays `receptor_model = "sign"`, `receptor_net_rule = "abs"`.** The keeping criterion holds on every clause: (a) 27 / 0 / 2 in
+3 of 3 no-flag suite replicates with no check's status worse than in any of the four round-2 off runs (strict and lenient lists empty); (b)
+the object sweep (2 seeds, FAIL as in all 17 prior runs, every LC11 / LC10a field inside the off / abs spread) and the figure-ground probe
+(1 seed, Spearman 0.95-0.97 with the two abs seeds, every listed type inside abs's seed spread, L1 z lower with an unchanged figure
+value) are within their scatter; (c) the sustain sweep's meals / energy distribution is identical to off (0 meals, energy 0 at 80 s in
+32 / 32 flies), i.e. not worse. `LIFParams(receptor_model=None)` reproduces the pre-round-3 weights byte for byte (pinned hash).
+
+Costs carried into the record: legacy `loom.GF_peak_hz` 27.05-31.90 vs off 36.74-43.88 (PASS); smell.KC_active 816 vs 1426 (PASS); more
+spontaneous take-offs in the room (24 vs 3 in 16 x 5 min); the pinned-loom escape at the threshold (GF 33-34 Hz) rather than with margin.
+Caveats: the two probe JSON headers misreport the model (A.1); the pinned loom is not bit-reproducible across jobs on this table; one seed
+per probe and one batch per sustain condition; the sustain assay is degenerate for feeding at 5 min from energy 0.4.
+
+Open questions for the next round: (1) the five scripts' `--receptor-model off` semantics (benchmark / object / figure-ground: "leave the
+default"; loom / bitter: "true off") and the JSON headers that record the flag rather than the LIFParams used; (2) step 8 (LPi x4, GF x0.3,
+AL LN override) under the new default, with the spontaneous take-off rate as a watch value; (3) a feeding-capable sustain protocol (longer
+than 80 s of energy, or `--energy` above 0.4) before meals / energy can rank models; (4) the source of the legacy loom -10 Hz (T1 / Dm9 /
+histamine silencings), never isolated.
+
+### Corrections (round-3 verification)
+
+* Provenance: `glutamate 29,707` is recorded in the four benchmark JSONs of batch r3-adopt-63e3de only; the object-sweep and sustain JSONs carry no nt_counts (they inherit the shared run-directory cache).
+* A.2's list of checks that differ from r3_abs_c1 should include `loom.GF_peak_hz` (3 of 4 runs); the 4th round-3 replicate (out/sk3_abs_c4.json) widens the demo-loom range to 40.2-55.3 Hz, overlapping round-2 abs (min 47.4), so no maximum should be used as a bound.
+* Pinned loom on the round-3 table: round-2 table 37 Hz with escape in 5 of 5 runs; new table 28-35 Hz with escape in 2 of 6 (GF 33-34 at the 33.0 Hz threshold); the spread is run-to-run.
+* A.1's bullet on `probe_object_sweep.py` was stale within the round: that script now has `--receptor-model {default,off,sign}` (default 'default') and applies 'off' explicitly; the same fix is now in benchmark.py, probe_figure_ground.py and screen_rotation.py (below).
+* **The headline caveat found by the round-3 critic:** `scripts/benchmark.py`'s legacy `walk` and `motion` sections built their optic lobe without the receptor lookup, so `walk.*` (including `walk.power_max_hz`, the one FAIL -> PASS), the legacy `loom.GF_peak_hz` (the one quantified cost) and `motion.*` were measured with the Brain under abs and the rate optic lobe under NT_SIGN -- 8,833 of the default's 179,944 changed synapses (KC, DN1 clock, OA silencings) in force and the 44,463 optic entries absent. Every room section, `room_demo`, `batch_sustain` and the probes ran the model as shipped. Fixed (the sections now pass `receptor=` / `receptor_gain=` like `fly.py`), and `--receptor-model off` -- which had become a silent no-op after the default change -- now sets `receptor_model=None` explicitly while `default` leaves LIFParams alone; the JSON header records the LIFParams used. The re-score (round 4, item 1) decides whether 27/0/2, walk.power_max 46.10 and the -10 Hz loom cost are properties of the shipped model; until then they are not to be quoted as such. Structurally the -10 Hz legacy-loom cost cannot come from T1 / Dm9 / the histamine silencings (absent in that section); it is a Brain-side effect of the KC / DN1 / OA entries.

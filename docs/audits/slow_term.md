@@ -280,3 +280,141 @@ them (3.45 / 1353); `threshold` 0.01 leaves KC 3.57 / 1419. No setting changed `
 * walk.power_max over the four 26/1/2 runs is 70.4-82.3 Hz (65.48 belongs to u_additive_01). Runtime 15-24 min per job across the two batches.
 * `benchmark.py --receptor-model full` without `--eager` used to abort every room section (warp requested while the slow term forces the Torch path) and still print a pass count with 9 checks MISSING; brain.py now downgrades warp to cuSPARSE with a warning when a model option turns the kernels off.
 * The generator of out/slow_term_stats.json is now `scripts/slow_term_stats.py`.
+
+## 7. Round 3: the slow term on the `abs` fast weights (batch `r3-slow-abs-4c1ba7`, 11 jobs, 2026-09-12)
+
+Round 2 measured its four passing settings on the `class` fast weights, whose term-off control fails the Shiu sugar
+check (section 5b). This section reruns them on the candidate default -- `--receptor-net-rule abs` on the round-3
+contested-flip table (`flyverse/data/receptors_by_type.csv`, md5 `0381a446107e6050e75cc87b16d7f830`, built with
+`--flip-rule any`; "fast sign changed on 48,295 of 25,578,600 entries" in every log) -- with a 3-replicate term-off
+control. One cluster batch, `scripts/benchmark.py --eager --seeds 0,1,2 --receptor-model full --receptor-net-rule abs
+--receptor-gain 1,1,1` (the `sign`/`abs` fast weights on the Torch path) plus `--slow-gain-monoamine 0` (control, x3) or
+`--slow-mode <m> --slow-gain-monoamine <g> --dopamine-lead dop1r1` (x2 each); commands in `out/r3_slow_abs_cmds.txt`,
+logs `out/r3_slow_abs_cluster.log`, results `out/r3_slow_abs_{ctl_1..3,add02_1..2,gain01_1..2,gain02_1..2,thr01_1..2}.json/.txt`,
+scores `out/r3_slow_abs_scores.txt`. Every JSON: device `NVIDIA B200`, backend `eager torch`, `cache_dir`
+`/mnt/beegfs/neurome/runs/r3-slow-abs-4c1ba7/cache` (the shared override cache; `nt_counts.serotonin` 415), seeds
+[0, 1, 2], 17.5-23.0 min per job (11 sharing 8 GPUs with two other batches; whole batch 23.9 min). Provenance checks:
+
+* **The control is the candidate default.** Its deterministic (Brain-only) sections are bit-identical to the native
+  `sign`/`abs` and round-3 default suite runs of the adoption task (`out/r3_abs_c1..3.json`, `out/r3_default_1..3.json`):
+  smell.KC 2.17 Hz / 816 active, taste.MN9 10.93, Shiu sugar 139.90 / +bitter 0.82, calibrated 5.52 / 0.00,
+  walk.power_max 46.10 (loom.GF_peak is not deterministic: 28.10 / 28.10 / 28.04 across the controls, 31.90 in r3_default_2) -- so `full` with every class scale at 0 on the Torch path equals the
+  native default, as `test_zero_gains_cost_nothing_and_equal_sign_gain` says it should.
+* **The `dop1r1` rebuild uses the same fast weights.** CPU check (scratchpad `check_dop1r1_rebuild.py`, output
+  `out/receptors_r3_dop1r1.csv`): `build_receptor_table.build_tables(c, None)` under the working-tree builder reproduces
+  the shipped table on all 22 `fast_*` / tier / source columns and all slow columns (0 diffs); patched to Dop1R1/Dop1R2 it
+  changes only dopamine slow columns (`slow_net` 385 rows, `slow_sign_abs` 384; 609 dopamine rows: slow_net +1 86 / -1
+  188 / mixed 251 / none 84, + lead Dop1R1 323 / Dop1R2 174 / none 112 -- the round-2 counts of section 4).
+* **No write race on `out/receptors_by_type_dop1r1.csv`** (8 jobs rebuilt it concurrently in one run directory): all 8
+  active JSONs record the same monoamine slow matrix, 104,104 entries / 299,612 syn-eq, and the same dopamine-lead
+  counts; the control (shipped DopEcR table, abs slow columns) has 215,579 / 510,385. (Section 3's 88,172 / 232,708 were
+  the class-variant slow columns; the abs variant selects its slow row from the abs profile.)
+
+| run | mode | monoamine gain | rest spk/step | KC Hz (active) | walk_gf p99 (median) | loom GF peak (per seed) | escapes | wind DNp18 | taste MN9 | bitter cal sugar / +bitter | Shiu sugar / +bitter | rotation flip | walk.power_max (< 50) | loom.GF_peak (a) | pass/fail/gap | runaway 4 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ctl_1 (term off = default) | - | 0 | 0 | 2.17 (816) | 19.6 (13) | 48.5 (40.0, 44.0, 48.5) | 3 | 46.5 | 10.93 | 5.52 / 0.00 | 139.9 / 0.82 | -10.05 PASS | 46.1 | 28.1 | 27/0/2 | PASS |
+| ctl_2 | - | 0 | 0 | 2.17 (816) | 23.9 (12) | 47.5 (47.5, 46.9, 45.4) | 3 | 46.1 | 10.93 | 5.52 / 0.00 | 139.9 / 0.82 | -9.53 PASS | 46.1 | 28.1 | 27/0/2 | PASS |
+| ctl_3 | - | 0 | 0 | 2.17 (816) | 25.5 (13) | 57.6 (57.6, 45.8, 50.6) | 3 | 44.9 | 10.93 | 5.52 / 0.00 | 139.9 / 0.82 | -9.66 PASS | 46.1 | 28.0 | 27/0/2 | PASS |
+| add02_1 (dop1r1) | additive | 0.02 | 0 | 1.89 (848) | 18.4 (14) | 50.2 (50.2, 46.5, 47.7) | 3 | 44.5 | 2.48 | 6.99 / 0.00 | 72.0 / 0.30 | -9.16 PASS | 52.0 FAIL | 34.6 | 26/1/2 | PASS |
+| add02_2 | additive | 0.02 | 0 | 1.89 (848) | 19.3 (13) | 55.8 (48.5, 55.8, 50.9) | 3 | 45.9 | 2.48 | 6.99 / 0.00 | 72.0 / 0.30 | -9.56 PASS | 52.0 FAIL | 30.8 | 26/1/2 | PASS |
+| gain01_1 (dop1r1) | gain | 0.01 | 0 | 1.30 (1374) | 20.2 (12) | 52.4 (47.4, 44.6, 52.4) | 3 | 45.3 | 4.19 | 5.68 / 0.00 | 131.4 / 0.01 | -9.47 PASS | 66.8 FAIL | 28.3 | 26/1/2 | PASS |
+| gain01_2 | gain | 0.01 | 0 | 1.30 (1374) | 26.9 (12) | 51.0 (51.0, 43.1, 49.6) | 3 | 44.0 | 4.19 | 5.68 / 0.00 | 131.4 / 0.92 | -10.24 PASS | 66.8 FAIL | 28.3 | 26/1/2 | PASS |
+| gain02_1 (dop1r1) | gain | 0.02 | 0 | 2.92 (1118) | 18.8 (13) | 51.8 (45.8, 51.8, 41.0) | 3 | 46.4 | 7.54 | 6.14 / 0.00 | 5.7 FAIL / 1.18 | -9.88 PASS | 55.0 FAIL | 34.4 | 25/2/2 | PASS |
+| gain02_2 | gain | 0.02 | 0 | 2.92 (1118) | 20.7 (13) | 52.8 (47.0, 52.8, 51.9) | 3 | 46.9 | 7.54 | 6.14 / 0.00 | 5.7 FAIL / 1.18 | -9.97 PASS | 55.0 FAIL | 30.6 | 25/2/2 | PASS |
+| thr01_1 (dop1r1) | threshold | 0.01 | 0 | 2.28 (913) | 18.0 (12) | 55.9 (44.4, 52.1, 55.9) | 3 | 44.3 | 5.01 | 7.53 / 0.00 | 130.4 / 2.18 | -9.69 PASS | 36.8 | 27.6 | 27/0/2 | PASS |
+| thr01_2 | threshold | 0.01 | 0 | 2.28 (913) | 23.4 (14) | 52.1 (46.2, 52.1, 51.0) | 3 | 47.7 | 5.01 | 7.53 / 0.00 | 130.4 / 2.18 | -9.65 PASS | 53.6 FAIL | 33.3 | 26/1/2 | PASS |
+
+"runaway 4" = rest.spikes_per_step < 5, walk_gf.p99 < 38, loom_escape.GF_peak >= 33, wind.DNp18_flip >= 15, as in
+section 5. The two KNOWN GAPs are object.LC10a_flip and compass.wedge_cells_persisting in every run.
+
+**Control scatter (3 replicates, the yardstick for every single-run difference below):** walk_gf.p99 19.6 / 23.9 / 25.5
+Hz (median 12-13), loom_escape GF peak 48.5 / 47.5 / 57.6 (per-seed 40.0-57.6, 3/3 escapes each), rotation
+-10.05 / -9.53 / -9.66, wind DNp18 46.5 / 46.1 / 44.9, odour apple 8 cm 17.3-17.4 / clean 4.3-4.7, motion min DSI
+0.168-0.173, loom.GF_peak(a) 28.04-28.10; everything else bit-identical (KC 2.17 / 816, taste 10.93, Shiu 139.90 / 0.82,
+calibrated 5.52 / 0.00, walk.power_max 46.10, MDN 153, DNa02 2.58). Tally 27 / 0 / 2 in 3 of 3.
+
+**Reading.**
+
+1. **The four runaway checks pass in 11 of 11 runs** on the abs weights: rest 0 spikes/step everywhere, walk_gf.p99
+   18.0-26.9 Hz (< 38; the control spans 19.6-25.5), loom_escape GF peak 50.2-55.9 Hz (control 47.5-57.6; 3/3 escapes
+   in every run), wind DNp18 44.0-47.7 (control 44.9-46.5). Rotation -9.2 to -10.2 vs the control's -9.5 to -10.1. On
+   these checks no setting is distinguishable from the control at the measured scatter.
+2. **But no setting keeps every check the control passes in 2 of 2 replicates.** The cost is `walk.power_max_hz`
+   (per-frame max of the wing-power MN mean under walking optic flow, bound < 50; the check `abs` had fixed from
+   73-82 Hz off/class to 46.10): additive 0.02 -> 52.05 (x2), gain 0.01 -> 66.80 (x2), gain 0.02 -> 55.03 (x2),
+   threshold 0.01 -> 36.79 (PASS) / 53.56 (FAIL). So the tally is 26/1/2 for additive 0.02 and gain 0.01 (x2), 25/2/2
+   for gain 0.02 (x2), 27/0/2 and 26/1/2 for threshold 0.01. Rest, KC, taste, wind, loom, rotation and the calibrated
+   bitter checks do not change status in any active run. No VNC cell receives a monoamine slow entry (VNC coverage 0;
+   `out/r3_gain_semantics.json`), so the wing-power change arrives through the 23 descending neurons that do (12 with a
+   negative tone, 11 positive, all net-excited) or through the CNS activity feeding them -- not measured here.
+3. **gain 0.02 breaks the Shiu-rules sugar check on abs** (5.7 Hz FAIL vs the control's 139.9; bit-identical in both
+   replicates; +bitter 1.18). The same setting produced 129.6 Hz on the class weights, whose control had 6.63 (section
+   5b). This is the knife-edge of section 5b seen from the other side: the uncapped Shiu network sits at a total-activity
+   threshold, and the monoamine tone pushes it across in whichever direction the fast weights left it. Additive 0.02
+   halves it (72.0, PASS) and gain 0.01 / threshold 0.01 leave it (131.4 / 130.4).
+4. **Deterministic-section shifts** (bit-identical within each pair, so real, but with no direction across modes):
+   taste.MN9 10.93 -> 2.48 (additive 0.02; PASS > 2 by 0.5 Hz), 4.19 (gain 0.01), 7.54 (gain 0.02), 5.01 (threshold
+   0.01); KC 2.17 / 816 -> 1.89 / 848, 1.30 / 1,374, 2.92 / 1,118, 2.28 / 913 (again non-monotone in the gain, as the
+   round-2 correction says); calibrated sugar 5.52 -> 5.68-7.53 with +bitter 0.00 in every run; odour 17.8-19.9 /
+   4.4-5.0 (control 17.3-17.4 / 4.3-4.7; the gain 0.02 pair at 19.9 is 2.5 Hz above the control's spread).
+5. **The walk section is not bit-reproducible with the term active.** In the three controls and in every round-2 rerun
+   the Brain-only sections were bit-identical; here the threshold 0.01 pair differs in `walk` (power_max 36.79 vs 53.56,
+   sustained 19.10 vs 22.05, GF_max 9.74 vs 4.96, leg 0.87 vs 1.24, different top cells), and the additive 0.02 and gain
+   0.02 pairs share power_max but differ in power_mean / leg / top cells (gain 0.02: mean 16.27 vs 15.45, leg 4.66 vs
+   7.32). smell / taste / dn stay identical within every pair; motion differs in all seven pairs INCLUDING the three term-off controls (min_dsi 0.1726 / 0.1679 / 0.1713), and bitter differs in the gain-0.01 pair (shiu_sugar_bitter 0.01 vs 0.92 Hz) -- a non-deterministic reduction already exists in the term-off optic pipeline. The slow update (`_slow_update`, a
+   sparse-times-dense product per class per step on CUDA) is the only new op; a non-deterministic reduction there would
+   explain it and is the first thing to pin down (run the walk section twice on one GPU with
+   `torch.use_deterministic_algorithms(True)`). Until then threshold 0.01's PASS / FAIL on walk.power_max is a coin flip
+   around the 50 Hz bound, not a property of the setting.
+6. **Verdict on the precondition for assay 7 (section 6.2: "pass the four runaway-sensitive checks and every other
+   check the reference passes").** On the candidate default the first half holds for all four settings (11 / 11 runs);
+   the second half holds for none of them in 2 of 2 -- every setting costs `walk.power_max` (7 of 8 active runs), and
+   gain 0.02 also costs the Shiu sugar check. **The precondition is not met on the abs weights.** The nearest candidate
+   is threshold 0.01 (27/0/2 in one replicate, 26/1/2 in the other; taste 5.01, Shiu 130.4, KC 2.28), which is also the
+   cheapest mode; adopting it for the hunger experiment would need the walk non-determinism (point 5) resolved and >= 3
+   further replicates of the walk section, or a documented acceptance of walk.power_max 37-54 Hz against a 50 Hz bound.
+   Nothing here changes a default.
+
+**'gain' mode semantics check (the round-2 correction: the factor multiplies the NET fast input).** Two parts, CPU only,
+`out/r3_gain_semantics.json` (scratchpad `gain_semantics.py`):
+
+* *Two-neuron test graph* (`tests/test_receptor_model.two_neuron_graph`, dopamine -> TA, the real `Brain.step`, tone set
+  directly on `g_slow_cls`, one step, membrane minus rest vs the same step with no tone): with a net-EXCITED target
+  (g = +2 mV) a tone of -3.5 mV halves the depolarisation (+0.022 vs +0.045 mV) and -7 mV removes it (0.000); with a
+  net-INHIBITED target (g = -2 mV) the same -3.5 mV tone halves the HYPERPOLARISATION (-0.022 vs -0.045: the cell ends
+  0.022 mV more depolarised than without the tone) and -7 mV removes the inhibition entirely (0.000 = rest); +3.5 mV
+  scales both by 1.5 (+0.067 / -0.067). So a negative tone silences net-excited targets and disinhibits net-inhibited
+  ones, exactly as the correction states; the LIFParams comment in brain.py already says so.
+* *Which cells that is, on the weights of this batch* (abs fast weights, `--receptor-gain 1,1,1`, dop1r1 table; row sums
+  of the fan-in-scaled fast and monoamine-slow matrices in synapse-equivalents -- a structural proxy: the run-time g is
+  the net input of the presynaptic cells that fire, which the JSONs do not record): 30,475 cells receive a monoamine
+  slow entry (21,850 are optic rate units, i.e. the optic term). Quadrants: tone < 0 on a net-inhibited cell
+  (disinhibition under 'gain') 834 cells / 20,100 syn-eq; tone < 0 on a net-excited cell (silencing) 5,300 / 71,611;
+  tone > 0 on net-inhibited (more inhibition) 10,429 / 34,027; tone > 0 on net-excited (more excitation) 13,317 /
+  100,394. The disinhibition quadrant is 2.7 % of the tone-receiving cells and 8.9 % of the tone syn-eq, and it is
+  almost entirely the compass ring: ER3p_a (14 cells, tone -225, net -94), ER4d (26; -109 / -109), PFGs (18), ER3w_b
+  (18), ExR3 (2; -505 / -384), ER3p_b, ER3d_b, ER2_c, ER3m, ER3w_a/c, ER2_a/b/d, ER3d_e -- cb_intrinsic 255 of the 834,
+  ol_intrinsic 432 (rate units), visual_projection 115, descending 0, KC 0. None of the populations behind the scored
+  checks sits in it: KC 2,736 with tone, 2,481 tone+ / net+ and 169 tone- / net+, 0 disinhibited; MBON 86 of 97
+  tone- / net+ (MBON03 -877, MBON04 -695, MBON07 -453 syn-eq); PAM 175 tone- / net+, PPL1 16 / 16; MN9, GF, DNp18, DNp20
+  receive no monoamine slow entry; HSN / HSE small positive tones (+0.7 / +2.2) on net-excited cells; no VNC cell has one.
+  Steady tone at the batch gains with every monoamine input at 50 Hz (tau 200 ms): median |tone| 0.055 / 0.11 mV at
+  gain 0.01 / 0.02, extremes -25 / +7.8 and -50 / +15.7 mV (ExR3, the OA autoreceptor cells of section 6.4).
+* *Answer:* neither gain setting's suite outcome rests on disinhibition of net-inhibited targets in the structural
+  sense -- the disinhibition quadrant is the compass ring, whose check is a KNOWN GAP in every run, and the scored
+  populations (KC, MBON, DAN, MN9, GF, DNp18/20, HSN/HSE, VNC) are either untouched or net-excited (where a negative
+  tone reduces excitation, the intended semantics). The effects the gain runs do show (walk.power_max 66.8 / 55.0,
+  Shiu 5.7 at 0.02, KC 1.30 / 2.92) come from the net-excited MBON / DAN / DN quadrant and cannot be assigned to
+  disinhibition from the JSONs; a per-cell record of g and g_slow during the walk and Shiu sections would settle it.
+
+Files: `out/r3_slow_abs_*.json/.txt`, `out/r3_slow_abs_scores.txt`, `out/r3_slow_abs_cmds.txt`, `out/r3_slow_abs_cluster.log`,
+`out/r3_gain_semantics.json`, `out/receptors_r3_dop1r1.csv`. Not a default change; no script other than these outputs
+was touched by this task.
+
+### Corrections (round-3 verification, `verify:exp:slow`)
+
+* A third replicate of additive 0.02 gives walk.power_max 60.52 (pair 52.05 / 52.05): the pair's agreement was chance, not reproducibility. Two-run ranges under-sample: walk_gf.p99 up to 31.27 (threshold 0.01), loom_escape 62.43, rotation -10.62 in the skeptic's reruns -- all still PASS, so the runaway checks hold in 16 of 16 runs; walk.power_max fails in 3 of 4 threshold-0.01 runs.
+* Every active arm used `--dopamine-lead dop1r1` while the control used the shipped DopEcR table; no abs + DopEcR + term-on arm exists, so "the cost is the slow term / mode / gain" is not separable from "the cost is the dop1r1 slow signs" (round 4, item 8).
+* The dop1r1 table differs from the shipped one in dopamine rows only, in the slow and provenance columns (receptor_groups, slow_pos_val, alt_sources) -- none read by `receptor_signs`.
+* In the very section where walk.power_max is measured the optic lobe carried neither the abs signs nor the tone at the time of the round-3 batch (fixed with the benchmark change above); the 21,850 optic rate units "in the optic term" are toned only in the FlyBrain room sections.
+* The '2 of 2 replicates' bar was the round-3 author's tightening of slow_term.md 6.2 (which asked for 3 replicates before adoption); the skeptic's extra replicates support it. The test cited for the zero-gain identity pins full-with-zero-gains == 'sign+gain'; equality to 'sign' holds because --receptor-gain 1,1,1 sets every class factor to 1.

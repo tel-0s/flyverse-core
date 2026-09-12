@@ -30,6 +30,24 @@ def add_options(ap):
     ap.add_argument('--cuda-sparse',choices=('torch','warp'),default='torch')
     ap.add_argument('--weight-dtype',choices=('float32','float16'),default='float32')
     ap.add_argument('--device',default=None)
+    ap.add_argument('--receptor-model',choices=('default','off','sign'),default='default',
+                    help="LIFParams.receptor_model: 'default' leaves the LIFParams default (sign / abs since round 3), "
+                         "'off' selects the presynaptic-sign rule (receptor_model=None), 'sign' the receptor lookup")
+    ap.add_argument('--receptor-net-rule',choices=('class','abs','nonmda'),default='abs',help="with --receptor-model sign")
+
+
+def patch_receptor(model,net_rule):
+    """Make every brain.LIFParams built from here on (BatchSim's included) carry the requested receptor model
+    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'default' leaves the class untouched."""
+    if model=='default': return
+    from flyverse import brain
+    L = brain.LIFParams
+    def make(**kw):
+        p = L(**kw)
+        p.receptor_model = None if model=='off' else model
+        p.receptor_net_rule = net_rule
+        return p
+    brain.LIFParams = make
 
 
 def sim_options(args):
@@ -60,7 +78,12 @@ def main():
         if len(start)!=3: raise ValueError()
         seeds = [int(s) for s in args.seeds.split(',')] if args.seeds else None
     except ValueError: ap.error('invalid --start or --seeds')
+    patch_receptor(args.receptor_model,args.receptor_net_rule)
     sim = BatchSim(args.batch,seeds=seeds,start=start,**sim_options(args))
+    lp = sim.fb.brain.p
+    receptor_info = dict(model=lp.receptor_model,net_rule=lp.receptor_net_rule if lp.receptor_model else None,
+                         fast_sign_changed_entries=int((sim.fb.receptor.fast_sign!=np.sign(sim.c.W.data)).sum()) if sim.fb.receptor is not None else 0)
+    print(f'receptor model {receptor_info["model"]} ({receptor_info["net_rule"]}); fast sign changed on {receptor_info["fast_sign_changed_entries"]:,} of {sim.c.W.nnz:,} entries',flush=True)
     if args.load: sim.load_state(args.load)
     else:
         for seed,fly,m in zip(sim.seeds,sim.flies,sim.metabolisms):
@@ -92,7 +115,7 @@ def main():
                  modes={k:v/count for k,v in modes[i].items()},position=sim.flies[i].pos.tolist()) for i,m in enumerate(sim.metabolisms)]
     result = dict(batch=sim.B,brain_seed=args.seed,frames=count,simulated_s=count*sim.FRAME_MS/1000,
                   wall_s=elapsed,aggregate_fly_s_per_wall_s=sim.B*count*sim.FRAME_MS/1000/elapsed,
-                  options=vars(args),rows=rows,
+                  options=vars(args),receptor=receptor_info,rows=rows,
                   rng_note='Rows are independent; changing batch size changes brain RNG draw layout. These are not bit-identical replays of single-seed processes.')
     Path(args.json).parent.mkdir(parents=True,exist_ok=True)
     Path(args.json).write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')

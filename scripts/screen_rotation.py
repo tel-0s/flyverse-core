@@ -28,9 +28,12 @@ from flyverse import brain, screen  # noqa: E402
 
 def patch_receptor(model, net_rule):
     """Make every brain.LIFParams built from here on (room_demo.Sim's included) carry the receptor model
-    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'off' leaves the class untouched."""
-    if model in (None, "off"):
+    (LIFParams.receptor_model; docs/NT_INTEGRATION.md). 'default' leaves the class untouched; 'off' forces
+    receptor_model=None (the presynaptic-sign rule) on every LIFParams built from here on."""
+    if model in (None, "default"):
         return
+    if model == "off":
+        model = None
     L = brain.LIFParams
 
     def make(**kw):
@@ -46,7 +49,7 @@ def main():
     ap.add_argument("--pattern", default=r"^(DN[a-z]|MDN|LPT|HS|VS|H2|LPi|MeVP|Nod|CH|LLPC|LPC)")
     ap.add_argument("--top", type=int, default=20)
     ap.add_argument("--out", default="out/screen_rotation.csv")
-    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+    ap.add_argument("--receptor-model", default="default", choices=["off", "sign", "sign+gain", "full", "default"],
                     help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
     ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
     args = ap.parse_args()

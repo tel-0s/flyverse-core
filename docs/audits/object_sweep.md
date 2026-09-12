@@ -292,3 +292,208 @@ source (spiking feedback into the optic lobe vs the LIF noise).
 * Section 6.4's "LC11 spontaneous rate 0.006 -> 0.000 Hz" is the ball condition; no-stimulus values are 0.0015 -> 0.0000. Section 6.4's no-ball LC11 mean drive under sign-class is +0.156 mV (ball +0.221), not +0.22 for both.
 * Angular-size ladder (skeptic's positive control, off, seed 0): a static object of 11 / 22 / 28 / 43 deg raises LPLC2's (ball - none) best-cell drive +0.11 / +0.97 / +1.37 / +3.67 mV, LC16 up to +1.20, LC10b +1.65, LC11 only +0.05 / +0.12 / +0.12 / +0.21 -- the loom chain responds to size, the small-object detectors do not; NOTES 9's LPLC2 +9.8 mV was a larger / higher stimulus, not a model difference.
 * Two seeds per mode is not enough for any ratio here; round 3 adds a none-vs-none null and five replicates per mode.
+
+## 8. Round 3: the sweep made quantitative -- five replicates per mode, a none-vs-none null, z-scores, the size ladder
+
+Round 2 left the object sweep with a per-run verdict that is a coin flip and (ball - none) magnitudes quoted from two
+seeds with no null. Round 3 measures the null directly: the probe can now run the **no-ball condition twice**
+(`--null`) and report the identical difference statistics for that pair, so every (ball - none) number has a
+distribution to be read against. One cluster batch, 24 jobs, no `--cache-dir`.
+
+### 8.1 Changes to `scripts/probe_object_sweep.py` (this round)
+
+* `diff_best_cell_mean_mv` -> **`diff_max_over_cells_mean_mv`**: it is the max over cells of the per-cell (ball - none)
+  time-mean drive, never "the difference at the best-driven cell" (round-2 correction). A companion
+  `diff_mean_over_cells_mean_mv` (the population mean of the same per-cell difference) is new.
+* `diff_peak_mv` and `diff_peak_cells_over_7mv` are **removed**: a frame-by-frame subtraction of two independent
+  stochastic runs is noise. What that noise is worth is now measurable -- `diff_peak_100ms_mv`, which has the same
+  defect and is kept only because the null measures it, is **+11.4 mV for LC11 with no ball in either run** (off,
+  mean of 5 null runs) against +10.8 mV with the ball. Any "difference peak" statistic on this protocol reads above
+  the 7 mV pass criterion in a pair of runs that contain no stimulus at all.
+* `smooth_peak` (the 100 ms boxcar) off-by-one fixed: the cumulative sum now carries a leading zero row, so window *i*
+  is `frames[i:i+w]`; before, the first window was `frames[1:w+1]` and frame 0 was never scored. Unit check: a single
+  +100 mV frame at t = 0 gives +10.0 mV at w = 10 after the fix and +0.0 before.
+* `--null`: run the no-ball condition twice (same seed, same code path -- the two runs differ only by the native
+  backend's run-to-run nondeterminism) and report the same statistics; `config.null = true`, `condition_a = "none"`.
+* `--ball-radius` / `--ahead` / `--half-sweep` expose the geometry, so the round-2 skeptic's angular-size ladder is a
+  flag change rather than a wrapper script (his `scripts/skeptic_object_check.py` is no longer in the tree).
+* **`--receptor-model off` is now applied, not skipped, and `default` is a third choice.**
+  `LIFParams.receptor_model` defaults to `'sign'` / `receptor_net_rule 'abs'` since round 3, so round 2's
+  `patch_receptor` (which returned early for `off`) would have run the default receptor model under the label `off` --
+  the mislabel `docs/audits/receptor_integration.md` A.1 records for the no-flag runs `out/r3_obj_default_s{0,1}.json`
+  ("`config.mode` says `off`"), with the request that this script's owner add a `default` choice. Done:
+  `--receptor-model {default,off,sign}`, flag default `default` = leave `LIFParams` alone (so a bare run is the
+  shipped model), `off` = `receptor_model = None` applied explicitly. Every run now prints and records the pair it
+  actually used (`config.receptor_model` / `config.receptor_net_rule`, with the flag in `config.receptor_model_flag`).
+  `--receptor-net-rule` keeps its own default `class` so that round-2 commands reproduce; the LIFParams default is
+  `abs`, so the rule has to be spelled out with `--receptor-model sign`.
+
+### 8.2 The batch
+
+Cluster run `r3-obj-0101cb` (24 jobs, one batch, 0 failed, 3.9 min wall; every job `device cuda`, NVIDIA B200, torch
+2.11.0+cu128, native backend, no CUDA graphs): `--null` x 5 seeds for each of `off` and `sign`/`abs` (10 jobs) and the
+ball sweep x 5 seeds for each of the two modes (10 jobs), plus the four ladder geometries (off, seed 0). Both modes
+are given explicitly on the command line, and each mode is compared with its own null. Outputs `out/r3obj/{ball,null}_{off,abs}_s{0..4}.{json,txt}`,
+`out/r3obj/lad_{11deg_static,22deg,28deg,43deg}.{json,txt}`, aggregated by `out/r3obj/aggregate.py` into
+`out/r3obj/aggregate.md`; structural coverage by `out/r3obj/coverage_r3.py` into `out/r3obj/coverage_r3.json`
+(both scratch scripts kept with the outputs; `out/` is git-ignored).
+
+Provenance (job `r3-obj-cache-3add6e`, `out/r3obj/cachecheck.txt`): the cluster's **shared** cache is now the adopted
+`TYPE_NT_OVERRIDE` cache -- 167,106 cells, nnz 25,578,600, sum W 25,825,116, sum |W| **121,460,584**, TmY14 glutamate
+300 / ACh 177, Mi19 serotonin 12 -- identical to the local `cache/`, so no `--cache-dir` is passed any more. The files
+the jobs ran are sha256 `9216bbaa...` `scripts/probe_object_sweep.py`, `ac8f4421...` `flyverse/brain.py`,
+`a15dc6e0...` `flyverse/connectome.py`, `0ec5355d...` `flyverse/data/receptors_by_type.csv` (the round-3
+contested-flip table), each equal to the local working-tree file at submission time.
+
+*Script provenance.* The 24 jobs ran `probe_object_sweep.py` sha256
+`9216bbaae669d7369e3a6aab1301ae7b2126f76af0fdb38f1237dfc6079b5339`; the file shipped in the tree is sha256
+`c8ebd337e87103eace2f9dd874bd5d670eaaaff9991f182bb910e8a35b7ea24a`, which adds the `--receptor-model default` choice
+and the resolved-receptor recording of 8.1 **after** the batch. The diff is confined to the argument parser, the
+header line and the JSON `config` block; no line of the simulation, recording, summary, difference or verdict path
+differs, and with the explicit flags used here (`--receptor-model off`, `--receptor-model sign --receptor-net-rule
+abs`) both versions build the identical `LIFParams` -- checked by calling `patch_receptor` / `resolved_receptor` on
+CPU: `off` -> `(None, 'class')`, `sign abs` -> `('sign', 'abs')`, `default` -> `('sign', 'abs')`. Re-running any
+command of 8.2 with the shipped file therefore repeats the same configuration; only the JSONs' `config.receptor_model`
+field changes (`"off"` -> `null`, plus the new `receptor_model_flag`). The shipped file was then run end to end on the
+cluster (job `r3-obj-smoke-cdc344`, 2 jobs, 1.3 min, `out/r3obj/smoke_{default,off_null}.{json,txt}`, 2 s window): a
+bare invocation now prints `mode sign-abs (--receptor-model default)` and `receptor model sign (abs); fast sign
+changed on 48,295 of 25,578,600 entries` (the count of 8.3) and records `receptor_model: "sign"`,
+`receptor_net_rule: "abs"`, `receptor_model_flag: "default"`; `--receptor-model off --null` records
+`receptor_model: null`, `null: true`, `condition_a: "none"`.
+
+### 8.3 What `sign`/`abs` changes on this pathway (round-3 table, CPU, `out/r3obj/coverage_r3.json`)
+
+Model-wide the current table under `abs` changes 48,295 of 25,578,600 entries (30,916 flipped + 17,379 silenced) =
+179,944 |W| synapses = 0.148 %. On the measured types it changes **zero** input synapses of LC11, LC10a, LC10b, LC16,
+LPLC2, LC4, T3, Tm5Y, TmY21 and TmY13, and only silences histamine input on Mi4 20,024 (3.74 % of its input), Mi1
+13,013 (1.90 %), T2 712, Tm3 476, TmY5a 216. (Under `class` the model-wide count is 161,877 entries / 630,436 syn.)
+The round-2 statement is unchanged by the contested-flip rebuild: whatever the two modes differ by downstream, it does
+not reach these cells through their own inputs.
+
+### 8.4 (ball - none) against the none-vs-none null
+
+Statistic: `diff_max_over_cells_mean_mv` (mV), 12 s window, 5 seeds per cell of the table. `z = (mean(ball-none) -
+mean(none-none)) / SD(none-none)`; the Welch column is the same difference over the standard error of the two means
+(`sqrt(s_B^2/5 + s_N^2/5)`); `U` is the exact Mann-Whitney statistic of the 5 ball values against the 5 null values
+(max 25) with its exact two-sided p (0.0079 is the smallest attainable at n = 5, 5).
+
+| type | cells | mode | (ball - none) per seed 0..4 | mean | SD | (none - none) per seed 0..4 | null mean | null SD | z | Welch | U | p |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| LC11 | 143 | off | +0.081 +0.118 +0.040 +0.058 +0.032 | +0.066 | 0.035 | +0.080 +0.067 +0.026 +0.097 +0.071 | +0.068 | 0.026 | **-0.1** | -0.1 | 12 | 1.00 |
+| LC11 | 143 | sign-abs | +0.091 +0.062 +0.032 +0.091 +0.096 | +0.074 | 0.027 | +0.093 +0.067 +0.040 +0.065 +0.067 | +0.066 | 0.019 | **+0.4** | +0.5 | 14 | 0.84 |
+| LC10a | 275 | off | +0.111 +0.087 +0.065 +0.067 +0.077 | +0.081 | 0.019 | +0.054 +0.104 +0.067 +0.077 +0.079 | +0.076 | 0.019 | **+0.3** | +0.4 | 14 | 0.84 |
+| LC10a | 275 | sign-abs | +0.088 +0.058 +0.063 +0.084 +0.116 | +0.082 | 0.023 | +0.127 +0.064 +0.068 +0.102 +0.062 | +0.085 | 0.029 | **-0.1** | -0.2 | 11 | 0.84 |
+| LC10b | 95 | off | +0.115 +0.180 +0.219 +0.029 +0.101 | +0.129 | 0.074 | +0.156 +0.036 +0.065 +0.148 +0.021 | +0.085 | 0.063 | **+0.7** | +1.0 | 17 | 0.42 |
+| LC10b | 95 | sign-abs | +0.099 +0.146 +0.086 +0.129 +0.166 | +0.125 | 0.033 | +0.026 +0.067 +0.095 +0.082 +0.140 | +0.082 | 0.042 | **+1.0** | +1.8 | 21 | 0.10 |
+| LC16 | 182 | off | +0.139 +0.125 +0.049 +0.103 +0.064 | +0.096 | 0.039 | +0.118 +0.055 +0.120 +0.068 +0.146 | +0.102 | 0.038 | **-0.1** | -0.2 | 11 | 0.84 |
+| LC16 | 182 | sign-abs | +0.047 +0.121 +0.056 +0.063 +0.052 | +0.068 | 0.031 | +0.219 +0.075 +0.116 +0.138 +0.054 | +0.120 | 0.064 | **-0.8** | -1.7 | 5 | 0.15 |
+| LPLC2 | 185 | off | +0.302 +0.288 +0.287 +0.299 +0.267 | +0.289 | 0.014 | +0.153 +0.200 +0.143 +0.266 +0.190 | +0.190 | 0.048 | **+2.0** | +4.4 | 25 | 0.0079 |
+| LPLC2 | 185 | sign-abs | +0.369 +0.370 +0.326 +0.392 +0.299 | +0.351 | 0.038 | +0.124 +0.081 +0.178 +0.137 +0.174 | +0.139 | 0.040 | **+5.4** | +8.6 | 25 | 0.0079 |
+| LC4 | 126 | off | +0.126 +0.126 +0.023 +0.115 +0.039 | +0.086 | 0.051 | +0.036 +0.050 +0.074 +0.143 +0.142 | +0.089 | 0.051 | **-0.1** | -0.1 | 10 | 0.69 |
+| LC4 | 126 | sign-abs | +0.072 +0.104 +0.043 +0.106 +0.046 | +0.074 | 0.030 | +0.110 +0.120 +0.064 +0.100 +0.085 | +0.096 | 0.022 | **-1.0** | -1.3 | 7 | 0.31 |
+
+**The null is not centred on zero.** With no ball in either run the statistic is +0.066 to +0.190 mV, because it is a
+maximum over 95-275 cells of a per-cell difference whose per-cell mean is ~0 (`diff_mean_over_cells_mean_mv` under `off`:
++0.004 / +0.000 / -0.016 / +0.004 / +0.001 / +0.008 mV for LC11 / LC10a / LC10b / LC16 / LPLC2 / LC4 against a null
+of +0.008 / -0.002 / -0.028 / +0.005 / -0.001 / +0.007 -- every |z| <= 0.2; under `sign`/`abs` the same statistic
+spans z -2.2 (LC4) to +1.5 (LC11), also no signal). That positive bias is the whole of the
+round-2 "signal" in the two modes replicated here: round 2's LC11 values under `off` (+0.050 +0.034 +0.084 +0.080
++0.131 +0.074 over six runs, mean +0.075; `receptor_verification.md` round-2 record) and LC10a +0.05..+0.16 mV sit
+inside this null, and reproduce the off mean of +0.066 +- 0.035 measured here. Round 2's larger `sign-class` values
+(LC11 +0.15..+0.48, mean +0.27) are **not** covered: `class` was not replicated in this batch and has no null, and it
+is the mode that raises LC11's drive in both conditions (+0.08 -> +0.22 mV time-mean, section 4), so its difference
+statistic has to be read against a `class` null, not against this one.
+
+Other difference statistics, same treatment (all in `out/r3obj/aggregate.md`): the sweep-locked tuning peak
+`diff_tuning_peak_mv` is null-dominated for every type (LC11 off +3.95 vs null +4.01; LC10a +4.94 vs +4.78; LPLC2
++3.99 vs +4.03; largest |z| 1.4, LC10b sign-abs); `diff_rate_hz_max_cell` likewise (LC11 off +0.13 vs +0.15 Hz;
+LPLC2 +0.63 vs +0.58; largest |z| 0.9); `diff_peak_100ms_mv` as in 8.1.
+
+### 8.5 Which types show a (ball - none) signal above the null
+
+**At z > 3 on the primary statistic: LPLC2 under `sign`/`abs` (z = +5.4) and nothing else.** LPLC2 under `off` is
+z = +2.0 on the SD of the null but +4.4 on the standard error of the two means, with all five ball runs above all
+five null runs (U = 25/25, p = 0.0079) and the tightest ball arm in the table (SD 0.014 mV) -- so LPLC2 carries this
+11.4 deg ball in **both** modes, at +0.10 mV (off) / +0.21 mV (sign-abs) above its own null, i.e. **30-70 x below the 7 mV pass
+criterion** and invisible in the population mean drive (+0.481 vs +0.479 mV, 8.4).
+**LC11, LC10a, LC10b, LC16 and LC4 show no signal above the null in either mode** (every |z| <= 1.0, every U within
+chance except LC10b sign-abs: z +1.04, U 21/25, exact p 0.0952; pooled 9 v 9 with the skeptic's seeds Welch p 0.013, U 68/81 p 0.014, but NOT above the skeptic's invisible-ball control (+0.135 vs +0.129 mV, p 0.93)) -- the small-object detectors do not see the object, and the difference between their (ball - none)
+numbers and zero is the statistic's bias, not a response.
+
+The per-run 7 mV / 1 Hz verdict remains uninformative and is now bounded: **1 PASS in the 20 replicate runs** (10 ball + 10 null; the PASS is ball off
+seed 0, on LC10a's max-cell rate 1.167 vs 0.833 Hz = 14 vs 10 spikes in 12 s), and **0 of 10 no-ball-vs-no-ball runs
+pass** -- consistent with round 2's 1 in 17, and with a criterion that is decided by the spontaneous rate.
+
+### 8.6 Angular-size ladder repeated (off, seed 0, one run per size)
+
+Same four geometries as the round-2 skeptic, now as flags (`--ball-radius`, `--ahead`, `--half-sweep`; the 11.4 deg
+entry is the static ball, half sweep 1e-9, the other three sweep). `diff_max_over_cells_mean_mv`, mV; the round-2
+values are the skeptic's `diff_best_cell_mean_mv` from `out/skobj/sk_{static,r010,near,r020}_off_s0.json`.
+
+| object | r / ahead / half sweep (m) | LC11 | LC10a | LC10b | LC16 | LPLC2 | LC4 | LPLC2 rate mean ball/none (Hz) | LPLC2 max cell ball/none (Hz) |
+|---|---|---|---|---|---|---|---|---|---|
+| 11.4 deg static | 0.005 / 0.05 / 1e-9 | +0.050 | +0.052 | +0.151 | +0.034 | +0.189 | +0.076 | 0.115 / 0.121 | 2.67 / 2.92 |
+| *(round 2)* | | +0.051 | +0.045 | +0.016 | +0.065 | +0.114 | +0.055 | 0.120 / 0.102 | 2.50 / 2.33 |
+| 22.6 deg | 0.010 / 0.05 / 0.06 | +0.118 | +0.120 | +0.145 | +0.405 | +0.977 | +0.188 | 0.148 / 0.143 | 2.33 / 2.33 |
+| *(round 2)* | | +0.123 | +0.117 | +0.142 | +0.385 | +0.965 | +0.212 | 0.157 / 0.133 | 2.67 / 2.67 |
+| 28.1 deg | 0.005 / 0.02 / 0.024 | +0.102 | +0.112 | +0.021 | +0.535 | +1.358 | +0.345 | 0.181 / 0.114 | 2.83 / 2.42 |
+| *(round 2)* | | +0.124 | +0.120 | +0.076 | +0.460 | +1.369 | +0.349 | 0.182 / 0.123 | 2.83 / 2.58 |
+| 43.6 deg | 0.020 / 0.05 / 0.06 | +0.189 | +0.172 | +1.555 | +1.176 | +3.456 | +0.660 | 0.367 / 0.120 | 7.42 / 2.42 |
+| *(round 2)* | | +0.207 | +0.176 | +1.650 | +1.199 | +3.674 | +0.679 | 0.345 / 0.126 | 7.42 / 2.83 |
+
+The ladder reproduces: every entry repeats the round-2 value inside the run-to-run scatter of the section-8.4
+replicates except LC10b at 11.4 deg (+0.151 vs +0.016, 2.1 x that type's null SD of 0.063). The null of 8.4 applies to
+every row -- neither of its two runs contains an object, so it does not depend on the ball's geometry, only on the
+mode and the window. Read against it, the loom types scale with size far outside it (LPLC2 +0.19 -> +0.98 -> +1.36 -> +3.46 mV,
+null +0.190 +- 0.048; LC16 +0.03 -> +1.18, null +0.102 +- 0.038; LC10b +0.15 -> +1.56, null +0.085 +- 0.063) and
+LPLC2's best cell goes from 2.67 to 7.42 Hz with the largest object while its no-ball control stays at 2.4-2.9 Hz.
+LC11 and LC10a move from +0.05 to +0.19 / +0.17 mV over a 4 x size range: the 43.6 deg point is above the 11.4 deg
+null (LC11 null +0.068 +- 0.026), but it is one run per size, it is 37 x below the 7 mV criterion, and it is the same
+value LPLC2 shows for an object 16 x smaller in solid angle. The small-field detectors have no size tuning here.
+
+### 8.7 The medulla does carry the ball
+
+Same treatment on the optic rate units (`diff_abs_best_cell_mean`, max over cells of the (A - B) time-mean |dev|,
+rate units; ball mean of 5 seeds vs the null mean +- SD of 5 seeds):
+
+| type | off ball | off null | z(off) | sign-abs ball | sign-abs null | z(abs) |
+|---|---|---|---|---|---|---|
+| Mi4 | +0.0754 | +0.0098 +- 0.0023 | **+28.6** | +0.0457 | +0.0077 +- 0.0017 | **+22.3** |
+| Mi1 | +0.0510 | +0.0192 +- 0.0041 | **+7.8** | +0.0724 | +0.0153 +- 0.0020 | **+27.9** |
+| Tm3 | +0.1010 | +0.0303 +- 0.0091 | **+7.8** | +0.1064 | +0.0252 +- 0.0052 | **+15.6** |
+| Tm5Y | +0.0380 | +0.0339 +- 0.0103 | +0.4 | +0.0499 | +0.0292 +- 0.0080 | +2.6 |
+| TmY21 | +0.0355 | +0.0300 +- 0.0049 | +1.1 | +0.0343 | +0.0301 +- 0.0073 | +0.6 |
+| T2 | +0.0337 | +0.0301 +- 0.0080 | +0.5 | +0.0429 | +0.0302 +- 0.0108 | +1.2 |
+| T3 | +0.0224 | +0.0224 +- 0.0073 | -0.0 | +0.0227 | +0.0193 +- 0.0048 | +0.7 |
+| TmY13 | +0.0187 | +0.0255 +- 0.0109 | -0.6 | +0.0240 | +0.0208 +- 0.0063 | +0.5 |
+| TmY5a | +0.0292 | +0.0354 +- 0.0062 | -1.0 | +0.0365 | +0.0311 +- 0.0045 | +1.2 |
+
+So the ball is in the model's medulla at high confidence (Mi1 / Mi4 / Tm3, z 7.8-28.6 in both modes), is at or below
+the null by the time it reaches T2 / T3 and the lobula Tm / TmY stage (|z| <= 1.2, except Tm5Y +2.6 under sign-abs),
+and reappears only in LPLC2. This is the same conclusion as section 6.5, now with an error bar: it is not that the
+measurement is too noisy to see the object -- the same measurement resolves Mi4's 0.066 rate-unit difference against
+a null of 0.010 +- 0.002 -- it is that
+the small-field pathway does not pass it on.
+
+### 8.8 Caveats
+
+* 5 seeds per cell of the table; the null and the ball arm are measured under the same mode, so z compares like with
+  like, but a z of 3 at n = 5 is a modest claim (the exact rank-sum test cannot go below p = 0.0079 here).
+* The null measures the native backend's run-to-run nondeterminism at fixed seed and fixed weights only. It is not a
+  null for seed-to-seed variation of the brain RNG, nor for the geometry.
+* Two modes only (`off` and the shipped `sign`/`abs`). `class`, `nonmda` and the T2/T3-rectified variants of sections
+  3-6 have no null of their own; because the null scales with a mode's drive scatter, their round-2 difference
+  numbers must not be compared with the nulls measured here.
+* `diff_max_over_cells_mean_mv` is a maximum over cells and is therefore biased upward; it is comparable across
+  conditions only because the null is computed the same way, with the same cell count.
+* One ball geometry for the replicate table (1 cm, 5 cm ahead, on the table, ~46 deg/s), one window (12 s); the ladder
+  is a single run per size, so differences below ~0.1 mV in it are not resolvable.
+* LPLC2's signal is +0.10 / +0.21 mV against a 7 mV criterion and does not appear in its population mean drive or its
+  firing rate (+0.63 / +0.47 Hz max-cell difference, both inside the null): it is a few cells' drive, not a response
+  the downstream escape circuit would act on. The pathway conclusion of sections 6-7 is unchanged.
+
+### Corrections (round-3 verification, `verify:exp:object-null`)
+
+* z > 3 at n = 5 per arm has P = 0.0045 per comparison under a Gaussian null (5.3 % over the twelve comparisons of 8.4); LC16 sign-abs reached z +4.59 against the skeptic's own 4-seed null and -0.8 / -0.21 against the shipped and pooled ones -- one z > 3 at n ~ 5 is not by itself a signal. LPLC2's result does not depend on it (Welch, exact rank-sum, both modes, an independent batch, and an invisible-ball control with 0 of 1,466 columns changed).
+* "reads above the 7 mV pass criterion" compares a difference statistic with a threshold the script applies to absolute drive; say "a difference-peak statistic reaches 11 mV in a stimulus-free pair".
+* Batch wall 3.9 min is cluster_run's submit-to-fetch wall; the 24 jobs' own span was 3.0 min.

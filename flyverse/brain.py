@@ -97,9 +97,13 @@ class LIFParams:
     # Drop the synapses from / onto frozen rate units (the optic lobe) from the LIF matrix. Exact: frozen
     # neurons never spike, so those entries only cost time (~40% of the nnz in the full brain).
     prune_frozen: bool = True
-    # ---- receptor model (docs/NT_INTEGRATION.md step 5; docs/audits/receptor_rules.md): OPTIONAL, default off.
-    # None: the present rule (a synapse carries NT_SIGN of its presynaptic cell); the weights are byte-identical
-    #   to the model without this block.
+    # ---- receptor model (docs/NT_INTEGRATION.md step 5; docs/audits/receptor_rules.md). DEFAULT since round 3
+    # (docs/audits/receptor_integration.md "Round 3: adoption"): "sign" with the absolute-level net rule "abs" on the
+    # contested-flip table -- 30,916 glutamate entries flipped to +1 (iGluR targets no other source contradicts) and
+    # 17,379 histamine entries silenced (>= 2 sources with ort / HisCl off) = 48,295 of 25,578,600 entries, 0.15 % of
+    # |W|; adopted after 27 PASS / 0 FAIL / 2 KNOWN GAP in 3 of 3 suite replicates with no check worse than any off run.
+    # None: the previous rule (a synapse carries NT_SIGN of its presynaptic cell); still selectable, and the weights
+    #   are then byte-identical to the model before the receptor block (tests/test_receptor_model.py pins the hash).
     # "sign": where (postsynaptic type, presynaptic transmitter) has a row in flyverse/data/receptors_by_type.csv
     #   (29.7 % of edges / 25.7 % of |W| synapses of the whole CNS; optic module 52 %), the fast sign of that row
     #   replaces the presynaptic sign (glutamate -> +1 on iGluR targets, 0 where the target has no fast receptor
@@ -129,8 +133,8 @@ class LIFParams:
     #   first use). The native CUDA / Metal kernels do not carry g_slow: "full" forces the Torch path (a warning if
     #   kernels were requested), like adapt_by_type; when every class gain is 0 no slow matrix is built and the step
     #   loop does no slow work (the weights and the dynamics then equal "sign+gain" on the Torch path).
-    receptor_model: str | None = None
-    receptor_net_rule: str = "class"          # "class" | "abs" | "nonmda": which column set of the table decides the sign
+    receptor_model: str | None = "sign"       # round-3 default; None = the presynaptic-sign rule (previous weights)
+    receptor_net_rule: str = "abs"            # "class" | "abs" | "nonmda": which column set of the table decides the sign
     receptor_nt_class_fallback: bool = False  # unprofiled targets take the Davis 2020 whole-class baseline (tier nt_class)
     receptor_table: str | None = None         # path override for receptors_by_type.csv
     receptor_gain: dict | None = None         # {gain class: factor}; None = DEFAULT_RECEPTOR_GAIN (low 0.5, mid 1, high 1.5)

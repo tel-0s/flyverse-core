@@ -34,14 +34,19 @@ def main():
     ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
                     help="LIFParams.receptor_model (default off = the presynaptic NT_SIGN rule)")
     ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"])
+    ap.add_argument("--receptor-table", default=None, metavar="PATH",
+                    help="LIFParams.receptor_table: a receptors_by_type.csv other than flyverse/data/receptors_by_type.csv")
     args = ap.parse_args()
+    if args.receptor_table is not None and not os.path.isfile(args.receptor_table):
+        raise SystemExit(f"--receptor-table {args.receptor_table}: no such file")
     c = connectome.load(verbose=False)
     lp = brain.LIFParams(input_norm_alpha=args.norm_alpha, input_norm_ref=args.norm_ref,
-                         receptor_model=None if args.receptor_model == "off" else args.receptor_model, receptor_net_rule=args.receptor_net_rule)
+                         receptor_model=None if args.receptor_model == "off" else args.receptor_model, receptor_net_rule=args.receptor_net_rule,
+                         receptor_table=args.receptor_table)
     rs = brain._receptor(c, lp, with_counts=lp.receptor_model == "full")      # one lookup shared by the LIF and the optic lobe
     if rs is not None:
         cov = rs.coverage(c.W)
-        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}); fast sign changed on "
+        print(f"receptor model {args.receptor_model} ({args.receptor_net_rule}; table {rs.table_path}); fast sign changed on "
               f"{int((rs.fast_sign != np.sign(c.W.data)).sum()):,} of {c.W.nnz:,} entries; coverage by tier:")
         print(cov.to_string(index=False, float_format=lambda v: f"{v:.4f}"))
     r = retina.build_retina(c)

@@ -43,7 +43,8 @@ mAChR-C (unknown coupling; absent from two sources) is not used. NMDA receptors 
 * Per (type, transmitter, fast|slow): `*_pos_class` / `*_neg_class` are the classes of the + and - groups; `*_net` = sign of the larger class (`mixed` if equal and both present, `none` if both absent); `*_sign` is the numeric sign (+1 / -1 / 0 = none; for `mixed` the prior of `NT_SIGN` is kept for the fast class -- glutamate -1 -- and 0 for the slow class), `*_gain_class` the class of the winning group.
 * The same with the suffix `_abs` under the absolute rule: the larger side must exceed the other 2-fold in summed source-unit level, else `mixed`. This rule is provided because the class rule compares ranks, not amounts: GluCl is expressed at ~10x the iGluR level in every profiled optic type (Davis 2020), which the tertile classes erase.
 * One candidate profile per source and type: the mapping row with the best tier (exact > alias > fuzzy > class), then QC pass before suboptimal, then the row pooling the fewest MaleCNS types, then the source name (alphabetical); the sources are ranked davis2020 > ozel2021 > kurmangaliyev2020 > fca2022 > davie2018 at equal tier / QC. The best-ranked candidate is the `primary` profile.
-* **Profile selection per (type, transmitter) -- round-2 rule** (`select_profile`; docs/audits/receptor_verification.md, verify:implement and the critic): the primary profile decides the fast sign, EXCEPT when it has no fast receptor group for the transmitter (`none`, i.e. the edge would be silenced). A silencing stands only if every source that profiles the type agrees. (i) If the primary is a single-nucleus profile (fca2022 / davie2018) and a whole-cell source (davis2020 / ozel2021 / kurmangaliyev2020) has the group on, that whole-cell profile is used for the row (`fast_selection` = `group_on_override:<source>`; `tier` / `source` / `source_name` then name it). (ii) Any other disagreement about `none` (a whole-cell `none` against any `on`, or a single-nucleus `none` against a single-nucleus `on`) keeps the primary profile but falls back to `NT_SIGN` for the fast sign: `fast_net` = `none_contested`, `fast_sign` = the prior, `fast_gain_class` = `none` (gain factor 1 under `sign+gain`). (iii) A `none` carried by fewer than 2 sources (every source agrees, but only one profiles the type) also falls back to `NT_SIGN`: `fast_net` = `none_single_source` (an anatomical synapse is silenced only on >= 2 concurring profiles; one profile's dropout or threshold call -- e.g. Özel cluster 163 Pm1/Pm5/Pm6 with Rdl P(on) 0.37 at mean log 2.4 -- is not enough). (iv) The `_nonmda` variant is selected separately (a profile whose only iGluR members are Nmdar1 + Nmdar2 is `none` there; `fast_selection_nonmda`, `source_nonmda`). The slow columns come from the profile selected for the class variant. `primary_source` / `primary_tier` record what the round-1 rule (primary always) would have used; `alt_sources` lists the other candidates' net calls.
+* **Profile selection per (type, transmitter) -- round-2 rule** (`select_profile`; docs/audits/receptor_verification.md, verify:implement and the critic): the primary profile decides the fast sign, EXCEPT when it has no fast receptor group for the transmitter (`none`, i.e. the edge would be silenced). A silencing stands only if every source that profiles the type agrees. (i) If the primary is a single-nucleus profile (fca2022 / davie2018) and a whole-cell source (davis2020 / ozel2021 / kurmangaliyev2020) has the group on, that whole-cell profile is used for the row (`fast_selection` = `group_on_override:<source>`; `tier` / `source` / `source_name` then name it). (ii) Any other disagreement about `none` (a whole-cell `none` against any `on`, or a single-nucleus `none` against a single-nucleus `on`) keeps the primary profile but falls back to `NT_SIGN` for the fast sign: `fast_net` = `none_contested`, `fast_sign` = the prior, `fast_gain_class` = `none` (gain factor 1 under `sign+gain`). (iii) A `none` carried by fewer than 2 sources (every source agrees, but only one profiles the type) also falls back to `NT_SIGN`: `fast_net` = `none_single_source` (an anatomical synapse is silenced only on >= 2 concurring profiles; one profile's dropout or threshold call -- e.g. Özel cluster 163 Pm1/Pm5/Pm6 with Rdl P(on) 0.37 at mean log 2.4 -- is not enough). (iv) The `_nonmda` variant is selected separately (a profile whose only iGluR members are Nmdar1 + Nmdar2 is `none` there; `fast_selection_nonmda`, `source_nonmda`). The slow columns come from the profile selected for the class variant. `primary_source` / `primary_tier` record what the round-1 rule (primary always) would have used; `alt_sources` lists the other candidates' net calls (`fast=` class variant, `abs=`, `nonmda=`, `slow=`).
+* **Contested flips -- round-3 rule** (`contest_flip`; docs/audits/receptor_verification.md, round-2 critic follow-up 1), the symmetric case of (ii): a FLIP -- the selected profile's fast net is the opposite sign of the `NT_SIGN` prior (a `+1` on glutamate; a `-1` on a +1 transmitter, which no fast group produces today) -- stands only if no other source profiling the type contradicts it. The rule is applied per variant with each source's net under that variant (class nets for the class columns, `_abs` nets for the abs columns, `_nonmda` nets for the nonmda columns); a source at the prior's own sign contradicts the flip, a source at the flip's sign agrees with it, `mixed` and `none` do neither. Two variants of the rule exist (`--flip-rule`): `any` (**the default and the rule of this table**: >= 1 contradicting source, `fast_net*` = `flip_contested`) and `majority` (fall back only when the contradicting sources outnumber the agreeing ones, `fast_net*` = `flip_contested_majority`); `off` reproduces the round-2 table. A contested flip keeps the selected profile (`tier` / `source` / `alt_sources` unchanged) but takes `fast_sign*` = the prior and `fast_gain_class*` = `none` (factor 1), exactly like `none_contested`; the column `flip_contested` names the contradicting sources per variant (`class:...;abs:...;nonmda:...`, empty when no variant is contested), `fast_selection` / `fast_selection_nonmda` carry `flip_contested*:<sources>` for the class / nonmda variants. This table was built with `--flip-rule any`.
 * Rows `<nt=acetylcholine|gaba|glutamate>` are the Davis 2020 ChAT / Gad1 / VGlut protein-trap drivers: the receptor baseline of a whole transmitter class, usable as a fallback for unprofiled targets (`edge_lookup(..., nt_class_fallback=True)`), off by default.
 
 ## 4. Edge lookup (`edge_lookup(c)`)
@@ -276,162 +277,145 @@ With `nt_class_fallback=True` (Davis ChAT / Gad1 / VGlut class baselines for unp
 
 ### 4e. Glutamatergic edges under the class rule (`net`)
 
-* glutamatergic edges 4,841,001 (21,205,507 synapses |W|); onto a profiled target 1,554,418 (5,976,622); **flip -1 -> +1 (iGluR targets): 240,199 edges, 879,459 synapses = 4.1% of all glutamatergic synapses, 14.7% of those onto profiled targets**; silenced (no fast glutamate receptor on the target): 0 edges, 0 synapses.
+* glutamatergic edges 4,841,001 (21,205,507 synapses |W|); onto a profiled target 1,554,418 (5,976,622); **flip -1 -> +1 (iGluR targets): 144,498 edges, 546,963 synapses = 2.6% of all glutamatergic synapses, 9.2% of those onto profiled targets**; silenced (no fast glutamate receptor on the target): 0 edges, 0 synapses.
 
 By postsynaptic module:
 
 | module | syn_W | edges |
 |---|---|---|
-| antennal_lobe | 38,937 | 8,211 |
-| central | 27,890 | 6,007 |
-| descending | 3,139 | 1,061 |
-| gustatory | 9 | 5 |
-| mushroom_body | 12,074 | 5,632 |
-| optic | 775,299 | 210,184 |
-| visual_projection | 22,111 | 9,099 |
+| antennal_lobe | 38,768 | 8,136 |
+| central | 4,022 | 1,088 |
+| mushroom_body | 8,475 | 4,663 |
+| optic | 494,454 | 130,225 |
+| visual_projection | 1,244 | 386 |
 
 By the lead (highest-level) fast + receptor gene of the postsynaptic type:
 
 | lead_gene | syn_W | edges | frac_of_flipped_syn |
 |---|---|---|---|
-| Nmdar2 | 462,122 | 117,757 | 52.5% |
-| GluRIB | 210,800 | 74,266 | 24.0% |
-| GluRIA | 118,547 | 13,352 | 13.5% |
-| KaiR1D | 87,990 | 34,824 | 10.0% |
+| Nmdar2 | 321,762 | 63,779 | 58.8% |
+| GluRIB | 162,748 | 59,493 | 29.8% |
+| KaiR1D | 62,453 | 21,226 | 11.4% |
 
 Top postsynaptic types:
 
 | post_type | syn_W | edges | frac_of_flipped_syn | lead_gene | GluCl_class | source |
 |---|---|---|---|---|---|---|
-| Mi4 | 194,324 | 39,327 | 22.1% | Nmdar2 | low | davis2020 |
-| L3 | 118,547 | 13,352 | 13.5% | GluRIA | low | davis2020 |
-| T2a | 114,676 | 47,146 | 13.0% | GluRIB | mid | ozel2021 |
-| Mi9 | 103,917 | 43,271 | 11.8% | Nmdar2 | mid | davis2020 |
-| Dm10 | 93,256 | 16,252 | 10.6% | Nmdar2 | low | davis2020 |
-| T1 | 62,361 | 21,157 | 7.1% | KaiR1D | none | davis2020 |
-| Lawf2 | 29,368 | 8,122 | 3.3% | Nmdar2 | low | davis2020 |
-| Dm9 | 25,467 | 5,981 | 2.9% | Nmdar2 | none | davis2020 |
-| Tm9 | 22,946 | 11,799 | 2.6% | KaiR1D | none | davis2020 |
-| EL | 6,335 | 296 | 0.7% | GluRIB | mid | fca2022 |
-| OA-VPM3 | 5,385 | 1,171 | 0.6% | GluRIB | mid | fca2022 |
-| OA-ASM1 | 5,373 | 2,335 | 0.6% | GluRIB | mid | fca2022 |
-| OA-AL2i1 | 4,591 | 2,253 | 0.5% | GluRIB | mid | fca2022 |
-| l-LNv | 4,207 | 262 | 0.5% | Nmdar2 | low | davis2020 |
-| KCg-m | 3,906 | 2,137 | 0.4% | GluRIB | low | fca2022 |
-| OA-VUMa3 | 3,612 | 602 | 0.4% | GluRIB | mid | fca2022 |
-| OA-AL2i2 | 3,419 | 1,423 | 0.4% | GluRIB | mid | fca2022 |
-| M_l2PNm16 | 3,191 | 269 | 0.4% | GluRIB | low | fca2022 |
-| LoVCLo3 | 3,133 | 1,103 | 0.4% | GluRIB | mid | fca2022 |
-| Dm11 | 3,125 | 1,485 | 0.4% | Nmdar2 | low | davis2020 |
-| OA-AL2i3 | 2,736 | 1,132 | 0.3% | GluRIB | mid | fca2022 |
-| OA-VUMa6 | 2,679 | 950 | 0.3% | GluRIB | mid | fca2022 |
-| L1 | 2,591 | 1,799 | 0.3% | KaiR1D | none | davis2020 |
-| VP1d+VP4_l2PN2 | 2,212 | 133 | 0.3% | GluRIB | low | fca2022 |
-| OA-VUMa4 | 2,173 | 454 | 0.2% | GluRIB | mid | fca2022 |
+| Mi4 | 194,324 | 39,327 | 35.5% | Nmdar2 | low | davis2020 |
+| T2a | 114,676 | 47,146 | 21.0% | GluRIB | mid | ozel2021 |
+| Dm10 | 93,256 | 16,252 | 17.0% | Nmdar2 | low | davis2020 |
+| T1 | 62,361 | 21,157 | 11.4% | KaiR1D | none | davis2020 |
+| Dm9 | 25,467 | 5,981 | 4.7% | Nmdar2 | none | davis2020 |
+| l-LNv | 4,207 | 262 | 0.8% | Nmdar2 | low | davis2020 |
+| KCg-m | 3,906 | 2,137 | 0.7% | GluRIB | low | fca2022 |
+| M_l2PNm16 | 3,191 | 269 | 0.6% | GluRIB | low | fca2022 |
+| VP1d+VP4_l2PN2 | 2,212 | 133 | 0.4% | GluRIB | low | fca2022 |
+| KCab-s | 1,781 | 782 | 0.3% | Nmdar2 | low | davis2020 |
+| MZ_lv2PN | 1,750 | 79 | 0.3% | GluRIB | low | fca2022 |
+| VP1d+VP4_l2PN1 | 1,582 | 183 | 0.3% | GluRIB | low | fca2022 |
+| DN1pB | 1,535 | 277 | 0.3% | GluRIB | low | davie2018 |
+| DN1pA | 1,100 | 395 | 0.2% | GluRIB | low | davie2018 |
+| M_lv2PN9t49_b | 1,089 | 155 | 0.2% | GluRIB | low | fca2022 |
+| M_lv2PN9t49_a | 1,051 | 178 | 0.2% | GluRIB | low | fca2022 |
+| M_l2PNm15 | 991 | 142 | 0.2% | GluRIB | low | fca2022 |
+| M_adPNm3 | 975 | 146 | 0.2% | GluRIB | low | fca2022 |
+| M_spPN5t10 | 957 | 138 | 0.2% | GluRIB | low | fca2022 |
+| DN1a | 898 | 203 | 0.2% | GluRIB | low | davie2018 |
+| VP3+_l2PN | 849 | 108 | 0.2% | GluRIB | low | fca2022 |
+| VP1m+VP2_lvPN2 | 820 | 158 | 0.1% | GluRIB | low | fca2022 |
+| VP3+VP1l_ivPN | 813 | 96 | 0.1% | GluRIB | low | fca2022 |
+| M_smPN6t2 | 811 | 136 | 0.1% | GluRIB | low | fca2022 |
+| VP1l+VP3_ilPN | 789 | 89 | 0.1% | GluRIB | low | fca2022 |
 
 ### 4e. Glutamatergic edges under the absolute rule (`net_abs`)
 
-* glutamatergic edges 4,841,001 (21,205,507 synapses |W|); onto a profiled target 1,554,418 (5,976,622); **flip -1 -> +1 (iGluR targets): 46,001 edges, 127,462 synapses = 0.6% of all glutamatergic synapses, 2.1% of those onto profiled targets**; silenced (no fast glutamate receptor on the target): 0 edges, 0 synapses.
+* glutamatergic edges 4,841,001 (21,205,507 synapses |W|); onto a profiled target 1,554,418 (5,976,622); **flip -1 -> +1 (iGluR targets): 30,916 edges, 96,471 synapses = 0.5% of all glutamatergic synapses, 1.6% of those onto profiled targets**; silenced (no fast glutamate receptor on the target): 0 edges, 0 synapses.
 
 By postsynaptic module:
 
 | module | syn_W | edges |
 |---|---|---|
-| central | 8,987 | 2,362 |
+| central | 3,533 | 875 |
 | mushroom_body | 5,018 | 2,834 |
-| optic | 113,457 | 40,805 |
+| optic | 87,920 | 27,207 |
 
 By the lead (highest-level) fast + receptor gene of the postsynaptic type:
 
 | lead_gene | syn_W | edges | frac_of_flipped_syn |
 |---|---|---|---|
-| KaiR1D | 87,990 | 34,824 | 69.0% |
-| Nmdar2 | 30,921 | 7,468 | 24.3% |
-| GluRIB | 8,551 | 3,709 | 6.7% |
+| KaiR1D | 62,453 | 21,226 | 64.7% |
+| Nmdar2 | 25,467 | 5,981 | 26.4% |
+| GluRIB | 8,551 | 3,709 | 8.9% |
 
 Top postsynaptic types:
 
 | post_type | syn_W | edges | frac_of_flipped_syn | lead_gene | GluCl_class | source |
 |---|---|---|---|---|---|---|
-| T1 | 62,361 | 21,157 | 48.9% | KaiR1D | none | davis2020 |
-| Dm9 | 25,467 | 5,981 | 20.0% | Nmdar2 | none | davis2020 |
-| Tm9 | 22,946 | 11,799 | 18.0% | KaiR1D | none | davis2020 |
-| KCg-m | 3,906 | 2,137 | 3.1% | GluRIB | low | fca2022 |
-| L1 | 2,591 | 1,799 | 2.0% | KaiR1D | none | davis2020 |
-| DN1pB | 1,535 | 277 | 1.2% | GluRIB | low | davie2018 |
-| ER1_a | 1,183 | 242 | 0.9% | Nmdar2 | low | fca2022 |
-| DN1pA | 1,100 | 395 | 0.9% | GluRIB | low | davie2018 |
-| DN1a | 898 | 203 | 0.7% | GluRIB | low | davie2018 |
-| ER4d | 725 | 202 | 0.6% | Nmdar2 | low | fca2022 |
-| ER3a_b | 554 | 55 | 0.4% | Nmdar2 | low | fca2022 |
-| ER2_c | 543 | 152 | 0.4% | Nmdar2 | low | fca2022 |
-| KCa'b'-ap2 | 498 | 371 | 0.4% | GluRIB | low | fca2022 |
-| ER3a_c | 434 | 97 | 0.3% | Nmdar2 | low | fca2022 |
-| ER1_b | 317 | 150 | 0.2% | Nmdar2 | low | fca2022 |
-| ER2_a | 312 | 89 | 0.2% | Nmdar2 | low | fca2022 |
-| ER1_c | 292 | 87 | 0.2% | Nmdar2 | low | fca2022 |
-| ER4m | 286 | 104 | 0.2% | Nmdar2 | low | fca2022 |
-| KCg-s1 | 273 | 68 | 0.2% | GluRIB | low | fca2022 |
-| KCa'b'-ap1 | 272 | 216 | 0.2% | GluRIB | low | fca2022 |
-| ER3w_b | 154 | 62 | 0.1% | Nmdar2 | low | fca2022 |
-| ER2_d | 138 | 33 | 0.1% | Nmdar2 | low | fca2022 |
-| ER3w_a | 118 | 49 | 0.1% | Nmdar2 | low | fca2022 |
-| ER3w_c | 103 | 30 | 0.1% | Nmdar2 | low | fca2022 |
+| T1 | 62,361 | 21,157 | 64.6% | KaiR1D | none | davis2020 |
+| Dm9 | 25,467 | 5,981 | 26.4% | Nmdar2 | none | davis2020 |
+| KCg-m | 3,906 | 2,137 | 4.0% | GluRIB | low | fca2022 |
+| DN1pB | 1,535 | 277 | 1.6% | GluRIB | low | davie2018 |
+| DN1pA | 1,100 | 395 | 1.1% | GluRIB | low | davie2018 |
+| DN1a | 898 | 203 | 0.9% | GluRIB | low | davie2018 |
+| KCa'b'-ap2 | 498 | 371 | 0.5% | GluRIB | low | fca2022 |
+| KCg-s1 | 273 | 68 | 0.3% | GluRIB | low | fca2022 |
+| KCa'b'-ap1 | 272 | 216 | 0.3% | GluRIB | low | fca2022 |
 | Lai | 92 | 69 | 0.1% | KaiR1D | low | davis2020 |
+| KCg-s2 | 28 | 14 | 0.0% | GluRIB | low | fca2022 |
+| KCg-s3 | 25 | 16 | 0.0% | GluRIB | low | fca2022 |
+| KCg-s4 | 11 | 8 | 0.0% | GluRIB | low | fca2022 |
+| KCg | 5 | 4 | 0.0% | GluRIB | low | fca2022 |
 
 ### 4e. Glutamatergic edges under the class rule without NMDA (`net_nonmda`)
 
-* glutamatergic edges 4,841,001 (21,205,507 synapses |W|); onto a profiled target 1,554,418 (5,976,622); **flip -1 -> +1 (iGluR targets): 371,905 edges, 1,705,996 synapses = 8.0% of all glutamatergic synapses, 28.5% of those onto profiled targets**; silenced (no fast glutamate receptor on the target): 0 edges, 0 synapses.
+* glutamatergic edges 4,841,001 (21,205,507 synapses |W|); onto a profiled target 1,554,418 (5,976,622); **flip -1 -> +1 (iGluR targets): 189,644 edges, 947,473 synapses = 4.5% of all glutamatergic synapses, 15.9% of those onto profiled targets**; silenced (no fast glutamate receptor on the target): 0 edges, 0 synapses.
 
 By postsynaptic module:
 
 | module | syn_W | edges |
 |---|---|---|
-| antennal_lobe | 38,937 | 8,211 |
-| central | 44,997 | 7,220 |
-| descending | 3,139 | 1,061 |
-| gustatory | 9 | 5 |
-| mushroom_body | 11,275 | 6,084 |
-| optic | 1,586,772 | 340,611 |
-| visual_projection | 20,867 | 8,713 |
+| antennal_lobe | 38,768 | 8,136 |
+| central | 21,129 | 2,301 |
+| mushroom_body | 9,890 | 5,574 |
+| optic | 877,686 | 173,633 |
 
 By the lead (highest-level) fast + receptor gene of the postsynaptic type:
 
 | lead_gene | syn_W | edges | frac_of_flipped_syn |
 |---|---|---|---|
-| GluRIB | 882,000 | 185,282 | 51.7% |
-| GluRIA | 477,861 | 54,603 | 28.0% |
-| KaiR1D | 346,135 | 132,020 | 20.3% |
+| GluRIB | 779,394 | 158,615 | 82.3% |
+| GluRIA | 105,137 | 9,590 | 11.1% |
+| KaiR1D | 62,942 | 21,439 | 6.6% |
 
 Top postsynaptic types:
 
 | post_type | syn_W | edges | frac_of_flipped_syn | lead_gene | GluCl_class | source |
 |---|---|---|---|---|---|---|
-| Mi1 | 254,177 | 31,661 | 14.9% | GluRIA | mid | davis2020 |
-| Tm4 | 197,318 | 73,528 | 11.6% | KaiR1D | low | davis2020 |
-| Mi4 | 194,324 | 39,327 | 11.4% | GluRIB | low | davis2020 |
-| L5 | 188,826 | 17,818 | 11.1% | GluRIB | low | davis2020 |
-| L3 | 118,547 | 13,352 | 6.9% | GluRIA | low | davis2020 |
-| T2a | 114,676 | 47,146 | 6.7% | GluRIB | mid | ozel2021 |
-| C3 | 105,137 | 9,590 | 6.2% | GluRIA | low | davis2020 |
-| Dm10 | 93,256 | 16,252 | 5.5% | GluRIB | low | davis2020 |
-| T1 | 62,361 | 21,157 | 3.7% | KaiR1D | none | davis2020 |
-| C2 | 57,453 | 5,142 | 3.4% | GluRIB | mid | davis2020 |
-| Mi15 | 53,169 | 11,384 | 3.1% | GluRIB | mid | davis2020 |
-| Dm12 | 36,094 | 11,151 | 2.1% | GluRIB | mid | davis2020 |
-| Lawf2 | 29,368 | 8,122 | 1.7% | KaiR1D | low | davis2020 |
-| L4 | 27,845 | 13,848 | 1.6% | KaiR1D | low | davis2020 |
-| Dm9 | 25,467 | 5,981 | 1.5% | GluRIB | none | davis2020 |
-| Tm9 | 22,946 | 11,799 | 1.3% | KaiR1D | none | davis2020 |
-| PFNa | 17,107 | 1,213 | 1.0% | GluRIB | mid | davis2020 |
-| EL | 6,335 | 296 | 0.4% | GluRIB | mid | fca2022 |
-| OA-VPM3 | 5,385 | 1,171 | 0.3% | GluRIB | mid | fca2022 |
-| OA-ASM1 | 5,373 | 2,335 | 0.3% | GluRIB | mid | fca2022 |
-| OA-AL2i1 | 4,591 | 2,253 | 0.3% | GluRIB | mid | fca2022 |
-| KCg-m | 3,906 | 2,137 | 0.2% | GluRIB | low | fca2022 |
-| OA-VUMa3 | 3,612 | 602 | 0.2% | GluRIB | mid | fca2022 |
-| OA-AL2i2 | 3,419 | 1,423 | 0.2% | GluRIB | mid | fca2022 |
-| M_l2PNm16 | 3,191 | 269 | 0.2% | GluRIB | low | fca2022 |
+| Mi4 | 194,324 | 39,327 | 20.5% | GluRIB | low | davis2020 |
+| L5 | 188,826 | 17,818 | 19.9% | GluRIB | low | davis2020 |
+| T2a | 114,676 | 47,146 | 12.1% | GluRIB | mid | ozel2021 |
+| C3 | 105,137 | 9,590 | 11.1% | GluRIA | low | davis2020 |
+| Dm10 | 93,256 | 16,252 | 9.8% | GluRIB | low | davis2020 |
+| T1 | 62,361 | 21,157 | 6.6% | KaiR1D | none | davis2020 |
+| C2 | 57,453 | 5,142 | 6.1% | GluRIB | mid | davis2020 |
+| Dm12 | 36,094 | 11,151 | 3.8% | GluRIB | mid | davis2020 |
+| Dm9 | 25,467 | 5,981 | 2.7% | GluRIB | none | davis2020 |
+| PFNa | 17,107 | 1,213 | 1.8% | GluRIB | mid | davis2020 |
+| KCg-m | 3,906 | 2,137 | 0.4% | GluRIB | low | fca2022 |
+| M_l2PNm16 | 3,191 | 269 | 0.3% | GluRIB | low | fca2022 |
+| VP1d+VP4_l2PN2 | 2,212 | 133 | 0.2% | GluRIB | low | fca2022 |
+| KCab-s | 1,781 | 782 | 0.2% | GluRIB | low | davis2020 |
+| MZ_lv2PN | 1,750 | 79 | 0.2% | GluRIB | low | fca2022 |
+| VP1d+VP4_l2PN1 | 1,582 | 183 | 0.2% | GluRIB | low | fca2022 |
+| DN1pB | 1,535 | 277 | 0.2% | GluRIB | low | davie2018 |
+| DN1pA | 1,100 | 395 | 0.1% | GluRIB | low | davie2018 |
+| M_lv2PN9t49_b | 1,089 | 155 | 0.1% | GluRIB | low | fca2022 |
+| M_lv2PN9t49_a | 1,051 | 178 | 0.1% | GluRIB | low | fca2022 |
+| KCg-d | 1,036 | 615 | 0.1% | GluRIB | mid | davis2020 |
+| M_l2PNm15 | 991 | 142 | 0.1% | GluRIB | low | fca2022 |
+| M_adPNm3 | 975 | 146 | 0.1% | GluRIB | low | fca2022 |
+| M_spPN5t10 | 957 | 138 | 0.1% | GluRIB | low | fca2022 |
+| DN1a | 898 | 203 | 0.1% | GluRIB | low | davie2018 |
 
 ### 4f. Monoamine synapses that acquire a slow sign (raw synapses where available, else |W| = 0 by construction)
 
@@ -596,31 +580,31 @@ Top silenced postsynaptic types per presynaptic transmitter:
 
 4,263 rows = 609 types x 7 transmitters (the `<nt=...>` selector rows excluded). Counts of rows per net call:
 
-| transmitter | column | +1 | -1 | mixed | none | none_contested | none_single_source |
-|---|---|---|---|---|---|---|---|
-| acetylcholine | fast_net | 609 | 0 | 0 | 0 | 0 | 0 |
-| acetylcholine | fast_net_abs | 609 | 0 | 0 | 0 | 0 | 0 |
-| acetylcholine | slow_net | 304 | 76 | 39 | 190 | 0 | 0 |
-| acetylcholine | slow_net_abs | 305 | 60 | 54 | 190 | 0 | 0 |
-| gaba | fast_net | 0 | 600 | 0 | 0 | 7 | 2 |
-| gaba | fast_net_abs | 0 | 600 | 0 | 0 | 7 | 2 |
-| gaba | slow_net | 0 | 601 | 0 | 8 | 0 | 0 |
-| gaba | slow_net_abs | 0 | 601 | 0 | 8 | 0 | 0 |
-| glutamate | fast_net | 193 | 140 | 180 | 0 | 10 | 86 |
-| glutamate | fast_net_abs | 40 | 185 | 288 | 0 | 10 | 86 |
-| glutamate | fast_net_nonmda | 195 | 171 | 147 | 0 | 10 | 86 |
-| glutamate | slow_net | 0 | 411 | 0 | 198 | 0 | 0 |
-| glutamate | slow_net_abs | 0 | 411 | 0 | 198 | 0 | 0 |
-| histamine | fast_net | 0 | 36 | 0 | 221 | 2 | 350 |
-| histamine | fast_net_abs | 0 | 36 | 0 | 221 | 2 | 350 |
-| histamine | slow_net | 0 | 0 | 0 | 609 | 0 | 0 |
-| histamine | slow_net_abs | 0 | 0 | 0 | 609 | 0 | 0 |
-| dopamine | slow_net | 400 | 131 | 78 | 0 | 0 | 0 |
-| dopamine | slow_net_abs | 381 | 129 | 99 | 0 | 0 | 0 |
-| octopamine | slow_net | 188 | 33 | 246 | 142 | 0 | 0 |
-| octopamine | slow_net_abs | 377 | 30 | 60 | 142 | 0 | 0 |
-| serotonin | slow_net | 273 | 251 | 40 | 45 | 0 | 0 |
-| serotonin | slow_net_abs | 283 | 250 | 31 | 45 | 0 | 0 |
+| transmitter | column | +1 | -1 | mixed | none | none_contested | none_single_source | flip_contested |
+|---|---|---|---|---|---|---|---|---|
+| acetylcholine | fast_net | 609 | 0 | 0 | 0 | 0 | 0 | 0 |
+| acetylcholine | fast_net_abs | 609 | 0 | 0 | 0 | 0 | 0 | 0 |
+| acetylcholine | slow_net | 304 | 76 | 39 | 190 | 0 | 0 | 0 |
+| acetylcholine | slow_net_abs | 305 | 60 | 54 | 190 | 0 | 0 | 0 |
+| gaba | fast_net | 0 | 600 | 0 | 0 | 7 | 2 | 0 |
+| gaba | fast_net_abs | 0 | 600 | 0 | 0 | 7 | 2 | 0 |
+| gaba | slow_net | 0 | 601 | 0 | 8 | 0 | 0 | 0 |
+| gaba | slow_net_abs | 0 | 601 | 0 | 8 | 0 | 0 | 0 |
+| glutamate | fast_net | 157 | 140 | 180 | 0 | 10 | 86 | 36 |
+| glutamate | fast_net_abs | 14 | 185 | 288 | 0 | 10 | 86 | 26 |
+| glutamate | fast_net_nonmda | 159 | 171 | 147 | 0 | 10 | 86 | 36 |
+| glutamate | slow_net | 0 | 411 | 0 | 198 | 0 | 0 | 0 |
+| glutamate | slow_net_abs | 0 | 411 | 0 | 198 | 0 | 0 | 0 |
+| histamine | fast_net | 0 | 36 | 0 | 221 | 2 | 350 | 0 |
+| histamine | fast_net_abs | 0 | 36 | 0 | 221 | 2 | 350 | 0 |
+| histamine | slow_net | 0 | 0 | 0 | 609 | 0 | 0 | 0 |
+| histamine | slow_net_abs | 0 | 0 | 0 | 609 | 0 | 0 | 0 |
+| dopamine | slow_net | 400 | 131 | 78 | 0 | 0 | 0 | 0 |
+| dopamine | slow_net_abs | 381 | 129 | 99 | 0 | 0 | 0 | 0 |
+| octopamine | slow_net | 188 | 33 | 246 | 142 | 0 | 0 | 0 |
+| octopamine | slow_net_abs | 377 | 30 | 60 | 142 | 0 | 0 | 0 |
+| serotonin | slow_net | 273 | 251 | 40 | 45 | 0 | 0 | 0 |
+| serotonin | slow_net_abs | 283 | 250 | 31 | 45 | 0 | 0 | 0 |
 
 Source x tier of the profile deciding the fast sign (class variant); one row per (type, transmitter):
 
@@ -643,7 +627,7 @@ Source x tier of the profile deciding the fast sign (class variant); one row per
 | ozel2021 | exact | 42 |
 | ozel2021 | fuzzy | 14 |
 
-Selection outcomes over all type rows: primary 2,733, none_single_source 1,500, none_contested 19, group_on_override 11; nonmda: primary 2,733, none_single_source 1,500, none_contested 19, group_on_override 11.
+Selection outcomes over all type rows: primary 2,697, none_single_source 1,500, flip_contested 36, none_contested 19, group_on_override 11; nonmda: primary 2,697, none_single_source 1,500, flip_contested 36, none_contested 19, group_on_override 11.
 
 ## 5. Caveats
 
@@ -656,65 +640,38 @@ Selection outcomes over all type rows: primary 2,733, none_single_source 1,500, 
 
 ## 6. Changes against the previous table (`--previous`)
 
-Compared with the previous `receptors_by_type.csv` (4,277 (type, transmitter) rows in both; types added 2: ['Pm5', 'Pm6']; removed 0: []). Rows whose value changed: fast_net 1,547, fast_net_abs 1,538, fast_net_nonmda 1,560, fast_sign 470, fast_sign_abs 467, fast_sign_nonmda 471, slow_net 20, tier 72, source 81, source_name 79, fast_pos_lead 3,182, fast_pos_lead_nonmda 3,236.
+Compared with the previous `receptors_by_type.csv` (4,291 (type, transmitter) rows in both; types added 0: []; removed 0: []). Rows whose value changed: fast_net 36, fast_net_abs 26, fast_net_nonmda 36, fast_sign 36, fast_sign_abs 26, fast_sign_nonmda 36, slow_net 0, tier 0, source 0, source_name 0, fast_pos_lead 0, fast_pos_lead_nonmda 0.
 
 `fast_net` transitions (old -> new: rows):
 
 | fast_net_old | fast_net_new | rows |
 |---|---|---|
-| none | none_single_source | 1,504 |
-| none | none_contested | 19 |
-| none | -1 | 12 |
-| -1 | mixed | 8 |
-| mixed | +1 | 2 |
-| +1 | mixed | 1 |
-| mixed | -1 | 1 |
+| +1 | flip_contested | 36 |
 
 `fast_net_abs` transitions (old -> new: rows):
 
 | fast_net_abs_old | fast_net_abs_new | rows |
 |---|---|---|
-| none | none_single_source | 1,504 |
-| none | none_contested | 19 |
-| none | -1 | 12 |
-| -1 | mixed | 2 |
-| mixed | -1 | 1 |
+| +1 | flip_contested | 26 |
 
 `fast_net_nonmda` transitions (old -> new: rows):
 
 | fast_net_nonmda_old | fast_net_nonmda_new | rows |
 |---|---|---|
-| none | none_single_source | 1,504 |
-| none | none_contested | 19 |
-| -1 | mixed | 15 |
-| none | -1 | 12 |
-| mixed | -1 | 6 |
-| mixed | +1 | 2 |
-| -1 | +1 | 2 |
+| +1 | flip_contested | 36 |
 
-`slow_net` transitions (old -> new: rows):
-
-| slow_net_old | slow_net_new | rows |
-|---|---|---|
-| -1 | +1 | 7 |
-| +1 | mixed | 4 |
-| mixed | +1 | 4 |
-| -1 | mixed | 3 |
-| +1 | -1 | 1 |
-| none | +1 | 1 |
-
-Edge-level effect (class rule, |W| synapses): glutamate flips -1 -> +1 243,248 / 902,771 -> 240,199 / 879,459; silenced classical edges 40,144 / 286,600 -> 17,379 / 83,473.
+Edge-level effect (class rule, |W| synapses): glutamate flips -1 -> +1 240,199 / 879,459 -> 144,498 / 546,963; silenced classical edges 17,379 / 83,473 -> 17,379 / 83,473.
 
 Named silenced pairs, previous table:
 
 | pair | edges | syn_W |
 |---|---|---|
-| R7* -> Tm5a / Tm5b (histamine) | 1,733 | 13,777 |
+| R7* -> Tm5a / Tm5b (histamine) | 0 | 0 |
 | R8* -> Mi1 (histamine) | 1,330 | 12,491 |
-| glutamate / GABA -> R7* / R8* (photoreceptor targets) | 10,903 | 153,506 |
-| histamine -> any | 21,682 | 116,366 |
-| glutamate -> any | 9,396 | 149,489 |
-| GABA -> any | 9,066 | 20,745 |
+| glutamate / GABA -> R7* / R8* (photoreceptor targets) | 0 | 0 |
+| histamine -> any | 17,379 | 83,473 |
+| glutamate -> any | 0 | 0 |
+| GABA -> any | 0 | 0 |
 | acetylcholine -> any | 0 | 0 |
 
 Named silenced pairs, this table:
@@ -733,1659 +690,97 @@ Silenced pairs of the previous table (top):
 
 | pre_nt | pre_type | post_type | syn_W | edges |
 |---|---|---|---|---|
-| glutamate | Dm9 | R7y | 26,831 | 1,237 |
-| glutamate | Dm9 | R8y | 24,765 | 863 |
-| glutamate | Dm9 | R7_unclear | 20,728 | 820 |
-| glutamate | Dm9 | R8_unclear | 20,522 | 724 |
-| glutamate | Dm9 | R7p | 19,081 | 705 |
-| glutamate | Dm9 | R8p | 18,230 | 554 |
 | histamine | R8y | Mi15 | 10,706 | 858 |
-| histamine | R8_unclear | R7_unclear | 10,007 | 383 |
 | histamine | R8y | Mi4 | 7,028 | 620 |
 | histamine | R8_unclear | Mi4 | 6,651 | 543 |
-| histamine | R7y | Tm5a | 6,507 | 549 |
 | histamine | R8p | Mi4 | 5,980 | 406 |
-| glutamate | Dm9 | R7d | 5,694 | 150 |
-| glutamate | Dm9 | R8d | 5,025 | 135 |
-| gaba | Pm10 | Pm1 | 5,022 | 949 |
 | histamine | R8y | Mi1 | 4,276 | 483 |
 | histamine | R8_unclear | Mi1 | 4,190 | 451 |
 | histamine | R8p | Mi1 | 3,832 | 343 |
 | histamine | R8p | Mi15 | 3,743 | 324 |
-| histamine | R7_unclear | R8_unclear | 3,740 | 349 |
 | histamine | R8_unclear | Mi15 | 3,692 | 375 |
-| histamine | R7_unclear | Tm5b | 3,151 | 410 |
-| histamine | R7p | Tm5b | 2,950 | 398 |
-| gaba | Pm3 | Pm1 | 2,900 | 983 |
 | histamine | R8_unclear | Dm2 | 2,891 | 454 |
+| histamine | R8p | Dm2 | 2,858 | 402 |
+| histamine | R1-R6 | L4 | 1,947 | 1,437 |
+| histamine | R8y | Dm2 | 1,863 | 411 |
+| histamine | R8_unclear | Mi9 | 1,644 | 386 |
+| histamine | R8p | Mi9 | 1,571 | 326 |
+| histamine | R7p | Dm2 | 1,441 | 362 |
+| histamine | R7_unclear | Dm2 | 1,436 | 373 |
+| histamine | R7y | Mi9 | 1,300 | 427 |
+| histamine | R7y | Dm2 | 1,115 | 390 |
+| histamine | R7y | Mi15 | 670 | 349 |
+| histamine | R1-R6 | C3 | 652 | 476 |
+| histamine | R8y | Mi9 | 647 | 289 |
+| histamine | R7d | Dm2 | 628 | 125 |
+| histamine | R7d | Mi15 | 542 | 109 |
+| histamine | R7p | Tm29 | 533 | 169 |
 
-All 1,626 rows whose net call, slow call or deciding source changed:
+All 64 rows whose net call, slow call or deciding source changed:
 
 | malecns_type | transmitter | fast_net_old | fast_net_new | fast_net_abs_old | fast_net_abs_new | fast_net_nonmda_old | fast_net_nonmda_new | slow_net_old | slow_net_new | source_old | source_new | tier_old | tier_new | fast_pos_lead_old | fast_pos_lead_new |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 5-HTPMPD01 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPD01 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPD01 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPD01 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV01 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV01 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV01 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV01 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV03 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV03 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV03 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| 5-HTPMPV03 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| 5thsLNv_LNd6 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| 5thsLNv_LNd6 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| 5thsLNv_LNd6 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| 5thsLNv_LNd6 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| <nt=acetylcholine> | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | class | class |  |  |
-| <nt=acetylcholine> | glutamate | mixed | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | davis2020 | class | class | Nmdar2 | Nmdar2 |
-| <nt=acetylcholine> | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | class | class |  |  |
-| <nt=acetylcholine> | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | class | class |  |  |
-| <nt=acetylcholine> | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davis2020 | davis2020 | class | class |  |  |
-| <nt=gaba> | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | class | class |  |  |
-| <nt=gaba> | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | class | class |  |  |
-| <nt=gaba> | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | class | class |  |  |
-| <nt=gaba> | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | class | class |  |  |
-| <nt=glutamate> | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | class | class |  |  |
-| <nt=glutamate> | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | class | class |  |  |
-| <nt=glutamate> | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | class | class |  |  |
-| <superclass=ol_intrinsic|ol_sensory|visual_projection|visual_centrifugal> | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davis2020 | davis2020 | class | class |  |  |
-| <superclass=ol_intrinsic|ol_sensory|visual_projection|visual_centrifugal> | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | class | class |  |  |
-| <superclass=ol_intrinsic|ol_sensory|visual_projection|visual_centrifugal> | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davis2020 | davis2020 | class | class |  |  |
-| ATL032 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ATL032 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| ATL032 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| ATL032 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ATL042 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ATL042 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| ATL042 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| ATL042 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| AVLP532 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| AVLP532 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| AVLP532 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| AVLP532 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| C2 | glutamate | mixed | mixed | -1 | -1 | mixed | +1 | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| C2 | histamine | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | exact | exact |  |  |
-| CB0650 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB0650 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB0650 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB0650 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB1009 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CB1009 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CB1009 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CB1009 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CB1026 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CB1026 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CB1026 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CB1026 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CB1296_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB1296_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB1296_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB1296_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2004 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2004 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2004 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2004 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2561 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2561 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2561 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2561 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2589 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2589 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2589 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2589 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2703 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2703 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2703 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2703 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2711 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2711 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2711 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2711 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2772 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB2772 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2772 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB2772 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB3228 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB3228 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB3228 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB3228 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB3383 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB3383 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB3383 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB3383 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB3447 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB3447 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB3447 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| CB3447 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| CB4246 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CB4246 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CB4246 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CB4246 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL344_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL344_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CL344_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CL344_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL357 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL357 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CL357 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CL357 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL360 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL360 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CL360 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CL360 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL365 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CL365 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CL365 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CL365 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CSD | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| CSD | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| CSD | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| CSD | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DA1_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DA1_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DA1_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DA1_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DC4_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DC4_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DC4_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DC4_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DL2d_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DL2d_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DL2d_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DL2d_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DM3_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DM3_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DM3_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DM3_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DM4_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DM4_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DM4_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DM4_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DN1a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pA | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pA | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pA | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pA | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pB | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pB | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pB | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DN1pB | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| DNg26 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNg26 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| DNg26 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| DNg26 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNg30 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNg30 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| DNg30 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| DNg30 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNp29 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNp29 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| DNp29 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| DNp29 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNp32 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNp32 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| DNp32 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| DNp32 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNpe048 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DNpe048 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| DNpe048 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| DNpe048 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| DP1l_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DP1l_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DP1l_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DP1l_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DP1m_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| DP1m_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DP1m_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| DP1m_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| Delta7 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| Delta7 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| Delta7 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| Delta7 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| Dm1 | glutamate | -1 | -1 | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | exact | exact | GluRIA | KaiR1D |
-| Dm11 | glutamate | +1 | +1 | mixed | mixed | -1 | +1 | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| Dm8a | glutamate | -1 | mixed | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  | KaiR1D |
-| Dm8b | glutamate | -1 | mixed | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  | KaiR1D |
-| ENS4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ENS4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| ENS4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| ENS4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ENS5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ENS5 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| ENS5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| ENS5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| EPG | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| EPG | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| EPG | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| EPG | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davis2020 | davis2020 | alias | alias |  |  |
-| ExR3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ExR3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| ExR3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| ExR3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| FB4Y | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| FB4Y | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| FB4Y | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| FB4Y | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| FLA006m | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| FLA006m | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| FLA006m | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| FLA006m | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG002 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG002 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG002 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG002 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG056 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG056 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG056 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG056 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG067 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG067 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG067 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG067 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG101 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG101 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG101 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG101 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG137 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG137 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG137 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG137 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG190 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG190 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG190 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG190 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG540 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG540 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG540 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG540 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG550 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG550 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG550 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG550 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG572 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG572 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG572 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG572 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG642 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG642 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG642 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG642 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG644 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG644 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG644 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG644 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG655 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| GNG655 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| GNG655 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| GNG655 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| HSE | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSE | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSE | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSE | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSS | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSS | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSS | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| HSS | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Hugin-RG | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| Hugin-RG | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| Hugin-RG | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| Hugin-RG | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | fuzzy | fuzzy |  |  |
-| IB118 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| IB118 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| IB118 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| IB118 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| IPC | histamine | none | -1 | none | -1 | none | -1 | none | none | davie2018 | davis2020 | exact | class |  |  |
-| JO-A-unclear | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A-unclear | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A-unclear | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A-unclear | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A-unclear | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-A4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-A4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B-unclear | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B-unclear | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B-unclear | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B-unclear | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B-unclear | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_a | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_b | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_b | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_b | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_b | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_b | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_c | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_c | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_c | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_c | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B1_c | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_a | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_b | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_b | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_b | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_b | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-B4_b | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CA1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CA1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CA1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CA1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CA1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CA2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CA2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CA2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CA2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CA2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CL | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CL | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CL | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CL | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CL | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CM | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CM | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CM | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-CM | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-CM | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-DA | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-DA | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-DA | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-DA | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-DA | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-DP | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-DP | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-DP | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-DP | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-DP | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_a | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_b | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_b | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_b | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_b | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_b | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_c | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_c | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_c | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_c | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-ED2_c | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV5 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV5 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV6 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV6 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV6 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-EV6 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-EV6 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FD1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-FD1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FD1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FD1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-FD1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FD2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-FD2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FD2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FD2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-FD2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FV | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-FV | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FV | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-FV | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-FV | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-mz | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-mz | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-mz | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-mz | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-mz | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-unclear | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-unclear | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-unclear | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| JO-unclear | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| JO-unclear | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| KC | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| KC | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| KC | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | fca2022 | fca2022 | class | class |  |  |
-| KC | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | fca2022 | fca2022 | class | class |  |  |
-| KCa'b'-ap1 | histamine | none | -1 | none | -1 | none | -1 | none | none | fca2022 | davis2020 | fuzzy | fuzzy |  |  |
-| KCa'b'-ap2 | histamine | none | -1 | none | -1 | none | -1 | none | none | fca2022 | davis2020 | fuzzy | fuzzy |  |  |
-| KCg-d | glutamate | mixed | mixed | -1 | mixed | +1 | +1 | -1 | -1 | davis2020 | davis2020 | alias | alias | Nmdar2 | Nmdar2 |
-| LC10_unclear | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LC10_unclear | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LC10_unclear | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LC10_unclear | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LC10a | glutamate | -1 | mixed | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| LC10d | histamine | none | none_contested | none | none_contested | none | none_contested | none | none | ozel2021 | ozel2021 | exact | exact |  |  |
-| LC10e | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LC10e | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LC10e | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LC10e | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| LHPV6q1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LHPV6q1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| LHPV6q1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| LHPV6q1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LLPC1 | glutamate | -1 | mixed | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| LNd_b | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LNd_b | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| LNd_b | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| LNd_b | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LNd_c | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LNd_c | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| LNd_c | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| LNd_c | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LPN_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LPN_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| LPN_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| LPN_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LPN_b | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| LPN_b | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| LPN_b | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| LPN_b | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| Lat1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lat5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| Lawf2 | glutamate | mixed | +1 | -1 | mixed | -1 | +1 | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| MBON01 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON01 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON01 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON01 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON02 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON02 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON02 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON02 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON03 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON03 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON03 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON03 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON04 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON04 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON04 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON04 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON05 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON05 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON05 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON05 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON06 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON06 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON06 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON06 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON07 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON07 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON07 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON07 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON09 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON09 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON09 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON09 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON12 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON12 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON12 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON12 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON13 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON13 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON13 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON13 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON14 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON14 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON14 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON14 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON15 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON15 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON15 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON15 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON15-like | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON15-like | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON15-like | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON15-like | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON16 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON16 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON16 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON16 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON17 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON17 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON17 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON17 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON17-like | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON17-like | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON17-like | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON17-like | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON18 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON18 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON18 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON18 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON19 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON19 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON19 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON19 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON20 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON20 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON20 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON20 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON21 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON21 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON21 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON21 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON22 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON22 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON22 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON22 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON23 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON23 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON23 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON23 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON24 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON24 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON24 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON24 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON25 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON25 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON25 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON25 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON25-like | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON25-like | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON25-like | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON25-like | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON26 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON26 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON26 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON26 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON27 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON27 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON27 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON27 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON28 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON28 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON28 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON28 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON29 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON29 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON29 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON29 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON30 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON30 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON30 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON30 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON31 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON31 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON31 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON31 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON32 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON32 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON32 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON32 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON33 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON33 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON33 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON33 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON34 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON34 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON34 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON34 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MBON35 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON35 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MBON35 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MBON35 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MNx05 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MNx05 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| MNx05 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| MNx05 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| MZ_lv2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| MZ_lv2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| MZ_lv2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| MZ_lv2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_VPNml66 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_VPNml66 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_VPNml66 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_VPNml66 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm5 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm7 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm7 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm7 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm7 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm8 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm8 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm8 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_adPNm8 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_ilPNm90 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_ilPNm90 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_ilPNm90 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_ilPNm90 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_imPNl92 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_imPNl92 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_imPNl92 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_imPNl92 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN10t19 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN10t19 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN10t19 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN10t19 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN3t18 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN3t18 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN3t18 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PN3t18 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl20 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl20 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl20 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl20 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl21 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl21 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl21 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl21 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl22 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl22 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl22 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl22 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl23 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl23 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl23 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNl23 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm14 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm14 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm14 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm14 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm15 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm15 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm15 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm15 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm16 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm16 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm16 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm16 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm17 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm17 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm17 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_l2PNm17 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11A | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11A | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11A | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11A | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11B | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11B | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11B | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11B | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11C | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11C | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11C | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11C | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11D | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11D | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11D | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm11D | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm12 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm12 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm12 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm12 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm13 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm13 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm13 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lPNm13 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_b | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_b | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_b | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lv2PN9t49_b | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm24 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm24 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm24 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm24 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm25 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm25 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm25 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm25 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm26 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm26 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm26 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm26 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm27 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm27 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm27 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm27 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm28 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm28 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm28 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm28 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm29 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm29 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm29 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm29 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm30 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm30 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm30 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm30 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm31 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm31 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm31 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm31 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm32 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm32 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm32 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm32 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm33 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm33 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm33 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm33 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm35 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm35 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm35 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm35 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm37 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm37 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm37 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm37 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm38 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm38 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm38 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm38 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm39 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm39 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm39 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm39 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm40 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm40 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm40 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm40 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm41 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm41 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm41 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm41 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm42 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm42 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm42 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm42 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm43 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm43 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm43 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm43 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm44 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm44 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm44 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm44 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm45 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm45 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm45 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm45 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm46 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm46 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm46 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm46 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm47 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm47 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm47 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm47 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm48 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm48 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm48 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_lvPNm48 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_smPN6t2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_smPN6t2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_smPN6t2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_smPN6t2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_smPNm1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_smPNm1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_smPNm1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_smPNm1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_spPN4t9 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_spPN4t9 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_spPN4t9 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_spPN4t9 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_spPN5t10 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_spPN5t10 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_spPN5t10 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_spPN5t10 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml50 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml50 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml50 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml50 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml51 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml51 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml51 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml51 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml52 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml52 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml52 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml52 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml53 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml53 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml53 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml53 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml54 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml54 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml54 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml54 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml55 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml55 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml55 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml55 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml57 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml57 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml57 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml57 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml60 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml60 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml60 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml60 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml63 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml63 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml63 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml63 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml65 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml65 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml65 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml65 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml67 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml67 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml67 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml67 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml68 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml68 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml68 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml68 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml69 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml69 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml69 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml69 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml72 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml72 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml72 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml72 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml73 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml73 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml73 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml73 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml75 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml75 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml75 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml75 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml76 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml76 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml76 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml76 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml77 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml77 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml77 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml77 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml78 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml78 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml78 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml78 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml79 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml79 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml79 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml79 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml80 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml80 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml80 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml80 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml83 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml83 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml83 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml83 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml84 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml84 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml84 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml84 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml86 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml86 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml86 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml86 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml87 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml87 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml87 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml87 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml88 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml88 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml88 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| M_vPNml88 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| Mi15 | glutamate | +1 | mixed | mixed | -1 | +1 | +1 | -1 | -1 | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| Mi9 | glutamate | +1 | +1 | mixed | mixed | -1 | mixed | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| NPFL1-I | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | +1 | +1 | davie2018 | davis2020 | class | class | nAChRalpha6 | nAChRbeta1 |
-| NPFL1-I | dopamine | none | none | none | none | none | none | -1 | -1 | davie2018 | davis2020 | class | class |  |  |
-| NPFL1-I | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davie2018 | davis2020 | class | class |  |  |
-| NPFL1-I | glutamate | mixed | +1 | mixed | mixed | mixed | +1 | -1 | -1 | davie2018 | davis2020 | class | class | GluRIB | Nmdar2 |
-| NPFL1-I | histamine | none | none | none | none | none | none | none | none | davie2018 | davis2020 | class | class |  |  |
-| NPFL1-I | octopamine | none | none | none | none | none | none | mixed | mixed | davie2018 | davis2020 | class | class |  |  |
-| NPFL1-I | serotonin | none | none | none | none | none | none | -1 | +1 | davie2018 | davis2020 | class | class |  |  |
-| OA-ASM3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| OA-ASM3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| OA-ASM3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| OA-ASM3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| ORN_D | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_D | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_D | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_D | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_D | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4l | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4l | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4l | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4l | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4l | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4m | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4m | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4m | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4m | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DA4m | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DC4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2d | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2d | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2d | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2d | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2d | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2v | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2v | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2v | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2v | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL2v | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_DL3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_DL3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_DL3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_DL3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_DL4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL5 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL5 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DL5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM5 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM5 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM6 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM6 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM6 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM6 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DM6 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1l | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1l | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1l | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1l | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1l | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1m | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1m | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1m | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1m | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_DP1m | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_V | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | alias | alias |  |  |
-| ORN_V | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | alias | alias |  |  |
-| ORN_V | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | alias | alias |  |  |
-| ORN_V | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | alias | alias |  |  |
-| ORN_VA1d | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1d | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1d | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1d | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1d | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1v | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1v | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1v | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1v | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA1v | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| ORN_VA2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA5 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA5 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA6 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA6 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA6 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA6 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA6 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7l | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7l | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7l | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7l | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7l | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7m | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7m | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7m | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7m | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VA7m | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC5 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC5 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC5 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC5 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VC5 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2a | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2p | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2p | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2p | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2p | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VL2p | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM1 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM2 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM3 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM3 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM3 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM3 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM3 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM4 | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5d | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5d | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5d | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5d | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5d | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5v | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5v | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5v | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5v | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM5v | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6l | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6l | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6l | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6l | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6l | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6m | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6m | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6m | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6m | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6m | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6v | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6v | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6v | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6v | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM6v | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7d | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7d | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7d | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7d | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7d | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7v | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7v | glutamate | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7v | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7v | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| ORN_VM7v | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| PAM07 | glutamate | -1 | mixed | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  | KaiR1D |
-| PAM08 | glutamate | -1 | mixed | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  | KaiR1D |
-| PEN_a(PEN1) | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PEN_a(PEN1) | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PEN_a(PEN1) | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PEN_a(PEN1) | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PEN_b(PEN2) | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PEN_b(PEN2) | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PEN_b(PEN2) | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PEN_b(PEN2) | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFGs | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PFGs | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| PFGs | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| PFGs | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PFNa | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| PFNa | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| PFNa | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| PFNa | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| PFNd | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| PFNd | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| PFNd | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | alias | alias |  |  |
-| PFNd | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | alias | alias |  |  |
-| PFNp_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_a | glutamate | -1 | -1 | -1 | -1 | -1 | mixed | -1 | -1 | davis2020 | davis2020 | fuzzy | fuzzy | Nmdar2 | Nmdar2 |
-| PFNp_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_b | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_b | glutamate | -1 | -1 | -1 | -1 | -1 | mixed | -1 | -1 | davis2020 | davis2020 | fuzzy | fuzzy | Nmdar2 | Nmdar2 |
-| PFNp_b | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_b | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_b | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_c | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_c | glutamate | -1 | -1 | -1 | -1 | -1 | mixed | -1 | -1 | davis2020 | davis2020 | fuzzy | fuzzy | Nmdar2 | Nmdar2 |
-| PFNp_c | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_c | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_c | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_d | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_d | glutamate | -1 | -1 | -1 | -1 | -1 | mixed | -1 | -1 | davis2020 | davis2020 | fuzzy | fuzzy | Nmdar2 | Nmdar2 |
-| PFNp_d | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_d | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_d | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_e | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_e | glutamate | -1 | -1 | -1 | -1 | -1 | mixed | -1 | -1 | davis2020 | davis2020 | fuzzy | fuzzy | Nmdar2 | Nmdar2 |
-| PFNp_e | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_e | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFNp_e | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| PFR_a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PFR_a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| PFR_a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| PFR_a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PLP259 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PLP259 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| PLP259 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| PLP259 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PPL203 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PPL203 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| PPL203 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| PPL203 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PRW006 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PRW006 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| PRW006 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| PRW006 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PRW044 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PRW044 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| PRW044 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| PRW044 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PRW068 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| PRW068 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| PRW068 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| PRW068 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| Pm1 | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | none | +1 | ozel2021 | davie2018 | exact | fuzzy | nAChRalpha6 | nAChRalpha7 |
-| Pm1 | dopamine | none | none | none | none | none | none | mixed | +1 | ozel2021 | davie2018 | exact | fuzzy |  |  |
-| Pm1 | gaba | none | -1 | none | -1 | none | -1 | -1 | -1 | ozel2021 | davie2018 | exact | fuzzy |  |  |
-| Pm1 | glutamate | -1 | -1 | -1 | -1 | -1 | -1 | none | none | ozel2021 | davie2018 | exact | fuzzy |  | GluRIB |
-| Pm1 | histamine | none | none | none | none | none | none | none | none | ozel2021 | davie2018 | exact | fuzzy |  |  |
-| Pm1 | octopamine | none | none | none | none | none | none | +1 | -1 | ozel2021 | davie2018 | exact | fuzzy |  |  |
-| Pm1 | serotonin | none | none | none | none | none | none | -1 | -1 | ozel2021 | davie2018 | exact | fuzzy |  |  |
-| R1-R6 | gaba | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| R1-R6 | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| R7R8_unclear | gaba | none | none_contested | none | none_contested | none | none_contested | none | none | ozel2021 | ozel2021 | class | class |  |  |
-| R7R8_unclear | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | ozel2021 | ozel2021 | class | class |  |  |
-| R7_unclear | gaba | none | -1 | none | -1 | none | -1 | none | none | fca2022 | kurmangaliyev2020 | fuzzy | class |  |  |
-| R7_unclear | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| R7_unclear | histamine | none | -1 | none | -1 | none | -1 | none | none | fca2022 | ozel2021 | fuzzy | class |  |  |
-| R7d | gaba | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| R7d | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| R7p | gaba | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| R7p | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| R7y | gaba | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| R7y | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| R8_unclear | gaba | none | -1 | none | -1 | none | -1 | none | none | fca2022 | kurmangaliyev2020 | fuzzy | class |  |  |
-| R8_unclear | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| R8_unclear | histamine | none | -1 | none | -1 | none | -1 | none | none | fca2022 | ozel2021 | fuzzy | class |  |  |
-| R8d | gaba | none | -1 | none | -1 | none | -1 | none | none | fca2022 | kurmangaliyev2020 | fuzzy | class |  |  |
-| R8d | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | fca2022 | fca2022 | fuzzy | fuzzy |  |  |
-| R8d | histamine | none | -1 | none | -1 | none | -1 | none | none | fca2022 | ozel2021 | fuzzy | class |  |  |
-| R8p | gaba | none | none_contested | none | none_contested | none | none_contested | -1 | -1 | davis2020 | davis2020 | alias | alias |  |  |
-| R8p | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| R8y | gaba | none | none_contested | none | none_contested | none | none_contested | -1 | -1 | davis2020 | davis2020 | alias | alias |  |  |
-| R8y | glutamate | none | none_contested | none | none_contested | none | none_contested | none | none | davis2020 | davis2020 | alias | alias |  |  |
-| SIP087 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SIP087 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SIP087 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SIP087 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP304 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP304 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SLP304 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SLP304 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP373 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP373 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SLP373 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SLP373 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP374 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP374 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SLP374 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SLP374 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP403 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP403 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SLP403 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SLP403 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP438 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP438 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SLP438 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SLP438 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP444 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP444 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SLP444 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SLP444 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP457 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SLP457 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SLP457 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SLP457 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP039 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP039 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP039 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP039 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP142 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP142 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP142 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP142 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP145 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP145 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP145 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP145 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP384 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP384 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP384 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP384 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP385 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP385 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP385 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP385 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP503 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP503 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP503 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP503 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP588 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP588 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP588 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP588 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP732 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP732 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP732 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP732 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP735 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP735 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP735 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP735 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP737 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP737 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP737 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP737 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP738 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP738 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP738 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP738 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP741 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP741 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP741 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP741 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP745 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| SMP745 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| SMP745 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| SMP745 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| T4a | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T4a | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4a | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4a | glutamate | -1 | -1 | -1 | -1 | mixed | -1 | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | Nmdar2 |  |
-| T4a | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4a | octopamine | none | none | none | none | none | none | +1 | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4a | serotonin | none | none | none | none | none | none | mixed | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4b | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T4b | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4b | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4b | glutamate | -1 | -1 | -1 | -1 | mixed | -1 | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | Nmdar2 | GluRIB |
-| T4b | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4b | octopamine | none | none | none | none | none | none | +1 | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4b | serotonin | none | none | none | none | none | none | mixed | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4c | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T4c | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4c | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4c | glutamate | -1 | -1 | -1 | -1 | mixed | -1 | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | Nmdar2 | GluRIB |
-| T4c | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4c | octopamine | none | none | none | none | none | none | +1 | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4c | serotonin | none | none | none | none | none | none | mixed | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4d | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T4d | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4d | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4d | glutamate | -1 | -1 | -1 | -1 | mixed | -1 | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | Nmdar2 | GluRIB |
-| T4d | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4d | octopamine | none | none | none | none | none | none | +1 | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T4d | serotonin | none | none | none | none | none | none | mixed | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5a | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T5a | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5a | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5a | glutamate | -1 | -1 | -1 | -1 | mixed | -1 | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | GluRIB | GluRIB |
-| T5a | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5a | octopamine | none | none | none | none | none | none | mixed | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5a | serotonin | none | none | none | none | none | none | -1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5b | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T5b | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5b | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5b | glutamate | -1 | -1 | -1 | -1 | mixed | -1 | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | GluRIB | GluRIB |
-| T5b | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5b | octopamine | none | none | none | none | none | none | mixed | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5b | serotonin | none | none | none | none | none | none | -1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5c | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T5c | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5c | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5c | glutamate | -1 | mixed | -1 | -1 | mixed | mixed | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | GluRIB | GluRIB |
-| T5c | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5c | octopamine | none | none | none | none | none | none | mixed | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5c | serotonin | none | none | none | none | none | none | -1 | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5d | acetylcholine | +1 | +1 | +1 | +1 | +1 | +1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact | nAChRbeta1 | nAChRalpha5 |
-| T5d | dopamine | none | none | none | none | none | none | +1 | +1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5d | gaba | -1 | -1 | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5d | glutamate | -1 | mixed | -1 | -1 | mixed | mixed | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact | GluRIB | GluRIB |
-| T5d | histamine | none | none | none | none | none | none | none | none | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5d | octopamine | none | none | none | none | none | none | mixed | mixed | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| T5d | serotonin | none | none | none | none | none | none | -1 | -1 | davis2020 | kurmangaliyev2020 | fuzzy | exact |  |  |
-| Tm2 | glutamate | -1 | -1 | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | exact | exact | KaiR1D | KaiR1D |
-| Tm5a | histamine | none | -1 | none | -1 | none | -1 | none | none | davie2018 | ozel2021 | fuzzy | class |  |  |
-| Tm5b | histamine | none | -1 | none | -1 | none | -1 | none | none | davie2018 | ozel2021 | fuzzy | class |  |  |
-| TmY3 | glutamate | mixed | mixed | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| TmY5a | glutamate | mixed | mixed | -1 | -1 | -1 | mixed | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
-| VA1d_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VA1d_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VA1d_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VA1d_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VA1v_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VA1v_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VA1v_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VA1v_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VC5_lvPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VC5_lvPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VC5_lvPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VC5_lvPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL1_ilPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL1_ilPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL1_ilPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL1_ilPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL1_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL1_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL1_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL1_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL2a_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL2a_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL2a_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL2a_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL2p_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VL2p_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL2p_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VL2p_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VM4_lvPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VM4_lvPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VM4_lvPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VM4_lvPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VM6_lvPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VM6_lvPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VM6_lvPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VM6_lvPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1d+VP4_l2PN2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1d_il2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1d_il2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1d_il2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1d_il2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1l+VP3_ilPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1l+VP3_ilPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1l+VP3_ilPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1l+VP3_ilPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1l+_lvPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1l+_lvPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1l+_lvPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1l+_lvPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN1 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN1 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN1 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN1 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN2 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN2 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN2 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP2_lvPN2 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP5_ilPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP5_ilPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP5_ilPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+VP5_ilPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+_lvPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m+_lvPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+_lvPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m+_lvPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m_l2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP1m_l2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m_l2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP1m_l2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP2+VC5_l2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP2+VC5_l2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP2+VC5_l2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP2+VC5_l2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP2+Z_lvPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP2+Z_lvPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP2+Z_lvPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP2+Z_lvPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP2_l2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP2_l2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP2_l2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP2_l2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP3+VP1l_ivPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP3+VP1l_ivPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP3+VP1l_ivPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP3+VP1l_ivPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP3+_l2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP3+_l2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP3+_l2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP3+_l2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP3+_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP3+_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP3+_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP3+_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP4+VL1_l2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP4+VL1_l2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP4+VL1_l2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP4+VL1_l2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP4+_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP4+_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP4+_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP4+_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP4_vPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP4_vPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP4_vPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP4_vPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP5+VP3_l2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VP5+VP3_l2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP5+VP3_l2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| VP5+VP3_l2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| VS | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| VS | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| VS | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| VS | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | davis2020 | davis2020 | fuzzy | fuzzy |  |  |
-| V_ilPN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| V_ilPN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| V_ilPN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| V_ilPN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| V_l2PN | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| V_l2PN | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| V_l2PN | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | fca2022 | fca2022 | class | class |  |  |
-| V_l2PN | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | +1 | +1 | fca2022 | fca2022 | class | class |  |  |
-| aDT4 | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| aDT4 | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| aDT4 | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| aDT4 | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| aMe17a | dopamine | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
-| aMe17a | histamine | none | none_single_source | none | none_single_source | none | none_single_source | none | none | davie2018 | davie2018 | class | class |  |  |
-| aMe17a | octopamine | none | none_single_source | none | none_single_source | none | none_single_source | mixed | mixed | davie2018 | davie2018 | class | class |  |  |
-| aMe17a | serotonin | none | none_single_source | none | none_single_source | none | none_single_source | -1 | -1 | davie2018 | davie2018 | class | class |  |  |
+| DNg104 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| DNg34 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| DNg66 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| DNge138 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| DNge149 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| DNge150 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| DNge151 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| DNge152 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| Dm11 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
+| EL | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| ER1_a | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER1_b | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER1_c | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER2_a | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER2_b | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER2_c | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER2_d | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3a_a | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3a_b | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3a_c | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3a_d | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3d_a | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3d_b | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3d_c | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3d_d | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3d_e | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3m | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3p_a | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3p_b | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3w_a | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3w_b | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER3w_c | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER4d | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| ER4m | glutamate | mixed | mixed | +1 | flip_contested | -1 | -1 | none | none | fca2022 | fca2022 | class | class | Nmdar2 | Nmdar2 |
+| GNG629 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| L1 | glutamate | +1 | flip_contested | +1 | flip_contested | +1 | flip_contested | none | none | davis2020 | davis2020 | exact | exact | KaiR1D | KaiR1D |
+| L3 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | none | none | davis2020 | davis2020 | exact | exact | GluRIA | GluRIA |
+| L4 | glutamate | mixed | mixed | mixed | mixed | +1 | flip_contested | none | none | davis2020 | davis2020 | exact | exact | KaiR1D | KaiR1D |
+| LB2b | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| Lat3 | glutamate | +1 | flip_contested | mixed | mixed | mixed | mixed | -1 | -1 | davis2020 | davis2020 | fuzzy | fuzzy | Nmdar2 | Nmdar2 |
+| Lawf2 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
+| LoVCLo3 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| MBON11 | glutamate | +1 | flip_contested | mixed | mixed | mixed | mixed | -1 | -1 | davis2020 | davis2020 | alias | alias | Nmdar2 | Nmdar2 |
+| Mi1 | glutamate | -1 | -1 | -1 | -1 | +1 | flip_contested | -1 | -1 | davis2020 | davis2020 | exact | exact | GluRIA | GluRIA |
+| Mi15 | glutamate | mixed | mixed | -1 | -1 | +1 | flip_contested | -1 | -1 | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
+| Mi9 | glutamate | +1 | flip_contested | mixed | mixed | mixed | mixed | none | none | davis2020 | davis2020 | exact | exact | Nmdar2 | Nmdar2 |
+| OA-AL2i1 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-AL2i2 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-AL2i3 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-AL2i4 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-ASM1 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VPM3 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VPM4 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VUMa1 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VUMa2 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VUMa3 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VUMa4 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VUMa5 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VUMa6 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| OA-VUMa8 | glutamate | +1 | flip_contested | mixed | mixed | +1 | flip_contested | -1 | -1 | fca2022 | fca2022 | class | class | GluRIB | GluRIB |
+| PAM11 | glutamate | +1 | flip_contested | -1 | -1 | -1 | -1 | -1 | -1 | davis2020 | davis2020 | alias | alias | Nmdar2 | Nmdar2 |
+| PAM12 | glutamate | +1 | flip_contested | -1 | -1 | +1 | flip_contested | -1 | -1 | davis2020 | davis2020 | alias | alias | Nmdar2 | Nmdar2 |
+| Tm4 | glutamate | mixed | mixed | -1 | -1 | +1 | flip_contested | -1 | -1 | davis2020 | davis2020 | exact | exact | KaiR1D | KaiR1D |
+| Tm9 | glutamate | +1 | flip_contested | +1 | flip_contested | +1 | flip_contested | none | none | davis2020 | davis2020 | exact | exact | KaiR1D | KaiR1D |

@@ -14,7 +14,7 @@ import torch
 
 from flyverse import connectome as cn
 from flyverse.connectome import Connectome, receptor_signs, RECEPTOR_TIERS, GAIN_CLASSES
-from flyverse.brain import Brain, LIFParams, DEFAULT_RECEPTOR_GAIN, _shaped_weights
+from flyverse.brain import Brain, LIFParams, DEFAULT_RECEPTOR_GAIN, RECEPTOR_MODELS, _shaped_weights, _receptor_key
 
 TABLE_COLUMNS = ["malecns_type", "transmitter", "fast_sign", "fast_gain_class", "fast_sign_abs", "fast_gain_class_abs",
                  "fast_sign_nonmda", "fast_gain_class_nonmda", "slow_sign", "slow_gain_class", "slow_sign_abs",
@@ -112,14 +112,19 @@ class ReceptorLookupTests(unittest.TestCase):
         np.testing.assert_array_equal(rs.tier[other], rs0.tier[other])
 
     def test_off_is_byte_identical(self):
-        base = _shaped_weights(self.c, LIFParams())
+        # receptor_model=None: the table is never read, whatever path is set (round 3: None is no longer the default)
+        base = _shaped_weights(self.c, LIFParams(receptor_model=None))
         off = _shaped_weights(self.c, LIFParams(receptor_model=None, receptor_table=str(self.table)))
         np.testing.assert_array_equal(base.data, off.data)
         np.testing.assert_array_equal(base.indices, off.indices); np.testing.assert_array_equal(base.indptr, off.indptr)
-        b0 = Brain(self.c, LIFParams(event_driven=False), device="cpu")
-        b1 = Brain(self.c, LIFParams(event_driven=False, receptor_table=str(self.table)), device="cpu")
+        b0 = Brain(self.c, LIFParams(event_driven=False, receptor_model=None), device="cpu")
+        b1 = Brain(self.c, LIFParams(event_driven=False, receptor_model=None, receptor_table=str(self.table)), device="cpu")
         torch.testing.assert_close(b0.W.to_dense(), b1.W.to_dense(), rtol=0, atol=0)
         self.assertIsNone(b1.receptor); self.assertIsNone(b1.W_slow); self.assertFalse(b1._slow_on)
+        # the default model on a graph whose types have no row in the shipped table changes nothing either
+        bd = Brain(self.c, LIFParams(event_driven=False), device="cpu")
+        self.assertIsNotNone(bd.receptor); self.assertEqual(int(bd.receptor.matched.sum()), 0)
+        torch.testing.assert_close(b0.W.to_dense(), bd.W.to_dense(), rtol=0, atol=0)
 
     def test_sign_changes_only_matched_edges(self):
         p0 = LIFParams(event_driven=False, same_type_gain=1.0)          # (TA -> TA would otherwise be damped x0.1 in both)
@@ -214,9 +219,10 @@ class CachedConnectomeTests(unittest.TestCase):
 
     def test_off_identical_and_sign_changes_only_matched(self):
         sub = self.sub
-        p0 = LIFParams(event_driven=False); p1 = LIFParams(event_driven=False, receptor_model="sign")
+        # explicit None (the pre-round-3 default) against the class rule this test was written for
+        p0 = LIFParams(event_driven=False, receptor_model=None); p1 = LIFParams(event_driven=False, receptor_model="sign", receptor_net_rule="class")
         b0 = Brain(sub, p0, device="cpu"); b1 = Brain(sub, p1, device="cpu")
-        boff = Brain(sub, LIFParams(event_driven=False, receptor_model=None), device="cpu")
+        boff = Brain(sub, LIFParams(event_driven=False, receptor_model=None, receptor_table=str(cn.RECEPTOR_TABLE)), device="cpu")
         np.testing.assert_array_equal(b0._W_cpu.data, boff._W_cpu.data)
         rs = b1.receptor
         self.assertEqual(len(rs.fast_sign), sub.W.nnz)
@@ -250,6 +256,55 @@ class CachedConnectomeTests(unittest.TestCase):
         # a cache built with the override has every cell of each type relabelled; one built without keeps its consensus
         applied = [bool((n.nt[n.type == t] == nt).all()) for t, nt in cn.TYPE_NT_OVERRIDE.items()]
         self.assertIn(all(applied), (True, False))
+
+    # ---- round-3 adoption (docs/audits/receptor_integration.md "Round 3: adoption") ---------------------------------
+    # Hashes of brain._shaped_weights (data + indices + indptr of the sorted CSR) on the adopted TYPE_NT_OVERRIDE cache
+    # (nnz 25,578,600, sum|W| 121,460,584, glutamate cells 29,707), computed with EXPLICIT receptor settings before the
+    # default changed (scratch hash_weights.py, 2026-09-12): receptor_model=None must keep giving the previous weights.
+    ADOPTED_CACHE = {"nnz": 25_578_600, "sum_abs_W": 121_460_584, "glutamate_cells": 29_707}
+    WEIGHTS_MD5_NONE = "2e276b30b6117c1f62688b01775eda6b"          # receptor_model=None: the pre-round-3 default weights
+    WEIGHTS_MD5_SIGN_ABS = "f0d145d1bb81b446ebc51f89ded7bd4b"      # receptor_model='sign', receptor_net_rule='abs' (shipped table)
+    SIGN_ABS_VS_NONE = {"differing": 48_295, "flipped": 30_916, "zeroed": 17_379}
+
+    @staticmethod
+    def _weights_md5(W):
+        import hashlib
+        W = W.tocsr(); W.sort_indices()
+        m = hashlib.md5(); m.update(W.data.tobytes()); m.update(W.indices.tobytes()); m.update(W.indptr.tobytes())
+        return m.hexdigest(), W
+
+    def test_default_is_sign_abs_and_none_is_selectable(self):
+        p = LIFParams()
+        self.assertEqual(p.receptor_model, "sign"); self.assertEqual(p.receptor_net_rule, "abs")
+        self.assertFalse(p.receptor_nt_class_fallback); self.assertIsNone(p.receptor_table)
+        self.assertIn(None, RECEPTOR_MODELS)
+        p0 = LIFParams(receptor_model=None)
+        self.assertIsNone(p0.receptor_model); self.assertIsNone(_receptor_key(p0))
+        self.assertEqual(_receptor_key(LIFParams()), ("sign", "abs", False, None, None))
+        # a Brain under None carries no lookup; under the default it carries one aligned with W
+        b0 = Brain(self.sub, LIFParams(event_driven=False, receptor_model=None), device="cpu")
+        bd = Brain(self.sub, LIFParams(event_driven=False), device="cpu")
+        self.assertIsNone(b0.receptor); self.assertEqual(len(bd.receptor.fast_sign), self.sub.W.nnz)
+
+    def test_none_reproduces_previous_weights_byte_for_byte(self):
+        c = self.c
+        on_adopted_cache = (c.W.nnz == self.ADOPTED_CACHE["nnz"] and int(np.abs(c.W.data).sum()) == self.ADOPTED_CACHE["sum_abs_W"]
+                            and int((c.neurons.nt == "glutamate").sum()) == self.ADOPTED_CACHE["glutamate_cells"])
+        h_none, W_none = self._weights_md5(_shaped_weights(c, LIFParams(receptor_model=None)))
+        h_def, W_def = self._weights_md5(_shaped_weights(c, LIFParams()))
+        h_abs, W_abs = self._weights_md5(_shaped_weights(c, LIFParams(receptor_model="sign", receptor_net_rule="abs")))
+        self.assertEqual(h_def, h_abs)                                   # the default IS sign / abs on the shipped table
+        self.assertNotEqual(h_def, h_none)
+        d = W_def.data != W_none.data
+        self.assertTrue(np.all(W_def.indices == W_none.indices)); self.assertTrue(np.all(W_def.indptr == W_none.indptr))
+        self.assertEqual(int(((W_def.data == 0) & (W_none.data != 0)).sum()) + int((np.sign(W_def.data) * np.sign(W_none.data) < 0).sum()), int(d.sum()))
+        if not on_adopted_cache:
+            self.skipTest("cache is not the adopted TYPE_NT_OVERRIDE cache; the pinned hashes do not apply")
+        self.assertEqual(h_none, self.WEIGHTS_MD5_NONE)                  # receptor_model=None: the previous weights
+        self.assertEqual(h_def, self.WEIGHTS_MD5_SIGN_ABS)               # the round-3 default on the shipped table
+        self.assertEqual(int(d.sum()), self.SIGN_ABS_VS_NONE["differing"])
+        self.assertEqual(int((np.sign(W_def.data) * np.sign(W_none.data) < 0).sum()), self.SIGN_ABS_VS_NONE["flipped"])
+        self.assertEqual(int(((W_def.data == 0) & (W_none.data != 0)).sum()), self.SIGN_ABS_VS_NONE["zeroed"])
 
 
 # ---- round-2 slow term: class split, zero-cost off, the multiplicative variants, the optic-lobe term ----------------
@@ -361,7 +416,7 @@ class SlowTermRound2Tests(unittest.TestCase):
         torch.testing.assert_close(b.v, b_sg.v, rtol=0, atol=0); torch.testing.assert_close(b.rate, b_sg.rate, rtol=0, atol=0)
         self.assertEqual(float(b.g_slow.abs().sum()), 0.0)
         # the model off is still byte-identical to the base weights
-        base = _shaped_weights(self.c, LIFParams()); off = _shaped_weights(self.c, LIFParams(receptor_model=None, slow_mode="gain"))
+        base = _shaped_weights(self.c, LIFParams(receptor_model=None)); off = _shaped_weights(self.c, LIFParams(receptor_model=None, slow_mode="gain"))
         np.testing.assert_array_equal(base.data, off.data)
 
     def _tone(self, mode, **kw):
@@ -550,6 +605,52 @@ class SelectProfileTests(unittest.TestCase):
         self.assertFalse(brt.WHOLE_CELL_SOURCES & brt.SINGLE_NUCLEUS_SOURCES)
 
 
+class ContestFlipTests(unittest.TestCase):
+    """Round-3 symmetric rule (scripts/build_receptor_table.contest_flip): a flip contradicted by another profiled
+    source at the prior's sign falls back to NT_SIGN ('any'); 'majority' only when the contradictors outnumber the
+    sources agreeing with the flip; 'off' never."""
+
+    TM9 = _cands(("davis2020", "+1"), ("kurmangaliyev2020", "-1"), ("fca2022", "-1"), ("davie2018", "-1"))
+
+    def test_any_contests_on_one_contradictor(self):
+        # Tm9 glutamate under abs: Davis +1 (KaiR1D 107 TPM, GluClalpha 0) vs three exact sources at -1
+        self.assertEqual(brt.contest_flip(self.TM9, 0, -1), (brt.FLIP_CONTESTED, ["kurmangaliyev2020", "fca2022", "davie2018"]))
+        # L1: Davis +1 vs Davie -1 alone
+        self.assertEqual(brt.contest_flip(_cands(("davis2020", "+1"), ("davie2018", "-1")), 0, -1), (brt.FLIP_CONTESTED, ["davie2018"]))
+        self.assertEqual(brt.FLIP_RULE_DEFAULT, "any")
+
+    def test_majority_needs_more_contradictors_than_agreers(self):
+        self.assertEqual(brt.contest_flip(self.TM9, 0, -1, "majority"), (brt.FLIP_CONTESTED_MAJORITY, ["kurmangaliyev2020", "fca2022", "davie2018"]))
+        one_each = _cands(("davis2020", "+1"), ("ozel2021", "+1"), ("davie2018", "-1"))
+        self.assertEqual(brt.contest_flip(one_each, 0, -1, "majority"), (None, ["davie2018"]))   # 1 vs 1: the flip stands
+        self.assertEqual(brt.contest_flip(one_each, 0, -1, "any"), (brt.FLIP_CONTESTED, ["davie2018"]))
+        two_v_one = _cands(("davis2020", "+1"), ("ozel2021", "-1"), ("davie2018", "-1"))
+        self.assertEqual(brt.contest_flip(two_v_one, 0, -1, "majority"), (brt.FLIP_CONTESTED_MAJORITY, ["ozel2021", "davie2018"]))
+
+    def test_uncontested_mixed_none_and_prior_are_left_alone(self):
+        # T1 glutamate under abs: Kurmangaliyev +1, the other three 'none' -> the flip stands
+        self.assertEqual(brt.contest_flip(_cands(("kurmangaliyev2020", "+1"), ("ozel2021", "none"), ("fca2022", "none")), 0, -1), (None, []))
+        self.assertEqual(brt.contest_flip(_cands(("davis2020", "+1"), ("ozel2021", "mixed")), 0, -1), (None, []))
+        self.assertEqual(brt.contest_flip(_cands(("davis2020", "-1"), ("ozel2021", "+1")), 0, -1), (None, []))   # not a flip
+        self.assertEqual(brt.contest_flip(_cands(("davis2020", "mixed"), ("ozel2021", "-1")), 0, -1), (None, []))
+        self.assertEqual(brt.contest_flip(_cands(("davis2020", "none"), ("ozel2021", "-1")), 0, -1), (None, []))
+        self.assertEqual(brt.contest_flip(_cands(("davis2020", "+1")), 0, 0), (None, []))                       # monoamine prior 0
+
+    def test_symmetric_case_and_selected_index(self):
+        # a -1 on a +1 transmitter is the mirror image
+        self.assertEqual(brt.contest_flip(_cands(("davis2020", "-1"), ("ozel2021", "+1")), 0, +1), (brt.FLIP_CONTESTED, ["ozel2021"]))
+        # the selected candidate need not be the first (group_on_override); the skipped 'none' does not count
+        self.assertEqual(brt.contest_flip(_cands(("davie2018", "none"), ("ozel2021", "+1"), ("fca2022", "-1")), 1, -1),
+                         (brt.FLIP_CONTESTED, ["fca2022"]))
+
+    def test_off_and_bad_rule(self):
+        self.assertEqual(brt.contest_flip(self.TM9, 0, -1, "off"), (None, []))
+        with self.assertRaises(ValueError):
+            brt.contest_flip(self.TM9, 0, -1, "sometimes")
+        self.assertEqual(brt.FAST_FALLBACK, brt.NONE_FALLBACK + brt.FLIP_FALLBACK)
+        self.assertEqual(set(brt.FLIP_FALLBACK), {"flip_contested", "flip_contested_majority"})
+
+
 @unittest.skipUnless(cn.RECEPTOR_TABLE.exists(), "receptor table absent")
 class ShippedTableRuleTests(unittest.TestCase):
     """The shipped receptors_by_type.csv obeys the round-2 rule."""
@@ -601,6 +702,62 @@ class ShippedTableRuleTests(unittest.TestCase):
         self.assertIn("kurmangaliyev2020", set(self.rt.source))
         for t in ("T4a", "T5a"):
             self.assertEqual(self._row(t, "acetylcholine").source, "kurmangaliyev2020")
+
+    @staticmethod
+    def _alt_nets(row, field):
+        """The other candidates' net calls for one variant field ('fast', 'abs', 'nonmda', 'slow') from alt_sources."""
+        out = []
+        for a in str(row.alt_sources).split(";"):
+            if not a or a == "nan":
+                continue
+            kv = dict(kv.split("=") for kv in a.split(":", 1)[1].split(","))
+            out.append(kv[field])
+        return out
+
+    def test_contested_flips_fall_back_to_prior(self):
+        """Round-3 rule on the shipped table (built with --flip-rule any): every flip-fallback row carries the prior with
+        gain class none, and no surviving flip has another source at the prior's sign under the same variant."""
+        classical = self.rt[self.rt.transmitter.isin(brt.CLASSICAL)]
+        self.assertIn("flip_contested", self.rt.columns)
+        seen = 0
+        for col, sgn, gcls, field in [("fast_net", "fast_sign", "fast_gain_class", "fast"),
+                                      ("fast_net_abs", "fast_sign_abs", "fast_gain_class_abs", "abs"),
+                                      ("fast_net_nonmda", "fast_sign_nonmda", "fast_gain_class_nonmda", "nonmda")]:
+            fb = classical[classical[col].isin(brt.FLIP_FALLBACK)]
+            self.assertGreater(len(fb), 0, col)
+            seen += len(fb)
+            for _, r in fb.iterrows():
+                prior = int(cn.NT_SIGN[r.transmitter])
+                self.assertEqual(int(r[sgn]), prior, (r.malecns_type, r.transmitter, col))
+                self.assertEqual(r[gcls], "none", (r.malecns_type, r.transmitter, col))
+                self.assertIn(f"{field if field != 'fast' else 'class'}:", str(r.flip_contested), (r.malecns_type, r.transmitter, col))
+                self.assertIn(f"{prior:+d}", self._alt_nets(r, field), (r.malecns_type, r.transmitter, col))
+            # surviving flips: no other source at the prior's sign under this variant
+            for _, r in classical[classical[col].isin(["+1", "-1"])].iterrows():
+                prior = int(cn.NT_SIGN[r.transmitter])
+                if int(r[col]) != prior:
+                    self.assertNotIn(f"{prior:+d}", self._alt_nets(r, field), (r.malecns_type, r.transmitter, col))
+        self.assertGreater(seen, 0)
+        # a row not contested in any variant has an empty flip_contested
+        empty = classical[~classical.fast_net.isin(brt.FLIP_FALLBACK) & ~classical.fast_net_abs.isin(brt.FLIP_FALLBACK)
+                          & ~classical.fast_net_nonmda.isin(brt.FLIP_FALLBACK)]
+        self.assertTrue(empty.flip_contested.fillna("").eq("").all())
+
+    def test_named_contested_flips_of_round_3(self):
+        r = self._row("Tm9", "glutamate")                # Davis KaiR1D 107 TPM vs GluClalpha 0; Kurmangaliyev / FCA / Davie exact at -1
+        self.assertEqual(r.source, "davis2020")
+        for col, sgn in [("fast_net", "fast_sign"), ("fast_net_abs", "fast_sign_abs"), ("fast_net_nonmda", "fast_sign_nonmda")]:
+            self.assertEqual(r[col], brt.FLIP_CONTESTED, col); self.assertEqual(int(r[sgn]), -1, col)
+        self.assertEqual(set(str(r.flip_contested).split(";")[1].split(":")[1].split("+")), {"kurmangaliyev2020", "fca2022", "davie2018"})
+        r = self._row("L1", "glutamate")                 # Davis +1 vs Davie -1 (class), Kurmangaliyev + Davie -1 (abs)
+        self.assertEqual(r.fast_net_abs, brt.FLIP_CONTESTED); self.assertEqual(int(r.fast_sign_abs), -1)
+        per_variant = dict(kv.split(":") for kv in str(r.flip_contested).split(";"))
+        self.assertEqual(set(per_variant["abs"].split("+")), {"kurmangaliyev2020", "davie2018"})
+        r = self._row("T1", "glutamate")                 # Kurmangaliyev +1, the others 'none': an uncontested flip survives
+        self.assertEqual(r.fast_net_abs, "+1"); self.assertEqual(int(r.fast_sign_abs), +1); self.assertTrue(pd.isna(r.flip_contested) or r.flip_contested == "")
+        for t in ("Tm5a", "Tm5b", "Mi1", "Pm5", "Pm6"):  # the round-2 named pairs are untouched
+            for nt in ("histamine", "gaba"):
+                self.assertNotIn(self._row(t, nt).fast_net, brt.FLIP_FALLBACK, (t, nt))
 
 
 if __name__ == "__main__":

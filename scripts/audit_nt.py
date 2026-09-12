@@ -265,6 +265,38 @@ def main():
     n = c.neurons
     N = c.n
     log(f"neurons {N:,}")
+    # the receptor model in force by default (LIFParams.receptor_model; round 3 made 'sign' / 'abs' the default):
+    # how many stored entries of W the per-edge lookup re-signs on top of the presynaptic convention audited here
+    lp = LIFParams()
+    receptor_line = None
+    if lp.receptor_model is not None:
+        t0 = time.time()
+        rs = cn.receptor_signs(c, table_path=lp.receptor_table, net_rule=lp.receptor_net_rule, nt_class_fallback=lp.receptor_nt_class_fallback)
+        w_sign = np.sign(c.W.data)
+        changed = rs.fast_sign != w_sign
+        flipped = (rs.fast_sign * w_sign) < 0
+        zeroed = (rs.fast_sign == 0) & (w_sign != 0)
+        unsilenced = (rs.fast_sign != 0) & (w_sign == 0)
+        absW = np.abs(c.W.data)
+        pre_col = c.W.tocoo().col
+        pre_nt_all = n.nt.to_numpy()
+
+        def by_nt(mask):
+            vc = pd.Series(pre_nt_all[pre_col[mask]]).value_counts()
+            return ", ".join(f"{k} {int(v):,}" for k, v in vc.items()) or "none"
+        receptor_line = (f"Receptor model in force by default (`brain.LIFParams.receptor_model` = `{lp.receptor_model}`, net rule "
+                         f"`{lp.receptor_net_rule}`, table `{os.path.relpath(rs.table_path, root).replace(os.sep, '/')}`; docs/NT_INTEGRATION.md, "
+                         f"docs/audits/receptor_integration.md): on the {int(rs.matched.sum()):,} of {c.W.nnz:,} stored entries "
+                         f"({rs.matched.mean():.1%}; {absW[rs.matched].sum() / absW.sum():.1%} of |W|) whose (postsynaptic type, "
+                         f"presynaptic transmitter) has a row in the receptor table, the row's fast sign replaces the presynaptic sign: "
+                         f"{int(changed.sum()):,} entries change -- {int(flipped.sum()):,} flipped ({int(absW[flipped].sum()):,} |W| synapses; "
+                         f"presynaptic transmitter: {by_nt(flipped)}), {int(zeroed.sum()):,} silenced ({int(absW[zeroed].sum()):,} synapses; "
+                         f"{by_nt(zeroed)}), {int(unsilenced.sum()):,} sign-0 entries un-silenced. The lookup never revives a sign-0 "
+                         f"presynaptic cell (monoamine and `unknown` synapses stay explicit zeros), so every count in this audit is "
+                         f"unchanged by the receptor model; `LIFParams(receptor_model=None)` selects the presynaptic-sign rule alone.")
+        log(f"receptor model {lp.receptor_model} / {lp.receptor_net_rule}: {int(changed.sum()):,} entries changed "
+            f"({int(flipped.sum()):,} flipped, {int(zeroed.sum()):,} zeroed, {int(unsilenced.sum()):,} un-silenced) ({time.time() - t0:.1f}s)")
+        del rs
     raw = nt_columns(n)
     ann = pf.read_table(cn.DATA_DIR / cn.ANNOT_FILE, columns=["bodyId", "synonyms"]).to_pandas()
     syn = ann.set_index("bodyId").synonyms.reindex(n.bodyId.to_numpy()).fillna("").astype(str).to_numpy()
@@ -416,6 +448,8 @@ def main():
              "or to the fan-in normalisation (`in_syn` excludes them). Counts below are raw synapse counts (`weight`) "
              "on the model's node set (Traced bodies + photoreceptors), before the connection cap; the "
              f"`capped` column applies `min(count, {cap:g})` per connection, the first step of `brain._shaped_weights`.\n")
+    if receptor_line is not None:
+        L.append(receptor_line + "\n")
 
     L.append("## 1. Overall\n")
     L.append(f"* Neurons: {N:,}; presynaptic neurons (>= 1 output synapse): {int(has_out.sum()):,}.")

@@ -1201,6 +1201,51 @@ cuSPARSE with a warning instead of aborting the room sections silently; `cx_wedg
 overwrite the audit's structural files; `cluster_run.py --fetch out/` copies the directory's contents instead of
 nesting; the two remaining scratchpad generators are in `scripts/`.
 
+## Session 10: receptor-expression integration, round 3
+
+Round 3 (13 agents: rule, adoption, four experiments, five Opus skeptics, one critic) closed the receptor plan's
+open list; `docs/NT_INTEGRATION.md` section 7 has the outcome, `docs/audits/receptor_verification.md` the verdicts.
+
+**The default model now uses receptor-derived signs.** `LIFParams.receptor_model = 'sign'` with the absolute-level
+rule (`abs`) on the contested-flip table: a glutamatergic synapse is excitatory where the target's absolute iGluR
+expression exceeds its GluCl expression and no other profiled source says otherwise (26 rows removed by that rule:
+Tm9, L1, 24 ring-neuron rows); histamine is silenced where two or more sources agree the target has no ort / HisCl.
+It changes 0.148 % of the synaptic weight (30,916 glutamate flips, 17,379 histamine silencings), 95 % of it on
+optic rate units (T1, Dm9, Mi4, Mi1); `receptor_model=None` reproduces the previous weights byte for byte (pinned
+test). Under the project's rule this is the right kind of change: a sign taken from expression data, no fitted
+parameter, no gain, reversible by one flag. The suite is 27/0/2 in 10 of 10 runs against off's 26/1/2 and 24/3/2 with
+no check worse in status; the demo loom escapes 12/12 seeds; costs on record are the legacy loom GF (27-32 vs 37-44
+Hz, still PASS), KC_active 816 vs 1426, and more spontaneous take-offs in the room (24 vs 3 in 16 flies x 5 min, one
+batch). One caveat qualifies the headline: the critic found that benchmark.py's two legacy sections (walk, motion)
+built their optic lobe without the receptor lookup, so the check that flips to PASS (walk.power_max) and the one
+quantified cost were measured with the model half applied. That is fixed (and `--receptor-model off`, which had
+become a silent no-op, again means the presynaptic rule); the re-score is the first item of round 4, and until it
+runs those two numbers are not quoted as properties of the shipped model.
+
+**Step 8 (stop-gap retirement) under the new default:** LPi x4, GF x0.3 damping and the AL LN GABA override each
+break walk.power_max alone in 3/3 replicates, so none is retired; the session-9 "GF damping can go" is retracted
+(its ablation now raises the walking GF instead of collapsing it); weakening LPi x4 -> x1 undoes the loom cost. To be
+re-derived after the benchmark fix, since the deciding check lives in the affected section.
+
+**Compass with the GLNO loop closed inhibitory** (both EM predictions favour it): the bump persists at gE 2 / gD 15
+at 180-184 Hz (-10 %); over a seed-matched grid the silent and inhibitory rings persist in equal numbers of runs
+(21/36 each) with the window shifted one gD step, not narrower; the session-9 window was a seed-0 statement and
+fails at three seeds at its corners. Nothing in the session-9 compass conclusions moves; gE 2 / gD 15 lies in both
+windows; the 200 Hz bump rate is untouched.
+
+**Slow term on abs weights:** the hunger-assay precondition is not met (walk.power_max fails in 11/12 runs); the
+Torch-path walk / motion sections are not bit-reproducible; the dop1r1 confound is unseparated. Stays a flag.
+
+**Object sweep with a proper null:** the (ball - none) statistic's no-stimulus value is +0.07-0.19 mV (a max over
+cells); only LPLC2 rises above it (+0.1-0.2 mV; z +5.4), an invisible-ball control confirms the null; the
+medulla carries the ball (Mi4 z +22-29) and the lobula small-field stage does not. Hypothesis (a) is closed with an
+error bar; the object item continues as a medulla -> lobula wiring / dynamics question.
+
+Verification cost this round: attribution and wording errors only (a per-seed loom determinism that is run-to-run;
+"narrower" compass window; "discrete" walk.power_max values; p 0.0003 -> 7.7e-5) -- none reversed a decision, and the
+skeptics' added controls supported every direction. 64 tests pass; round-3 batches: six task + five skeptic, 0
+failed jobs.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

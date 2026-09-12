@@ -106,7 +106,8 @@ Per cell type (MaleCNS name), from the transcriptomic sources:
 And on our side:
 
 - A weight-shaping stage that can set a synapse's sign from (pre transmitter, post receptor
-  profile) rather than from the pre cell alone, kept as an **optional, swappable** step in
+  profile) rather than from the pre cell alone (since round 3 the DEFAULT, `receptor_model='sign'` / `abs`;
+  `None` restores the presynaptic rule byte for byte), implemented as a swappable step in
   `brain._shaped_weights` (`LIFParams.receptor_model`), default off until it scores better.
 - A slow-current term in the LIF for the monoamine / metabotropic class (a second, low-pass
   conductance with its own time constant per receptor class), so that dopamine, octopamine and
@@ -272,7 +273,46 @@ histamine; Kurmangaliyev 2020 added as a sixth source). Findings:
    control fails Shiu; never run on abs weights; 'gain' acts on the net input (disinhibits net-inhibited targets); the
    KC-direction story did not survive verification. It stays an experiment flag for assay 7, not a default.
 
-**Round 3 (next):** a symmetric "contested flip" rule and rebuild; re-score abs with and without the Tm9 row; adopt
-`sign`/`abs` as the default only if 27/0/2 holds in 3/3 with the contested flips removed (then step 8 -- LPi x4, GF
-x0.3, AL LN override -- under the new default); the GLNO=gaba compass scan; the slow term on abs weights; an
-object-sweep null and replicates; and the remaining reporting debt listed in the verification record.
+**Round 3 (done; `docs/audits/receptor_verification.md` round-3 section):**
+
+1. **Default model changed, data-driven.** `LIFParams.receptor_model = 'sign'`, `receptor_net_rule = 'abs'` on the
+   contested-flip table (a flip stands only when no other profiled source contradicts it; 26 abs rows removed: Tm9,
+   L1, 24 ER ring rows): 48,295 entries = 179,944 |W| synapses = 0.148 % (30,916 glutamate flips onto iGluR targets,
+   17,379 two-source histamine silencings); 95 % of the changed weight lands on optic rate units (T1, Dm9, Mi4, Mi1),
+   8,833 synapses on spiking cells (KCg-m, DN1 clock, KCa'b', OA silencings). `None` reproduces the previous weights
+   byte for byte (md5-pinned test). Evidence: 27/0/2 in 10 of 10 suite runs vs off 26/1/2 and 24/3/2, no check worse
+   in status than any off run; demo loom escapes 12/12 vs 3/12; bitter 3 seeds 139.9 / 138.9 / 131.5 vs 123.5 / 122.0
+   / 114.7; figure-ground and object sweep within scatter. Costs on record: legacy loom.GF_peak 27-32 vs 37-44 Hz
+   (PASS), KC_active 816 vs 1426, spontaneous take-offs 24 vs 3 in 16 flies x 5 min (U 226, p 7.7e-5; one batch),
+   pinned-loom escape at the 33 Hz threshold in 2 of 6 runs (round-2 table 5/5 at 37 Hz; off 0/5 at 19). The
+   justification the adoption rests on is the data-side argument for `abs` in `receptor_rules.md` section 3 (absolute
+   GluCl vs iGluR level; contested flips removed), not the suite count.
+   **Caveat found by the critic:** benchmark.py's legacy `walk` and `motion` sections built the optic lobe without the
+   receptor lookup, so `walk.power_max` (the FAIL -> PASS) and the legacy `loom.GF_peak` (the cost) were measured
+   with the model half applied; every room section and probe ran it as shipped. Fixed; re-score is round-4 item 1,
+   and until then those two numbers are not properties of the shipped model.
+2. **Step 8 under the new default:** none of LPi x4, GF x0.3, AL LN override can be retired -- each alone fails
+   walk.power_max in 3/3 (51.56 / 69.77 / 72.8-79.3 vs 46.10); the session-9 "GF x0.3 goes" recommendation is retracted
+   (without it the walking GF max rises 8.5 -> 9.2 Hz instead of collapsing); LPi x1 undoes the -10 Hz loom cost. All
+   three verdicts rest on the half-applied `sec_walk` and are re-derived in round 4.
+3. **Compass, GLNO=gaba scan** (+ the skeptic's seed-matched silent control): with the loop closed inhibitory the bump
+   persists at gE 2 / gD 15 (180-184 vs 201-204 Hz silent), 2/8, 2.25/15-25, 2.5/25; totals equal (21/36 persisting
+   runs per condition), the window moves down one gD step, is not narrower; the session-9 window was seed 0 only. The
+   150-250 Hz rate problem is untouched; GLNO stays unlabelled; no compass default moves.
+4. **Slow term on abs weights:** the assay-7 precondition is not met (walk.power_max fails in 11 of 12 active runs;
+   gain 0.02 breaks Shiu at 5.7 Hz); the walk / motion sections are not bit-reproducible on the Torch path; every
+   active arm used dop1r1 with no DopEcR control. Hunger stays an experiment flag.
+5. **Object sweep with a null:** the none-vs-none null is +0.07-0.19 mV (a max over 95-275 cells); LPLC2 is the only
+   type above it (z +5.4 abs; Welch +4.4 off; +0.10 / +0.21 mV vs the 7 mV criterion; invisible-ball control
+   confirms the null); LC11 / LC10a / LC16 / LC4 at the null, LC10b marginal; the medulla carries the ball (Mi4 z
+   +22 to +29). Hypothesis (a) stays closed; the object item is a separate plan entry (medulla -> lobula small-field
+   wiring / dynamics; `probe_object_sweep.py --null` and `probe_figure_ground.py` are its benchmarks).
+
+**Round 4 (next):** (1) re-score default x3 and off x3 with the fixed benchmark (off must reproduce the round-2 off
+values; the default gives the first fully-applied walk / legacy-loom / motion numbers); (2) isolate the 8,833
+Brain-side synapses (hold KC, hold DN1) to attribute taste 5.85 -> 10.93, Shiu 123 -> 140, walk.power_max 73 -> 46;
+(3) spontaneous take-offs with a feeding-capable sustain (--energy 0.9, 3 batches x 16 flies per condition); (4)
+reporting debt (done in this commit except the generators listed in the record); (5) step 8 continued
+(gf_damping_dnp70, LPi x2 / x3) under the corrected benchmark; (6) seed-matched compass grid completed for both GLNO
+conditions; (7) the type-majority NT rule for the ~496 unknown presynaptic cells; (8) slow-term determinism and a
+DopEcR arm.

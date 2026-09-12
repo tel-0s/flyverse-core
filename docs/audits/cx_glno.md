@@ -156,3 +156,172 @@ with a clean 191-235 Hz bump, 10-11/11 inside cells and vs 0.76-0.78 count as "n
 22 Hz; ach gE 2 seed 4 is "no" because the pre-pulse ring was already saturated (in 81 / out 57 Hz). The pre-pulse
 state is seed-dependent enough to change what the pulse is asked to do (from a quiet ring to a fully formed bump at the
 driven tile), so the capture counts (denominators 1-3 runs) carry little weight; read the rate / vs columns.
+
+## 4. Round 3: the GLNO = gaba gain scan (cluster batch `r3-glno-gaba-5f4869`)
+
+Question: the round-2 gains (EPG <-> PEN, PEG x gE; Delta7 -> EPG x gD, Delta7 -> PEN x1; compass adaptation 0) were
+tuned against a silent GLNO, and both EM predictions favour an inhibitory GLNO (section 3). Where does a confined,
+persistent, capturable bump exist once the PEN <-> GLNO loop is closed inhibitory, is that window narrower or shifted
+against the silent-GLNO window, and does the bump rate change?
+
+**Protocol.** `scripts/cx_glno.py --run gaba` (config `gaba` = `TYPE_NT_OVERRIDE` + {GLNO: gaba}, compiled from the raw
+MaleCNS files into the job's `out/cache_72164311/`; GLNO nt `gaba`, sign -1, GLNO -> PEN W sum -16,371, PEN -> GLNO
++3,496, sum|W| 121,478,280 vs 121,460,584 on the adopted cache), the section-3 protocol (FlyBrain on the full connectome,
+compass adaptation 0, 10 Hz Poisson background on all 46 EPG, wedges 0-3 at +40 Hz for 2 s, 5 s free, cuda graphs,
+torch sparse backend), grid gE in {1.75, 2, 2.25, 2.5} x gD in {8, 15, 25, 40} (Delta7 -> EPG only), seeds 0-2 = 48 runs
+in four jobs (one per gE, 12 runs each, 6.5-7.9 min per job; the anchor job 2.2 min on a B200, torch 2.11.0+cu128, CUDA asserted). Comparison:
+config `glu` on the same gD grid at gE 2 and 2.25 (24 runs, two jobs, cache `cache_c51b23e2`). Anchor: config `base` at
+gE 2 / gD 15 from the cluster's shared cache (`--no-scratch`; the shared cache now carries `TYPE_NT_OVERRIDE`, sum|W|
+121,460,584). Submitted 2026-09-12 06:44 UTC, all seven jobs exit 0 by 06:52 UTC. Data: `out/cx_glno_gaba_gE{1.75,2,
+2.25,2.5}.json` + `.txt`, `out/cx_glno_glu_gE{2,2.25}.json` + `.txt`, `out/cx_glno_base_r3.json` + `.txt`; tables
+`out/cx_glno_gaba_table.{md,csv}` and `out/cx_glno_gaba_table_summary.csv` from `python scripts/cx_glno.py --report --files
+"out/cx_glno_gaba_*.json" "out/cx_glno_glu_gE*.json" out/cx_glno_base_r3.json --table cx_glno_gaba_table`.
+
+**Two identity checks (every field of every row compared, `wall_s` / `cache_dir` excluded).** (i) The base anchor from the
+shared cache is bit-identical to the round-2 base rows (3/3 seeds), so the shared cache and the round-2 scratch compile are
+the same connectome. (ii) `gaba` and `glu` are bit-identical at all 24 shared grid points (gE 2 / 2.25 x gD 8 / 15 / 25 /
+40 x 3 seeds, 0 differing fields): under `NT_SIGN` both labels are fast -1 and the receptor model is off, so the only
+thing the label changes is the sign of GLNO's 17,698 output synapses. The round-2 `glu` rows at gE 1.75 / gD 15 (10 / 12 /
+8 Hz) and gE 2 / gD 15 (180 / 181 / 184 Hz) are therefore the `gaba` rows at those points, and the six `glu` runs the task
+asked for are a same-code replication rather than a second condition. The `glu` rows are omitted from the per-run table
+below (they are in `out/cx_glno_gaba_table.md`).
+
+**Magnitudes at the scanned gains** (`cx_wedge.effective_weights` on the local adopted cache, CPU): the EPG volley onto a
+PEN is +139.8 / +159.8 / +179.8 / +199.7 mV at gE 1.75 / 2 / 2.25 / 2.5 (per-cell range 95.8-297.0; PEN fan-in scale 1.00
+throughout), the Delta7 volley onto a PEN -45.2 mV (x1 at every gE), and the signed GLNO volley 33.0 mV per PEN (two
+contralateral GLNO, every edge above the cap) is 23.6 / 20.7 / 18.4 / 16.5 % of the EPG volley. The Delta7 volley onto
+an EPG at gD 15 is -341 / -335 / -329 / -322 mV (the EPG fan-in scale falls slightly with gE).
+
+### Summary per grid point (3 seeds each; rates at 5 s after release; rho = gD / gE^2)
+
+| config | gE | gD | rho = gD / gE^2 | persist (n/3) | bump Hz at 5 s (per seed) | out Hz (per seed) | in > 22 Hz (/11) | out > 22 Hz (/35) | vs (per seed) | PEN | Delta7 | GLNO 5 s | GLNO pulse | captured / prior bump elsewhere | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| base | 2.0 | 15 | 3.75 | 3 | 201 / 201 / 204 | 10 / 10 / 9 | 11/10/11 | 1/3/2 | 0.76 / 0.78 / 0.78 | 48 | 100 | 134 | 147 | 3/3 | window (round-2 anchor, bit-identical to section 3) |
+| gaba | 1.75 | 8 | 2.61 | 3 | 154 / 148 / 152 | 10 / 10 / 9 | 9/9/9 | 1/3/2 | 0.73 / 0.75 / 0.76 | 33 | 84 | 96 | 103 | 1/1 | window |
+| gaba | 1.75 | 15 | 4.90 | 0 | 10 / 12 / 8 | 13 / 15 / 11 | 0/2/0 | 7/7/4 | 0.22 / 0.22 / 0.31 | 4 | 15 | 13 | 95 | 0/1 | dead (3/3 by 2 s) |
+| gaba | 1.75 | 25 | 8.16 | 0 | 10 / 8 / 7 | 12 / 12 / 11 | 0/0/0 | 7/6/4 | 0.21 / 0.17 / 0.31 | 3 | 13 | 9 | 78 | 0/1 | dead (3/3 by 2 s) |
+| gaba | 1.75 | 40 | 13.06 | 0 | 10 / 8 / 7 | 10 / 12 / 10 | 0/0/0 | 1/5/3 | 0.10 / 0.17 / 0.24 | 2 | 11 | 7 | 53 | 0/1 | dead (3/3 by 1 s) |
+| gaba | 2.0 | 8 | 2.00 | 3 | 194 / 192 / 197 | 10 / 10 / 9 | 9/10/10 | 1/3/2 | 0.76 / 0.78 / 0.79 | 42 | 99 | 121 | 128 | 2/2 | window |
+| gaba | 2.0 | 15 | 3.75 | 3 | 180 / 181 / 184 | 10 / 10 / 9 | 10/10/10 | 1/3/2 | 0.75 / 0.77 / 0.78 | 40 | 95 | 116 | 125 | 2/2 | window |
+| gaba | 2.0 | 25 | 6.25 | 2 | 161 / 42 / 163 | 10 / 42 / 9 | 9/3/9 | 1/9/2 | 0.73 / 0.73 / 0.77 | 38 | 85 | 101 | 119 | 1/2 | 2/3; seed 1 jump at 3-5 s |
+| gaba | 2.0 | 40 | 10.00 | 1 | 135 / 8 / 8 | 10 / 19 / 16 | 9/0/0 | 1/12/9 | 0.70 / 0.27 / 0.47 | 17 | 40 | 48 | 104 | 0/1 | 1/3; seeds 1-2 dead by 1-2 s |
+| gaba | 2.25 | 8 | 1.58 | 2 | 10 / 235 / 237 | 75 / 10 / 9 | 0/11/11 | 10/3/2 | 0.79 / 0.79 / 0.79 | 49 | 109 | 131 | 139 | 2/3 | 2/3; seed 0 stiff (pre-pulse bump at wedges 12-14 not displaced) |
+| gaba | 2.25 | 15 | 2.96 | 3 | 214 / 216 / 223 | 10 / 10 / 9 | 10/11/11 | 1/3/2 | 0.76 / 0.78 / 0.79 | 48 | 105 | 132 | 141 | 3/3 | window (seed 0's pre-pulse bump captured) |
+| gaba | 2.25 | 25 | 4.94 | 3 | 196 / 199 / 192 | 10 / 10 / 9 | 10/10/10 | 1/3/2 | 0.75 / 0.77 / 0.77 | 45 | 97 | 126 | 135 | 3/3 | window |
+| gaba | 2.25 | 40 | 7.90 | 1 | 171 / 45 / 7 | 10 / 47 / 52 | 10/3/0 | 1/9/11 | 0.74 / 0.75 / 0.79 | 42 | 84 | 108 | 126 | 0/2 | 1/3; seed 1 jump at 3-5 s, seed 2 jump to the opposite side at 1-2 s |
+| gaba | 2.5 | 8 | 1.28 | 2 | 10 / 264 / 265 | 102 / 10 / 9 | 0/11/11 | 13/3/2 | 0.79 / 0.80 / 0.80 | 63 | 122 | 162 | 160 | 2/3 | 2/3; seed 0 stiff |
+| gaba | 2.5 | 15 | 2.40 | 2 | 10 / 250 / 249 | 83 / 10 / 9 | 0/11/11 | 11/3/2 | 0.80 / 0.80 / 0.80 | 55 | 113 | 145 | 149 | 2/3 | 2/3; seed 0 stiff |
+| gaba | 2.5 | 25 | 4.00 | 3 | 227 / 225 / 222 | 10 / 10 / 9 | 10/10/10 | 1/3/2 | 0.77 / 0.79 / 0.79 | 52 | 106 | 143 | 150 | 3/3 | window |
+| gaba | 2.5 | 40 | 6.40 | 2 | 196 / 56 / 191 | 10 / 52 / 9 | 10/3/10 | 1/9/2 | 0.75 / 0.78 / 0.77 | 49 | 96 | 129 | 141 | 2/3 | 2/3; seed 1 jump at 3-5 s |
+
+Verdicts: **window** = persists in 3/3 (>= 8/11 inside and <= 3/35 outside cells above 22 Hz at 5 s) and no run in which a
+pulse failed to capture a prior bump; **jump** = a bump that survives at full rate (vs 0.73-0.79) but leaves the driven
+block; **stiff** = a spontaneous pre-pulse bump elsewhere that the +40 Hz pulse does not displace; **dead** = no bump by 2 s.
+The jumps are one event in every case where they occur: with seed 1 the bump sits at wedges 0-3 through 3 s and is at
+wedges 3-5 (133 / 234 / 159 Hz, centre 4.1) at 5 s, the same profile at gaba gE 2 / gD 25, 2.25 / 40, 2.5 / 40 and at
+the round-2 base gE 1.75 / gD 15 (133 / 231 / 160) -- the seed-1 background realisation moves the bump once gD is high
+enough (rho >= 6.25 with GLNO signed, 4.9 silent); at gE 2.25 / gD 40 seed 2 the bump jumps to the opposite side (wedges
+12-14, 173 / 197 / 176 Hz) between 1 and 2 s and is at wedges 10-12 at 5 s. The stiff cases are all seed 0 at gE >= 2.25
+with gD <= 15: the 1 s settle produces a 3-4-wedge bump at wedges 12-14 (225-278 Hz per wedge) that the pulse captures at
+gE 2.25 / gD 15 and 25 and at 2.5 / 25 but not at 2.25 / 8, 2.5 / 8 or 2.5 / 15 (in 9-10 Hz, out 75-102 Hz at 5 s).
+
+### Per run
+
+| config | gE | gD | seed | before pulse in/out (>22 Hz in, out) | 0.5 s in/out (>22) | 2 s | 5 s in/out Hz | in >22 Hz | out >22 Hz | persists | vs | centre wedge | capture | PEN | Delta7 | GLNO | GLNO during pulse | ER/ExR | rest | wall s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| base | 2.0 | 15.0 | 0 | 14/64 (0/11, 12/35) | 204/8 (11, 0) | 201/9 (10, 1) | 201/10 | 11/11 | 1/35 | yes | 0.76 | 1.5 | captured | 48.7 | 101.2 | 132.8 | 147.9 | 9.6 | 0.033 | 30.9 |
+| base | 2.0 | 15.0 | 1 | 10/60 (1/11, 13/35) | 201/10 (10, 4) | 197/10 (10, 4) | 201/9 | 10/11 | 3/35 | yes | 0.78 | 1.5 | captured | 48.2 | 99.5 | 137.2 | 150.9 | 9.8 | 0.034 | 29.8 |
+| base | 2.0 | 15.0 | 2 | 8/56 (0/11, 9/35) | 203/10 (10, 4) | 200/10 (11, 3) | 204/9 | 11/11 | 2/35 | yes | 0.78 | 1.4 | captured | 48.3 | 99.7 | 132.0 | 143.1 | 9.7 | 0.033 | 26.1 |
+| gaba | 1.75 | 8.0 | 0 | 14/10 (0/11, 2/35) | 160/8 (9, 0) | 155/9 (9, 1) | 154/10 | 9/11 | 1/35 | yes | 0.73 | 1.2 | no prior bump | 32.9 | 85.5 | 96.5 | 105.2 | 7.3 | 0.023 | 26.9 |
+| gaba | 1.75 | 8.0 | 1 | 10/13 (1/11, 4/35) | 152/10 (10, 4) | 149/10 (9, 4) | 148/9 | 9/11 | 3/35 | yes | 0.75 | 1.2 | captured | 32.4 | 83.7 | 96.0 | 107.2 | 7.1 | 0.025 | 23.7 |
+| gaba | 1.75 | 8.0 | 2 | 8/10 (0/11, 0/35) | 150/10 (9, 4) | 149/10 (9, 3) | 153/9 | 9/11 | 2/35 | yes | 0.76 | 1.1 | no prior bump | 32.8 | 82.7 | 96.3 | 97.6 | 7.1 | 0.025 | 20.8 |
+| gaba | 1.75 | 15.0 | 0 | 14/10 (0/11, 2/35) | 146/8 (9, 0) | 18/17 (3, 8) | 10/13 | 0/11 | 7/35 | no | 0.22 | 11.9 | no prior bump | 3.4 | 14.1 | 11.4 | 101.1 | 1.4 | 0.003 | 22.5 |
+| gaba | 1.75 | 15.0 | 1 | 10/12 (1/11, 4/35) | 138/10 (9, 4) | 131/10 (8, 4) | 12/15 | 2/11 | 7/35 | no | 0.22 | 13.6 | not captured | 5.8 | 20.4 | 18.9 | 100.3 | 1.8 | 0.005 | 31.1 |
+| gaba | 1.75 | 15.0 | 2 | 8/10 (0/11, 0/35) | 34/12 (9, 4) | 10/12 (0, 5) | 8/11 | 0/11 | 4/35 | no | 0.31 | 13.2 | no prior bump | 2.7 | 11.5 | 9.2 | 82.3 | 1.1 | 0.003 | 45.6 |
+| gaba | 1.75 | 25.0 | 0 | 14/10 (0/11, 2/35) | 125/8 (9, 0) | 10/11 (0, 3) | 10/12 | 0/11 | 7/35 | no | 0.21 | 11.8 | no prior bump | 3.1 | 13.4 | 11.4 | 83.7 | 1.3 | 0.003 | 30.3 |
+| gaba | 1.75 | 25.0 | 1 | 10/12 (1/11, 4/35) | 26/16 (7, 10) | 7/10 (0, 4) | 8/12 | 0/11 | 6/35 | no | 0.17 | 12.0 | not captured | 3.4 | 13.7 | 5.9 | 90.8 | 1.1 | 0.003 | 34.3 |
+| gaba | 1.75 | 25.0 | 2 | 8/9 (0/11, 0/35) | 22/13 (5, 4) | 10/11 (0, 4) | 7/11 | 0/11 | 4/35 | no | 0.31 | 13.1 | no prior bump | 2.6 | 10.9 | 9.0 | 59.1 | 1.0 | 0.003 | 23.5 |
+| gaba | 1.75 | 40.0 | 0 | 14/10 (0/11, 2/35) | 36/9 (8, 1) | 8/9 (0, 1) | 10/10 | 0/11 | 1/35 | no | 0.1 | 11.8 | no prior bump | 1.4 | 9.8 | 2.0 | 52.6 | 0.9 | 0.002 | 28.4 |
+| gaba | 1.75 | 40.0 | 1 | 10/12 (1/11, 4/35) | 12/13 (1, 6) | 7/10 (0, 4) | 8/12 | 0/11 | 5/35 | no | 0.17 | 12.4 | not captured | 3.6 | 13.8 | 13.6 | 73.3 | 1.3 | 0.003 | 24.3 |
+| gaba | 1.75 | 40.0 | 2 | 8/9 (0/11, 0/35) | 15/12 (2, 4) | 10/11 (0, 4) | 7/10 | 0/11 | 3/35 | no | 0.24 | 13.1 | no prior bump | 1.7 | 8.8 | 6.7 | 32.9 | 0.8 | 0.002 | 27.8 |
+| gaba | 2.0 | 8.0 | 0 | 61/48 (4/11, 8/35) | 198/8 (10, 0) | 195/9 (10, 1) | 194/10 | 9/11 | 1/35 | yes | 0.76 | 1.2 | no prior bump | 41.5 | 98.8 | 120.9 | 128.6 | 9.0 | 0.03 | 19.3 |
+| gaba | 2.0 | 8.0 | 1 | 10/58 (1/11, 12/35) | 195/10 (11, 4) | 194/10 (10, 4) | 192/9 | 10/11 | 3/35 | yes | 0.78 | 1.2 | captured | 42.2 | 100.1 | 121.4 | 128.8 | 9.2 | 0.031 | 17.4 |
+| gaba | 2.0 | 8.0 | 2 | 8/49 (0/11, 9/35) | 190/10 (10, 4) | 192/10 (10, 3) | 197/9 | 10/11 | 2/35 | yes | 0.79 | 1.1 | captured | 42.2 | 99.0 | 119.6 | 125.8 | 8.8 | 0.03 | 19.6 |
+| gaba | 2.0 | 15.0 | 0 | 21/11 (6/11, 2/35) | 190/8 (10, 0) | 184/9 (10, 1) | 180/10 | 10/11 | 1/35 | yes | 0.75 | 1.2 | spontaneous at driven tile | 40.3 | 95.6 | 114.8 | 126.9 | 8.7 | 0.029 | 22.2 |
+| gaba | 2.0 | 15.0 | 1 | 10/51 (1/11, 12/35) | 181/10 (11, 4) | 180/10 (10, 4) | 181/9 | 10/11 | 3/35 | yes | 0.77 | 1.2 | captured | 39.8 | 95.4 | 118.2 | 126.7 | 8.8 | 0.032 | 34.5 |
+| gaba | 2.0 | 15.0 | 2 | 8/17 (0/11, 12/35) | 180/10 (11, 4) | 184/10 (11, 3) | 184/9 | 10/11 | 2/35 | yes | 0.78 | 1.2 | captured | 40.6 | 94.7 | 116.3 | 122.4 | 8.6 | 0.03 | 21.7 |
+| gaba | 2.0 | 25.0 | 0 | 15/10 (0/11, 2/35) | 167/8 (9, 0) | 165/9 (10, 1) | 161/10 | 9/11 | 1/35 | yes | 0.73 | 1.2 | no prior bump | 38.0 | 89.3 | 106.2 | 124.6 | 7.9 | 0.027 | 30.2 |
+| gaba | 2.0 | 25.0 | 1 | 10/20 (1/11, 11/35) | 162/10 (10, 4) | 160/10 (10, 4) | 42/42 | 3/11 | 9/35 | no | 0.73 | 4.1 | not captured | 37.4 | 80.9 | 88.4 | 119.8 | 7.3 | 0.023 | 18.5 |
+| gaba | 2.0 | 25.0 | 2 | 8/21 (0/11, 10/35) | 152/10 (10, 4) | 158/10 (11, 3) | 163/9 | 9/11 | 2/35 | yes | 0.77 | 1.2 | captured | 37.5 | 84.8 | 108.3 | 112.7 | 7.7 | 0.028 | 23.8 |
+| gaba | 2.0 | 40.0 | 0 | 14/10 (0/11, 2/35) | 143/8 (9, 0) | 117/9 (9, 1) | 135/10 | 9/11 | 1/35 | yes | 0.7 | 1.2 | no prior bump | 34.1 | 78.2 | 95.7 | 110.7 | 6.6 | 0.022 | 27.2 |
+| gaba | 2.0 | 40.0 | 1 | 10/12 (1/11, 4/35) | 135/10 (10, 4) | 9/12 (0, 5) | 8/19 | 0/11 | 12/35 | no | 0.27 | 12.1 | not captured | 9.7 | 20.6 | 25.5 | 109.7 | 2.1 | 0.006 | 20.7 |
+| gaba | 2.0 | 40.0 | 2 | 8/9 (0/11, 0/35) | 30/12 (9, 4) | 11/12 (1, 6) | 8/16 | 0/11 | 9/35 | no | 0.47 | 13.6 | no prior bump | 7.8 | 21.0 | 21.9 | 92.6 | 2.1 | 0.006 | 25.7 |
+| gaba | 2.25 | 8.0 | 0 | 14/76 (0/11, 12/35) | 9/76 (0, 10) | 8/74 (0, 11) | 10/75 | 0/11 | 10/35 | no | 0.79 | 13.2 | not captured | 45.8 | 103.6 | 117.3 | 115.9 | 10.4 | 0.034 | 25.2 |
+| gaba | 2.25 | 8.0 | 1 | 10/69 (1/11, 14/35) | 240/10 (11, 4) | 241/10 (11, 4) | 235/9 | 11/11 | 3/35 | yes | 0.79 | 1.5 | captured | 50.3 | 111.8 | 137.8 | 150.3 | 10.9 | 0.037 | 22.4 |
+| gaba | 2.25 | 8.0 | 2 | 8/68 (0/11, 10/35) | 231/10 (11, 4) | 241/10 (11, 3) | 237/9 | 11/11 | 2/35 | yes | 0.79 | 1.4 | captured | 50.9 | 112.3 | 137.7 | 151.5 | 10.8 | 0.037 | 33.8 |
+| gaba | 2.25 | 15.0 | 0 | 14/71 (0/11, 12/35) | 226/8 (11, 0) | 220/9 (10, 1) | 214/10 | 10/11 | 1/35 | yes | 0.76 | 1.6 | captured | 47.1 | 104.6 | 130.6 | 139.3 | 10.0 | 0.033 | 21.8 |
+| gaba | 2.25 | 15.0 | 1 | 10/65 (1/11, 13/35) | 218/10 (10, 4) | 213/10 (10, 4) | 216/9 | 11/11 | 3/35 | yes | 0.78 | 1.6 | captured | 47.5 | 104.7 | 132.1 | 142.7 | 10.2 | 0.035 | 32.0 |
+| gaba | 2.25 | 15.0 | 2 | 8/63 (0/11, 9/35) | 216/10 (11, 4) | 219/10 (11, 3) | 223/9 | 11/11 | 2/35 | yes | 0.79 | 1.5 | captured | 49.7 | 105.5 | 134.0 | 141.9 | 10.3 | 0.037 | 31.2 |
+| gaba | 2.25 | 25.0 | 0 | 14/64 (0/11, 11/35) | 198/8 (10, 0) | 197/9 (10, 1) | 196/10 | 10/11 | 1/35 | yes | 0.75 | 1.6 | captured | 45.1 | 97.6 | 122.9 | 141.2 | 9.3 | 0.031 | 36.7 |
+| gaba | 2.25 | 25.0 | 1 | 10/59 (1/11, 13/35) | 194/10 (10, 4) | 199/10 (10, 4) | 199/9 | 10/11 | 3/35 | yes | 0.77 | 1.6 | captured | 45.0 | 98.3 | 130.7 | 128.5 | 9.5 | 0.033 | 30.4 |
+| gaba | 2.25 | 25.0 | 2 | 8/57 (0/11, 9/35) | 193/10 (10, 4) | 195/10 (10, 3) | 192/9 | 10/11 | 2/35 | yes | 0.77 | 1.5 | captured | 45.3 | 94.6 | 123.0 | 134.3 | 9.2 | 0.032 | 26.8 |
+| gaba | 2.25 | 40.0 | 0 | 163/10 (10/11, 2/35) | 177/8 (10, 0) | 171/9 (10, 1) | 171/10 | 10/11 | 1/35 | yes | 0.74 | 1.6 | spontaneous at driven tile | 42.0 | 89.4 | 114.8 | 127.0 | 8.3 | 0.027 | 29.5 |
+| gaba | 2.25 | 40.0 | 1 | 10/51 (1/11, 12/35) | 162/10 (9, 4) | 164/10 (10, 4) | 45/47 | 3/11 | 9/35 | no | 0.75 | 4.1 | not captured | 44.7 | 88.2 | 106.4 | 130.7 | 8.4 | 0.029 | 31.1 |
+| gaba | 2.25 | 40.0 | 2 | 8/49 (0/11, 8/35) | 153/10 (10, 4) | 11/53 (0, 11) | 7/52 | 0/11 | 11/35 | no | 0.79 | 11.2 | not captured | 39.3 | 73.8 | 102.2 | 120.7 | 7.6 | 0.025 | 26.0 |
+| gaba | 2.5 | 8.0 | 0 | 14/89 (0/11, 14/35) | 9/89 (0, 12) | 8/88 (0, 12) | 10/102 | 0/11 | 13/35 | no | 0.79 | 12.7 | not captured | 71.9 | 127.5 | 170.2 | 157.7 | 14.0 | 0.047 | 17.9 |
+| gaba | 2.5 | 8.0 | 1 | 10/107 (1/11, 17/35) | 267/10 (11, 4) | 266/10 (11, 4) | 264/9 | 11/11 | 3/35 | yes | 0.8 | 1.5 | captured | 59.0 | 120.4 | 158.6 | 161.1 | 12.3 | 0.043 | 18.9 |
+| gaba | 2.5 | 8.0 | 2 | 8/105 (0/11, 13/35) | 265/10 (11, 4) | 270/10 (11, 3) | 265/9 | 11/11 | 2/35 | yes | 0.8 | 1.4 | captured | 58.8 | 119.4 | 156.1 | 160.3 | 12.2 | 0.042 | 19.9 |
+| gaba | 2.5 | 15.0 | 0 | 14/81 (0/11, 13/35) | 9/79 (0, 11) | 8/79 (0, 11) | 10/83 | 0/11 | 11/35 | no | 0.8 | 13.2 | not captured | 53.9 | 109.7 | 135.5 | 135.7 | 11.6 | 0.039 | 19.1 |
+| gaba | 2.5 | 15.0 | 1 | 10/99 (1/11, 17/35) | 254/10 (11, 4) | 249/10 (11, 4) | 250/9 | 11/11 | 3/35 | yes | 0.8 | 1.6 | captured | 56.1 | 115.4 | 152.1 | 156.6 | 11.5 | 0.04 | 17.1 |
+| gaba | 2.5 | 15.0 | 2 | 8/100 (0/11, 13/35) | 251/10 (11, 4) | 249/10 (11, 3) | 249/9 | 11/11 | 2/35 | yes | 0.8 | 1.5 | captured | 55.9 | 114.0 | 146.5 | 155.4 | 11.5 | 0.039 | 19.3 |
+| gaba | 2.5 | 25.0 | 0 | 14/73 (0/11, 12/35) | 230/8 (10, 0) | 234/9 (10, 1) | 227/10 | 10/11 | 1/35 | yes | 0.77 | 1.6 | captured | 52.9 | 108.4 | 141.6 | 153.5 | 10.7 | 0.037 | 47.8 |
+| gaba | 2.5 | 25.0 | 1 | 10/89 (1/11, 17/35) | 226/10 (10, 4) | 228/10 (10, 4) | 225/9 | 10/11 | 3/35 | yes | 0.79 | 1.6 | captured | 52.7 | 107.3 | 145.2 | 152.3 | 10.8 | 0.037 | 30.2 |
+| gaba | 2.5 | 25.0 | 2 | 8/90 (0/11, 13/35) | 229/10 (10, 4) | 227/10 (10, 3) | 223/9 | 10/11 | 2/35 | yes | 0.79 | 1.6 | captured | 51.5 | 103.7 | 142.0 | 144.2 | 10.4 | 0.037 | 33.3 |
+| gaba | 2.5 | 40.0 | 0 | 14/67 (0/11, 11/35) | 197/8 (10, 0) | 201/9 (10, 1) | 196/10 | 10/11 | 1/35 | yes | 0.75 | 1.7 | captured | 47.1 | 97.8 | 127.9 | 141.5 | 9.5 | 0.032 | 26.9 |
+| gaba | 2.5 | 40.0 | 1 | 10/62 (1/11, 12/35) | 192/10 (10, 4) | 190/10 (10, 4) | 56/52 | 3/11 | 9/35 | no | 0.78 | 4.1 | not captured | 54.0 | 97.8 | 133.4 | 142.3 | 9.9 | 0.036 | 21.8 |
+| gaba | 2.5 | 40.0 | 2 | 8/61 (0/11, 9/35) | 188/10 (10, 4) | 182/10 (10, 3) | 191/9 | 10/11 | 2/35 | yes | 0.77 | 1.6 | captured | 46.7 | 93.9 | 126.7 | 140.6 | 9.2 | 0.031 | 18.2 |
+
+### Answers
+
+**Where does a confined, persistent, capturable bump exist with the loop closed inhibitory?** At six of the sixteen grid
+points, all with rho = gD / gE^2 between 2.0 and 4.9: gE 1.75 / gD 8 (148-154 Hz, PEN 32-33, captured 1/1 with prior
+bump), 2 / 8 (192-197, 2/2), 2 / 15 (180-184, 2/2), 2.25 / 15 (214-223, 3/3), 2.25 / 25 (192-199, 3/3) and 2.5 / 25
+(222-227, 3/3). At each the outside mean is 9-10 Hz with 1-3 of 35 cells above 22 Hz, vs 0.73-0.79, and the rest of the
+brain 0.02-0.05 Hz. Above that band (rho >= 6.25) the bump jumps in seed 1 (gE 2 / gD 25, 2.25 / 40, 2.5 / 40) or dies
+(gE 2 / gD 40 seeds 1-2 by 1-2 s; every gE 1.75 point with gD >= 15 in 3/3 seeds -- in 0/11 to 2/11 cells, PEN 2-6 Hz,
+Delta7 11-20, vs 0.10-0.31); below it (rho <= 2.4 at gE >= 2.25) the ring forms a spontaneous bump the pulse cannot move
+in seed 0.
+
+**Narrower or shifted vs the silent-GLNO window?** (Corrected by the skeptic's seed-matched silent control, out/sk_base_gE{1.75,2,2.5}.json: over the same 12 grid points x 3 seeds both conditions give 21/36 persisting runs -- NOT narrower; the 3/3 window moves from silent {1.75/8, 2/15, 2/25, 2.5/25, 2.5/40} to gaba {2/8, 2/15, 2.5/25, and 1.75/8 at 3/6 over six seeds}; gaba gains 2/8 and 2.5/8 and loses 1.75/15, 2/25, 2.5/40; the session-9 silent window 'gE 1.75-2, gD 15-40' was a seed-0 statement and fails at 3 seeds at 1.75/25, 1.75/40, 2/40.) The original reading follows: shifted down in gD by a factor of about 2, and narrower at the low-gE
+end. Silent GLNO (`cx_wedge.md` section 6, seed 0; round-2 seeds 0-5 where available): gE 1.75-2 with gD 15-40, rho
+3.75-13 -- gE 2 / gD 15 persists 5/6, 2 / 25 and 2 / 40 persist at seed 0, 1.75 / 15 persists 3/6. With GLNO inhibitory
+the same gE 2 needs gD 8-15 (3/3 each), gD 25 is 2/3 (seed-1 jump) and gD 40 is 1/3 (two deaths); at gE 1.75 only gD 8
+works (3/3) and gD 15-40 is dead in 9/9 runs, where the silent ring still held 3/6 at gD 15. The window regains two gD
+points only at gE 2.25 (gD 15-25) and the round-2 operating point gE 2 / gD 15 is at its upper edge in rho. Read as a
+gain budget: the signed GLNO volley (33 mV, 16-24 % of the EPG volley on a PEN) is PEN inhibition proportional to PEN
+activity itself, so it substitutes for part of the Delta7 -> EPG inhibition; the gD that was needed silent becomes too
+much.
+
+**Does the bump rate change?** Within the window it is 148-227 Hz: at the round-2 point gE 2 / gD 15 an inhibitory GLNO
+takes the bump from 201-204 (base; 192-204 over six round-2 seeds) to 180-184 Hz (-10 %), PEN 48 -> 40 Hz, Delta7 100 ->
+95, and the lowest persistent bump in the scan is 148-154 Hz at gE 1.75 / gD 8 (PEN 32-33, Delta7 83-86, GLNO 96 Hz).
+That is still an order of magnitude above the animal's E-PG rates (no numeric animal rate is cited in these audits), so closing the loop inhibitory does not fix the rate; it lowers it by ~10 %
+at fixed gains and by ~25 % at the low-gain edge of its window. GLNO itself fires at 96-145 Hz at 5 s inside the window (above Delta7's 83-108 Hz at every window point; 162 was the mean at gE 2.5 / gD 8, outside the window)dow
+(driven by the +222 mV PEN volley it receives), higher than any compass type but Delta7.
+
+**Caveats.** Three seeds per point; persistence at a point is a 3/3, 2/3 or worse count and the 2/3 points differ from
+the 3/3 points by one seed-1 event, so the window edges are +-1 grid step. The persist criterion's brittleness noted in
+section 3 applies (four outside cells above 22 Hz would count as "no"); in this scan every "no" is a real jump, a stiff
+pre-pulse bump or a death, none is the 4-cell boundary case. The gD grid is coarse (8 / 15 / 25 / 40); the gE 1.75 window
+may extend below gD 8 and the gE 2 window between 15 and 25, neither was sampled. GLNO stays out of `TYPE_NT_OVERRIDE`
+(section 3: two low-confidence EM predictions, no expression profile); if it is ever adopted, gE 2 / gD 15 still works
+but with a 10 % slower bump and no margin in gD, and gE 2.25 / gD 15-25 is the better-centred setting.
+
+### Corrections (round-3 verification, `verify:exp:compass`)
+
+* Seed-matched silent control (out/sk_base_gE{1.75,2,2.5}.json, seeds 0-2) and seeds 3-5 (out/sk_{base,gaba}_s345.json): persisting runs 21/36 in each condition; 1.75/8 is 3/6 for gaba (seeds 3-4 die at 17 / 10 Hz) against 5/6 silent, so the "lowest persistent bump 148-154 Hz" and "-25 % at the low-gain edge" clauses are withdrawn; the rate answer is -10 % at fixed gains (2/15: 180-184 vs 201-204 Hz).
+* gaba 1.75/15: dead 3/3 by 5 s; seeds 0 and 2 by 2 s / 1 s, seed 1 only between 3 and 5 s (131-134 Hz at 2-3 s).
+* The three seed-1 jump rows share the destination (wedges 3-5, centre 4.1) and the background wedges, not the amplitudes (133/234/159, 144/247/197, 182/270/238). The seed-0 pre-pulse bump at gE >= 2.25 is 206-287 Hz per wedge and occurs at every gD, not only <= 15.
+* The persist criterion's 4-outside-cells boundary case fires at seed 5 in BOTH conditions (bump confined at 154-244 Hz, out mean 11.2 Hz); 3/3-vs-2/3 distinctions are within the criterion's own noise -- read the rate / vs columns. Capture tests per window point are 1-2, not 3.
+* Job durations 367-471 s (12-run jobs), anchor 114 s. Dead gE 1.75 points: Delta7 8.8-20.4 Hz; rest of brain 0.023-0.037 Hz at window points.
+* Consequence for the compass thread: the session-9 conclusions (ring-attractor wiring; Delta7 gain on Delta7->EPG only; the ExR/ER loop; 200 Hz bump) stand; gE 2 / gD 15 lies inside both windows; the robust operating points from the present data are gE 2 / gD 15 and gE 2.5 / gD 25. GLNO stays out of TYPE_NT_OVERRIDE (EM predictions only).

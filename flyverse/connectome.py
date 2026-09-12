@@ -199,10 +199,15 @@ def receptor_signs(c: "Connectome", table_path=None, net_rule: str = "class", nt
     coo = W.tocoo()                                   # csr -> coo keeps the stored order
     post, pre = coo.row, coo.col
     n = c.neurons
+    # A graph without transmitter / type labels (the synthetic graphs of the tests) has nothing to look up: every
+    # entry keeps the presynaptic sign at tier 'fallback', i.e. the weights of the model before the receptor block
+    # (round 3 made the model the default, so such graphs reach this function through LIFParams()).
+    labelled = "nt" in n.columns and "type" in n.columns
     nt_cats = TRANSMITTERS + ["unknown"]
-    nt_code = pd.Categorical(n.nt, categories=nt_cats).codes.astype(np.int16)
+    nt_code = pd.Categorical(n.nt if labelled else pd.Series(["unknown"] * len(n), index=n.index),
+                             categories=nt_cats).codes.astype(np.int16)
     nt_code[nt_code < 0] = len(TRANSMITTERS)
-    type_cat = pd.Categorical(n.type.fillna(""))
+    type_cat = pd.Categorical(n.type.fillna("") if labelled else pd.Series([""] * len(n), index=n.index))
     type_code = type_cat.codes.astype(np.int32)
     type_index = {t: i for i, t in enumerate(type_cat.categories)}
     gain_code = {g: i for i, g in enumerate(GAIN_CLASSES)}
@@ -223,12 +228,13 @@ def receptor_signs(c: "Connectome", table_path=None, net_rule: str = "class", nt
     idx = L[type_code[post], pre_nt]
     matched = idx >= 0
     i2 = np.where(matched, idx, 0)
-    pre_sign = n.sign.to_numpy(np.float32)[pre]
+    pre_sign = n.sign.to_numpy(np.float32)[pre] if "sign" in n.columns else np.sign(W.data).astype(np.float32)
     fast_sign = np.where(matched, fs[i2], pre_sign).astype(np.float32)
     slow_sign = np.where(matched, ss[i2], np.float32(0)).astype(np.float32)
     fast_gain = np.where(matched, fg[i2], 0).astype(np.int8)
     slow_gain = np.where(matched, sg[i2], 0).astype(np.int8)
-    tier = np.where(matched, tr[i2], np.where(pre_nt == len(TRANSMITTERS), tier_code["pre_unknown"], 0)).astype(np.int8)
+    unknown_pre = (pre_nt == len(TRANSMITTERS)) if labelled else np.zeros(len(pre), dtype=bool)
+    tier = np.where(matched, tr[i2], np.where(unknown_pre, tier_code["pre_unknown"], 0)).astype(np.int8)
 
     if nt_class_fallback:
         sel = rt[rt.malecns_type.astype(str).str.startswith("<nt=")].reset_index(drop=True)
