@@ -1,5 +1,5 @@
 {
- "_comment": "Data flyverse does not ship. scripts/fetch_data.py reads this file. sha256 verified on download when present.",
+ "_comment": "Data flyverse does not ship. scripts/fetch_data.py reads this file. sha256 verified on download when present. 'unpack' notes name archives that the build scripts expect extracted next to them (fetch_data.py does not extract).",
  "malecns": {
   "citation": "MaleCNS v1.0 flat connectome (Janelia FlyEM), https://male-cns.janelia.org/download/ ; paper: Cell 2026, S0092-8674(26)00942-6",
   "licence": "see https://male-cns.janelia.org/ (Janelia FlyEM data terms, CC BY 4.0 at the time of writing -- check)",
@@ -34,5 +34,351 @@
    }
   ]
  },
- "external": {}
+ "external": {
+  "ozel2021": {
+   "citation": "\u00d6zel et al. 2021, Nature 589:88-95, doi:10.1038/s41586-020-2879-3; GEO GSE142787",
+   "licence": "GEO public data (cite); Nature ESM under Springer Nature terms",
+   "notes_doc": "docs/audits/receptor_sources_ozel2021.md",
+   "files": [
+    {
+     "path": "GSE142787_Log_normalized_average_expression.xlsx",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE142nnn/GSE142787/suppl/GSE142787_Log_normalized_average_expression.xlsx",
+     "sha256": "44999534dd706c2c06686718fbbf982d99743138b45e435620603a3d3646b259",
+     "size_mb": 145.8
+    },
+    {
+     "path": "GSE142787_Mixture_modeling.xlsx",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE142nnn/GSE142787/suppl/GSE142787_Mixture_modeling.xlsx",
+     "sha256": "76deacac9b65d022f214db74fc4c98e86b9330bc7afb15a35f109cb125b9916a",
+     "size_mb": 48.8
+    },
+    {
+     "path": "GSE142787_Cluster_markers.xlsx",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE142nnn/GSE142787/suppl/GSE142787_Cluster_markers.xlsx",
+     "sha256": "6415901fb8edc22483b4c54c15a4a726269982aa4179361c73f0129ce3863636",
+     "size_mb": 36.0
+    },
+    {
+     "path": "GSE142787_family.soft.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE142nnn/GSE142787/soft/GSE142787_family.soft.gz",
+     "sha256": "27124d720332fd5fcd8e21e2311e18f909f75df91959830f561f1f4e06f31dcd",
+     "size_mb": 0.0
+    },
+    {
+     "path": "41586_2020_2879_MOESM1_ESM.pdf",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-020-2879-3/MediaObjects/41586_2020_2879_MOESM1_ESM.pdf",
+     "sha256": "25d81f12ad2f7ad4e94ee2d3a292423e9be20478a4155f3f3383586b9519dcbc",
+     "size_mb": 0.5
+    },
+    {
+     "path": "41586_2020_2879_MOESM2_ESM.pdf",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-020-2879-3/MediaObjects/41586_2020_2879_MOESM2_ESM.pdf",
+     "sha256": "05cf48c22cb005ade8c5344085516328daa9d4d7436ebcf87176b15a96179ef2",
+     "size_mb": 0.1
+    },
+    {
+     "path": "41586_2020_2879_MOESM3_ESM.pdf",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-020-2879-3/MediaObjects/41586_2020_2879_MOESM3_ESM.pdf",
+     "sha256": "2ddeaaec15a4906fd5ee19fe6e57cb16413b37947cc6332d2aea0a6e0c759eb6",
+     "size_mb": 0.7
+    },
+    {
+     "path": "41586_2020_2879_MOESM4_ESM.xlsx",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-020-2879-3/MediaObjects/41586_2020_2879_MOESM4_ESM.xlsx",
+     "sha256": "17e7b13f386df022592dcadade6cafd8d259ed18922ac6136b635214d5faf2d7",
+     "size_mb": 0.0
+    },
+    {
+     "path": "41586_2020_2879_MOESM5_ESM.xlsx",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-020-2879-3/MediaObjects/41586_2020_2879_MOESM5_ESM.xlsx",
+     "sha256": "4aad3f189e9ce1f3d3f7475d5eccf6d4eac1d05de2222cfd5c3c931ee330cc58",
+     "size_mb": 0.0
+    },
+    {
+     "path": "41586_2020_2879_MOESM6_ESM.docx",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-020-2879-3/MediaObjects/41586_2020_2879_MOESM6_ESM.docx",
+     "sha256": "b601d63915c0a6f7773e2e74439a4eac86d1a4a7caf18803dd7d7ed599e31f8b",
+     "size_mb": 0.0
+    },
+    {
+     "path": "41586_2020_2879_MOESM7_ESM.zip",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-020-2879-3/MediaObjects/41586_2020_2879_MOESM7_ESM.zip",
+     "sha256": "b55b94382e76604b23d6375ef333f36529b7ad427df0c4ae13399ca09444a034",
+     "size_mb": 12.0
+    }
+   ],
+   "unpack": "41586_2020_2879_MOESM7_ESM.zip -> MOESM7/ (NN-classifier appendix; used by scripts/build_ozel2021_tables.py)"
+  },
+  "davis2020": {
+   "citation": "Davis et al. 2020, eLife 9:e50901, doi:10.7554/eLife.50901; GEO GSE116969",
+   "licence": "CC BY 4.0 (eLife); GEO public data",
+   "notes_doc": "docs/audits/receptor_sources_davis2020.md",
+   "files": [
+    {
+     "path": "GSE116969_README_dataTables.txt",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_README_dataTables.txt",
+     "sha256": "fbd0e7cbf91f42ad6ef44c46c2f98f73a09bb3049804159d56ac8d9812ceb1f9",
+     "size_mb": 0.0
+    },
+    {
+     "path": "GSE116969_dataTable1.transcripts_x_samples_TPM.all_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable1.transcripts_x_samples_TPM.all_genes.txt.gz",
+     "sha256": "b96dd43df9a92ad8a1bb2d12aeb5f4ae34e642d707e2d9ed1ccab20627f7b4a2",
+     "size_mb": 12.4
+    },
+    {
+     "path": "GSE116969_dataTable2.genes_x_samples_TPM.all_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable2.genes_x_samples_TPM.all_genes.txt.gz",
+     "sha256": "115497e3d60fe1a051e910e84ea29814543c6348b0a32b85a3ada507aed04686",
+     "size_mb": 7.2
+    },
+    {
+     "path": "GSE116969_dataTable3.genes_x_samples_TPM.coding_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable3.genes_x_samples_TPM.coding_genes.txt.gz",
+     "sha256": "5c035c18b531995e2fe1b56109c1c8550628b678d305b6942b9e073bf37a3181",
+     "size_mb": 6.5
+    },
+    {
+     "path": "GSE116969_dataTable4.genes_x_cells_TPM.coding_genes_QCpass.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable4.genes_x_cells_TPM.coding_genes_QCpass.txt.gz",
+     "sha256": "90f3ae41bf501ffb8d4fd7609c76062bf2bf1aea2ad28063f9e955fbe2fcdada",
+     "size_mb": 2.2
+    },
+    {
+     "path": "GSE116969_dataTable5a.genes_x_samples_TPM.modeled_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable5a.genes_x_samples_TPM.modeled_genes.txt.gz",
+     "sha256": "70333616bfeb6233501b572dc99907b1de63a79304d796f3474dc849c751355a",
+     "size_mb": 4.7
+    },
+    {
+     "path": "GSE116969_dataTable5b.genes_x_samples_p_expression.modeled_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable5b.genes_x_samples_p_expression.modeled_genes.txt.gz",
+     "sha256": "fe17a2a54bfe2534892e46fdd09f717b73eabe7f4124c19c8cf62fbb1e8008ff",
+     "size_mb": 1.4
+    },
+    {
+     "path": "GSE116969_dataTable6a.genes_x_drivers_TPM.modeled_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable6a.genes_x_drivers_TPM.modeled_genes.txt.gz",
+     "sha256": "5e233a9a709268f85c84d1715b48fc511f5b0f1c9f55a2c31ad67467942beb7f",
+     "size_mb": 2.5
+    },
+    {
+     "path": "GSE116969_dataTable6b.genes_x_drivers_p_expression.modeled_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable6b.genes_x_drivers_p_expression.modeled_genes.txt.gz",
+     "sha256": "69fbfc2a50186b8c44f9ee4b5549d4a83555fba9a20c5e601c9954a7d2af63e5",
+     "size_mb": 0.7
+    },
+    {
+     "path": "GSE116969_dataTable7a.genes_x_cells_TPM.modeled_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable7a.genes_x_cells_TPM.modeled_genes.txt.gz",
+     "sha256": "88f3b2168214fa7ff5b9c950f307331eeb484e9d91de52f3e24ed75768fa8d5b",
+     "size_mb": 2.0
+    },
+    {
+     "path": "GSE116969_dataTable7b.genes_x_cells_p_expression.modeled_genes.txt.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE116nnn/GSE116969/suppl/GSE116969_dataTable7b.genes_x_cells_p_expression.modeled_genes.txt.gz",
+     "sha256": "8f827bdd4c64b208281260e5c7643c3887e9bc380b06a24a84cef83f6b14c462",
+     "size_mb": 0.6
+    },
+    {
+     "path": "elife-50901-supp1-v2.xlsx",
+     "url": "https://elifesciences.org/download/aHR0cHM6Ly9jZG4uZWxpZmVzY2llbmNlcy5vcmcvYXJ0aWNsZXMvNTA5MDEvZWxpZmUtNTA5MDEtc3VwcDEtdjIueGxzeA--/elife-50901-supp1-v2.xlsx",
+     "sha256": "8f7890472d7b07e4a04a0fd38716dd5f5e46d94995467a5ceba54d01ab15d361",
+     "size_mb": 0.1
+    }
+   ]
+  },
+  "nern2025": {
+   "citation": "Nern et al. 2025, Nature, doi:10.1038/s41586-025-08746-0; code repo reiserlab/male-drosophila-visual-system-connectome-code",
+   "licence": "CC BY 4.0 (article + SI); code GPL-3.0",
+   "notes_doc": "docs/audits/receptor_sources_nern2025.md",
+   "files": [
+    {
+     "path": "github_code_params/Edge_cell_types.xlsx",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/Edge_cell_types.xlsx",
+     "sha256": "c675d894a9ad2a6d7fcb4a37c7ae0c004f1a9fea4fa95ae3b1792d1b15fb0246",
+     "size_mb": 0.0
+    },
+    {
+     "path": "github_code_params/LICENSE",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/LICENSE",
+     "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+     "size_mb": 0.0
+    },
+    {
+     "path": "github_code_params/Nern-et-al_SuppTable01_Cell-types-and-counts.xlsx",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/Nern-et-al_SuppTable01_Cell-types-and-counts.xlsx",
+     "sha256": "095a80142923b09e17e5025f6d0e8b8aa0faed0adf5fbad17aff793e30b284a8",
+     "size_mb": 0.0
+    },
+    {
+     "path": "github_code_params/Nern-et-al_SuppTable05_Neurotransmitter_validation.xlsx",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/Nern-et-al_SuppTable05_Neurotransmitter_validation.xlsx",
+     "sha256": "38baa04d0d8b13eccbfb28193d7d38451679ccb09674341ec21ff897598b0602",
+     "size_mb": 0.0
+    },
+    {
+     "path": "github_code_params/Primary_cell_type_table.xlsx",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/Primary_cell_type_table.xlsx",
+     "sha256": "5ed863fbe1ccb6e2f2c8e9f2271fdc5861394df6bb47b25b30174d3451c7b501",
+     "size_mb": 0.0
+    },
+    {
+     "path": "github_code_params/confusion_df.csv",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/confusion_df.csv",
+     "sha256": "d466b63c27c82229bab072a1e751ab16b9a494c7672cede68ea2127003da9a48",
+     "size_mb": 0.0
+    },
+    {
+     "path": "github_code_params/gt_count.csv",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/gt_count.csv",
+     "sha256": "6ff7a70437cdf98e559dc11e6a9361bb428c25b0d6b67c1a8c1cd79693b1dc26",
+     "size_mb": 0.0
+    },
+    {
+     "path": "github_code_params/uncurated_vpns_vcns.xlsx",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/uncurated_vpns_vcns.xlsx",
+     "sha256": "9cb02a3ba0005dac736ef9c79db63809754db05648cfa199afd1bc288e331b72",
+     "size_mb": 0.0
+    },
+    {
+     "path": "nature_esm/41586_2025_8746_MOESM1_ESM.pdf",
+     "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-025-08746-0/MediaObjects/41586_2025_8746_MOESM1_ESM.pdf",
+     "sha256": "a142a82b327a48092d064d245c2bb9d995b0b7a4ee1231af5fbbb01628665d6f",
+     "size_mb": 64.5
+    },
+    {
+     "path": "nature_esm/41586_2025_8746_MOESM2_ESM.pdf",
+     "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-025-08746-0/MediaObjects/41586_2025_8746_MOESM2_ESM.pdf",
+     "sha256": "709af476b254271f70fe3ae4cc29921a9fc07e05faa1aa781930368e151205cd",
+     "size_mb": 2.6
+    },
+    {
+     "path": "nature_esm/41586_2025_8746_MOESM3_ESM.pdf",
+     "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-025-08746-0/MediaObjects/41586_2025_8746_MOESM3_ESM.pdf",
+     "sha256": "7d960c1c6bdf0f244aae2d4fc71aac9dc5d58339121b649c72c59029a21e73d3",
+     "size_mb": 0.6
+    },
+    {
+     "path": "nature_esm/41586_2025_8746_MOESM4_ESM.zip",
+     "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-025-08746-0/MediaObjects/41586_2025_8746_MOESM4_ESM.zip",
+     "sha256": "ef34f64c74e157fdec06312e3a1d6e567ae48a383944dd99a3f854e7ba593c93",
+     "size_mb": 0.7
+    }
+   ],
+   "unpack": "nature_esm/41586_2025_8746_MOESM4_ESM.zip -> nature_esm/MOESM4_unzipped/ (Sup_Table_1..7)"
+  },
+  "central": {
+   "citation": "Fly Cell Atlas 2022, Science 375:eabk2432 (head 10x stringent loom); Davie et al. 2018, Cell 174:982 (GEO GSE107451)",
+   "licence": "FCA: see flycellatlas.org; GEO public data; Cell supplement under Elsevier terms",
+   "notes_doc": "docs/audits/receptor_sources_central.md",
+   "files": [
+    {
+     "path": "GSE107451_DGRP-551_w1118_WholeBrain_57k_0d_1d_3d_6d_9d_15d_30d_50d_10X_DGEM_MEX.mtx.tsv.tar.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE107nnn/GSE107451/suppl/GSE107451_DGRP-551_w1118_WholeBrain_57k_0d_1d_3d_6d_9d_15d_30d_50d_10X_DGEM_MEX.mtx.tsv.tar.gz",
+     "sha256": "5beaf1378736a41b8668cf8ae1816900b491aeba44a0aeeca71480d80d5d7ca6",
+     "size_mb": 219.3
+    },
+    {
+     "path": "GSE107451_DGRP-551_w1118_WholeBrain_57k_Metadata.tsv.gz",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE107nnn/GSE107451/suppl/GSE107451_DGRP-551_w1118_WholeBrain_57k_Metadata.tsv.gz",
+     "sha256": "bb0e13e263d182b819df3e4bebfde77e267c070a30ec5d68ba19bd9a19c46cc9",
+     "size_mb": 4.6
+    },
+    {
+     "path": "GSE107451_DGRP-551_w1118_WholeBrain_57k_Metadata_README.txt",
+     "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE107nnn/GSE107451/suppl/GSE107451_DGRP-551_w1118_WholeBrain_57k_Metadata_README.txt",
+     "sha256": "847d1f0bea6a527b20f0e4406a5da672b775aed62e7fdf9ca36f206693157723",
+     "size_mb": 0.0
+    },
+    {
+     "path": "davie2018_mmc2.xlsx",
+     "url": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867418307207-mmc2.xlsx",
+     "sha256": "0d4743d8c6e3637fdf5529e5f021e75e4cf5db6a3f144b1c8ac7b9d2413fdcc7",
+     "size_mb": 0.1
+    },
+    {
+     "path": "davie2018_mmc3.xlsx",
+     "url": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867418307207-mmc3.xlsx",
+     "sha256": "72cf6a8f974d8e998c11c37537cd0cef7abf39382b93ce221a75ebb9faacf5cc",
+     "size_mb": 1.0
+    },
+    {
+     "path": "davie2018_mmc4.xlsx",
+     "url": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867418307207-mmc4.xlsx",
+     "sha256": "f8d784445c98f3c7a13d2fc0f20bfd3700a78998d1c13473dab3a5fb5ed80d92",
+     "size_mb": 0.1
+    },
+    {
+     "path": "davie2018_mmc5.xlsx",
+     "url": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867418307207-mmc5.xlsx",
+     "sha256": "dfd68a86d636b96000cd72a2b55dec2fda11a9e5dd6a971c974b3d26aa67edfd",
+     "size_mb": 0.0
+    },
+    {
+     "path": "s_fca_biohub_head_10x.loom",
+     "url": "https://cloud.flycellatlas.org/index.php/s/jtH5fGwLqtiSRSD/download",
+     "sha256": "95de36ec70fe399c40356820cd1d1bbe0df64aefe51e760c50fde0783d8c654e",
+     "size_mb": 743.0
+    }
+   ],
+   "unpack": "GSE107451_..._MEX.mtx.tsv.tar.gz -> davie2018_57k_mex/ (matrix.mtx, genes.tsv, barcodes.tsv, annotation.tsv)"
+  },
+  "typing": {
+   "citation": "Schlegel et al. 2024, Nature 634:139, doi:10.1038/s41586-024-07686-5 (flywire_annotations repo, ESM); Nern 2025 SI tables; Reiser lab cell-type explorers",
+   "licence": "CC BY 4.0 (Nature articles + flywire_annotations); explorer JSON per repo licence",
+   "notes_doc": "docs/audits/receptor_sources_typing.md",
+   "files": [
+    {
+     "path": "schlegel2024_Supplemental_file1_neuron_annotations.tsv",
+     "url": "https://raw.githubusercontent.com/flyconnectome/flywire_annotations/main/supplemental_files/Supplemental_file1_neuron_annotations.tsv",
+     "sha256": "9a4f8b2f843196074431ebd7cd883536afa1be86c8a4ce90970441e8be81d1be",
+     "size_mb": 31.7
+    },
+    {
+     "path": "schlegel2024_41586_2024_7686_MOESM5_ESM.tsv",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-024-07686-5/MediaObjects/41586_2024_7686_MOESM5_ESM.tsv",
+     "sha256": "30be6c73975a70c56d930e27911f36455d3886e15abf383b78edd2a5d679e0b6",
+     "size_mb": 27.0
+    },
+    {
+     "path": "schlegel2024_41586_2024_7686_MOESM9_ESM.csv",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-024-07686-5/MediaObjects/41586_2024_7686_MOESM9_ESM.csv",
+     "sha256": "cf1c6d1821cf9179584e2ba89a614bd1b184234e547b660d378c964ed46fd9e1",
+     "size_mb": 2.6
+    },
+    {
+     "path": "nature_s41586-024-07686-5.html",
+     "url": "https://www.nature.com/articles/s41586-024-07686-5",
+     "sha256": "0f6b7a1ab62270e53e1e06dea985a4cf21b8ab7c69c2741159b10be8d2481518",
+     "size_mb": 1.0
+    },
+    {
+     "path": "nern2025_41586_2025_8746_MOESM4_ESM.zip",
+     "url": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41586-025-08746-0/MediaObjects/41586_2025_8746_MOESM4_ESM.zip",
+     "sha256": "ef34f64c74e157fdec06312e3a1d6e567ae48a383944dd99a3f854e7ba593c93",
+     "size_mb": 0.7
+    },
+    {
+     "path": "nern2025_Nern-et-al_SuppTable01_Cell-types-and-counts.xlsx",
+     "url": "https://raw.githubusercontent.com/reiserlab/male-drosophila-visual-system-connectome-code/main/params/Nern-et-al_SuppTable01_Cell-types-and-counts.xlsx",
+     "sha256": "095a80142923b09e17e5025f6d0e8b8aa0faed0adf5fbad17aff793e30b284a8",
+     "size_mb": 0.0
+    },
+    {
+     "path": "nature_s41586-025-08746-0.html",
+     "url": "https://www.nature.com/articles/s41586-025-08746-0",
+     "sha256": "33f3e24c42f6e7ff8f363c87a5e5db108b6ecf957b9b25ba1b7aae65d2d7c7cf",
+     "size_mb": 1.1
+    },
+    {
+     "path": "reiser_malecns_explorer_neurons.json",
+     "url": "https://raw.githubusercontent.com/reiserlab/celltype-explorer-drosophila-male-cns/main/data/neurons.json",
+     "sha256": "cbbb8a35d0aac077f64d5f98d51d19f6d3ed40331b5c49fb4edb7e2f1e6b1180",
+     "size_mb": 1.6
+    }
+   ],
+   "unpack": "nern2025_41586_2025_8746_MOESM4_ESM.zip -> nern2025_MOESM4/"
+  }
+ }
 }
