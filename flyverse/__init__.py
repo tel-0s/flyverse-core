@@ -1,9 +1,12 @@
 """flyverse: put the MaleCNS v1.0 fly connectome into simulations, games and other strange places."""
 
-__all__ = ["FlyBrain", "MotorRates", "StepResult", "AsyncFlyBrain", "NTChannel", "NTSnapshot", "NTSource"]
+__all__ = ["FlyBrain", "MotorRates", "StepResult", "AsyncFlyBrain", "BatchSim", "NTChannel", "NTSnapshot", "NTSource"]
 
 
 def __getattr__(name):
+    if name == "BatchSim":
+        from .batch_sim import BatchSim
+        return BatchSim
     # Keep CLI tools such as python -m flyverse.connectome free of eager torch imports.
     if name in ("FlyBrain", "StepResult"):
         from . import fly
