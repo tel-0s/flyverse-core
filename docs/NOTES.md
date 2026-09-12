@@ -1327,6 +1327,33 @@ points; medulla -> lobula small-field wiring; a feeding-capable metabolism; the 
 referent under the shipped gains before tuning anything to sit under it); the take-off cost. First commands for each
 are in the round-5 verification record. No round 6 of receptor work.
 
+## Session 10, dynamics: why the plain fly walks straight
+
+Observed in the room demo: the plain fly (program `none`) walks nearly straight, past fruit and eventually off the
+table, even when starving, where an earlier model wandered. Bisected with `scripts/probe_walk_straightness.py`
+(BatchSim, 16 plain flies, full table, no fence, 60 s; cluster batch walk-straight-fb28c0, 10 jobs; out/ws_*.json):
+median yaw-rate SD over flies is 2.5-2.6 deg/s under the shipped default, 1.6-1.8 with the receptor model off, 1.7-1.9
+with receptor off + the GF damping restored (the pre-session-10 weights), 2.6-2.8 for the round-3/4 default, and
+1.6-1.7 for the true session-9 weights (the pre-TYPE_NT_OVERRIDE cache); straightness 0.99-1.00 in every arm; no arm
+reaches a fruit (closest approach 2.5-9 cm; 0-1 of 16 leave the table within 60 s). **Every arm walks straight, so none
+of the session-10 weight changes caused it** (the receptor default is if anything slightly turnier). The history
+shows what did: `Locomotion.k_opto` was deg2rad(150)/15 rad/s per Hz of DNp04 / LPT asymmetry until session 9 zeroed
+it (commit c4ec33d: the optomotor readout never flipped under imposed rotation and HSN / DNp20 / HSE respond to the
+fly's own walking). The old fly's turns were that optomotor term reacting to self-motion -- an artefact -- and with
+it gone the only turning signals left in the plain body, DNa02 R-L and leg-MN L-R asymmetry, are symmetric with no
+directed input. Starvation does nothing in the plain model by design: hunger-driven search exists only as programs
+(`--program anemotaxis` / `cx`).
+
+So this is a real, previously masked deficit of the full model rather than a regression: the connectome model has no
+source of spontaneous turning. In the animal that comes from central-complex / LAL dynamics (the compass bump's
+projection through PFL3 to DNa02, plus exploratory state), which is exactly what the session-10 dynamics round is
+measuring (does a bump produce a PFL3 / DNa02 asymmetry in the room). Under the project rule the options are: leave
+the plain fly straight and state it (the honest default); a compass module with documented gains as a swappable
+stop-gap if the dynamics round shows the bump steers; or a noise-driven turning term, which would be hand-crafting
+and is not proposed. A benchmark assay for spontaneous turning (yaw-rate SD / straightness of the plain fly in the
+room, against free-walking Drosophila turn statistics) is added to the battery as a known gap so this cannot slip
+through the suite again -- none of the 29 existing checks scores it.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
