@@ -62,7 +62,11 @@ their existing APIs.
 
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
 `FLYVERSE_DATA`); only `body-annotations`, `body-neurotransmitters` and `connectome-weights` are used
-(1.1 GB). Torch backend: CUDA, else Apple MPS, else CPU (`FLYVERSE_DEVICE`); on MPS/CPU the synaptic
+(1.1 GB; `tbar-neurotransmitters`, 2.7 GB, only by the NT audit). None of it ships with the repo:
+`python scripts/fetch_data.py --malecns` downloads the files from Janelia's public bucket into that
+directory and verifies them (`flyverse/data/manifest.json` records URLs, hashes and licences; `--external
+all` fetches the third-party expression tables of the receptor integration into `data/external/`), then
+`python -c "from flyverse import connectome; connectome.load(rebuild=True)"` compiles `cache/`. Torch backend: CUDA, else Apple MPS, else CPU (`FLYVERSE_DEVICE`); on MPS/CPU the synaptic
 input is an event-driven gather instead of the sparse matmul (`flyverse/device.py`). On MPS the gather,
 the LIF update, the optic lobe's sparse products and the ray tracer are hand-written Metal kernels
 compiled at first use through `torch.mps.compile_shader` (`flyverse/metal.py`; `FLYVERSE_METAL=0` for

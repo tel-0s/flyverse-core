@@ -1,0 +1,38 @@
+{
+ "_comment": "Data flyverse does not ship. scripts/fetch_data.py reads this file. sha256 verified on download when present.",
+ "malecns": {
+  "citation": "MaleCNS v1.0 flat connectome (Janelia FlyEM), https://male-cns.janelia.org/download/ ; paper: Cell 2026, S0092-8674(26)00942-6",
+  "licence": "see https://male-cns.janelia.org/ (Janelia FlyEM data terms, CC BY 4.0 at the time of writing -- check)",
+  "files": [
+   {
+    "path": "body-annotations-male-cns-v1.0-minconf-0.5.feather",
+    "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-annotations-male-cns-v1.0-minconf-0.5.feather",
+    "sha256": "2177e246113e4cfbf1e7772ec37c6da1955ff22e8063d0b1f833101f99a9a3b2",
+    "size_mb": 14.5,
+    "used_by": "connectome.load (cache rebuild); brainmap"
+   },
+   {
+    "path": "body-neurotransmitters-male-cns-v1.0.feather",
+    "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/body-neurotransmitters-male-cns-v1.0.feather",
+    "sha256": "95c9289220663abeb3409f3ad9e5a7f8a53f8093f5139d15502cd08da8879621",
+    "size_mb": 43.3,
+    "used_by": "connectome.load (cache rebuild)"
+   },
+   {
+    "path": "connectome-weights-male-cns-v1.0-minconf-0.5.feather",
+    "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/connectome-weights-male-cns-v1.0-minconf-0.5.feather",
+    "sha256": "e35da783d1c686b2b58b3b87cd6a403ae43bfcfba8bff28e08ef752c1a56afc1",
+    "size_mb": 1051.2,
+    "used_by": "connectome.load (cache rebuild)"
+   },
+   {
+    "path": "tbar-neurotransmitters-male-cns-v1.0.feather",
+    "url": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/tbar-neurotransmitters-male-cns-v1.0.feather",
+    "sha256": "bade84c9eab431dd537ff644aaf3d203d639a819c739ecedb338e7d109064f4d",
+    "size_mb": 2651.7,
+    "used_by": "scripts/audit_nt.py only"
+   }
+  ]
+ },
+ "external": {}
+}
