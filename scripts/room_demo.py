@@ -89,15 +89,17 @@ class Sim:
                  wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32",
                  sensory_cuda_graphs=None, program="none", escape_gating=False, dt_by_module=None, prune_frozen=True,
                  fruit_set="all", fence=False,
-                 cuda_kernels=None, event_driven=None, cuda_sparse="torch", cuda_compact=True):
+                 cuda_kernels=None, event_driven=None, cuda_sparse="torch", cuda_compact=True, receptor_model="default"):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
         self.trail = []                          # (brain time s, position) samples, for the scene view
         self.cam_scale = int(cam_scale)          # fly's-eye camera rendered at 1/cam_scale resolution, upscaled
         self.sensory_cuda_graphs = cuda_graphs if sensory_cuda_graphs is None else sensory_cuda_graphs
-        self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(dt=brain_dt, weight_dtype=weight_dtype, dt_by_module=dt_by_module,
-                                                              prune_frozen=prune_frozen, event_driven=event_driven),
+        lif_kw = dict(dt=brain_dt, weight_dtype=weight_dtype, dt_by_module=dt_by_module, prune_frozen=prune_frozen, event_driven=event_driven)
+        if receptor_model != "default":          # 'off' = the presynaptic-sign rule; otherwise a receptor model name (docs/NT_INTEGRATION.md)
+            lif_kw["receptor_model"] = None if receptor_model == "off" else receptor_model
+        self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(**lif_kw),
                            optic_params=optic.OpticParams(dt_ms=optic_dt), cuda_graphs=cuda_graphs, cuda_kernels=cuda_kernels,
                            cuda_sparse=cuda_sparse, cuda_compact=cuda_compact)
         self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain
@@ -367,6 +369,9 @@ def main():
     ap.add_argument("--brain-dt", type=float, default=None, help="LIF step (ms), default 0.5")
     ap.add_argument("--dt-by-module", default=None, help="per-module LIF clocks, e.g. vnc=1.0 or vnc=1.0,descending=1.0 (ms; multiples of --brain-dt)")
     ap.add_argument("--no-prune", action="store_true", help="keep the optic-lobe synapses in the LIF matrix (they are zeros; for timing comparisons)")
+    ap.add_argument("--receptor-model", default="default", choices=["default", "off", "sign", "sign+gain", "full"],
+                    help="synapse-sign model: 'default' = LIFParams' own (receptor-corrected 'sign'/'abs' since session 10); 'off' = the presynaptic-sign rule "
+                         "(the pre-session-10 weights); see docs/NT_INTEGRATION.md")
     ap.add_argument("--fruit", default="all", choices=["all", "apple"], help="fruit on the table: all 19 items, or the apple alone (a single source)")
     ap.add_argument("--fence", action="store_true", help="test fixture: the fly cannot leave the table top by walking or hopping (scores foraging without the escape problem)")
     ap.add_argument("--program", default="none",
@@ -433,7 +438,7 @@ def main():
               cuda_graphs=args.cuda_graphs, weight_dtype=args.weight_dtype, program=args.program, escape_gating=args.escape_gating,
               dt_by_module=parse_dt_by_module(args.dt_by_module), prune_frozen=not args.no_prune, fruit_set=args.fruit, fence=args.fence,
               cuda_kernels=args.cuda_kernels, event_driven=args.event_driven, cuda_sparse=args.cuda_sparse,
-              cuda_compact=args.cuda_compact,
+              cuda_compact=args.cuda_compact, receptor_model=args.receptor_model,
               sensory_cuda_graphs=args.sensory_cuda_graphs, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)
