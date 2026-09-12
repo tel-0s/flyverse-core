@@ -262,9 +262,15 @@ class CachedConnectomeTests(unittest.TestCase):
     # (nnz 25,578,600, sum|W| 121,460,584, glutamate cells 29,707), computed with EXPLICIT receptor settings before the
     # default changed (scratch hash_weights.py, 2026-09-12): receptor_model=None must keep giving the previous weights.
     ADOPTED_CACHE = {"nnz": 25_578_600, "sum_abs_W": 121_460_584, "glutamate_cells": 29_707}
-    WEIGHTS_MD5_NONE = "2e276b30b6117c1f62688b01775eda6b"          # receptor_model=None: the pre-round-3 default weights
-    WEIGHTS_MD5_SIGN_ABS = "f0d145d1bb81b446ebc51f89ded7bd4b"      # receptor_model='sign', receptor_net_rule='abs' (shipped table)
+    # Round 5 retired the GF input damping (brain.GF_DAMPED_TYPE_PATH_GAIN is the previous DEFAULT_TYPE_PATH_GAIN; docs/audits/
+    # anti_runaway.md "Round 5: GF damping adoption"), so the round-3 hashes now belong to type_path_gain=GF_DAMPED_TYPE_PATH_GAIN
+    # and the shipped default has its own pair (scripts/r5_adopt_structure.py, out/r5_adopt_structure.json, 2026-09-12).
+    WEIGHTS_MD5_NONE_GF_DAMPED = "2e276b30b6117c1f62688b01775eda6b"      # receptor_model=None + the damping: the pre-round-3 weights
+    WEIGHTS_MD5_SIGN_ABS_GF_DAMPED = "f0d145d1bb81b446ebc51f89ded7bd4b"  # sign / abs + the damping: the round-3 / round-4 default
+    WEIGHTS_MD5_NONE = "fcb5bec2a6c492196a622e31cdb24fc6"                # receptor_model=None on the round-5 type gains
+    WEIGHTS_MD5_SIGN_ABS = "0e30e4a80cb607d4a168d1b08ebd6a40"            # the shipped default: sign / abs, round-5 type gains
     SIGN_ABS_VS_NONE = {"differing": 48_295, "flipped": 30_916, "zeroed": 17_379}
+    GF_DAMPING = {"entries": 21, "post_type": "DNp01", "pre_types": {"SAD073", "GNG300", "DNp70", "CL367", "PVLP010"}, "factor": 0.3}
 
     @staticmethod
     def _weights_md5(W):
@@ -300,11 +306,47 @@ class CachedConnectomeTests(unittest.TestCase):
         self.assertEqual(int(((W_def.data == 0) & (W_none.data != 0)).sum()) + int((np.sign(W_def.data) * np.sign(W_none.data) < 0).sum()), int(d.sum()))
         if not on_adopted_cache:
             self.skipTest("cache is not the adopted TYPE_NT_OVERRIDE cache; the pinned hashes do not apply")
-        self.assertEqual(h_none, self.WEIGHTS_MD5_NONE)                  # receptor_model=None: the previous weights
-        self.assertEqual(h_def, self.WEIGHTS_MD5_SIGN_ABS)               # the round-3 default on the shipped table
+        self.assertEqual(h_none, self.WEIGHTS_MD5_NONE)                  # receptor_model=None: the previous signs, current gains
+        self.assertEqual(h_def, self.WEIGHTS_MD5_SIGN_ABS)               # the shipped default on the shipped table
         self.assertEqual(int(d.sum()), self.SIGN_ABS_VS_NONE["differing"])
         self.assertEqual(int((np.sign(W_def.data) * np.sign(W_none.data) < 0).sum()), self.SIGN_ABS_VS_NONE["flipped"])
         self.assertEqual(int(((W_def.data == 0) & (W_none.data != 0)).sum()), self.SIGN_ABS_VS_NONE["zeroed"])
+
+    # ---- round-5 GF-damping retirement (docs/audits/anti_runaway.md "Round 5: GF damping adoption") ---------------------
+    def test_default_type_gains_have_no_gf_damping(self):
+        import re
+        from flyverse.brain import DEFAULT_TYPE_PATH_GAIN, GF_DAMPED_TYPE_PATH_GAIN
+        self.assertIsNone(LIFParams().type_path_gain)                    # None = the module default
+        for pre_re, post_re, f in DEFAULT_TYPE_PATH_GAIN:
+            if re.match(post_re, "DNp01"):
+                self.assertGreaterEqual(f, 1.0, (pre_re, post_re, f))     # nothing onto the GF is damped
+                for t in self.GF_DAMPING["pre_types"]:
+                    self.assertIsNone(re.match(pre_re, t), (pre_re, t))   # and the five damped inputs match no entry
+        self.assertEqual(DEFAULT_TYPE_PATH_GAIN, [(r"^(LC4|LPLC2)$", r"^DNp01$", 3.0)])
+        self.assertEqual(GF_DAMPED_TYPE_PATH_GAIN, DEFAULT_TYPE_PATH_GAIN
+                         + [(r"^(SAD073|GNG300|DNp70|CL367|PVLP010)$", r"^DNp01$", self.GF_DAMPING["factor"])])
+
+    def test_gf_damped_type_gains_reproduce_the_previous_weights(self):
+        from flyverse.brain import GF_DAMPED_TYPE_PATH_GAIN
+        c = self.c
+        on_adopted_cache = (c.W.nnz == self.ADOPTED_CACHE["nnz"] and int(np.abs(c.W.data).sum()) == self.ADOPTED_CACHE["sum_abs_W"]
+                            and int((c.neurons.nt == "glutamate").sum()) == self.ADOPTED_CACHE["glutamate_cells"])
+        h_new, W_new = self._weights_md5(_shaped_weights(c, LIFParams()))
+        h_old, W_old = self._weights_md5(_shaped_weights(c, LIFParams(type_path_gain=GF_DAMPED_TYPE_PATH_GAIN)))
+        h_old_none, _ = self._weights_md5(_shaped_weights(c, LIFParams(receptor_model=None, type_path_gain=GF_DAMPED_TYPE_PATH_GAIN)))
+        self.assertNotEqual(h_new, h_old)
+        # the two differ on the damped entries only: onto DNp01, from the five types, by exactly the factor
+        self.assertTrue(np.all(W_new.indices == W_old.indices)); self.assertTrue(np.all(W_new.indptr == W_old.indptr))
+        d = np.flatnonzero(W_new.data != W_old.data)
+        coo = W_new.tocoo(); ty = c.neurons.type.fillna("").to_numpy()
+        self.assertEqual(len(d), self.GF_DAMPING["entries"])
+        self.assertTrue(np.all(ty[coo.row[d]] == self.GF_DAMPING["post_type"]))
+        self.assertEqual(set(ty[coo.col[d]].tolist()), self.GF_DAMPING["pre_types"])
+        np.testing.assert_allclose(W_old.data[d] / W_new.data[d], self.GF_DAMPING["factor"], rtol=1e-6)
+        if not on_adopted_cache:
+            self.skipTest("cache is not the adopted TYPE_NT_OVERRIDE cache; the pinned hashes do not apply")
+        self.assertEqual(h_old, self.WEIGHTS_MD5_SIGN_ABS_GF_DAMPED)     # the round-3 / round-4 default, byte for byte
+        self.assertEqual(h_old_none, self.WEIGHTS_MD5_NONE_GF_DAMPED)    # the pre-round-3 weights, byte for byte
 
 
 # ---- round-2 slow term: class split, zero-cost off, the multiplicative variants, the optic-lobe term ----------------

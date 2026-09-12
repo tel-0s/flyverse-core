@@ -30,6 +30,10 @@ Sections (letters or names in --sections; "legacy" = the five original ones, "al
   h odour        the lateral-horn apple channel (motor.LH_ODOUR_CHANNELS['apple']) 8 cm downwind of the apple vs a
                  plume-free spot (scripts/screen_odour.py --fruit apple sites)
   i compass      a 12-cell EPG wedge driven at 60 Hz for 2 s: cells still firing 0.5 s later -- a known gap
+  j hops         OPT-IN ONLY (--sections hops; not in 'all' / 'new', dropped by --fast): 16 fenced apple-table rooms under
+                 the cx program through one batched FlyBrain for 2.5 simulated min (scripts/batch_sustain.py's protocol,
+                 --energy 0.9; 2,400 fly-s, ~10-20 min on a shared B200): take-offs by the GF escape route and by the
+                 voluntary wing-power route per 1,000 fly-s, and the per-row walking-GF maximum (median)
 
 Every section builds what it needs and frees it. The demo sections (b-e, g, h) run scripts/room_demo.py's Sim on
 the native backend (cuda_kernels + cuda_graphs + event_driven + warp CSR) unless --eager. Runs are chaotic: repeat
@@ -108,6 +112,15 @@ REFERENCES = {
     "odour.apple_channel_clean_hz": Ref(3.4, "<=", 6, "8", note="same channel at the plume-free spot"),
     # --- i: session 8 (compass grid: a driven wedge dies within 0.5 s under every gain / adaptation setting tried)
     "compass.wedge_cells_persisting": Ref(0, ">=", 6, "8", gap=True, note="wedge cells above 5 Hz 0.5 s after a 2 s 60 Hz pulse; known gap: no attractor"),
+    # --- j: session 10, receptor round 5 (docs/audits/receptor_integration.md 'Round 5: the take-off check'): references are the
+    #        --receptor-model off batches of scripts/batch_sustain.py (3 brain RNGs x 16 flies x 5 min, live escape route and
+    #        --gf-hz 1e9); the voluntary reference is voluntary-only, the escape rate is reported separately.
+    "hops.voluntary_per_1000_fly_s": Ref(0.0, "<", 1.0, "10", gap=True,
+        note="voluntary take-offs (wing power >= 50 Hz held 0.3 s) per 1,000 fly-s; reference = the presynaptic-sign model, 0 in 28,800 fly-s (6 batches); the shipped default measures 2.1-2.5 per batch (2.22 pooled, round 5, GF damping retired; 2.7-3.5 with the damping) -- KNOWN GAP in substance: one 2,400 fly-s draw passes the bound ~1 time in 10 at that rate, so quote >= 3 draws"),
+    "hops.escape_per_1000_fly_s": Ref(0.63, "<", 10.0, "10",
+        note="GF-escape take-offs on room optic flow per 1,000 fly-s; reference = the presynaptic-sign model under the damped gains, 0.42-0.83 per batch (0.63 pooled); the shipped default 1.25-2.29 (1.67 pooled; 2.15 with the damping); the bound is a storm guard (round-1 full: >= 2,330)"),
+    "hops.walk_gf_max_median_hz": Ref(27.2, "<", 33.0, "10",
+        note="median over flies of the walking-phase GF maximum; reference = the presynaptic-sign model 26.8-28.9 per 300 s batch (27.2 pooled); the shipped default 31.2-33.3 (31.9 pooled) with 19/48 flies at the 33 Hz escape threshold vs 8/48. A 150 s section reads 2-3 Hz below the 300 s value (median of a running maximum); can FAIL"),
 }
 
 
@@ -704,31 +717,92 @@ def sec_compass(ctx):
     return res
 
 
+# ------------------------------------------------------------------------------------------------ j: take-offs in the batched room
+def sec_hops(ctx):
+    """Opt-in: the take-off cost measured on the instrument that can see it (docs/audits/receptor_integration.md, round 4 S.3 and
+    round 5). 16 independent fenced apple-table rooms under the cx program through one FlyBrain(batch=16) -- exactly
+    scripts/batch_sustain.py --batch 16 --program cx --fruit apple --fence --energy 0.9 --seed 0 --seeds 0..15 -- for
+    --hops-minutes simulated minutes (2.5 = 2,400 fly-s). flyverse.batch_body attributes every take-off to its route: escape
+    (GF >= Flight.gf_hz after the landing refractory) or voluntary (wing power >= takeoff_power_hz held takeoff_hold_s); the
+    section reports each per 1,000 fly-s, plus the per-row maximum of the GF while walking (median, and the rows at or above
+    the escape threshold). The single-fly sections cannot score this: sec_walk_gf's 15 fly-s expects 0.03 voluntary hops."""
+    from flyverse import BatchSim
+    B, minutes = int(ctx.args.hops_batch), float(ctx.args.hops_minutes)
+    if B < 1 or not minutes > 0:
+        raise ValueError("--hops-batch must be >= 1 and --hops-minutes > 0")
+    flags = dict(cuda_kernels=True, cuda_graphs=True, event_driven=True, cuda_sparse="torch") if ctx.native else {}   # batches need the torch CSR path
+    with ctx.patched_params():
+        sim = BatchSim(B, c=ctx.c, seed=0, seeds=range(B), start=(-0.15, 0.15, 0.75), program="cx", fruit_set="apple", fence=True, **flags)
+    for seed, fly, m in zip(sim.seeds, sim.flies, sim.metabolisms):          # batch_sustain.py's initial headings and energy
+        fly.heading = np.random.default_rng(seed).uniform(-np.pi, np.pi); m.energy = 0.9
+    flight = sim.flights[0]
+    n = max(1, int(round(minutes * 60_000 / sim.FRAME_MS)))
+    prev_air = np.array([f.airborne for f in sim.flies]); gf_walk = np.zeros(B); hops = np.zeros(B, dtype=int)
+    launches = []                                                            # (row, t_s, route)
+    for k in range(n):
+        sim.step()
+        gf = np.array([w["gf"] for w in sim.wcommands])
+        gf_walk = np.where(prev_air, gf_walk, np.maximum(gf_walk, gf))      # the GF the flight model compares with gf_hz: sampled on the ground
+        air = np.array([f.airborne for f in sim.flies]); hops += air & ~prev_air; prev_air = air
+        for i in np.flatnonzero(sim.body.launched_escape):
+            launches.append([int(i), round((k + 1) * sim.FRAME_MS / 1000, 2), "escape"])
+        for i in np.flatnonzero(sim.body.launched_voluntary):
+            launches.append([int(i), round((k + 1) * sim.FRAME_MS / 1000, 2), "voluntary"])
+    fly_s = B * n * sim.FRAME_MS / 1000
+    esc, vol = sim.hops_escape.copy(), sim.hops_voluntary.copy()
+    res = {"batch": B, "minutes": minutes, "frames": n, "fly_s": fly_s, "environment_seeds": list(sim.seeds), "brain_seed": 0,
+           "protocol": "batch_sustain.py --program cx --fruit apple --fence --energy 0.9 --seed 0 --seeds 0..B-1",
+           "flight": {"gf_hz": float(flight.gf_hz), "takeoff_power_hz": float(flight.takeoff_power_hz), "takeoff_hold_s": float(flight.takeoff_hold_s),
+                      "landing_refractory_s": float(flight.landing_refractory_s)},
+           "device": str(sim.fb.device), "receptor": {"model": sim.fb.brain.p.receptor_model, "net_rule": sim.fb.brain.p.receptor_net_rule},
+           "hops_total": int(hops.sum()), "escape_total": int(esc.sum()), "voluntary_total": int(vol.sum()),
+           "escape_per_1000_fly_s": float(esc.sum() / fly_s * 1000), "voluntary_per_1000_fly_s": float(vol.sum() / fly_s * 1000),
+           "hops_per_row": hops.tolist(), "escape_per_row": esc.tolist(), "voluntary_per_row": vol.tolist(),
+           "walk_gf_max_per_row_hz": gf_walk.round(2).tolist(), "walk_gf_max_median_hz": float(np.median(gf_walk)),
+           "rows_gf_at_threshold": int((gf_walk >= flight.gf_hz).sum()), "launches": launches,
+           "route_split_consistent": bool(np.array_equal(hops, esc + vol))}
+    ctx.report("hops.voluntary_per_1000_fly_s", res["voluntary_per_1000_fly_s"]); ctx.report("hops.escape_per_1000_fly_s", res["escape_per_1000_fly_s"])
+    ctx.report("hops.walk_gf_max_median_hz", res["walk_gf_max_median_hz"])
+    print(f"hops      {B} flies x {n * sim.FRAME_MS / 1000:.0f} s = {fly_s:,.0f} fly-s: {res['hops_total']} take-offs = {res['escape_total']} escape + "
+          f"{res['voluntary_total']} voluntary ({res['escape_per_1000_fly_s']:.2f} / {res['voluntary_per_1000_fly_s']:.2f} per 1,000 fly-s); "
+          f"walking GF max per row median {res['walk_gf_max_median_hz']:.1f} Hz, {res['rows_gf_at_threshold']}/{B} rows at or above {flight.gf_hz:g} Hz"
+          + ("" if res["route_split_consistent"] else "; WARNING route split != airborne transitions"))
+    ctx.free(sim)
+    return res
+
+
 # ------------------------------------------------------------------------------------------------ registry / main
 SECTIONS = [  # (letter or None, name, function)
     (None, "rest", sec_rest), (None, "taste", sec_taste), (None, "smell", sec_smell), (None, "dn", sec_dn), (None, "walk", sec_walk),
     ("a", "motion", sec_motion), ("b", "loom_escape", sec_loom_escape), ("c", "walk_gf", sec_walk_gf), ("d", "rotation", sec_rotation),
     ("e", "object", sec_object), ("f", "bitter", sec_bitter), ("g", "wind", sec_wind), ("h", "odour", sec_odour), ("i", "compass", sec_compass),
+    ("j", "hops", sec_hops),
 ]
 LEGACY = ["rest", "taste", "smell", "dn", "walk"]
+OPTIONAL = ["hops"]     # run only when named in --sections: not part of 'all' / 'new', and dropped under --fast (no fast variant exists:
+                        # 960 fly-s cannot separate the two take-off rates; docs/audits/receptor_integration.md round 4 S.3)
 
 
-def select_sections(text):
+def select_sections(text, fast=False):
     if not text or text == "all":
-        return [s for s in SECTIONS]
-    want = set()
-    for tok in text.split(","):
-        tok = tok.strip()
-        if tok == "legacy":
-            want.update(LEGACY)
-        elif tok in ("new", "abcdefghi"):
-            want.update(name for letter, name, _ in SECTIONS if letter)
-        else:
-            want.add(tok)
-    chosen = [s for s in SECTIONS if s[1] in want or (s[0] and s[0] in want)]
-    unknown = want - {s[1] for s in chosen} - {s[0] for s in chosen if s[0]}
-    if unknown:
-        raise SystemExit(f"unknown sections {sorted(unknown)}; known: " + ", ".join(f"{l or '-'}={n}" for l, n, _ in SECTIONS))
+        chosen = [s for s in SECTIONS if s[1] not in OPTIONAL]
+    else:
+        want = set()
+        for tok in text.split(","):
+            tok = tok.strip()
+            if tok == "legacy":
+                want.update(LEGACY)
+            elif tok in ("new", "abcdefghi"):
+                want.update(name for letter, name, _ in SECTIONS if letter and name not in OPTIONAL)
+            else:
+                want.add(tok)
+        chosen = [s for s in SECTIONS if s[1] in want or (s[0] and s[0] in want)]
+        unknown = want - {s[1] for s in chosen} - {s[0] for s in chosen if s[0]}
+        if unknown:
+            raise SystemExit(f"unknown sections {sorted(unknown)}; known: " + ", ".join(f"{l or '-'}={n}" for l, n, _ in SECTIONS))
+    if fast and any(s[1] in OPTIONAL for s in chosen):
+        print(f"--fast: the opt-in section(s) {[s[1] for s in chosen if s[1] in OPTIONAL]} have no fast variant and are skipped", flush=True)
+        chosen = [s for s in chosen if s[1] not in OPTIONAL]
     return chosen
 
 
@@ -756,7 +830,8 @@ def summary_table(ctx):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--sections", default="all", help="comma-separated letters a-i and/or names (rest, taste, smell, dn, walk, motion, ...); 'legacy', 'new', 'all'")
+    ap.add_argument("--sections", default="all", help="comma-separated letters a-j and/or names (rest, taste, smell, dn, walk, motion, ...); 'legacy', 'new', 'all' "
+                                                     "(the opt-in section 'hops' runs only when named)")
     ap.add_argument("--json", type=str, default="", help="write every measured number and the check table to this file")
     ap.add_argument("--fast", action="store_true", help="shorter recordings and one seed (~half the runtime)")
     ap.add_argument("--eager", action="store_true", help="demo sections on the torch path (default: cuda_kernels + cuda_graphs + event_driven + warp CSR)")
@@ -766,6 +841,8 @@ def main():
                          "EXPORT CUBLAS_WORKSPACE_CONFIG=:4096:8 in the command; the script sets it if unset, which is only "
                          "safe before the first cuBLAS call.")
     ap.add_argument("--seeds", default="0,1", help="seeds for the demo loom-escape section (default 0,1; --fast keeps the first)")
+    ap.add_argument("--hops-minutes", type=float, default=2.5, help="opt-in section hops: simulated minutes per fly (default 2.5 = 2,400 fly-s at 16 flies)")
+    ap.add_argument("--hops-batch", type=int, default=16, help="opt-in section hops: number of independent rooms in the batch (default 16)")
     ap.add_argument("--std-u", type=float, default=None)
     ap.add_argument("--std-tau", type=float, default=None)
     ap.add_argument("--adapt-jump", type=float, default=None)
@@ -851,7 +928,7 @@ def main():
               "cache_dir": str(ctx.cache_dir or connectome.CACHE_DIR),
               "nt_counts": {k: int(v) for k, v in ctx.c.neurons.nt.value_counts().items()}}
     print("LIF:", config["lif"], " gain_out", op.gain_out_mv, " backend:", config["backend"], " fast:", ctx.fast, flush=True)
-    for letter, name, fn in select_sections(args.sections):
+    for letter, name, fn in select_sections(args.sections, ctx.fast):
         print(f"\n=== [{letter or '-'}] {name}", flush=True)
         t0 = time.time()
         try:

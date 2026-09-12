@@ -78,7 +78,7 @@ plain torch). Spike trains match the torch path exactly; continuous state and ra
 |---|---|---|---|
 | photoreceptors R1-R6, R7 (UV), R8 (blue / green) | 5,895 placed on 1,466 real hex columns of the two eyes | ray-traced spectral radiance [UV,B,G,R] per ommatidium, low-pass + contrast adaptation | `retina.py`, `world.py` |
 | optic lobe (lamina, medulla, lobula, lobula plate) | 89,390 `ol_intrinsic` | graded rate units on the signed, input-normalised connectome (flyvis-style); T4/T5 rectify with strong delayed inhibition and are **direction selective** with the correct preferred direction for all eight subtypes | `optic.py` |
-| everything else: visual projection neurons, central brain, VNC, motor neurons | 71,625 | Shiu et al. 2024 leaky integrate-and-fire on the GPU, plus adaptation, a per-connection saturation cap, a fan-in cap for giant neurons, same-type synapse damping, antennal-lobe-only depression, and two pathway gains (DN -> VNC x3, visual projection -> DN x2) | `brain.py` |
+| everything else: visual projection neurons, central brain, VNC, motor neurons | 71,625 | Shiu et al. 2024 leaky integrate-and-fire on the GPU, plus adaptation, a per-connection saturation cap, a fan-in cap for giant neurons, same-type synapse damping and antennal-lobe-only depression; synapse signs from the presynaptic transmitter, corrected per postsynaptic type by the receptor-expression table where six transcriptomic sources decide it (26 % of the weight; `LIFParams.receptor_model`, `None` restores the presynaptic rule; `docs/NT_INTEGRATION.md`); one type gain (LC4 / LPLC2 -> DNp01 x3) and two pathway gains (DN -> VNC x3, visual projection -> DN x2) | `brain.py` |
 | taste | 165 labellar sugar GRNs, found by connectivity to the known sweet interneurons | Poisson while touching fruit -> Usnea / Rattle / Phantom / G2N-1 -> proboscis MN9 | `scripts/find_sweet_grns.py`, `flyverse/data/taste_grns.csv` |
 | smell | 2,639 ORNs in 53 glomeruli, sided to the left / right antenna by their PN targets | every fruit is a **wind-blown plume** (Gaussian, puffing) sampled by two antennae 1 mm apart | `air.py` |
 | wind | Johnston's organ C / E neurons, sided by their AMMC/WED targets | antennal deflection per side from the wind vector in the body frame | `air.py` |
@@ -233,6 +233,7 @@ tests/                   control-surface, world and integration tests
 docs/NOTES.md            everything learned, session by session, with numbers
 docs/ARCHITECTURE.md, docs/CONTROL_SURFACE.md, docs/PERFORMANCE.md   the control surface and its cost
 docs/BENCHMARK_BATTERY.md   behavioural assays and how the plain model scores on each
+docs/audits/receptor_integration.md, docs/audits/receptor_verification.md   the receptor integration's scoring record and the skeptics' verdicts (rounds 1-5)
 docs/NT_INTEGRATION.md      receptor-expression data integration: findings, sources, task outline
 ```
 

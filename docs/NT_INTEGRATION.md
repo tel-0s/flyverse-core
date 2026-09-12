@@ -1,9 +1,8 @@
 # Neurotransmitter and receptor data integration
 
-Status: **rounds 1-4 done; the receptor plan is closing** (section 7): the receptor-derived sign stage is the
-default for the share of weight the data decide; the data are exhausted; a short closing round (evidence rewrite,
-the take-off check on the right instrument, the GF-damping adoption run) and then the thread hands over to the
-dynamics questions. This page records the question that prompted it, what data
+Status: **rounds 1-5 done; the receptor plan is CLOSED** (section 7): the receptor-derived sign stage is the
+default for the share of weight the data decide (26 % of |W|), reversible by one flag; the GF x0.3 input damping is
+retired; the data are exhausted; the thread hands over to the dynamics questions listed at the end of section 7. This page records the question that prompted it, what data
 exist, what the model does today, what we need, the task outline, and what each round found. Numbers in
 sections 1-6 come from `docs/audits/nt_audit.md`; round-1 numbers from `docs/audits/receptor_*.md`.
 
@@ -110,7 +109,7 @@ And on our side:
 - A weight-shaping stage that can set a synapse's sign from (pre transmitter, post receptor
   profile) rather than from the pre cell alone (since round 3 the DEFAULT, `receptor_model='sign'` / `abs`;
   `None` restores the presynaptic rule byte for byte), implemented as a swappable step in
-  `brain._shaped_weights` (`LIFParams.receptor_model`), default off until it scores better.
+  `brain._shaped_weights` (`LIFParams.receptor_model`); the default since round 3.
 - A slow-current term in the LIF for the monoamine / metabotropic class (a second, low-pass
   conductance with its own time constant per receptor class), so that dopamine, octopamine and
   serotonin become signed rather than zero. This is a model-level change (not a behaviour program):
@@ -286,7 +285,7 @@ histamine; Kurmangaliyev 2020 added as a sixth source). Findings:
    with the benchmark's walk / motion sections half applied): 26/1/2 in 11 of 11 fully-applied suite runs, equal to
    off's best tally, no check worse in status than any off run; demo loom escapes 12/12 vs 3/12; bitter 3 seeds 139.9 / 138.9 / 131.5 vs 123.5 / 122.0
    / 114.7; figure-ground and object sweep within scatter. Costs on record: legacy loom.GF_peak 27-32 vs 37-44 Hz
-   (PASS), KC_active 816 vs 1426, spontaneous take-offs 24 vs 3 in 16 flies x 5 min (U 226, p 7.7e-5; one batch),
+   (PASS), KC_active 816 vs 1426, take-offs (escape or voluntary) 24 vs 3 in 16 flies x 5 min (U 226, p 7.7e-5; one batch),
    pinned-loom escape at the 33 Hz threshold in 2 of 6 runs (round-2 table 5/5 at 37 Hz; off 0/5 at 19). The
    justification the adoption rests on is the data-side argument for `abs` in `receptor_rules.md` section 3 (absolute
    GluCl vs iGluR level; contested flips removed), not the suite count.
@@ -345,12 +344,49 @@ histamine; Kurmangaliyev 2020 added as a sixth source). Findings:
    (per-op probe); the walk.power_max cost is the term (-27 Hz), not the dop1r1 signs (+3 Hz); assay 7 stays blocked
    because the term-off reference itself fails walk.power_max. Parked; no native slow kernel.
 
-**Round 5 (closing; launched):** (a) the take-off check on the right instrument -- an escape / voluntary split in
-`batch_sustain`'s JSON, 3 + 3 batches live and 3 + 3 at gf_hz = 1e9, a voluntary-only reference, and a scored
-`hops` section for benchmark.py; (b) the GF-damping adoption run -- no-flag suite x3 on the edited default plus the
-same hop batches under it (the experiment that links the walk.power_max FAIL to the behavioural cost); (c) the
-Brain-side vs optic-side hold to settle the taste attribution. Then the receptor thread hands over to the dynamics
-questions (compass with senses, PEN L/R shift, PFN -> hDelta -> PFL3; medulla -> lobula small-field wiring; a
-metabolism that lets feeding rank models). The data are exhausted: six sources, 25.7 % of the weight decided, the
-object-pathway types unprofiled everywhere, the ring inert, 95 of 99 unknown-NT types unreachable -- a round 6 of
-receptor work would have nothing to measure.
+**Round 5 (closing; done; `docs/audits/receptor_verification.md` round-5 section):**
+
+1. **The take-off cost is now an instrument.** Every hop in the batched room records its route (GF escape at 33 Hz
+   vs voluntary wing power >= 50 Hz held 0.3 s; `batch_body` / `batch_sim` / `batch_sustain`, verified against the
+   scalar model at 2e-12), and `benchmark.py --sections hops` (opt-in, 2,400 fly-s) scores voluntary and escape
+   rates per 1,000 fly-s and the walking-GF median with references from the presynaptic-sign model. Measured, live
+   route, 3 brain RNGs x 16 flies x 300 s per arm: pre-retirement default 75 = 31 escape + 44 voluntary vs off 9 = 9 + 0
+   (voluntary p 4e-11); with the escape route disabled 30 voluntary vs 0 -- off never takes off voluntarily in 28,800
+   fly-s. The shipped default's voluntary entry is a KNOWN GAP in substance (P(pass per draw) ~ 0.1); one 150 s draw
+   measures the rate to a factor ~2.7, so quote >= 3.
+2. **GF x0.3 input damping retired (default model changed).** `DEFAULT_TYPE_PATH_GAIN` keeps only LC4/LPLC2 -> DNp01
+   x3; `GF_DAMPED_TYPE_PATH_GAIN` restores the old list (md5-pinned). Suite 27/0/2 in 4 of 4 draws (walk.power_max
+   48.48 in 14/14), no check worse in status than the pre-retirement default; room take-offs not worse in either
+   route (shipped 56 = 24 + 32 vs pre-retirement 75 = 31 + 44; p(shipped > pre) 0.77 / 0.95), the excess over off
+   survives (6.2x; voluntary 32 vs 0) with an unmoved walking-GF tail (31.9 vs 32.25 Hz). The tally gain is the
+   retirement's, not the receptor model's -- and the two interact: off with the damping retired fails walk.power_max
+   at 95.5-97.1 Hz, so under the shipped gains the receptor model is ~48 Hz better than off on that check where under
+   the damped gains it was 6.3 Hz worse. Skeptic verdict: sound.
+3. **Attribution.** Taste, both smell checks and the three sugar checks are 100 % Brain-side (bit-exact in three run
+   dirs); motion.min_dsi 100 % optic; loom.GF_peak mostly optic; walk.power_max both sides non-additively; walk.GF_max
+   neither -- either half of the receptor signs alone raises the walking GF 2.5-2.9x while both together cancel.
+   Fan-in normalisation is refuted (0 optic-side input_scale moves; MN9's fan-in bit-identical; the CPU dissociation
+   survives with the normalisation off). The CPU double dissociation names the 123 Brain-side histamine silencings
+   (282 synapses onto OA-AL2i3 / TmY14 / DNge14x) as what taste depends on and the 3,709 KC + DN1 glutamate flips as
+   what smell depends on -- dependence, not magnitude (CPU +3.5 / 0.0 / +0.1 Hz over seeds).
+
+**The default model at the close.** `LIFParams.receptor_model = 'sign'`, `receptor_net_rule = 'abs'` on the
+contested-flip table (48,295 entries = 0.148 % of |W|; `None` restores the presynaptic rule byte for byte);
+`DEFAULT_TYPE_PATH_GAIN` = LC4/LPLC2 -> DNp01 x3 only (`GF_DAMPED_TYPE_PATH_GAIN` restores the damping);
+`TYPE_NT_OVERRIDE` = TmY14 glutamate, Mi19 serotonin, aMe8 ACh. Weight md5s: shipped 0e30e4a8, damped gains f0d145d1
+(the round-3/4 default), receptor None on the shipped gains fcb5bec2, None on the damped gains 2e276b30
+(pre-round-3) -- all pinned in `tests/test_receptor_model.py`. Suite 27/0/2 (walk.power_max 48.5 vs a hand-set 50 Hz
+bound); costs: KC_active 816 vs 1426, and the room take-off excess (voluntary 2.2 + escape 1.7 vs 0 + 0.6 per 1,000
+fly-s), which neither the KC / DN1 holds nor the DNp01 inhibition accounts for.
+
+**Handover (the receptor data are exhausted: six sources, 26 % of |W| decided; PEN / GLNO / PFL3 / hDelta / Tm5Y /
+TmY21 / LC11 / DNp04 / LPT unprofiled everywhere; the ring inert; 95 of 99 unknown-NT types unreachable).** The
+closing critic's list, each with its first command, is in `docs/audits/receptor_verification.md` (round 5,
+"Handover"): (1) compass with senses / PEN L-R shift / PFN -> hDelta -> PFL3 readout, from the GLNO-sign-robust
+operating points (gE 2 / gD 15, 2.25 / 25, 2.5 / 25; the receptor default is irrelevant on the ring); (2) medulla ->
+lobula small-field wiring / dynamics, re-establishing the object-sweep null under the shipped gains first; (3) a
+feeding-capable metabolism (the present drain empties a 0.9 tank by t = 170-180 s; meals cannot rank models);
+(4) the walk.power_max bound (hand-set, two-regime, non-monotone in every scan; re-derive its referent under the
+shipped gains before anything else is tuned to sit under it; re-scan LPi x2 and the AL LN override there); (5) the
+take-off cost, inherited by the sustain / RL work (the room hold pair -- Brain-side vs optic-side signs -- is the
+first experiment). Do not start a round 6 of receptor work.

@@ -79,7 +79,7 @@ once (2.3 s), a `Brain` builds in ~3 s, a native demo `Sim` in ~6 s. JSON: `out/
 | odour.apple_channel_clean_hz          | 4.43     | 3.40      | <= 6      | PASS      | 8     |
 | compass.wedge_cells_persisting        | 0        | 0         | >= 6      | KNOWN GAP | 8     |
 
-26 pass, 1 fail (walk.power_max_hz, 79.5 Hz against a hand-set 50 Hz bound), 2 known gap, 0 missing at the round-4 defaults (receptor_model 'sign' / 'abs'; the walk and motion sections build the optic lobe with the receptor lookup since round 4; 5.3-12 min on a shared B200). The session-9 tally at the pre-receptor defaults was 24 pass, 3 fail, 2 known gap.
+27 pass, 0 fail, 2 known gap, 0 missing at the round-5 defaults (receptor_model 'sign' / 'abs'; GF x0.3 input damping retired -- that retirement, not the receptor model, turned walk.power_max_hz from 79.5 FAIL to 48.5 PASS against a hand-set 50 Hz bound; 4 of 4 draws; the walk and motion sections build the optic lobe with the receptor lookup since round 4; 5.3-12 min on a shared B200). The opt-in `hops` section (--sections hops, 2,400 fly-s) scores the room take-off cost the default suite does not: the shipped default's voluntary take-offs are a KNOWN GAP in substance. The session-9 tally at the pre-receptor defaults was 24 pass, 3 fail, 2 known gap.
 
 Section detail from the same run:
 

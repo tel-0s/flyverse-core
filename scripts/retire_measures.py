@@ -241,7 +241,9 @@ CONFIGS = {
                         "note": "no superclass gains; LC4/LPLC2 -> GF x6 (the same effective loom gain), GF -> TTMn/PSI x10 (electrical synapse stand-in)"},
     # type gains
     "no_type_gain": {"measure": "type gains", "kind": "ablation", "lif": {"type_path_gain": []}},
-    "no_gf_damping": {"measure": "type gains", "kind": "ablation", "lif": {"type_path_gain": [LOOM_GF]}, "note": "LC4/LPLC2 -> GF x3 kept, the x0.3 damping removed"},
+    "no_gf_damping": {"measure": "type gains", "kind": "ablation", "lif": {"type_path_gain": [LOOM_GF]}, "note": "LC4/LPLC2 -> GF x3 kept, the x0.3 damping removed (== the round-5 default)"},
+    "gf_damped": {"measure": "type gains", "kind": "restoration", "lif": {"type_path_gain": list(brain.GF_DAMPED_TYPE_PATH_GAIN)},
+                  "note": "the GF x0.3 input damping restored (the round-3/4 default; retired in round 5)"},
     "gf_damping_dnp70": {"measure": "type gains", "kind": "replacement", "lif": {"type_path_gain": [LOOM_GF, (r"^DNp70$", r"^DNp01$", 0.3)]},
                          "note": "x0.3 only on the one excitatory input of the five (SAD073 / GNG300 / CL367 are GABA, PVLP010 glutamate)"},
     # optic-lobe pair gains (optic.DEFAULT_PAIR_GAIN)
