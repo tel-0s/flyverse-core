@@ -418,3 +418,184 @@ was touched by this task.
 * The dop1r1 table differs from the shipped one in dopamine rows only, in the slow and provenance columns (receptor_groups, slow_pos_val, alt_sources) -- none read by `receptor_signs`.
 * In the very section where walk.power_max is measured the optic lobe carried neither the abs signs nor the tone at the time of the round-3 batch (fixed with the benchmark change above); the 21,850 optic rate units "in the optic term" are toned only in the FlyBrain room sections.
 * The '2 of 2 replicates' bar was the round-3 author's tightening of slow_term.md 6.2 (which asked for 3 replicates before adoption); the skeptic's extra replicates support it. The test cited for the zero-gain identity pins full-with-zero-gains == 'sign+gain'; equality to 'sign' holds because --receptor-gain 1,1,1 sets every class factor to 1.
+
+## 8. Round 4: `--deterministic`, and the slow term vs the dop1r1 slow signs (batch `r4-slowdet-f71ec1`, 12 jobs, 2026-09-12)
+
+Round-3 follow-up 8 (`docs/audits/receptor_verification.md`, completeness critic round 3; `docs/NT_INTEGRATION.md`
+section 7, round-4 item 8). Three questions: is the walk / motion pair bit-reproducible under
+`torch.use_deterministic_algorithms(True)`; does the walk.power_max cost belong to the term or to the
+`--dopamine-lead dop1r1` slow signs; what does the deterministic mode cost in run time. Everything below comes from
+`out/r4_sd_*.json` / `.txt` (12 runs), `out/r4_slowdet_scores.txt` (written by `scripts/slowdet_report.py`),
+`out/r4_slowdet_tables.json` (`scripts/slowdet_tables.py`, CPU), `out/r4_slowdet_cmds.txt` and
+`out/r4_slowdet_cluster.log`.
+
+### 8.1 Two changes to `scripts/benchmark.py`
+
+* **`--deterministic`** (new): `torch.use_deterministic_algorithms(True)` + `torch.backends.cudnn.benchmark = False`,
+  set in `main()` before any section runs; the flag, the value of `CUBLAS_WORKSPACE_CONFIG` and `torch.__version__` are
+  recorded in the JSON under `config.deterministic`. The commands export `CUBLAS_WORKSPACE_CONFIG=:4096:8` before
+  `python` (cuBLAS pins its workspace when its handle is first created); if the variable is unset the script sets it
+  in-process and says so. An op with no deterministic implementation raises, `main()`'s per-section `except` records the
+  section as an error and every check of it as MISSING, and the traceback naming the op lands in the `.txt` log.
+  **No such error occurred**: `grep -inE "nondeterministic|does not have a deterministic|RuntimeError|Traceback"
+  out/r4_sd_*.txt` is empty and all 12 runs report `0 missing`.
+* **`with_counts` in `sec_walk` / `sec_motion`** (a necessary fix, not part of the flag): the round-3 benchmark repair
+  made both sections build one `rs = brain._receptor(c, lif)` and hand it to `brain.Brain(c, lif, receptor=rs)`, but
+  without `with_counts`, so `rs.count is None` and `brain._slow_weights` raises
+  `ValueError("the slow term needs receptor_signs(..., with_counts=True)")` for any `--receptor-model full` with a
+  non-zero class scale. Reproduced locally on CPU before the edit (`brain._receptor(c, p)` then
+  `brain._slow_weights(c, p, rs, brain._slow_spec(p))` -> that ValueError). Both lines now read
+  `brain._receptor(c, lif, with_counts=lif.receptor_model == "full")`, the `probe_loom.py` line-46 pattern. The extra
+  argument only fills `ReceptorSigns.count`: `receptor_signs(c, net_rule='abs')` with and without it is array-equal on
+  `fast_sign`, `slow_sign`, `slow_class` and `tier` (checked on the adopted cache), so no other flag's numbers move.
+  Without this fix **no slow-term arm could run through the repaired benchmark at all**, so no round-3 walk / motion
+  value has ever been measured with the term active *and* the lobe receptor-aware; section 8.3-8.4 are the first.
+* Scope, unchanged: `sec_walk` and `sec_motion` build `optic.OpticLobe(..., receptor=rs, receptor_gain=...)` with **no
+  `slow=`**. Only `fly.FlyBrain` passes the `SlowSpec` to the lobe. In these two sections the monoamine tone therefore
+  acts through the spiking `Brain` only (the 21,850 toned optic rate units of section 7 are untoned here); the room
+  sections are unaffected.
+
+### 8.2 What ran
+
+One batch, 12 concurrent jobs, `python scripts/slowdet_batch.py --name r4-slowdet --minutes 30` (the generator writes
+`out/r4_slowdet_cmds.txt` and calls `scripts/cluster_run.py ... --fetch out/`; no `--cache-dir`). Every job is
+`--eager --sections walk,motion --seeds 0,1,2 --receptor-model full --receptor-net-rule abs --receptor-gain 1,1,1`
+(`1,1,1` makes `full`'s fast weights the adopted `sign` / `abs` ones) on `cache <cluster-fs>/neurome/runs/r4-slowdet-f71ec1/cache`,
+device NVIDIA B200, backend `eager torch`, `fast_sign_changed_entries` 48,295 in all 12. Three conditions:
+
+| tag | n (det + non-det) | flags on top of the base | monoamine slow entries / syn-eq (from `config.receptor.slow`) |
+|---|---|---|---|
+| `ctl` | 2 + 2 | `--slow-gain-monoamine 0` (term off, `slow.active false`) | -- (no matrix built) |
+| `ecr` | 2 + 1 | `--slow-mode threshold --slow-gain-monoamine 0.01`, shipped table | 215,579 / 510,385 |
+| `dop` | 3 + 2 | the same plus `--dopamine-lead dop1r1` | 104,104 / 299,612 |
+
+The deterministic runs record `config.deterministic = {"flag": true, "cublas_workspace_config": ":4096:8",
+"torch": "2.11.0+cu128"}`. The batch took 3.7 min wall; the job manager reported `12 job(s), 1 failed` but that job
+(`r4-slowdet-f71ec1-6` = `det_ctl_2`) ran to completion -- its log was lost by the manager ("no logs available"),
+while `out/r4_sd_det_ctl_2.txt` ends with the full check table and `wrote out/r4_sd_det_ctl_2.json`. The five dop1r1
+jobs rebuilt `out/receptors_by_type_dop1r1.csv` concurrently (12.2-13.1 s each) and the fetched file is md5
+`988c0e669e474b890b0da3f885a58e85`, byte-identical to the round-3 rebuild (`out/r4_sd_dop1r1_table.csv`, the copy this
+task took before the batch) -- a second demonstration that the concurrent rebuild is safe.
+
+### 8.3 `--deterministic` changes nothing about reproducibility here
+
+19 replicate pairs within a condition (ctl 6, dop 10, ecr 3; by kind: 5 det-det, 2 nd-nd, 12 mixed), every scalar leaf
+of `sections.walk` and `sections.motion` compared by `repr(float)` (`scripts/slowdet_report.py`):
+
+| sub-tree | det-det pairs (n=5) | nd-nd pairs (n=2) | mixed det/nd pairs (n=12) |
+|---|---|---|---|
+| `walk.walk`, 11 leaves (power_max, power_sustained, GF_max/mean, power_mean, leg_hz, frac_active, top x4) | **0 differ in 5 of 5** | **0 differ in 2 of 2** | **0 differ in 12 of 12** |
+| `walk.loom`, 2 leaves | `GF_peak_hz` differs in 3 of 5 | 1 of 2 | 6 of 12 (10 of 19 overall); `escape_cm` identical in 12 of 12 runs |
+| `walk.rotate`, 55 leaves per run (union up to 72 in a pair: the six most-lateralised DN types listed differ) | 23-68 differ, **5 of 5** | 24-67, **2 of 2** | 18-67, **12 of 12** (19 of 19 overall) |
+| `motion`, 68 leaves | 22-33 differ, **5 of 5** | 30-34, **2 of 2** | 23-36, **12 of 12** (19 of 19 overall) |
+
+So the three reported walk figures are bit-reproducible **with or without the flag** -- `walk.power_max_hz`
+79.46501159667969 in 4 of 4 ctl runs, 55.62504196166992 in 5 of 5 dop runs, 52.44422912597656 in 3 of 3 ecr runs, one
+distinct value per condition; likewise `power_sustained` (37.88953189849855 / 25.237401040395095 / 24.462433274587003)
+and `GF_max` (4.606074333190918 / 9.568930625915527 / 13.709206581115723). And `motion.min_dsi` is **not**
+bit-reproducible under the flag: det_ctl 0.2333961144552274 vs 0.23339655269918072, det_dop_1/_2 0.24686907156393234 vs
+det_dop_3 0.24686902720194054, det_ecr 0.2425185437262979 vs 0.24251852434048085. **The round-3 skeptic's point stands
+and is now stronger: the term-off control's motion scatter does not vanish under `--deterministic`** (27 of 68 motion
+leaves differ between `det_ctl_1` and `det_ctl_2`, against 30 of 68 between `nd_ctl_1` and `nd_ctl_2`).
+
+Where the divergence enters: the three phases of `sec_walk` share one `Brain` and one `OpticLobe` in sequence
+(walk 150 frames -> loom 80 -> rotate 2 x 130). The walking phase is bit-identical in all 19 pairs, the loom phase
+differs only in `GF_peak_hz` and only in 10 of 19, and the rotate phase differs in 19 of 19; `sec_motion`, a separate
+lobe + brain with no world motion, differs in 19 of 19. So the divergence appears at or after the loom onset -- the
+first point at which `world.move_sphere` mutates the scene -- and `sec_motion` diverges independently of it. That
+localisation is measured; the mechanism is not. What is ruled out is an op that `use_deterministic_algorithms` guards
+(none raised), so the remaining candidates are ops the flag does not cover -- the cuSPARSE CSR x dense products behind
+`brain.Brain._transmit` (`(W @ x.T).T`) and `optic._mv`, and the ray tracer's reductions -- and this needs a per-op
+probe, not another suite batch. `motion.min_dsi`'s scatter is 4.4e-7 absolute within ctl and 6.2e-5 within nd_dop against a `>= 0.1` criterion,
+and `rotate.DNp20_flip_hz` scatters 5.1-8.3 Hz per condition, so only the rotate and loom checks are actually at risk
+from it.
+
+### 8.4 The walk.power_max cost is the term, not the dop1r1 slow signs -- and it is a *reduction*
+
+The two tables differ only in the slow term: `scripts/slowdet_tables.py` recomputes `receptor_signs` on both under
+`net_rule='abs'` and finds `fast_sign` **identical entry for entry** (0 of 25,578,600 differ; both change 48,295
+entries against the presynaptic-sign rule; sum|W| 121,460,584). The monoamine slow matrix goes 215,579 entries /
+510,385 syn-eq (shipped, DopEcR-led) -> 104,104 / 299,612 (dop1r1); sign split -1/+1 29,548 / 186,031 -> 33,296 /
+70,808; cells with a non-zero tone row-sum 31,895 -> 29,923; the row sums differ on 6,840 cells (max |delta| 420 syn-eq;
+cb_intrinsic 3,861, visual_projection 1,501, ol_intrinsic 1,430, descending 10). The same 13 descending types carry a
+tone under both tables, with the same sign; only the magnitudes move (e.g. DNg104 158 -> 107, DNge138 168 -> 139
+syn-eq). So `ecr` - `ctl` is the slow term at fixed fast weights and `dop` - `ecr` is the dop1r1 slow signs alone.
+
+| check | ctl (n=4) | ecr (n=3) | dop (n=5) | term = ecr-ctl | lead = dop-ecr | max within-condition spread |
+|---|---|---|---|---|---|---|
+| walk.power_max_hz | 79.465 | 52.4442 | 55.625 | **-27.02** | +3.18 | 0 |
+| walk.power_sustained_hz | 37.8895 | 24.4624 | 25.2374 | **-13.43** | +0.77 | 0 |
+| walk.GF_max_hz | 4.60607 | 13.7092 | 9.56893 | +9.10 | **-4.14** | 0 |
+| loom.GF_peak_hz | 49.5297 [46.97,50.38] | 42.8149 [42.01,44.15] | 49.9487 [48.58,50.29] | -6.71 | **+7.13** | 3.41 |
+| rotate.DNp20_flip_hz | -30.92 [-33.75,-28.62] | -32.25 [-35.40,-27.13] | -39.74 [-43.46,-37.51] | -1.33 | -7.49 | 8.27 |
+| motion.min_dsi | 0.233396 | 0.242519 | 0.246942 | +0.00912 | +0.00442 | 0.000214 |
+| loom.escape_cm / motion.correct_directions | 3.5 / 8 | 3.5 / 8 | 3.5 / 8 | 0 | 0 | 0 |
+
+Answers: **on `walk.power_max` the term carries 89 % of the move (-27.02 Hz) and the dopamine lead 11 % (+3.18 Hz)**;
+the same on `power_sustained` (-13.43 vs +0.77). The confound is *not* negligible elsewhere: on `walk.GF_max` the lead
+is 45 % of the term's size and of the opposite sign, on `loom.GF_peak` the lead (+7.13) is larger than the term
+(-6.71) and cancels it, and on `rotate.DNp20_flip` neither exceeds the 8.3 Hz within-condition scatter. The round-3
+attribution of *any* of these to "the slow term" was indeed unsafe, but for `walk.power_max` the separation now exists
+and favours the term.
+
+The direction is the opposite of round 3's. With the repaired sections the **term-off control itself FAILS**
+`walk.power_max` (`< 50`) at 79.465 in 4 of 4, and the slow term *lowers* it to 52.4 / 55.6 -- still FAIL. All 12 runs
+score 7 PASS / 1 FAIL / 0 gap / 0 missing, the FAIL being `walk.power_max` in every one. Round 3's control value of
+46.0955 and its bimodal `36.79 / 53.56 / 53.56 / 53.56` under threshold 0.01 were properties of the half-applied
+`sec_walk`: with the lobe receptor-aware the identical threshold-0.01 command gives one value in 5 of 5 runs. Note that
+`--receptor-model full --receptor-gain 1,1,1 --slow-gain-monoamine 0` is the adopted `sign` / `abs` weight set, so
+79.465 should be what the round-4 re-score (`out/r4_default_*.json`, item 1) reports for the default; that comparison
+is that task's, not this one's.
+
+### 8.5 Cost of `--deterministic` in run time: not resolvable at this sample size
+
+Section seconds from `runtime_s` (12 concurrent jobs sharing the cluster's GPUs, so contention dominates):
+
+| | walk (s) | motion (s) |
+|---|---|---|
+| deterministic (n=7) | 19.1, 46.5, 46.9, 48.3, 48.9, 49.1, 50.9 -- median 48.3, mean 44.2 | 26.5, 27.3, 27.3, 27.6, 28.0, 28.2, 35.5 -- median 27.6, mean 28.6 |
+| non-deterministic (n=5) | 28.8, 34.4, 39.1, 41.2, 41.9 -- median 39.1, mean 37.1 | 23.2, 23.7, 25.0, 28.5, 29.6 -- median 25.0, mean 26.0 |
+
+Medians say +24 % on walk and +10 % on motion, but two runs of the *identical* deterministic control command took 19.1
+and 46.9 s of walk (and 35.5 and 26.5 s of motion), a spread larger than the difference between the groups. The honest
+statement is an upper bound: `--deterministic` costs at most about a quarter of the walk section and a tenth of the
+motion section here, and a dedicated serial timing run would be needed to resolve it. Whole-job totals (61-96 s) also
+carry the 12.4 s dop1r1 rebuild in the five `dop` jobs and are not comparable across conditions.
+
+### 8.6 Consequences
+
+1. `--deterministic` does **not** make `benchmark.py --eager --sections walk,motion` reproducible; it is not the tool
+   for this. What makes the *decisive* numbers reproducible is the repaired `sec_walk`: `walk.walk` is now
+   bit-identical in 19 of 19 pairs, with the flag and without it, which is what round-3 follow-up 8 was really after.
+   `loom.GF_peak`, `rotate.DNp20_flip` and everything in `motion` below the 4th decimal remain non-reproducible and
+   must be quoted as ranges over >= 3 replicates.
+2. The dop1r1 confound is separated for `walk.power_max` / `power_sustained` (the term dominates) and is **not**
+   separated for `walk.GF_max`, `loom.GF_peak` or `rotate.DNp20_flip`, where the lead's contribution is comparable or
+   larger. Any future slow-term scoring must carry a shipped-table arm, as here.
+3. **Assay 7 (hunger) stays blocked, for a new reason.** Section 6.2's precondition -- pass every check the reference
+   passes -- cannot be applied while the reference itself fails `walk.power_max` at 79.465 (4 of 4). The term moves the
+   check 27 Hz toward its bound without reaching it. Until round-4 item 1 settles what the corrected control is, the
+   slow term has no bar to clear; the native slow kernel (round-2 follow-up 8) stays unwritten.
+4. Not changed by this task: no default, no table, no test. `flyverse/` is untouched; the only code edits are the two
+   in `scripts/benchmark.py` above, plus the new generators `scripts/slowdet_batch.py`, `scripts/slowdet_report.py`
+   and `scripts/slowdet_tables.py`.
+
+Files: `out/r4_sd_{det,nd}_{ctl,dop,ecr}_*.json` / `.txt` (12), `out/r4_slowdet_scores.txt`,
+`out/r4_slowdet_tables.json`, `out/r4_sd_dop1r1_table.csv`, `out/r4_slowdet_cmds.txt`, `out/r4_slowdet_cluster.log`.
+
+### Corrections (round-4 verification, `verify:exp:slowdet`)
+
+* The dop1r1 table is row-identical to round 3's after line-ending normalisation, not byte-identical (md5 988c0e66
+  vs 77958cf9). Five concurrent jobs rebuilding the same CSV path is a race that happened not to bite, not a
+  demonstration of race-freedom.
+* Where the non-determinism enters: the skeptic's per-op probe (`scripts/skeptic_det_ops.py`, batch r4-detops-2e02f1)
+  shows the CSR x dense product on the real W -- the op behind `Brain._transmit` and `optic._mv` -- gives 20 distinct
+  results in 20 repetitions WITH `torch.use_deterministic_algorithms(True)`, while `index_add_` becomes bit-identical
+  under the flag and dense matmul is bit-identical either way. It runs from frame 0; the loom onset is where the
+  divergence becomes visible in the readouts, not where it enters. Any determinism work must replace or order that
+  product; the `--deterministic` flag neither raises nor helps for it.
+* "27 of 68 motion leaves" is 27 of 44 numeric leaves; the walk-section per-pair leaf union is up to 79 (rotate) / 92
+  (whole section); the leaf comparison counts a key present in only one run as a difference. `--seeds` feeds the
+  demo loom section only and `std_u` is 0 in these runs, so the within-condition spread is GPU-reduction scatter of
+  one initial condition. The round-3 threshold-0.01 bimodality was measured on different code (before the sec_walk
+  repair), so its non-reproduction says nothing about reduction order.

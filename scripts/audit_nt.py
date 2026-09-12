@@ -17,10 +17,26 @@ predictions lean towards for the "unknown" cells.
 Writes the markdown report plus out/nt_audit_populations.csv and out/nt_audit_groups.csv.
 Purely structural: no simulation, no GPU. ~40 s (the 1 GB weight table and the 2.6 GB T-bar table,
 memory-mapped, dominate).
+
+    PYTHONIOENCODING=utf-8 python scripts/audit_nt.py --type-majority [--majority-out docs/audits/nt_type_majority.md]
+                                                     [--majority-share 0.8] [--majority-min 4] [--compile-cache]
+
+--type-majority (round 4, docs/NT_INTEGRATION.md section 7 item 7): the TYPE-MAJORITY transmitter rule for the
+unknown-NT cells that belong to a type with labelled members. Per such type: the majority transmitter of its
+labelled cells (count, share), the transcriptome call of flyverse/data/nt_by_type_transcriptome.csv (with the
+sources behind it; a pool-mixed call is not evaluable), the Nern 2025 prediction (type_map_nern2025.csv), and
+`proposed` = the type majority (share >= --majority-share, >= --majority-min labelled cells) AND >= 1 non-mixed
+transcriptome source or the Nern prediction agree with it -- the round-2 adoption standard for TYPE_NT_OVERRIDE.
+Writes the markdown table with the totals (cells / raw output synapses that would be relabelled; by transmitter;
+by module), out/r4_type_majority.csv and out/r4_type_majority_proposed.json ({type: nt}). --compile-cache
+compiles a scratch connectome with the proposed entries added to TYPE_NT_OVERRIDE into out/cache_<hash>/
+(cx_wedge.load_connectome; never the shared cache) and prints its path; the benchmark then takes it with
+--cache-dir. Skips the T-bar table; ~50 s.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -233,7 +249,7 @@ def md_table(df: pd.DataFrame, fmt: dict | None = None) -> str:
     fmt = fmt or {}
     cols = list(df.columns)
     lines = ["| " + " | ".join(cols) + " |", "|" + "|".join("---" for _ in cols) + "|"]
-    for _, r in df.iterrows():
+    for _, r in df.astype(object).iterrows():      # object dtype: ints stay ints in a row that also holds floats
         cells = []
         for c in cols:
             v = r[c]
@@ -248,6 +264,359 @@ def md_table(df: pd.DataFrame, fmt: dict | None = None) -> str:
     return "\n".join(lines)
 
 
+def type_majority(c, raw: pd.DataFrame, pre, post, cnt, args, log):
+    """The type-majority rule (module docstring). Returns (table, LN-regex table, totals dict, proposed {type: nt})."""
+    n = c.neurons
+    N = c.n
+    nt = n.nt.to_numpy()
+    ty = n.type.fillna("").to_numpy()
+    mod = regions.labels(c)
+    out_syn = np.bincount(pre, weights=cnt, minlength=N)
+    out_edges = np.bincount(pre, minlength=N)
+    has_out = out_syn > 0
+    unknown = nt == "unknown"
+    root = os.path.join(os.path.dirname(__file__), "..")
+
+    # the transcriptome call (round-1/2 builder) and the Nern 2025 prediction
+    tr = pd.read_csv(os.path.join(root, "flyverse", "data", "nt_by_type_transcriptome.csv"), comment="#",
+                     dtype=str, keep_default_na=False).set_index("malecns_type")
+    nern = pd.read_csv(os.path.join(root, "flyverse", "data", "type_map_nern2025.csv"), comment="#",
+                       dtype=str, keep_default_na=False)
+    nern = nern[nern.tier.isin(["exact", "class"])].drop_duplicates("malecns_type").set_index("malecns_type")
+    classical = {"acetylcholine", "gaba", "glutamate", "histamine"}
+
+    def nern_call(t):
+        if t in tr.index and tr.at[t, "nern2025_prediction"]:
+            return tr.at[t, "nern2025_prediction"], tr.at[t, "nern2025_validated"]
+        if t in nern.index:
+            return nern.at[t, "nern_nt"], nern.at[t, "validated_nt"]
+        return "", ""
+
+    def transcriptome_call(t):
+        if t not in tr.index:
+            return "", 0, "", False
+        r = tr.loc[t]
+        srcs = [x for x in r.sources_agreeing.split(";") if x]
+        return r.nt_transcriptome, len(srcs), ";".join(srcs), r.pool_mixed == "True"
+
+    # the raw-unknown cells (all three NT columns unclear, or absent from the NT table): what the LN regex rescued
+    raw_unknown = ((raw.consensus_nt.fillna("unclear") == "unclear") & (raw.celltype_predicted_nt.fillna("unclear") == "unclear")
+                   & (raw.predicted_nt.fillna("unclear") == "unclear")).to_numpy() | ~raw.in_nt_table.to_numpy()
+    ln_regex = list(cn.UNKNOWN_NT_OVERRIDE_REGEX)[0]
+    ln_rescued = raw_unknown & ~unknown & pd.Series(ty).str.match(ln_regex).to_numpy() & (nt == "gaba")
+    for t, v in cn.TYPE_NT_OVERRIDE.items():             # cells the adopted table relabelled are not "rescued by the regex"
+        ln_rescued &= ~((ty == t) & (nt == v))
+
+    def majority_rows(cell_mask_unknown, label_mask, types):
+        rows = []
+        for t in types:
+            m = ty == t
+            u = m & cell_mask_unknown
+            lab = m & label_mask
+            vc = pd.Series(nt[lab]).value_counts()
+            maj, cnt_maj = (vc.index[0], int(vc.iloc[0])) if len(vc) else ("", 0)
+            n_lab = int(lab.sum())
+            share = cnt_maj / n_lab if n_lab else 0.0
+            tr_nt, tr_n, tr_src, tr_mixed = transcriptome_call(t)
+            nern_nt, nern_val = nern_call(t)
+            tr_agree = (not tr_mixed) and tr_n >= 1 and tr_nt == maj
+            nern_agree = bool(nern_nt) and nern_nt == maj
+            rule = n_lab >= args.majority_min and share >= args.majority_share and maj != ""
+            proposed = rule and (tr_agree or nern_agree)
+            rows.append({
+                "type": t, "module": pd.Series(mod[m]).value_counts().index[0], "n_cells": int(m.sum()),
+                "n_unknown": int(u.sum()), "n_unknown_pre": int((u & has_out).sum()),
+                "unknown_out_syn": int(out_syn[u].sum()), "unknown_out_edges": int(out_edges[u].sum()),
+                "n_labelled": n_lab, "majority": maj, "majority_n": cnt_maj, "majority_share": share,
+                "labels": ", ".join(f"{k} {int(v)}" for k, v in vc.items()),
+                "transcriptome": tr_nt, "transcriptome_sources": tr_n, "transcriptome_source_names": tr_src,
+                "transcriptome_pool_mixed": tr_mixed, "transcriptome_agrees": tr_agree,
+                "nern2025": nern_nt, "nern2025_validated": nern_val, "nern_agrees": nern_agree,
+                "majority_rule": rule, "proposed": proposed,
+                "sign_changes": proposed and maj in classical,
+            })
+        return pd.DataFrame(rows)
+
+    types_unknown = sorted(set(ty[unknown & (ty != "")]))
+    tab = majority_rows(unknown, ~unknown, types_unknown)
+    tab = tab.sort_values(["proposed", "unknown_out_syn"], ascending=[False, False]).reset_index(drop=True)
+    with_lab = tab[tab.n_labelled > 0]
+    log(f"unknown-NT cells: {int(unknown.sum()):,} ({int((unknown & has_out).sum()):,} presynaptic, "
+        f"{int(out_syn[unknown].sum()):,} raw output synapses); untyped {int((unknown & (ty == '')).sum()):,} "
+        f"({int(out_syn[unknown & (ty == '')].sum()):,} syn); in {len(tab)} types, {len(with_lab)} of them with labelled members "
+        f"({int(with_lab.n_unknown.sum()):,} cells, {int(with_lab.n_unknown_pre.sum()):,} presynaptic, "
+        f"{int(with_lab.unknown_out_syn.sum()):,} syn)")
+    log("  by the majority transmitter (all types with labelled members, no threshold): " +
+        ", ".join(f"{k} {int(v):,}" for k, v in with_lab.groupby("majority").unknown_out_syn.sum().sort_values(ascending=False).items()))
+
+    # the antennal-lobe LN regex: the rescued cells against the same rule (their labelled members = cells with a raw label)
+    ln_types = sorted(set(ty[ln_rescued]))
+    ln = majority_rows(ln_rescued, ~raw_unknown, ln_types) if ln_types else pd.DataFrame()
+    if len(ln):
+        ln = ln.rename(columns={"n_unknown": "n_rescued", "n_unknown_pre": "n_rescued_pre",
+                                "unknown_out_syn": "rescued_out_syn", "unknown_out_edges": "rescued_out_edges"})
+        ln["majority_is_gaba"] = ln.majority == "gaba"
+        log(f"LN regex rescued {int(ln_rescued.sum()):,} cells in {len(ln)} types, {int(ln.rescued_out_syn.sum()):,} raw output syn; "
+            f"majority gaba in {int(ln.majority_is_gaba.sum())} types; the rule would cover (proposed) "
+            f"{int(ln.proposed.sum())} types / {int(ln.n_rescued[ln.proposed].sum())} cells / {int(ln.rescued_out_syn[ln.proposed].sum()):,} syn")
+
+    # threshold sensitivity: the rule alone and with a source, over (min labelled cells, min share)
+    sens = []
+    src_ok = tab.transcriptome_agrees | tab.nern_agrees
+    for min_lab, share in [(1, 0.5), (1, 1.0), (2, 1.0), (3, 0.8), (4, 0.8), (4, 1.0), (8, 0.8), (20, 0.8)]:
+        rule = (tab.n_labelled >= min_lab) & (tab.majority_share >= share) & (tab.majority != "")
+        both = rule & src_ok
+        sens.append({"min_labelled": min_lab, "min_share": share,
+                     "rule_types": int(rule.sum()), "rule_cells": int(tab.n_unknown[rule].sum()), "rule_out_syn": int(tab.unknown_out_syn[rule].sum()),
+                     "with_source_types": int(both.sum()), "with_source_cells": int(tab.n_unknown[both].sum()),
+                     "with_source_out_syn": int(tab.unknown_out_syn[both].sum())})
+    sens = pd.DataFrame(sens)
+    log("sensitivity (min_labelled, min_share -> rule types/cells/syn | +source types/cells/syn): " +
+        "; ".join(f"({r.min_labelled}, {r.min_share:g}) {r.rule_types}/{r.rule_cells}/{r.rule_out_syn:,} | "
+                  f"{r.with_source_types}/{r.with_source_cells}/{r.with_source_out_syn:,}" for r in sens.itertuples()))
+    # types with unknown cells and >= 1 labelled member but NO transcriptome / Nern call at all
+    no_source = with_lab[(with_lab.transcriptome == "") & (with_lab.nern2025 == "")]
+    log(f"types with labelled members but no transcriptome / Nern call: {len(no_source)} of {len(with_lab)} "
+        f"({int(no_source.n_unknown.sum())} cells, {int(no_source.unknown_out_syn.sum()):,} syn)")
+
+    prop = tab[tab.proposed]
+    proposed = {r.type: r.majority for r in prop.itertuples()}
+    prop_cells = unknown & np.isin(ty, list(proposed))
+    totals = {
+        "types": int(len(prop)), "cells": int(prop.n_unknown.sum()), "presynaptic_cells": int(prop.n_unknown_pre.sum()),
+        "out_syn": int(prop.unknown_out_syn.sum()), "out_edges": int(prop.unknown_out_edges.sum()),
+        "sign_changing_types": int(prop.sign_changes.sum()), "sign_changing_cells": int(prop.n_unknown[prop.sign_changes].sum()),
+        "sign_changing_out_syn": int(prop.unknown_out_syn[prop.sign_changes].sum()),
+        "by_transmitter": {k: {"types": int(len(g)), "cells": int(g.n_unknown.sum()), "out_syn": int(g.unknown_out_syn.sum())}
+                           for k, g in prop.groupby("majority")},
+        "by_module": {k: {"cells": int(v), "out_syn": int(out_syn[prop_cells & (mod == k)].sum())}
+                      for k, v in pd.Series(mod[prop_cells]).value_counts().items()},
+        "rule_only": {"types": int(tab.majority_rule.sum()), "cells": int(tab.n_unknown[tab.majority_rule].sum()),
+                      "out_syn": int(tab.unknown_out_syn[tab.majority_rule].sum())},
+        "total_syn": int(cnt.sum()), "unknown_out_syn_all": int(out_syn[unknown].sum()), "unknown_cells_all": int(unknown.sum()),
+        "with_labelled": {"types": int(len(with_lab)), "cells": int(with_lab.n_unknown.sum()), "presynaptic": int(with_lab.n_unknown_pre.sum()),
+                          "out_syn": int(with_lab.unknown_out_syn.sum()),
+                          "by_majority": {k: int(v) for k, v in with_lab.groupby("majority").unknown_out_syn.sum().items()}},
+        "no_source": {"types": int(len(no_source)), "cells": int(no_source.n_unknown.sum()), "out_syn": int(no_source.unknown_out_syn.sum())},
+        "sensitivity": sens,
+    }
+    log(f"proposed: {totals['types']} types, {totals['cells']} cells ({totals['presynaptic_cells']} presynaptic), "
+        f"{totals['out_syn']:,} raw output syn ({100 * totals['out_syn'] / totals['total_syn']:.3f} % of all), "
+        f"{totals['out_edges']:,} edges; sign-changing {totals['sign_changing_types']} types / {totals['sign_changing_cells']} cells / "
+        f"{totals['sign_changing_out_syn']:,} syn; by transmitter " +
+        ", ".join(f"{k} {v['cells']}/{v['out_syn']:,}" for k, v in totals["by_transmitter"].items()))
+    return tab, ln, totals, proposed
+
+
+def write_type_majority(tab, ln, totals, proposed, args, cache_dir, out_path):
+    root = os.path.join(os.path.dirname(__file__), "..")
+    L = ["# Type-majority transmitter rule for the unknown-NT cells\n"]
+    L.append(f"Generated by `scripts/audit_nt.py --type-majority` on {time.strftime('%Y-%m-%d')} from the cached connectome "
+             f"`{cache_dir}` (the model's `nt` after the antennal-lobe LN regex `{list(cn.UNKNOWN_NT_OVERRIDE_REGEX)[0]}` "
+             f"and `TYPE_NT_OVERRIDE` = {', '.join(f'{t} -> {v}' for t, v in cn.TYPE_NT_OVERRIDE.items())}), the raw weight table, "
+             "`flyverse/data/nt_by_type_transcriptome.csv` (the transmitter call from synthesis / transport genes per source; "
+             "docs/audits/receptor_rules.md section 2) and `flyverse/data/type_map_nern2025.csv` (Nern et al. 2025 Sup. Table 1 "
+             "predictions). docs/NT_INTEGRATION.md section 7, round 4 item 7.\n")
+    L.append(f"**Rule.** For every type with >= 1 `unknown`-NT cell and >= 1 labelled cell, the *type majority* is the most "
+             f"frequent transmitter of its labelled cells (`majority`, `majority_n`, `majority_share` = majority_n / n_labelled). "
+             f"`majority_rule` = share >= {args.majority_share:g} and >= {args.majority_min} labelled cells. `proposed` = "
+             f"majority_rule AND (>= 1 non-pool-mixed transcriptome source calls the same transmitter, or the Nern 2025 prediction "
+             f"does) -- the round-2 adoption standard for `TYPE_NT_OVERRIDE` (a type label supported by the EM classifier and an "
+             f"independent source). A proposed entry relabels only the type's `unknown` cells (`compile_connectome`); "
+             f"`sign_changes` = the transmitter is classical (a monoamine label keeps sign 0 under `NT_SIGN`, so W is unchanged).\n")
+    T = totals
+    L.append("## 1. Totals\n")
+    L.append(f"* `unknown`-NT cells in the cache: {T['unknown_cells_all']:,} carrying {T['unknown_out_syn_all']:,} raw output synapses "
+             f"({100 * T['unknown_out_syn_all'] / T['total_syn']:.3f} % of {T['total_syn']:,}).")
+    wl = T["with_labelled"]
+    L.append(f"* In a type with labelled members: {wl['types']} types, {wl['cells']:,} cells ({wl['presynaptic']:,} presynaptic), "
+             f"{wl['out_syn']:,} synapses; by the majority transmitter with no threshold: " +
+             ", ".join(f"{k} {v:,}" for k, v in sorted(wl['by_majority'].items(), key=lambda kv: -kv[1])) + ".")
+    ro = T["rule_only"]
+    L.append(f"* Majority rule alone (share >= {args.majority_share:g}, >= {args.majority_min} labelled): {ro['types']} types, "
+             f"{ro['cells']:,} cells, {ro['out_syn']:,} synapses.")
+    L.append(f"* **Proposed (majority + >= 1 agreeing source): {T['types']} types, {T['cells']:,} cells "
+             f"({T['presynaptic_cells']:,} presynaptic), {T['out_syn']:,} raw output synapses = "
+             f"{100 * T['out_syn'] / T['total_syn']:.3f} % of all, {T['out_edges']:,} edges; sign-changing (classical transmitter): "
+             f"{T['sign_changing_types']} types / {T['sign_changing_cells']:,} cells / {T['sign_changing_out_syn']:,} synapses.**")
+    ns = T["no_source"]
+    L.append(f"* Of the {wl['types']} types with labelled members, {ns['types']} ({ns['cells']:,} cells, {ns['out_syn']:,} synapses) have "
+             f"no transcriptome call and no Nern 2025 prediction at all, so no threshold can make them `proposed` under this standard.")
+    L.append("\nThreshold sensitivity (the rule alone | the rule plus >= 1 agreeing source), types / unknown cells / raw output synapses:\n")
+    L.append(md_table(T["sensitivity"], {"min_share": lambda v: f"{v:g}"}))
+    L.append("\nProposed, by transmitter:\n")
+    bt = pd.DataFrame([{"transmitter": k, **v} for k, v in T["by_transmitter"].items()]).sort_values("out_syn", ascending=False) \
+        if T["by_transmitter"] else pd.DataFrame([{"transmitter": "(none)", "types": 0, "cells": 0, "out_syn": 0}])
+    L.append(md_table(bt))
+    L.append("\nProposed, by module of the relabelled cell (`flyverse/regions.py`):\n")
+    bm = pd.DataFrame([{"module": k, **v} for k, v in T["by_module"].items()]).sort_values("out_syn", ascending=False) \
+        if T["by_module"] else pd.DataFrame([{"module": "(none)", "cells": 0, "out_syn": 0}])
+    L.append(md_table(bm))
+    L.append("\nProposed `TYPE_NT_OVERRIDE` entries (`out/r4_type_majority_proposed.json`):\n")
+    L.append(("```\n" + "\n".join(f'    "{t}": "{v}",' for t, v in proposed.items()) + "\n```") if proposed else "none")
+
+    cols = ["type", "module", "n_cells", "n_unknown", "n_unknown_pre", "unknown_out_syn", "n_labelled", "majority", "majority_n",
+            "majority_share", "labels", "transcriptome", "transcriptome_sources", "transcriptome_source_names",
+            "transcriptome_pool_mixed", "nern2025", "nern2025_validated", "majority_rule", "proposed", "sign_changes"]
+    fmt = {"majority_share": lambda v: f"{v:.2f}", "transcriptome_pool_mixed": lambda v: "mixed" if v else "",
+           "majority_rule": lambda v: "yes" if v else "", "proposed": lambda v: "**yes**" if v else "",
+           "sign_changes": lambda v: "yes" if v else "", "transcriptome": lambda v: v or "-", "nern2025": lambda v: v or "-",
+           "transcriptome_source_names": lambda v: v or "-", "nern2025_validated": lambda v: v or "-", "majority": lambda v: v or "-"}
+    L.append(f"\n## 2. Every type with `unknown`-NT cells ({len(tab)} types; proposed first, then by silenced output)\n")
+    L.append("`labels` = the type's labelled cells by transmitter; `transcriptome` = `nt_transcriptome` with the number and names of "
+             "the sources agreeing with it (`mixed` = the profile is a pool of several types, not evaluable); `nern2025` = the "
+             "prediction (`validated` = Nern's own validation, where any). Types with no labelled cells have no majority.\n")
+    L.append(md_table(tab[cols], fmt))
+    L.append("\n## 3. The antennal-lobe LN regex against the same rule\n")
+    if len(ln):
+        L.append(f"`UNKNOWN_NT_OVERRIDE_REGEX` relabels raw-unknown cells of LN types to GABA before `TYPE_NT_OVERRIDE`; this table "
+                 f"applies the type-majority rule to those rescued cells, with the type's raw-labelled cells as the labelled set. "
+                 f"Rescued: {int(ln.n_rescued.sum())} cells in {len(ln)} types, {int(ln.rescued_out_syn.sum()):,} raw output synapses; "
+                 f"majority GABA in {int(ln.majority_is_gaba.sum())} of {len(ln)} types; covered by the rule (`proposed`): "
+                 f"{int(ln.proposed.sum())} types / {int(ln.n_rescued[ln.proposed].sum())} cells / "
+                 f"{int(ln.rescued_out_syn[ln.proposed].sum()):,} synapses; by the majority rule alone: {int(ln.majority_rule.sum())} types / "
+                 f"{int(ln.n_rescued[ln.majority_rule].sum())} cells / {int(ln.rescued_out_syn[ln.majority_rule].sum()):,} synapses.\n")
+        ren = {"n_unknown": "n_rescued", "n_unknown_pre": "n_rescued_pre", "unknown_out_syn": "rescued_out_syn"}
+        L.append(md_table(ln[[ren.get(c_, c_) for c_ in cols]], fmt))
+    else:
+        L.append("No cell is rescued by the regex in this cache.")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(L) + "\n")
+    tab.to_csv(os.path.join(root, "out", "r4_type_majority.csv"), index=False)
+    if len(ln):
+        ln.to_csv(os.path.join(root, "out", "r4_type_majority_ln_regex.csv"), index=False)
+    with open(os.path.join(root, "out", "r4_type_majority_proposed.json"), "w", encoding="utf-8") as f:
+        json.dump(proposed, f, indent=1)
+
+
+def compare_caches(c, cache_dir, other_dir, log):
+    """W (data / indices / indptr) byte identity, the cells whose nt / sign differ, and -- under the default LIFParams
+    receptor model -- whether the receptor lookup's fast signs are identical on both caches."""
+    import hashlib
+    lines = []
+    _log = log
+
+    def log(msg):
+        lines.append(msg); _log(msg)
+    c2 = cn.load(cache_dir=other_dir, verbose=False)
+    log(f"compare {cache_dir} vs {other_dir}")
+    A, B = c.W.tocsr(), c2.W.tocsr()
+    A.sort_indices(); B.sort_indices()
+    same_shape = A.shape == B.shape and A.nnz == B.nnz
+    md5 = lambda x: hashlib.md5(np.ascontiguousarray(x).tobytes()).hexdigest()
+    w_same = same_shape and md5(A.data) == md5(B.data) and md5(A.indices) == md5(B.indices) and md5(A.indptr) == md5(B.indptr)
+    log(f"W: shape {A.shape} / {B.shape}, nnz {A.nnz:,} / {B.nnz:,}, sum|W| {int(np.abs(A.data).sum()):,} / {int(np.abs(B.data).sum()):,}; "
+        f"data md5 {md5(A.data)} / {md5(B.data)}; indices md5 {md5(A.indices)} / {md5(B.indices)}; indptr md5 {md5(A.indptr)} / {md5(B.indptr)}; "
+        f"BYTE-IDENTICAL {w_same}")
+    n1, n2 = c.neurons, c2.neurons
+    same_cells = (n1.bodyId.to_numpy() == n2.bodyId.to_numpy()).all() if len(n1) == len(n2) else False
+    log(f"neurons: {len(n1):,} / {len(n2):,}, same bodyId order {same_cells}")
+    if same_cells:
+        d = n1.nt.to_numpy() != n2.nt.to_numpy()
+        ds = n1.sign.to_numpy() != n2.sign.to_numpy()
+        out_deg = np.asarray(np.abs(A).sum(axis=0)).ravel()
+        nnz_out = np.diff(A.tocsc().indptr)
+        log(f"cells with a different nt: {int(d.sum())} (different sign: {int(ds.sum())}); their stored output entries in W: "
+            f"{int(nnz_out[d].sum())}, sum|W| out {int(out_deg[d].sum())}; by type: "
+            + ", ".join(f"{k} {int(v)}" for k, v in pd.Series(n1.type.fillna('').to_numpy()[d]).value_counts().items())
+            + "; label change: " + ", ".join(f"{a} -> {b} {int(v)}" for (a, b), v in
+                                          pd.DataFrame({"a": n1.nt.to_numpy()[d], "b": n2.nt.to_numpy()[d]}).value_counts().items()))
+        for col in ("type", "superclass", "class"):
+            if col in n1.columns and col in n2.columns:
+                dc = (n1[col].fillna("").to_numpy() != n2[col].fillna("").to_numpy()).sum()
+                log(f"  column {col}: {int(dc)} differences")
+    lp = LIFParams()
+    if lp.receptor_model is not None:
+        t0 = time.time()
+        r1 = cn.receptor_signs(c, table_path=lp.receptor_table, net_rule=lp.receptor_net_rule, nt_class_fallback=lp.receptor_nt_class_fallback)
+        r2 = cn.receptor_signs(c2, table_path=lp.receptor_table, net_rule=lp.receptor_net_rule, nt_class_fallback=lp.receptor_nt_class_fallback)
+        fs_same = (r1.fast_sign.shape == r2.fast_sign.shape) and md5(r1.fast_sign) == md5(r2.fast_sign)
+        tier_same = md5(r1.tier) == md5(r2.tier)
+        changed1 = int((r1.fast_sign != np.sign(c.W.data)).sum()); changed2 = int((r2.fast_sign != np.sign(c2.W.data)).sum())
+        log(f"receptor model {lp.receptor_model} / {lp.receptor_net_rule}: fast_sign md5 {md5(r1.fast_sign)} / {md5(r2.fast_sign)} "
+            f"IDENTICAL {fs_same}; tier identical {tier_same}; entries changed vs the presynaptic sign {changed1:,} / {changed2:,} "
+            f"({time.time() - t0:.0f} s)")
+    return {"w_identical": bool(w_same), "lines": lines}
+
+
+def score_section(out_path, score_files, baseline_files, log, identity=None, note=None):
+    """Append the suite comparison: per check, measured value and status in every candidate run and every baseline run,
+    the status tally per run, and the checks whose status set differs between the two groups."""
+    import glob
+    def expand(fs):
+        out = []
+        for f in fs:
+            out += sorted(glob.glob(f)) or [f]
+        return out
+    score_files, baseline_files = expand(score_files), expand(baseline_files)
+    runs = []
+    for grp, fs in (("candidate", score_files), ("baseline", baseline_files)):
+        for f in fs:
+            if not os.path.isfile(f):
+                log(f"score: missing {f}"); continue
+            d = json.load(open(f, encoding="utf-8"))
+            cfg = d.get("config", {})
+            runs.append({"group": grp, "file": f.replace(os.sep, "/"), "checks": {c["key"]: c for c in d["checks"]},
+                         "receptor": cfg.get("receptor", {}), "cache_dir": cfg.get("cache_dir"), "nt_counts": cfg.get("nt_counts"),
+                         "date": d.get("date"), "device": cfg.get("device"), "runtime": d.get("total_runtime_s")})
+    if not runs:
+        return
+    abbr = {"PASS": "P", "FAIL": "F", "KNOWN GAP": "G", "MISSING": "M"}
+    keys = []
+    for r in runs:
+        for k in r["checks"]:
+            if k not in keys:
+                keys.append(k)
+    L = ["\n## 4. Suite score of the candidate set\n"]
+    L.append("Candidate runs = `scripts/benchmark.py --seeds 0,1,2 --cache-dir out/cache_<hash>` on the scratch cache compiled with the "
+             "proposed entries added to `TYPE_NT_OVERRIDE` (the shipped default receptor model on); baseline runs = the shipped default "
+             "cache. Adoption criterion (round 2): no check changes status. Per run: measured value and status "
+             "(P PASS, F FAIL, G KNOWN GAP, M MISSING).\n")
+    L.append("Runs:\n")
+    hdr = pd.DataFrame([{"group": r["group"], "file": r["file"], "date": r["date"], "device": r["device"],
+                         "receptor": f"{r['receptor'].get('model')} / {r['receptor'].get('net_rule', '-')} / changed {r['receptor'].get('fast_sign_changed_entries', '-')}",
+                         "cache_dir": r["cache_dir"],
+                         "nt unknown / ach": f"{(r['nt_counts'] or {}).get('unknown', '-')} / {(r['nt_counts'] or {}).get('acetylcholine', '-')}",
+                         "PASS/FAIL/GAP": "/".join(str(sum(1 for c in r["checks"].values() if c["status"] == st)) for st in ("PASS", "FAIL", "KNOWN GAP")),
+                         "runtime_s": f"{r['runtime']:.0f}" if r["runtime"] else "-"} for r in runs])
+    L.append(md_table(hdr))
+    rows, moved = [], []
+    for k in keys:
+        row = {"check": k}
+        stat = {"candidate": set(), "baseline": set()}
+        for i, r in enumerate(runs):
+            c = r["checks"].get(k)
+            col = f"{r['group'][0]}{i + 1}"
+            if c is None:
+                row[col] = "-"; continue
+            m = c["measured"]
+            row[col] = (f"{m:.2f} " if isinstance(m, (int, float)) and m is not None else "-- ") + abbr.get(c["status"], c["status"])
+            stat[r["group"]].add(c["status"])
+        row["criterion"] = next((r["checks"][k]["criterion"] for r in runs if k in r["checks"]), "")
+        row["status sets"] = f"cand {sorted(stat['candidate'])} / base {sorted(stat['baseline'])}" if stat["baseline"] else f"cand {sorted(stat['candidate'])}"
+        if stat["baseline"] and stat["candidate"] and stat["candidate"] != stat["baseline"]:
+            moved.append(f"{k}: candidate {sorted(stat['candidate'])} vs baseline {sorted(stat['baseline'])}")
+        rows.append(row)
+    L.append("\nPer check (columns c1.. = candidate runs, b1.. = baseline runs, in the order of the table above):\n")
+    L.append(md_table(pd.DataFrame(rows)))
+    L.append("\n**Checks whose status set differs between the candidate runs and the baseline runs: " +
+             ("; ".join(moved) if moved else "none") + f". Adoption criterion (no check changes status): {'MET' if not moved else 'NOT MET'}.**")
+    if identity:
+        L.append("\n## 5. Cache identity (scratch cache with the candidate entries vs the audited cache)\n")
+        L.append("`scripts/audit_nt.py --compare-cache`: W (data / indices / indptr) md5, the cells whose label differs and their stored "
+                 "output entries, and the default receptor model's fast signs on both caches.\n")
+        L.append("```\n" + "\n".join(identity["lines"]) + "\n```")
+        L.append(f"\nW byte-identical: **{identity['w_identical']}**" +
+                 (" -- a check whose status differs between the two groups of runs is therefore run-to-run scatter or a benchmark "
+                  "difference between the groups, not an effect of the candidate entries." if identity["w_identical"] else ""))
+    if note:
+        L.append("\n## 6. Decision\n")
+        L.append(note)
+    with open(out_path, "a", encoding="utf-8") as f:
+        f.write("\n".join(L) + "\n")
+    log(f"score section: {len(score_files)} candidate + {len(baseline_files)} baseline runs, {len(keys)} checks, status moved: {moved or 'none'}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="docs/audits/nt_audit.md")
@@ -255,6 +624,21 @@ def main():
     ap.add_argument("--top", type=int, default=12)
     ap.add_argument("--cache-dir", default=None,
                     help="connectome cache to audit (default cache/); e.g. a scratch cache built with TYPE_NT_OVERRIDE")
+    ap.add_argument("--type-majority", action="store_true", help="the type-majority rule table only (docstring); no T-bar table")
+    ap.add_argument("--majority-out", default="docs/audits/nt_type_majority.md")
+    ap.add_argument("--majority-share", type=float, default=0.8, help="minimum majority share of the type's labelled cells")
+    ap.add_argument("--majority-min", type=int, default=4, help="minimum number of labelled cells in the type")
+    ap.add_argument("--compile-cache", action="store_true",
+                    help="with --type-majority: compile a scratch connectome with the proposed entries added to TYPE_NT_OVERRIDE "
+                         "into out/cache_<hash>/ (cx_wedge.load_connectome) and print its path")
+    ap.add_argument("--score-json", nargs="*", default=[], metavar="JSON",
+                    help="with --type-majority: benchmark.py --json files run on the scratch cache (the candidate set); appended "
+                         "as a per-check comparison against --baseline-json (out/r4_ntmaj_*.json vs out/r4_default_*.json)")
+    ap.add_argument("--baseline-json", nargs="*", default=[], metavar="JSON", help="reference benchmark JSONs (the shipped default)")
+    ap.add_argument("--note", default=None, help="with --score-json: a decision paragraph appended as the last section")
+    ap.add_argument("--compare-cache", default=None, metavar="DIR",
+                    help="compare the audited cache with another one (a scratch TYPE_NT_OVERRIDE cache): W byte identity, per-cell "
+                         "label differences, and the default receptor model's fast signs on both; prints and exits")
     args = ap.parse_args()
     log = print
     root = os.path.join(os.path.dirname(__file__), "..")
@@ -264,7 +648,35 @@ def main():
     log(f"cache {cache_dir}")
     n = c.neurons
     N = c.n
-    log(f"neurons {N:,}")
+    log(f"neurons {N:,}  sum|W| {int(np.abs(c.W.data).sum()):,}")
+    if args.compare_cache:
+        compare_caches(c, cache_dir, args.compare_cache, log)
+        return None
+    if args.type_majority:
+        os.makedirs(os.path.join(root, "out"), exist_ok=True)
+        raw = nt_columns(n)
+        pre, post, cnt = load_edges(n, log)
+        tab, ln, totals, proposed = type_majority(c, raw, pre, post, cnt, args, log)
+        out_path = os.path.join(root, args.majority_out)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        write_type_majority(tab, ln, totals, proposed, args, cache_dir, out_path)
+        identity = None
+        if args.compile_cache:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import cx_wedge          # scripts/cx_wedge.py: TYPE_NT_OVERRIDE + extra -> out/cache_<hash>/ (tmp + rename)
+            already = {t: v for t, v in proposed.items() if cn.TYPE_NT_OVERRIDE.get(t) == v}
+            extra = {t: v for t, v in proposed.items() if t not in already}
+            t0 = time.time()
+            c2, cdir, table = cx_wedge.load_connectome(extra, scratch=True, verbose=False)
+            log(f"scratch cache {cdir}: {c2.n} cells, nnz {c2.W.nnz:,}, sum|W| {int(np.abs(c2.W.data).sum()):,}, "
+                f"nt counts {c2.neurons.nt.value_counts().to_dict()}; table {len(table)} entries "
+                f"({len(extra)} added to TYPE_NT_OVERRIDE, {len(already)} already in it); {time.time() - t0:.0f} s")
+            del c2
+            identity = compare_caches(c, cache_dir, cdir, log)
+        if args.score_json:
+            score_section(out_path, args.score_json, args.baseline_json, log, identity=identity, note=args.note)
+        log(f"wrote {out_path}, out/r4_type_majority.csv, out/r4_type_majority_proposed.json")
+        return None
     # the receptor model in force by default (LIFParams.receptor_model; round 3 made 'sign' / 'abs' the default):
     # how many stored entries of W the per-edge lookup re-signs on top of the presynaptic convention audited here
     lp = LIFParams()

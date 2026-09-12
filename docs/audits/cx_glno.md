@@ -325,3 +325,134 @@ but with a 10 % slower bump and no margin in gD, and gE 2.25 / gD 15-25 is the b
 * The persist criterion's 4-outside-cells boundary case fires at seed 5 in BOTH conditions (bump confined at 154-244 Hz, out mean 11.2 Hz); 3/3-vs-2/3 distinctions are within the criterion's own noise -- read the rate / vs columns. Capture tests per window point are 1-2, not 3.
 * Job durations 367-471 s (12-run jobs), anchor 114 s. Dead gE 1.75 points: Delta7 8.8-20.4 Hz; rest of brain 0.023-0.037 Hz at window points.
 * Consequence for the compass thread: the session-9 conclusions (ring-attractor wiring; Delta7 gain on Delta7->EPG only; the ExR/ER loop; 200 Hz bump) stand; gE 2 / gD 15 lies inside both windows; the robust operating points from the present data are gE 2 / gD 15 and gE 2.5 / gD 25. GLNO stays out of TYPE_NT_OVERRIDE (EM predictions only).
+
+## 5. Round 4: the seed-matched grid finished (6 seeds x both GLNO conditions; cluster batch `r4-glno-d04de8`)
+
+Question (round-3 critic follow-up 6): round 3 compared a 3-seed `gaba` scan against a 1-seed silent table, and the
+skeptic's controls (seeds 0-2 silent on the same grid, seeds 3-5 at four points in both conditions) showed the window
+edges moving by one seed. Which operating points hold the bump in **both** GLNO conditions over six seeds, i.e. which
+compass setting is robust to the sign the data cannot fix?
+
+**What was run.** One batch, three jobs, 0 failed, 8.3 min wall (run dir `<cluster-fs>/neurome/runs/r4-glno-d04de8`,
+B200, torch 2.11.0+cu128, CUDA asserted in every job):
+
+| job | command | runs | s |
+|---|---|---|---|
+| 1 | `cx_glno.py --run base --no-scratch --gains 2.25:8,2.25:15,2.25:25,2.25:40 --seeds 0,1,2 --out out/r4_base_gE2.25.json` | 12 | 320 |
+| 2 | `cx_glno.py --run gaba --gains 2:8,2:15,2.25:15,2.25:25,2.5:25 --seeds 3,4,5 --out out/r4_gaba_s345b.json` | 15 | 433 |
+| 3 | `cx_glno.py --run base --no-scratch --gains 2:8,2.25:15,2.25:25 --seeds 3,4,5 --out out/r4_base_s345b.json` | 9 | 206 |
+
+`base` reads the cluster's shared cache (`--no-scratch`; sum|W| 121,460,584, `TYPE_NT_OVERRIDE` = {TmY14, Mi19, aMe8},
+GLNO nt `unknown` sign 0, GLNO -> PEN W sum +0 on 84 entries / 16,371 raw synapses); `gaba` compiles from the raw
+MaleCNS files into the job's own `out/cache_72164311/` (79 s; sum|W| 121,478,280, GLNO nt `gaba` sign -1, GLNO -> PEN
+W sum -16,371, PEN -> GLNO +3,496). Protocol as section 4 (FlyBrain, full connectome, compass adaptation 0, 10 Hz
+Poisson background on all 46 EPG, wedges 0-3 at +40 Hz for 2 s, 5 s free, Delta7 gain on Delta7 -> EPG only, cuda
+graphs, torch sparse). Table: `python scripts/cx_glno.py --seed-table --files "out/cx_glno_gaba_gE*.json"
+"out/cx_glno_base*.json" "out/sk_base_*.json" "out/sk_gaba_*.json" "out/r4_base_*.json" "out/r4_gaba_*.json" --table
+cx_glno_r4_seeds` -> `out/cx_glno_r4_seeds.{md,csv}` + `_summary.csv` (138 unique (config, gE, gD, seed) rows from 15
+JSONs; all 32 grid-point x condition rows are in the .md, the 14 six-seed rows below).
+
+**Determinism (27 repeated keys, 0 differing metric fields).** The 15 files overlap on 27 (config, gE, gD, seed) keys
+and every one of them agrees field for field (`wall_s` excluded) -- including three pairs of independent from-raw
+compiles of the same hash in three different run directories (`r3-glno-gaba-5f4869`, `sk-glno-grid-9bf2b1`,
+`r4-glno-d04de8` all produce `out/cache_72164311`): `gaba` 2.25/{8,15,25,40} seeds 0-2 (round 3 vs skeptic) and
+`gaba` {2/15, 2.5/25} seeds 3-5 (skeptic vs this batch), plus `base` 1.75/15 and 2/15 seeds 0-2 across four files.
+Two identical reruns, so these runs are deterministic given (config, gains, seed).
+
+**The 3/35 rule is a seed effect, not a gain effect.** Persistence is `in_above >= 8 of 11 AND out_above <= 3 of 35`
+at 5 s. Over the 97 runs in this grid whose bump is confined (`in_above >= 8`), the number of outside EPG above 22 Hz
+is **exactly constant within each seed and independent of gE, gD and the GLNO sign**: seed 0 -> 1, seed 1 -> 3,
+seed 2 -> 2, seed 3 -> 2, seed 4 -> 2, seed 5 -> 4 (19/19/21/12/12/14 runs). The outside mean is the same per seed too
+(10.2 / 9.5 / 8.9 / 10.0 / 11.4 / 11.2 Hz) -- it is the background realisation, not the compass. So the criterion
+scores "no" at seed 5 for *every* confined run at *every* point in *both* conditions, and seed 1 sits exactly on the
+bound. Both columns are reported below: `persist` (the shipped rule) and `boundary` (confined but out_above = 4);
+`persist + boundary` = the number of seeds with a confined bump.
+
+### Six seeds in both conditions (rates at 5 s after release; rho = gD / gE^2)
+
+| gE | gD | rho | config | persist (3/35) | boundary | confined | in > 22 Hz (/11, seeds 0-5) | out > 22 Hz (/35, seeds 0-5) | bump Hz at 5 s (seeds 0-5) | bump mean (range) | out Hz | vs (mean; min) | PEN | Delta7 | GLNO |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1.75 | 8 | 2.61 | base | 5/6 | 1 | 6/6 | 9/10/9/11/11/11 | 1/3/2/2/2/4 | 177.4/178.0/178.8/172.3/170.5/176.6 | 176 (170-179) | 10.2 | 0.76; 0.73 | 42.5 (41.6-43.3) | 93.6 (91.4-95.8) | 123.0 (118.2-128.3) |
+| 1.75 | 8 | 2.61 | gaba | 3/6 | 1 | 4/6 | 9/9/9/4/2/9 | 1/3/2/3/2/4 | 154.4/148.2/152.5/17.2/9.9/154.5 | 106 (10-154) | 10.4 | 0.52; 0.05 | 22.5 (0.8-33.5) | 61.1 (13.3-87.5) | 65.9 (0.7-96.5) |
+| 2.0 | 8 | 2.00 | base | 3/6 | 1 | 4/6 | 0/11/4/11/11/11 | 10/3/8/2/2/4 | 9.9/216.6/70.4/213.5/210.2/219.3 | 157 (10-219) | 27.5 | 0.77; 0.75 | 49.7 (43.3-52.9) | 104.6 (97.8-109.5) | 134.3 (111.8-145.0) |
+| 2.0 | 8 | 2.00 | gaba | 5/6 | 1 | 6/6 | 9/10/10/10/11/11 | 1/3/2/2/2/4 | 193.5/192.2/196.7/194.7/191.1/196.1 | 194 (191-197) | 10.2 | 0.77; 0.74 | 42.0 (41.5-42.8) | 100.3 (98.8-102.2) | 120.1 (116.9-122.8) |
+| 2.0 | 15 | 3.75 | base | 5/6 | 1 | 6/6 | 11/10/11/10/10/10 | 1/3/2/2/2/4 | 201.0/201.4/204.3/196.5/191.6/200.5 | 199 (192-204) | 10.2 | 0.76; 0.74 | 47.9 (46.3-48.7) | 100.1 (98.4-102.7) | 132.5 (126.7-137.2) |
+| 2.0 | 15 | 3.75 | gaba | 5/6 | 1 | 6/6 | 10/10/10/11/11/11 | 1/3/2/2/2/4 | 179.9/181.2/184.4/179.0/175.8/182.3 | 180 (176-184) | 10.2 | 0.76; 0.73 | 40.4 (39.8-41.0) | 94.9 (93.4-96.6) | 114.9 (111.4-118.2) |
+| 2.0 | 25 | 6.25 | base | 5/6 | 1 | 6/6 | 10/10/10/10/10/10 | 1/3/2/2/2/4 | 186.8/187.0/184.2/173.3/167.3/181.1 | 180 (167-187) | 10.2 | 0.75; 0.72 | 44.9 (42.7-46.5) | 92.4 (88.6-95.1) | 125.1 (112.4-134.1) |
+| 2.0 | 25 | 6.25 | gaba | 3/6 | 1 | 4/6 | 9/3/9/4/9/9 | 1/9/2/8/2/4 | 161.2/42.0/163.0/46.5/122.2/163.1 | 116 (42-163) | 21.1 | 0.73; 0.67 | 36.6 (30.0-38.3) | 83.6 (72.9-89.9) | 99.5 (88.4-109.4) |
+| 2.25 | 15 | 2.96 | base | 3/6 | 1 | 4/6 | 0/11/11/11/5/11 | 11/3/2/2/7/4 | 9.9/243.5/240.9/237.6/83.2/245.6 | 177 (10-246) | 29.2 | 0.79; 0.78 | 58.5 (57.0-61.0) | 111.3 (104.8-115.9) | 152.6 (140.5-159.0) |
+| 2.25 | 15 | 2.96 | gaba | 5/6 | 1 | 6/6 | 10/11/11/10/11/10 | 1/3/2/2/2/4 | 213.7/216.2/223.3/213.6/209.6/216.8 | 216 (210-223) | 10.2 | 0.77; 0.75 | 48.0 (47.1-49.7) | 105.2 (103.8-107.7) | 132.0 (129.6-134.9) |
+| 2.25 | 25 | 4.94 | base | 5/6 | 1 | 6/6 | 10/10/10/10/10/10 | 1/3/2/2/2/4 | 210.7/214.7/210.4/206.8/206.4/219.3 | 211 (206-219) | 10.2 | 0.77; 0.75 | 53.2 (51.3-55.7) | 103.0 (100.7-108.5) | 143.4 (137.4-149.2) |
+| 2.25 | 25 | 4.94 | gaba | 5/6 | 1 | 6/6 | 10/10/10/10/10/10 | 1/3/2/2/2/4 | 195.9/199.0/192.5/189.6/179.6/198.3 | 192 (180-199) | 10.2 | 0.76; 0.73 | 44.6 (43.2-45.3) | 96.4 (92.4-100.5) | 122.7 (112.0-130.7) |
+| 2.5 | 25 | 4.00 | base | 5/6 | 1 | 6/6 | 11/11/11/10/11/11 | 1/3/2/2/2/4 | 243.4/241.0/241.2/235.0/236.6/243.8 | 240 (235-244) | 10.2 | 0.78; 0.77 | 61.1 (59.9-62.5) | 112.0 (110.0-114.6) | 159.8 (156.0-164.4) |
+| 2.5 | 25 | 4.00 | gaba | 5/6 | 1 | 6/6 | 10/10/10/10/10/10 | 1/3/2/2/2/4 | 227.1/225.4/222.5/224.0/219.7/228.8 | 225 (220-229) | 10.2 | 0.78; 0.76 | 52.3 (51.1-53.6) | 107.2 (103.7-111.3) | 140.2 (131.3-145.2) |
+
+Mean +- sd over the confined runs of each cell (same data, `out/cx_glno_r4_seeds.csv`): 2/15 base bump 199.2 +- 4.5 Hz,
+PEN 47.9 +- 0.8, Delta7 100.1 +- 1.6, GLNO 132.5 +- 3.7, vs 0.763 +- 0.015; 2/15 gaba 180.4 +- 3.0 / 40.4 +- 0.4 /
+94.9 +- 1.2 / 114.9 +- 2.3 / 0.757 +- 0.018. 2.25/25 base 211.4 +- 4.9 / 53.2 +- 1.4 / 103.0 +- 2.9 / 143.4 +- 4.7 /
+0.767 +- 0.012; gaba 192.5 +- 7.2 / 44.6 +- 1.0 / 96.4 +- 2.9 / 122.7 +- 6.1 / 0.757 +- 0.015. 2.5/25 base 240.2 +- 3.6
+/ 61.1 +- 0.9 / 112.0 +- 1.6 / 159.8 +- 3.2 / 0.783 +- 0.010; gaba 224.6 +- 3.3 / 52.3 +- 0.9 / 107.2 +- 2.5 /
+140.2 +- 5.3 / 0.778 +- 0.012.
+
+The other nine grid points have three seeds in one or both conditions and are unchanged from section 4; the new silent
+column at gE 2.25 (jobs 1 and 3) is, by the 3/35 rule, 2/3 at gD 8 (seed 0 an undisplaceable pre-pulse bump), 3/6 at
+gD 15, 5/6 at gD 25 and 1/3 at gD 40 (seed-1 and seed-2 jumps to centre 4.0-4.1).
+
+### Answers
+
+**Which points are robust to the GLNO sign?** Three, all with rho between 3.75 and 4.94: **gE 2 / gD 15**, **gE 2.25 /
+gD 25** and **gE 2.5 / gD 25**. Each is 6/6 confined in both conditions (5/6 by the 3/35 rule, the sixth being the
+seed-5 boundary case that fires at every point in both conditions), 10/11 or 11/11 EPG above 22 Hz at 5 s in all 36
+runs (12 per point), outside mean 8.9-11.4 Hz, vs 0.730-0.797, rest of the brain 0.028-0.042 Hz. Their capture columns
+are also full: not one `not captured` run among the 36, `captured` 6/6 at 2.5/25 in both conditions, 5/6 at 2.25/25
+in both, 5/6 base and 4/6 gaba at 2/15, the remaining seeds being `spontaneous at driven tile` (no prior bump
+elsewhere to capture) -- so the "capturable" claim now rests on 4-6 capture tests per point x condition, not 1-2.
+The two candidates named by the round-3 critic are confirmed and gE 2.25 / gD 25 joins them.
+
+**Which candidate points are not robust, and how they fail.** Four of the seven six-seed points fail in one condition
+only, and the failures are seed-matched (the same seeds hold in the other condition):
+* gE 1.75 / gD 8 (rho 2.61): silent 6/6; **gaba dies at seeds 3 and 4** (in 17.2 / 9.9 Hz, 4/11 and 2/11 cells, PEN
+  2.4 / 0.8 Hz, GLNO 9.6 / 0.7 Hz) -- the loop is below threshold once 33 mV of the PEN drive is inhibitory.
+* gE 2 / gD 8 (rho 2.00): gaba 6/6; **silent fails seeds 0 and 2** with a stiff pre-pulse bump the 40 Hz pulse cannot
+  displace (seed 0: in 9.9 / out 70.1 Hz, 10/35 outside cells, vs 0.78 at centre 13.2, classified `not captured`;
+  seed 2 a partial jump to centre 4.0 at in 70.4 / out 52.6).
+* gE 2.25 / gD 15 (rho 2.96): gaba 6/6; **silent fails seeds 0 (undisplaceable bump, in 9.9 / out 77.5, 11/35) and 4
+  (jump to centre 4.0, in 83.2 / out 58.0)**.
+* gE 2 / gD 25 (rho 6.25): silent 6/6; **gaba jumps at seeds 1 and 3** (in 42.0 / out 42.0 and 46.5 / 43.0 Hz, centre
+  4.1, 8-9 of 35 outside cells above 22 Hz).
+Read as a gain budget, this is the section-4 reading with the seeds filled in: below rho ~3 the ring is over-driven and
+the silent condition locks into a spontaneous bump the pulse cannot move, while the inhibitory loop (33 mV per PEN per
+GLNO volley, 16-24 % of the EPG volley) removes just enough drive to keep the pulse in control; above rho ~6 the
+inhibitory condition loses the bump to a jump first. The two conditions' failure modes are opposite, and the overlap
+where neither fails is rho 3.75-4.94.
+
+**What the GLNO sign costs at the robust points.** The inhibitory loop lowers every rate by a seed-matched, disjoint
+margin: bump -9.4 % at 2/15 (199.2 -> 180.4 Hz; ranges 191.6-204.3 vs 175.8-184.4), -8.9 % at 2.25/25 (211.4 -> 192.5;
+206.4-219.3 vs 179.6-199.0), -6.5 % at 2.5/25 (240.2 -> 224.6; 235.0-243.8 vs 219.7-228.8). PEN -14 to -16 % (47.9 ->
+40.4, 53.2 -> 44.6, 61.1 -> 52.3), Delta7 -4 to -6 % (100.1 -> 94.9, 103.0 -> 96.4, 112.0 -> 107.2), GLNO itself -12 to
+-14 % (132.5 -> 114.9, 143.4 -> 122.7, 159.8 -> 140.2, still above Delta7 at every point). Vector strength is unchanged
+within scatter (0.763 -> 0.757, 0.767 -> 0.757, 0.783 -> 0.778, sd 0.010-0.018). The 150-250 Hz rate problem is
+untouched by either sign: the lowest six-seed robust bump is 180 Hz (gaba at gE 2 / gD 15), still an order of magnitude
+above the animal's E-PG rates.
+
+**Caveats.** (i) The 3/35 half of the persist rule is a background-realisation effect at this background (10 Hz on 46
+EPG): it removes exactly one seed in six from every point and condition, so a "5/6" in this table is a clean sweep and
+a "3/6" is two real failures. Reporting `confined` (in_above >= 8) alongside it is the honest count; the criterion
+itself is not changed here, and no compass default moves. (ii) The gD grid is still coarse (8 / 15 / 25 / 40) -- the
+robust band rho 3.75-4.94 is bounded by untested cells at rho ~3.2 and ~5.5. (iii) Six seeds resolve a 1-in-6 failure
+rate at best; a point that is 6/6 here could still fail at a rate below ~15 %. (iv) GLNO stays out of
+`TYPE_NT_OVERRIDE` (section 3: two low-confidence EM predictions, no expression profile in any of the six sources);
+this section says only which gains survive either answer. (v) The silent-ring six-seed result supersedes the seed-0
+window quoted in `cx_wedge.md` section 6, which is corrected there.
+
+### Corrections (round-4 verification, `verify:exp:compass`)
+
+* At the three robust points the raw 5 s vector strength is 0.730-0.797 (0.72 belongs to the silent-ring no-failure
+  set in cx_wedge.md, whose minimum is at gE 2 / gD 25 seed 4, a point not robust to the GLNO sign). Percentage
+  ranges: PEN -14.4 to -16.2 %, Delta7 -4.3 to -6.4 %, GLNO -12.3 to -14.4 %; the lowest single robust-point bump is
+  175.8 Hz (gaba 2/15 seed 4). Six section-5 cells differ by one unit in the last digit from raw-value aggregation
+  (round-then-mean). gE 2 / gD 40 seed 1 is an undisplaceable pre-pulse bump (class a), not a jump.
+* Every grid run used receptor_model=None; the shipped sign/abs default changes 0 of 27,553 ring-core entries and 27
+  sign/abs runs are byte-identical to off on the ring (`out/sk4_signabs_{robust,fail}.json`,
+  `out/sk4_glno_receptor_check.txt`), so the grid stands under the current default -- a future table change must
+  re-check this. Working-tree diff 259 insertions; the batch log for r4-glno-d04de8 was not shipped.

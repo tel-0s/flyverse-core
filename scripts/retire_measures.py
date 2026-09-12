@@ -21,10 +21,9 @@ The measures (brain.LIFParams defaults; docs/NOTES.md session 3-4 and 8 record w
   AL LN NT override connectome.UNKNOWN_NT_OVERRIDE_REGEX: unknown-NT antennal-lobe local neurons relabelled GABA
 
 Receptor model: `--receptor-model` / `--receptor-net-rule` are passed through to every configuration exactly as
-benchmark.py takes them, and default to `off`, which does NOT mean "no receptor model": benchmark.Context leaves
-LIFParams alone when the flag is off, so a run inherits brain.LIFParams' own defaults (round 3: receptor_model
-'sign', receptor_net_rule 'abs'; docs/NT_INTEGRATION.md section 7). Pass `--receptor-model off` explicitly plus a
-LIFParams patch only if you want the pre-round-3 weights. Each run records what it actually ran under in the JSON
+benchmark.py takes them. The default is `default`, which leaves brain.LIFParams' own defaults in force (since round 3:
+receptor_model 'sign', receptor_net_rule 'abs'; docs/NT_INTEGRATION.md section 7); `off` means receptor_model=None,
+the presynaptic-sign rule (the pre-round-3 weights). Each run records what it actually ran under in the JSON
 (config.lif.receptor_model / receptor_net_rule, read back off the LIFParams the sections were built with).
 
 Each configuration runs in its own subprocess (the fan-in normalisation cache is keyed on the parameter set, and the
@@ -158,21 +157,28 @@ HOOKS = {"soft_cap": _hook_soft_cap, "soft_cap_120": lambda orig: _hook_soft_cap
 LPI_LPLC2 = (r"^LPi(34|43)$", r"^LPLC2$")     # optic.DEFAULT_PAIR_GAIN entry: the x4 added in NOTES session 9
 
 
-def pair_gain_lpi_x1():
-    """optic.DEFAULT_PAIR_GAIN with the LPi34 / LPi43 -> LPLC2 factor at 1.0 (the uniform-synapse value), everything
-    else untouched. The x4 was hand-set so that the fly's own turning stopped driving the giant fibre through LPLC2;
-    it is the only optic-lobe pair gain that stands in for a sign / strength the receptor table could now decide."""
-    from flyverse import optic
-    out, found = [], 0
-    for pre, post, g in optic.DEFAULT_PAIR_GAIN:
-        if (pre, post) == LPI_LPLC2:
-            found += 1
-            out.append((pre, post, 1.0))
-        else:
-            out.append((pre, post, g))
-    if found != 1:
-        raise SystemExit(f"optic.DEFAULT_PAIR_GAIN has {found} LPi -> LPLC2 entries {LPI_LPLC2}, expected 1")
-    return {"pair_gain": out}
+def pair_gain_lpi(factor):
+    """optic.DEFAULT_PAIR_GAIN with the LPi34 / LPi43 -> LPLC2 factor set to `factor` (1.0 is the uniform-synapse
+    value), everything else untouched. The x4 was hand-set so that the fly's own turning stopped driving the giant
+    fibre through LPLC2; it is the only optic-lobe pair gain that stands in for a sign / strength the receptor table
+    could now decide (round 3: the table matches 100 % of LPLC2's input and confirms the LPi glutamate as GluCl -1
+    without licensing any strength, so the open question is where between x1 and x4 the factor sits)."""
+    def build():
+        from flyverse import optic
+        out, found = [], 0
+        for pre, post, g in optic.DEFAULT_PAIR_GAIN:
+            if (pre, post) == LPI_LPLC2:
+                found += 1
+                out.append((pre, post, float(factor)))
+            else:
+                out.append((pre, post, g))
+        if found != 1:
+            raise SystemExit(f"optic.DEFAULT_PAIR_GAIN has {found} LPi -> LPLC2 entries {LPI_LPLC2}, expected 1")
+        return {"pair_gain": out}
+    return build
+
+
+pair_gain_lpi_x1 = pair_gain_lpi(1.0)
 
 
 def no_al_ln_override_connectome():
@@ -241,6 +247,12 @@ CONFIGS = {
     # optic-lobe pair gains (optic.DEFAULT_PAIR_GAIN)
     "pair_gain_lpi_x1": {"measure": "optic pair gains", "kind": "ablation", "optic": pair_gain_lpi_x1,
                          "note": "LPi34 / LPi43 -> LPLC2 back to x1 (the uniform synapse); every other pair gain kept"},
+    # the x1 / x2 / x3 / x4 scan the round-3 retire study named as its cheapest next test: where between the uniform
+    # synapse and the hand-set x4 the factor crosses walk.power_max's 50 Hz bound, and what that does to loom.GF_peak
+    "pair_gain_lpi_x2": {"measure": "optic pair gains", "kind": "replacement", "optic": pair_gain_lpi(2.0),
+                         "note": "LPi34 / LPi43 -> LPLC2 at x2 instead of x4; every other pair gain kept"},
+    "pair_gain_lpi_x3": {"measure": "optic pair gains", "kind": "replacement", "optic": pair_gain_lpi(3.0),
+                         "note": "LPi34 / LPi43 -> LPLC2 at x3 instead of x4; every other pair gain kept"},
     # the unknown-NT antennal-lobe local-neuron relabelling (connectome.UNKNOWN_NT_OVERRIDE_REGEX)
     "no_al_ln_override": {"measure": "AL LN NT override", "kind": "ablation", "connectome": no_al_ln_override_connectome,
                           "note": "UNKNOWN_NT_OVERRIDE_REGEX emptied: unknown-NT AL local neurons keep sign 0 instead of GABA"},
@@ -581,10 +593,10 @@ def main():
     ap.add_argument("--sections", default="all", help="passed to benchmark.py")
     ap.add_argument("--fast", action="store_true")
     ap.add_argument("--seeds", default="0,1")
-    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
+    ap.add_argument("--receptor-model", default="default", choices=["default", "off", "sign", "sign+gain", "full"],
                     help="passed to benchmark.py's Context for every configuration; 'off' leaves LIFParams alone, i.e. "
                          "the run inherits brain.LIFParams' defaults (round 3: 'sign' / 'abs')")
-    ap.add_argument("--receptor-net-rule", default="class", choices=["class", "abs", "nonmda"], help="passed through with --receptor-model")
+    ap.add_argument("--receptor-net-rule", default="abs", choices=["class", "abs", "nonmda"], help="passed through with --receptor-model (ignored under default / off)")
     ap.add_argument("--out", default=os.path.join(ROOT, "out", "retire"))
     ap.add_argument("--skip-existing", action="store_true", help="do not rerun configurations that already have a JSON")
     ap.add_argument("--timeout", type=float, default=30.0, help="minutes per configuration")

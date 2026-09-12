@@ -342,3 +342,202 @@ effective LIFParams, path / type / pair gains and connectome statistics of a con
 * The three "replicates" do not vary the seed for the deciding check: `sec_walk` draws no RNG (--seeds 4,5,6 reproduces --seeds 0,1,2 bit for bit), so they replicate GPU nondeterminism only.
 * Every retire_r3 JSON carries `config.receptor_flags = {model: off, net_rule: class}` (the CLI values) next to the authoritative `config.lif` = sign / abs; and `out/r3_default_*.json` recorded `receptor.model None` although sign/abs was active (benchmark.py defect, fixed: the header now records the LIFParams used).
 * **All three round-3 verdicts rest on `walk.power_max_hz` measured in the half-applied `sec_walk` (optic lobe without the receptor lookup, see receptor_integration.md round-3 corrections); they are to be re-derived from the round-4 baseline after the fix.** `report()` no longer prints "fixes" when no baseline is present.
+
+## Round 4: with the corrected benchmark (all three round-3 verdicts retracted)
+
+Round 3's `walk`, `motion` and legacy-`loom` numbers were produced with the optic lobe built *without* the receptor
+lookup (`scripts/benchmark.py` `sec_walk` / `sec_motion`; docs/audits/receptor_verification.md round-4 follow-up 1).
+The fix is in, `--receptor-model` now distinguishes `default` / `off` / model name, and the whole study was re-run.
+**The deciding check moved so far that every round-3 verdict in section "Per measure: can it be retired now?" is
+withdrawn: the baseline itself now fails `walk.power_max_hz`** (79.4650 against a bound of 50, bit-identical in 3 of 3
+replicates), and the three ablations that round 3 said "break" that check are the configurations that repair it.
+
+**The batch.** One cluster batch, 21 jobs (7 configurations x 3 replicates), `--seeds 0,1,2`, full suite, native
+backend, NVIDIA B200, shared override cache (sum|W| 121,460,584), run dir `<cluster-fs>/neurome/runs/r4-retire-4620b3`,
+12.3 min wall, 0 failed, 6.4-10.9 min per run. Each job:
+
+    python scripts/retire_measures.py --configs <cfg> --seeds 0,1,2 --receptor-model sign --receptor-net-rule abs \
+        --timeout 45 --out out/retire_r4/<cfg>_r<N>
+
+`--receptor-model sign --receptor-net-rule abs` is passed **explicitly** because the flag's meaning changed: round 3's
+`off` meant "leave LIFParams alone", it now means `receptor_model = None`. The explicit pair is byte-equal to the
+shipped defaults -- every field of `brain.LIFParams()` is identical after `benchmark.Context._apply_receptor`
+(checked in-process; `config.lif` in all 21 JSONs reads `sign` / `abs` / table `None` / fallback `False`, and
+`config.device` reads NVIDIA B200 in all 21).
+
+Results `out/retire_r4/<config>_r<N>/<config>.json` (+ `.log`, + the job's `.txt`), the configuration x replicate x
+check matrix in `out/retire_r4/replicates.md` / `.json`
+(`python scripts/retire_measures.py --report-replicates out/retire_r4`), a key-value digest in
+`out/r4_retire_summary.json`, the effective parameters of all seven configurations in `out/r4_retire_structure.txt`
+(`python scripts/retire_measures.py --check --configs ... --receptor-model sign --receptor-net-rule abs`, CPU, no
+simulation). Two configurations are new: `pair_gain_lpi_x2` / `pair_gain_lpi_x3` (the LPi -> LPLC2 factor at 2.0 /
+3.0; `retire_measures.pair_gain_lpi(factor)` is now a factory and `pair_gain_lpi_x1` is `pair_gain_lpi(1.0)`).
+
+**The baseline is the shipped default and it is independently confirmed.** The three `baseline` runs here reproduce
+the re-score task's three no-flag suite runs exactly (`out/r4_rescore_fetch/r4_default_{1,2,3}.json`, run dir
+`<cluster-fs>/neurome/runs/r4-rescore-680005`, `config.receptor` = sign / abs / flag `default` / 48,295 entries):
+`walk.power_max` 79.4650, `walk.GF_max` 4.6061, `walk.power_sustained` 37.8895, `loom.GF_peak` 50.3826 / 50.8586,
+`motion.min_dsi` 0.2334, `taste.MN9` 10.9342, `smell.KC_active` 816, `bitter.shiu_sugar` 139.8985,
+**26 PASS / 1 FAIL / 2 KNOWN GAP** in 6 of 6 runs. The three round-3 numbers the caveat named are therefore not what
+round 3 recorded:
+
+| number | round 3 (half-applied `sec_walk` / `sec_motion`) | round 4 (corrected) | `off` |
+|---|---|---|---|
+| `walk.power_max_hz` (< 50)  | 46.0955 PASS in 7/7 | **79.4650 FAIL in 6/6** | 73.1827 FAIL in 7/7 |
+| `walk.GF_max_hz` (< 38)     | 8.5189 in 7/7       | 4.6061 in 6/6       | 4.6287 in 3/3 |
+| `loom.GF_peak_hz` (>= 20)   | 27.05-31.90         | 50.38-50.86         | 38.16-40.83 (r4), 36.74-43.88 (r2) |
+| `motion.min_dsi` (>= 0.1)   | 0.1679-0.1726       | 0.2334              | 0.1679-0.1717 |
+
+(`off` = `out/r4_rescore_fetch/r4_off_{1,2,3}.json`, `--receptor-model off`, which records `model: null` and
+reproduces the round-2 off values: taste 5.8455, KC 1426, Shiu 123.5394; 26/1/2 twice and 24/3/2 once, the two
+extra FAILs of `r4_off_1` being `loom_escape.GF_peak` 32.2553 against a bound of 33 and `loom_escape.escapes` 0
+against >= 1 -- the demo fly does not escape in that run, where the default escapes in 3 of 3 in all six runs.) So the receptor default does not repair
+`walk.power_max` (it is 6.3 Hz *worse* than `off` there) and does not cost 10 Hz of legacy `loom.GF_peak` (it gains
+10). Those are the re-score task's conclusions to draw; what matters here is that **`walk.power_max` is the model's
+one open FAIL under every fully-applied configuration measured so far** -- 79.47 (default), 73.18 (off), 60.88 /
+79.06 (the two pre-receptor baselines `out/retire/baseline.json`, `out/retire_cluster/baseline.json`) -- and that the
+check's own note says its reference is 22 Hz at DN -> VNC x3 and 50 at x6, i.e. the bound is itself a hand-set number.
+
+### The suite, configuration x replicate (full table: `out/retire_r4/replicates.md`)
+
+Bit-identical in all 21 runs: `rest.spikes_per_step` 0.00, `taste.MN9_hz` 10.9342, `dn.DNa02_L_leg_asym_hz` 2.58,
+`dn.DNp09_top_hz` 152, `loom.escape_cm` 3.50, `motion.correct_directions` 8, `loom_escape.escapes` 3,
+`bitter.calibrated_sugar_MN9_hz` 5.52, `bitter.calibrated_sugar_bitter_MN9_hz` 0.00, `bitter.shiu_sugar_MN9_hz`
+139.8985, `bitter.shiu_sugar_bitter_MN9_hz` 0.82, `compass.wedge_cells_persisting` 0 (KNOWN GAP). Every `walk.*` and
+`smell.*` value is bit-identical across a configuration's own three replicates (`sec_walk` and `sec_motion` draw no
+RNG), so the three replicates test GPU nondeterminism only, as in round 3.
+
+| check | baseline x3 | no_gf_damping x3 | gf_damping_dnp70 x3 | lpi_x1 x3 | lpi_x2 x3 | lpi_x3 x3 | no_al_ln_override x3 |
+|---|---|---|---|---|---|---|---|
+| **walk.power_max_hz (< 50)** | **79.4650 FAIL** | 48.4805 | 48.4805 | **51.5078 FAIL** | 48.1205 | **60.4216 FAIL** | **60.8826 FAIL** |
+| walk.GF_max_hz (< 38)        | 4.6061 | 4.6292 | 4.6292 | 9.7681 | 9.0290 | 8.5064 | 8.7516 |
+| walk.power_sustained_hz (< 50) | 37.8895 | 20.1091 | 20.1091 | 20.2129 | 27.9224 | 25.1316 | 29.4649 |
+| loom.GF_peak_hz (>= 20)      | 50.38 / 50.86 / 50.38 | 47.2162 x3 | 43.82 / 44.04 / 47.26 | 64.84 / 60.19 / 58.06 | 50.2233 x3 | 46.59 / 46.26 / 46.26 | 55.50 / 50.78 / 50.78 |
+| loom_escape.GF_peak_hz (>= 33) | 55.82-58.43 | 47.39-49.61 | 46.85-52.62 | 58.68-64.35 | 52.68-65.27 | 50.98-60.34 | 47.81-56.34 |
+| walk_gf.p99_hz (< 38)        | 19.53-23.49 | 20.22-25.02 | 15.67-27.02 | 26.98-31.14 | 23.63-31.09 | 20.20-23.92 | 19.67-24.58 |
+| motion.min_dsi (>= 0.1)      | 0.2334 | 0.2411 | 0.2395-0.2460 | 0.2481-0.2494 | 0.2437 | 0.2398-0.2400 | 0.2397 |
+| smell.PN_hz (< 100)          | 7.86 | 7.86 | 7.86 | 7.86 | 7.86 | 7.86 | 5.04 |
+| smell.KC_active (> 0)        | 816 | 816 | 816 | 816 | 816 | 816 | 1805 |
+| dn.MDN_top_hz (< 250)        | 153 | 153 | 153 | 153 | 153 | 153 | 150 |
+| odour.apple_clean_hz (<= 6)  | 4.34-4.47 | 4.33-4.50 | 4.56-4.63 | 4.45-4.55 | 4.48-4.56 | 4.33-4.59 | 5.18-5.49 |
+| odour.apple_8cm_hz (>= 10)   | 17.35-17.55 | 17.35-17.55 | 17.36-17.50 | 17.48-17.57 | 17.31-17.43 | 17.41-17.45 | 18.57-18.78 |
+| rotate.DNp20_flip_hz (< -2)  | -30.2 to -40.0 | -32.5 to -35.4 | -29.1 to -36.4 | -22.9 to -40.5 | -30.0 to -38.0 | -32.3 to -40.9 | -34.7 to -40.3 |
+| **pass / fail / known gap**  | 26/1/2 x3 | **27/0/2 x3** | **27/0/2 x3** | 26/1/2 x3 | **27/0/2 x3** | 26/1/2 x3 | 26/1/2 x3 |
+
+Applying the rule unchanged -- *a check counts as broken only when it fails in every replicate of the configuration
+while passing in every baseline replicate* -- **nothing breaks anything**: `breaks_in_all` is empty for all six
+non-baseline configurations, no check differs in status between the three baseline replicates, and no configuration
+differs in status between its own replicates. `walk.power_max_hz` cannot count as broken by anyone now, because the
+baseline fails it; three configurations (`no_gf_damping`, `gf_damping_dnp70`, `pair_gain_lpi_x2`) *fix* it in 3/3.
+
+### The LPi34 / LPi43 -> LPLC2 factor scan (x1 / x2 / x3 / x4)
+
+Structure (`out/r4_lpi_scan_structure.json`, local CPU on the same cache; `c.W` is `W[post, pre]`): 1,231 edges,
+7,543 |W| from 180 LPi34/LPi43 cells onto 185 LPLC2 cells; T4/T5 -> LPLC2 is 33,409 edges / 112,941 |W|; LPLC2's
+whole input is 102,690 edges / 349,724 |W|. All round-3 structural numbers reproduce. With the gains in force the LPi
+share of LPLC2's shaped input is 2.16 / 4.22 / 6.20 / 8.10 % at x1 / x2 / x3 / x4 and the LPi : (T4/T5 x2) ratio is
+0.033 / 0.067 / 0.100 / 0.134.
+
+The scan, all values bit-identical across each configuration's three replicates:
+
+| factor | walk.power_max (< 50) | walk.GF_max (< 38) | walk_gf.p99 (< 38) | loom.GF_peak (>= 20) | pass/fail/gap |
+|---|---|---|---|---|---|
+| x1 | 51.5078 FAIL | 9.7681 | 26.98-31.14 | 58.06-64.84 | 26/1/2 |
+| x2 | **48.1205 PASS** | 9.0290 | 23.63-31.09 | 50.2233 | **27/0/2** |
+| x3 | 60.4216 FAIL | 8.5064 | 20.20-23.92 | 46.26-46.59 | 26/1/2 |
+| x4 (shipped) | 79.4650 FAIL | 4.6061 | 19.53-23.49 | 50.38-50.86 | 26/1/2 |
+
+**Where the factor crosses the bound: twice, and not monotonically.** `walk.power_max` is 51.51 / 48.12 / 60.42 /
+79.47 -- it crosses 50 downward between x1 and x2 and upward again between x2 and x3, and the shipped x4 is the worst
+point of the scan by 19 Hz. The only monotone quantities are the ones the gain was added for in session 9:
+`walk.GF_max` falls 9.77 -> 9.03 -> 8.51 -> 4.61 and `walk_gf.p99` falls with it, i.e. a stronger LPi -> LPLC2
+inhibition does suppress the giant-fibre drive the fly's own turning produces -- but every point of the scan is far
+under that check's 38 Hz bound, so the mechanism is real and the *size* of the hand-set factor buys nothing that is
+scored. `loom.GF_peak` is also non-monotone (58-65 / 50.22 / 46.3-46.6 / 50.4-50.9) and passes everywhere (bound 20),
+so round 3's "the x4 costs the loom peak" no longer holds either: the fully-applied default's legacy loom peak is
+50 Hz at x4, higher than at x2 or x3.
+
+### The GF input damping: DNp70 alone reproduces the ablation, not the baseline
+
+Structure (`out/r4_gf_damping_structure.json`, reproducing round 3): the five damped inputs are 21 edges / 4,315 |W|
+of DNp01's 36,589 |W| input -- SAD073 1,177 GABA, DNp70 1,416 ACh, PVLP010 711 glutamate, CL367 537 GABA, GNG300 474
+GABA; the one cholinergic input is 32.8 % of the damped weight. `gf_damping_dnp70` therefore restores full strength to
+2,899 |W| of *inhibition* onto the giant fibre and keeps the x0.3 on the only excitation.
+
+The answer to "does damping only DNp70 reproduce the baseline?" is **no -- it reproduces the ablation**:
+`gf_damping_dnp70` and `no_gf_damping` give bit-identical `walk.power_max` 48.4805, `walk.GF_max` 4.6292 and
+`walk.power_sustained` 20.1091, and both score 27/0/2 in 3/3. Damping the four inhibitory inputs is the whole of the
+baseline's `walk.power_max` 79.47; damping the cholinergic one is dynamically inert in `sec_walk`. The two differ only
+inside the scatter elsewhere (`loom.GF_peak` 47.2162 x3 vs 43.82 / 44.04 / 47.26; `loom_escape.GF_peak` 47.4-49.6 vs
+46.9-52.6; `odour.apple_clean` 4.33-4.50 vs 4.56-4.63).
+
+### Per measure: can it be retired now?
+
+The rule is unchanged: **retire nothing unless a replacement passes in 3/3 with a status margin.** Three
+configurations clear 3/3 at 27/0/2; their tightest margin is `walk.power_max` itself, +1.52 Hz (`no_gf_damping`,
+`gf_damping_dnp70`) and +1.88 Hz (`pair_gain_lpi_x2`) on a 50 Hz bound -- 3.0 % and 3.8 %, on a check whose value is
+bit-identical across replicates (zero scatter) but which section 2 above has already described as two-regime.
+
+* **GF input damping x0.3 (five inputs, `LIFParams.type_path_gain`)** -- **retire it.** Its plain ablation
+  `no_gf_damping` scores 27/0/2 in 3/3, breaks no check, and turns the default's only FAIL into a PASS
+  (`walk.power_max` 79.4650 -> 48.4805, `walk.power_sustained` 37.89 -> 20.11). Round 3's verdict ("cannot be retired,
+  breaks walk.power_max at 69.77") was produced by the half-applied `sec_walk` and is withdrawn; the session-9
+  recommendation "GF x0.3 goes", retracted in round 3, is reinstated on better evidence. The measure still has no
+  physiological referent, and four of the five inputs it damps are inhibitory under both NT_SIGN and the receptor
+  table (the receptor lookup matches 0 of DNp01's 1,455 input edges, so it has nothing to say about them). No
+  replacement is needed: `gf_damping_dnp70` gives the identical walk numbers, so keeping a damping term on the one
+  cholinergic input buys nothing. Costs on record: `loom.GF_peak` 50.4-50.9 -> 47.2 and `loom_escape.GF_peak`
+  55.8-58.4 -> 47.4-49.6, both far inside their bounds (20 / 33) with 3 escapes in 3/3. Adopt it alone, with a suite
+  run, as section 2 prescribes -- and not in the same change as anything below.
+* **LPi34 / LPi43 -> LPLC2 x4 (`optic.DEFAULT_PAIR_GAIN`)** -- **cannot be retired, but x4 is not the value the suite
+  supports.** Removing it (`pair_gain_lpi_x1`) is 26/1/2 in 3/3 with `walk.power_max` 51.5078, so the ablation does
+  not pass and the measure stays. What the scan adds is that the shipped x4 is the worst of the four factors on that
+  check (79.47) and **x2 is the only point that passes the whole suite (27/0/2 in 3/3, margin 1.88 Hz)**, at the price
+  of the walking giant-fibre drive the gain exists to suppress (`walk.GF_max` 4.61 -> 9.03, `walk_gf.p99` 19.5-23.5 ->
+  23.6-31.1, both still under 38). That is a re-parameterisation of a hand-set factor, not a retirement, and the
+  receptor data cannot license it: they match 100 % of LPLC2's input and confirm the LPi glutamate as GluCl -1 without
+  saying anything about strength (round-3 section above). It should not be adopted on `walk.power_max` alone while
+  that check fails in the default -- a non-monotone check with a 19 Hz swing across the scan is describing a regime
+  boundary, not a dose-response.
+* **Unknown-NT antennal-lobe LN -> GABA (`connectome.UNKNOWN_NT_OVERRIDE_REGEX`)** -- **cannot be retired**, verdict
+  unchanged but for a different reason. It is 26/1/2 in 3/3, so it neither breaks nor fixes anything by the rule
+  (its `walk.power_max` 60.8826 is better than the baseline's 79.47 and still over the bound), and it moves the
+  olfactory numbers in the runaway direction it was added against: Kenyon cells above 1 Hz 816 -> 1805, PN mean
+  7.86 -> 5.04, the LH apple channel at the plume-free spot 4.34-4.47 -> 5.18-5.49 against a bound of 6 (margin
+  1.6 -> 0.5 Hz) and at 8 cm 17.35-17.55 -> 18.57-18.78, MDN top 153 -> 150. The structure reproduces exactly
+  (recomputed locally with `connectome.UNKNOWN_NT_OVERRIDE_REGEX = {}` and `compile_connectome`): 27 cells in the same
+  13 types, 13,287 output edges, 136,223 |W|, by target superclass cb_intrinsic 106,111 / cb_sensory 29,213 /
+  descending 858 / ascending 16 / visual_projection 13, ORN_ targets 7,124 edges 26,097 |W|, sum|W| 121,460,584 ->
+  121,324,368, unknown-NT cells 2,361 -> 2,388. The round-3 "PN-named 42,005" that could not be reproduced is
+  45,222 |W| over 2,662 edges under a prefix/suffix name rule, inside the 37,000-49,000 range that correction quoted.
+  The data-driven replacement is still a transmitter prediction for those 27 cells, not the removal of the rule.
+
+**What this does not settle.** (1) Every "fix" above is a fix of a check the shipped default fails, so adopting one
+changes a default while the receptor default is itself under review for the same check; the order matters, and
+`walk.power_max`'s 50 Hz bound (its own note: 22 Hz at DN -> VNC x3, 50 at x6) deserves a look before anything is
+tuned to sit 1.5 Hz under it. (2) Combinations were not run -- the rule is one at a time, and `no_gf_damping` +
+`pair_gain_lpi_x2` is untested. (3) The three replicates still do not vary the seed for the deciding check: `sec_walk`
+draws no RNG, so 3/3 here means "three GPU runs", not three independent samples; the scatter quoted for
+`walk.power_max` is exactly zero and must not be read as a confidence interval. (4) `pair_gain_lpi_x4` is the shipped
+baseline and was not run as a separate configuration; the x4 column of the scan table is the `baseline` column.
+
+### Corrections (round-4 verification, `verify:exp:retire`)
+
+* The baseline's walk section is not bit-reproducible: an 8th full-suite baseline with a byte-identical config gave
+  walk.power_max 80.0928 (+0.63 Hz) and power_sustained 39.9078 (+2.02); motion.min_dsi takes three values across
+  the six baseline draws and differs between replicates in all seven configurations; loom.GF_peak spans 46.80-54.27
+  over 8 + 6 draws (not 0.48 Hz). The GF-damping retirement still clears its criterion -- no_gf_damping 48.4805 in
+  10/10 draws across two batches -- with a +1.52 Hz margin against a largest observed baseline excursion of 0.63 Hz.
+* The tightest PASS margins among the passing configurations are odour.apple_channel_clean (1.37-1.67 Hz) and the
+  calibrated sugar+bitter check (1.00 Hz), not only walk.power_max; walk.power_max is the tightest for LPi x2 only.
+* "LPi share of LPLC2's shaped input 2.16 / 4.22 / 6.20 / 8.10 %" applies the LPi gain without the T4/T5 x2 pair gain
+  in force in the same lobe; with every gain applied the shares are 1.63 / 3.21 / 4.74 / 6.22 %.
+* "PN-named 45,222 |W| over 2,662 edges" is not reproducible under any of twelve name rules (type endswith PN 37,349;
+  substring 48,982; class ALPN 49,483; ...) -- drop it; the generator now shipped is
+  `scripts/skeptic_retire_r4_structure.py` (all other structural numbers reproduce from it).
+* walk_gf.p99 is not monotone across the LPi scan (replicate spread 4-11 Hz); only walk.GF_max is. loom.GF_peak
+  separation default vs off is 3-17 Hz over the pooled draws, not "~11 Hz".
+* `retire_measures.py`'s docstring described the old "off leaves LIFParams alone" semantics and its argparse default
+  `off` silently scored the previous model after the round-4 benchmark fix: now `default` (LIFParams' own) with `off`
+  = None explicitly.
+* The three round-4 "replicates" replicate GPU nondeterminism only for walk.* (`sec_walk` draws no RNG).

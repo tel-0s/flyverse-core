@@ -1213,8 +1213,9 @@ Tm9, L1, 24 ring-neuron rows); histamine is silenced where two or more sources a
 It changes 0.148 % of the synaptic weight (30,916 glutamate flips, 17,379 histamine silencings), 95 % of it on
 optic rate units (T1, Dm9, Mi4, Mi1); `receptor_model=None` reproduces the previous weights byte for byte (pinned
 test). Under the project's rule this is the right kind of change: a sign taken from expression data, no fitted
-parameter, no gain, reversible by one flag. The suite is 27/0/2 in 10 of 10 runs against off's 26/1/2 and 24/3/2 with
-no check worse in status; the demo loom escapes 12/12 seeds; costs on record are the legacy loom GF (27-32 vs 37-44
+parameter, no gain, reversible by one flag. (The round-3 '27/0/2 in 10 of 10 runs' was measured with the benchmark's
+walk / motion sections half applied; round 4 below has the corrected 26/1/2, equal to off's best, with no check worse in
+status; the demo loom escapes 12/12 seeds; costs on record are the legacy loom GF (27-32 vs 37-44
 Hz, still PASS), KC_active 816 vs 1426, and more spontaneous take-offs in the room (24 vs 3 in 16 flies x 5 min, one
 batch). One caveat qualifies the headline: the critic found that benchmark.py's two legacy sections (walk, motion)
 built their optic lobe without the receptor lookup, so the check that flips to PASS (walk.power_max) and the one
@@ -1245,6 +1246,41 @@ Verification cost this round: attribution and wording errors only (a per-seed lo
 "narrower" compass window; "discrete" walk.power_max values; p 0.0003 -> 7.7e-5) -- none reversed a decision, and the
 skeptics' added controls supported every direction. 64 tests pass; round-3 batches: six task + five skeptic, 0
 failed jobs.
+
+## Session 10: receptor-expression integration, round 4 (closing the plan)
+
+Round 4 (13 agents; Opus on the run-and-tabulate stages and the skeptics) re-scored the default with the fixed
+benchmark and finished the plan's open items; `docs/NT_INTEGRATION.md` section 7 has the outcome.
+
+**The round-3 caveat resolved against the round-3 headline.** With the optic lobe under the receptor signs in every
+section, the default scores 26/1/2 in 11 of 11 suite runs -- the FAIL is walk.power_max (79.5 Hz vs a hand-set 50 Hz
+bound; off fails it too at 73.2) -- equal to off's best tally, not above it; the "-10 Hz legacy loom cost" was a
++10-14 Hz gain measured backwards, and direction selectivity rises 0.17 -> 0.23. The default stays, on the rule's
+letter ("not worse in status than off", expression-derived, reversible), and the record now says so instead of
+"27/0/2". Off is again producible from the scripts and reproduces the round-2 off values bit for bit.
+
+**The one open threat to the default is behavioural, not a suite check.** Its take-off excess in the room replicates
+across four brain RNGs (95 vs 16 hops over 64 flies x 5 min), and the skeptic's route split shows ~40 % are GF escape
+jumps on room optic flow from a higher walking-GF tail (median 33 vs 28.5 Hz, 8/16 vs 2/16 flies at the 33 Hz
+threshold); the rest are voluntary (10 vs 0 with the escape route disabled). Nothing in the suite scores it; a
+`hops` section with the escape / voluntary split and a voluntary-only reference is owed (round 5).
+
+**Step 8 reversed by the corrected benchmark:** the GF x0.3 input damping can be retired (its ablation is 27/0/2 in
+10/10 draws and turns the default's one FAIL into a PASS at 48.5 Hz; damping only the cholinergic DNp70 is inert, so
+the four inhibitory inputs are the whole effect) -- the session-9 recommendation reinstated on better evidence, to be
+adopted alone with its own suite and hop batches, because restoring 2,899 |W| of inhibition onto DNp01 is exactly the
+change that could move the take-off cost. LPi x4 and the AL LN override stay.
+
+**Closed items:** compass operating points robust to the GLNO sign (gE 2 / gD 15, 2.25 / 25, 2.5 / 25; the receptor
+default is byte-identical to off on the ring); the type-majority NT rule reaches 36 silent cells and would contradict
+the AL LN regex where it overlaps -- the regex has no data replacement; the slow term's non-determinism is the sparse
+product itself (a per-op probe: 20/20 distinct under the deterministic flag) and its cost is the term, not the
+dopamine signs -- parked; neither KC nor DN1 flips carry the taste rise (fan-in normalisation suspected).
+
+**Verification this round** refuted one premise ("spontaneous" hops), one reference scale, one determinism claim and
+one causal reading; no decision reversed. The receptor data are exhausted -- six sources, 25.7 % of the weight
+decided, the object-pathway types unprofiled everywhere, the ring inert -- so after the closing round the thread
+hands over to the dynamics questions.
 
 ## Batched brains and the RL environment
 
