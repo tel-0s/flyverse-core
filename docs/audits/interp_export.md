@@ -6,12 +6,18 @@ Interpretability toolkit, build task **export** (2026-09-12). Owns `flyverse/int
 directory, the interchange key, the unit-handling table). The export computes no new number: every value it writes
 was already in a tool's `common.Result`, so this module is field mapping, hashing and a refusal rule.
 
+**Sections 1-13 are revision 1, as shipped. [Section 14](#14-revision-2-neurome-intake-corrections) is revision 2
+(2026-09-13), which splits the two controls, defines every statistic in the manifest, ships the matched blank
+radiance and the object track with a declared `retina.mode`, makes the rank test tie-aware, and re-exports the size
+ladder into new run directories.** Where the two disagree, revision 2 is the shipped behaviour.
+
 ---
 
 ## 1. What the tool is
 
 `export(result, out_root='out/export', run_id=None, retina=None, parquet_rows=1e6, control_ids=None) -> Path`
-writes one run directory `out/export/<run_id>/`:
+writes one run directory `out/export/<run_id>/` (revision 2 adds `paired_control_ids` / `null_reference_ids` /
+`retina_blank` / `retina_geometry` / `retina_in_loop`; section 14):
 
 | file | role | what it is |
 |---|---|---|
@@ -21,6 +27,7 @@ writes one run directory `out/export/<run_id>/`:
 | `contributions.csv` | interchange | `body_pre` / `body_post` edge contributions with the sign and gain rules that made them |
 | `sensitivity.csv` | interchange | lesion / hold deltas with replicate scatter |
 | `retina_columns.csv` / `retina_bodies.csv` / `retina_radiance.{csv,parquet}` | interchange | the retinal sampling actually presented, and the column -> photoreceptor-body map |
+| `retina_radiance_blank.{csv,parquet}` / `retina_object_track.csv` | interchange | revision 2: the matched blank arm in the same schema, and the ball's azimuth / elevation / angular diameter per frame (section 14.3) |
 | the tool's own tables (`per_type`, `reference_per_type`, `delta_links`, ...) | tool | written and hashed too, so the directory does not depend on a reader parsing `result.json` |
 | `checks.json` | -- | the round trip and `verify` report; written *after* the manifest, so it is not one of the hashed tables |
 
@@ -38,6 +45,9 @@ read_table(run_dir, name) -> DataFrame          round_trip_check(result, run_dir
 retina_tables(retina, out_dir, parquet_rows) -> (table metas, the manifest's retina block)
 write_table(df, out_dir, name, parquet_rows, role) -> manifest entry   sha256_file(path) -> str
 source_fingerprint(root, patterns, include_loaded, extra) -> dict      loaded_sources(root, extra) -> dict
+mann_whitney(stim, null) -> {U, p, p_method, n_tied_values}            compare_tie_aware(stim, null) -> compare + p_method
+holm(p, family) -> array   family_labels(df, spec) -> array   add_family_columns(df, spec) -> DataFrame   # revision 2
+retina_mode_of(sampling, in_loop) -> dict      object_track(offset_m, *, ball_radius_m, ahead_m, ...) -> DataFrame
 match_sources(recorded, root) -> dict                                  # which commit a cluster run actually ran
 raw_counts(c) -> (csr, sign0_available)         silent_flags(c, pre_idx, frozen_idx, rates) -> DataFrame
 links_to_contributions(links, kind, normalisation, reference_graph, window) -> DataFrame
@@ -49,7 +59,8 @@ result_from_object_sweep(stim_jsons, null_jsons, *, cells, null_cells, provenanc
 **CLI** (`scripts/interp_export.py`): `record` (the only GPU subcommand -- runs the object-sweep protocol and
 captures what the probe JSON pools away: per-cell drive and rate, and the retinal sampling), `run` (recorded runs ->
 Result -> export), `analyse` (any Result JSON -> export; the default when no subcommand is given), `verify`,
-`static-decompose`. Common flags per `docs/INTERP.md` 2.6 / 5.
+`static-decompose`, and -- revision 2 -- `ladder` (a recorded size ladder -> one new run directory per size + the
+summary, section 14.6). Common flags per `docs/INTERP.md` 2.6 / 5.
 
 ---
 
@@ -131,7 +142,8 @@ batch 4, its null from +0.080 to +0.135), which is the reason `runs` and not `se
 ## 4. Validation 2 -- the per-body readouts Neurome asked for
 
 `readout_per_body.csv`, 26,482 rows over 13,241 bodies and 15 types, window 3.0-15.0 s, `control_ids` naming
-the three matched null runs:
+the three independent null runs (**the revision-1 field defect Neurome found: that column named the null runs while
+`control_value` came from arm b of the stimulus recordings. Revision 2 splits them -- section 14.1**):
 
 | unit_kind | quantity | unit | rows | bodies |
 |---|---|---|---|---|
@@ -173,7 +185,8 @@ without a finite z; the fix belongs in `export.py` and is not applied in this ro
 ## 5. Validation 3 -- the retinal sampling actually presented
 
 `--retina` replays the presented geometry frame by frame at the pinned pose (the ray tracer is deterministic, so the
-replay is the radiance the optic lobe received) and writes three tables:
+replay is the radiance the optic lobe received) and writes three tables (revision 2 adds the matched blank arm, the
+per-frame object track and an explicit `retina.mode` -- section 14.3):
 
 * `retina_columns.csv` -- **1,466** hex columns: side, hex coordinates, azimuth / elevation, unit direction, the
   number of photoreceptors and the `|`-joined list of their bodyIds. Every column has at least one; the lists cover
@@ -453,6 +466,11 @@ PYTHONIOENCODING=utf-8 python scripts/interp_export.py static-decompose --target
 # CPU: any other tool's Result, and a re-check of a finished directory
 PYTHONIOENCODING=utf-8 python scripts/interp_export.py analyse --result out/interp/<tool>/<run>.json --out out/export
 PYTHONIOENCODING=utf-8 python scripts/interp_export.py verify --run-dir out/export/<run_id>
+
+# CPU (revision 2): the recorded size ladder -> one NEW run directory per size + the summary (section 14.6)
+PYTHONIOENCODING=utf-8 python scripts/interp_export.py ladder \
+  --runs-csv out/export/export-20260913T014635Z-db22e3ea/runs.csv --out out/export \
+  --json-dir out/interp/export --family lc_drive --expect-counts '{"LC11": 143, "LC10a": 275}'
 ```
 
 ## 13. Tests
@@ -472,3 +490,225 @@ moves under other owners. `tests/test_control.py` 18 passed; `import flyverse.in
 | `test_source_fingerprint_names_the_commit_of_a_cluster_run` | the hashes, a changed and a missing file, LF/CRLF tolerance, and the imported-set scope beating a glob |
 | `test_object_sweep_result_arms_and_readouts` | the arms, the p floor at 3 v 3, the reference arm side by side with its SHA-256, two rows per spiking body, one per graded unit, the units and the window |
 | `test_cli_analyse_and_verify` | `analyse` / `verify` / the bare default form, `checks.json`, `--control-ids` |
+
+Revision 2 adds four (section 14.7), so `ExportTests` is **12** and the whole file **84 passed**.
+
+---
+
+## 14. Revision 2 (Neurome intake corrections)
+
+2026-09-13. Neurome consumed the size ladder (`out/export/objsize-d*/` + the summary
+`out/export/export-20260913T014635Z-db22e3ea/`) and reported one field defect, two portability gaps and two
+statistical caveats: `D:\Projects\neurome\docs\flyverse-size-tuning-reply.md` and
+`D:\Projects\neurome\reports\flyverse-size-tuning-intake.md` ('Corrected interpretation of the numbers', 'The
+retinal comparison is not yet a controlled size-tuning assay'). All of them are answered here, in
+`flyverse/interp/export.py` / `scripts/interp_export.py` only; the model, the probes and `common.py` are untouched,
+and **no recording was re-run** -- the ladder is re-reduced on the CPU from the recordings already on disk.
+
+`manifest.schema` is now `flyverse.neurome.export/2` and `manifest.export_revision` 2.
+
+### 14.1 The two controls, named apart
+
+Neurome: *"The exported `control_value` is the mean of arm b in the stimulus recordings, while `control_ids` names
+the independent blank/blank runs used for `null_mean`. For LC11 `24647` at 11.4 degrees, the actual paired blank is
+0.1167 Hz, whereas the independent null arms average 0.1333 and 0.0500 Hz."* That is exactly what the code did:
+`_cells_frame` reads `<quantity>__<type>__a` (object) and `__b` (blank) from the **same** npz, so `control_value` is
+the paired blank, while `result_from_object_sweep` stamped the null runs' stems into `control_ids`.
+
+`readout_per_body` and the per-type tables (`per_type`, `reference_per_type`, and the ladder's `size_tuning`) now
+carry **three** columns:
+
+| column | what it names | which numbers rest on it |
+|---|---|---|
+| `paired_control_ids` | arm b of each stimulus recording, id `<record>#arm_b` | `control_value`, `stimulus_minus_control`, every `diff_*` per-type statistic |
+| `null_reference_ids` | the independent blank/blank runs | `null_mean`, `null_sd`, `z_vs_null`, the per-type comparison arm, the verdict |
+| `control_ids` | **deprecated**, written equal to `null_reference_ids` for one revision | nothing new -- the revision-1 spelling, so a revision-1 reader does not break |
+
+`manifest.conventions` gains `controls` (which reference produced which column) and `control_ids` (the word
+DEPRECATED, the revision it survives in, and that it goes in the next). `verify()` enforces the rule rather than
+trusting the writer:
+`control_ids` must equal `null_reference_ids` row for row, the manifest must document the alias, and the paired and
+null ids must not be the same runs. A caller that still passes `control_ids=` (e.g.
+`scripts/interp_apply_object.py ladder`) is read as passing `null_reference_ids`, which is what that argument has
+always held, so no other tool's call site had to change.
+
+In the re-export, `paired_control_ids` = `d045_stim_s0#arm_b|...|d045_stim_s4#arm_b` and `null_reference_ids` =
+`d045_null_s0|...|d045_null_s4`: both present, five ids each, and disjoint.
+
+### 14.2 `statistic_definitions`: the drive numbers are differences of time-means
+
+Neurome read the headline drive values as membrane voltages until the intake corrected it (*"The headline drive
+values are maxima of time-mean differences within runs, not absolute membrane voltages"*). `manifest` now carries
+`statistic_definitions`, one sentence per value the export's tables actually use (14 of them in each ladder
+directory: the four `readout_per_body` quantities and the ten `SWEEP_STATS`). The primary one reads
+
+> `diff_max_over_cells_mean_mv`: max over the cells of the type, within each run, of that cell's time-mean
+> object-minus-blank received optic drive (mV), compared with the same statistic in independent blank/blank runs. A
+> difference of time-means, never an absolute membrane voltage; the maximising cell may differ from run to run.
+
+and `upstream_drive_mV` says the same for the per-body rows ("the rate lobe's input to that spiking cell,
+time-averaged over the analysis window -- not an absolute membrane voltage and not a distance to threshold"). The
+definition also travels as a `statistic_definition` column on the small per-type tables; `readout_per_body` keeps it
+in the manifest only (keyed by `quantity`), since repeating 330 characters on 26,482 rows would add ~9 MB per size
+and say nothing new. The `diff_signed_best_cell` / `diff_abs_best_cell_mean` entries say in the table that the two
+are distinct statistics with different 20 deg verdicts -- Neurome's 'the choice of statistic matters' point.
+
+### 14.3 Retina: mode, the matched blank arm, and the object track
+
+* **`retina.mode`** is `geometry_replay` for every table this protocol writes, with `replayed` spelling out what
+  that means ("re-rendered frame by frame at the pinned pose, AFTER the rollout, by the same deterministic ray
+  tracer the rollout used ... it is a replay and no in-loop capture was recorded to test that equivalence against")
+  and `in_loop: false`. `retina_mode_of` derives it from the record's own `sampling` string and returns `unknown`
+  when the record does not say; only an explicit caller assertion produces `in_loop_capture`. `verify()` refuses an
+  export that ships radiance with no mode. The pose the sampling was taken at now travels **inside** the same block
+  (`retina.pinned_pose`: `pos_m [-0.2, 0.1, 0.75]`, `heading_rad -1.5708`, `frame_ms 10`, and the statement that the
+  fly is replaced at that pose every frame and only the object moves), so mode, pose and radiance are read together
+  instead of one of them sitting in `stimulus.params`.
+* **`retina_radiance_blank`** is the matched blank run's radiance in the **identical schema** (frame, t_s,
+  column_id, the four channels, `ball_offset_m` -- empty in the blank arm, there being no ball), so
+  object-minus-blank is a join on `(frame, column_id)` inside the run directory. **Nothing was re-rendered on the
+  CPU**: the blank arm's replay was already recorded on the GPU by the same path as the object arm
+  (`scripts/interp_export.py record --retina` -> `capture_retina`; `ladder-plan` asks for `--retina` at seed 0 of
+  *both* arms, so `out/apply_object/ladder/d{045,114,200,300}_null_s0_retina.npz` exist, 1,200 frames x 1,466
+  columns each), and `retina_tables(..., blank=...)` writes the two arms through one `_radiance_long`. Recomputing
+  the 30 deg footprint from the two exported Parquet tables alone gives
+  **26.78 / 19.73 columns dimmed per frame and min relative radiance 0.0046**, the numbers Neurome could previously
+  only obtain by reaching outside the export to `out/apply_object/ladder/d300_null_s0_retina.npz`.
+* **`retina_object_track`**, 1,200 rows (one per frame): `ball_offset_m`, `centre_azimuth_deg`,
+  `centre_elevation_deg`, `angular_diameter_deg` and `distance_eye_to_centre_m` from the eye, plus -- when the blank
+  is present -- `columns_dimmed_5pct`, `columns_dimmed_50pct`, `min_relative_radiance` and the radiance-weighted
+  `dimmed_centroid_azimuth_deg` / `_elevation_deg`. The geometry is the probe's own: the ball rests on the table
+  `r - eye_above_table` above the eye at `ahead` = 0.05 m, `eye_above_table_m` = 0.0012 m (eye z 0.7512 over a table
+  top at 0.750035 m, as every record's console log prints and `interp_apply_object.angular_size_from_eye` already
+  used). The geometric track and the replayed radiance agree: at offset +0.06 m the 30 deg ball's centre is at
+  azimuth +50.19 deg and the dimmed columns' radiance-weighted centroid is at +50.26 deg.
+
+  This puts Neurome's objection on file per frame rather than per size. Centre elevation and angular diameter move
+  together across the ladder, and the diameter also moves **within** each sweep, because the ball recedes as it
+  slides sideways:
+
+  | size | ball radius | centre elevation (deg) | angular diameter (deg) | azimuth swept (deg) |
+  |---|---|---|---|---|
+  | d045 | 0.001965 m | 0.56 - 0.88 | 2.88 - 4.50 | -50.2 .. +50.2 |
+  | d114 | 0.004991 m | 2.78 - 4.34 | 7.32 - 11.42 | -50.2 .. +50.2 |
+  | d200 | 0.008816 m | 5.57 - 8.66 | 12.90 - 20.08 | -50.2 .. +50.2 |
+  | d300 | 0.013397 m | 8.88 - 13.71 | 19.51 - 30.18 | -50.2 .. +50.2 |
+
+  The nominal size is the value at azimuth 0 only. This is a diagnostic of the delivered ladder, not a fix: the
+  controlled assay Neurome asks for (fixed centre elevation, matched angular trajectory and speed, an independent
+  per-body receptive-field localizer) is a new protocol and belongs to the probe, not to the serializer.
+
+### 14.4 The rank test is tie-aware
+
+`common.compare` asks scipy for `method="exact"` whenever the two arms hold <= 40 runs, which is every arm this
+toolkit produces. The exact Mann-Whitney null distribution enumerates rank assignments and has no place for a tie,
+so on tied data it answers for a distribution the data do not follow -- **25 of the ladder's 288 statistics**, every
+one of them a firing-rate arm (`diff_rate_hz_max_cell` 22, `diff_rate_hz_mean` 3) where several runs return the
+identical sparse-spike value (Neurome: *"The exact U calculation also
+encounters ties in 25 of the full 288 statistics; reproducing it does not validate its use with tied data."*).
+
+`export.mann_whitney` picks the method the data allow and `export.compare_tie_aware` re-derives the verdict from the
+p that resulted; every per-type row now carries `p_method` (`exact` | `asymptotic_tie_corrected` | `none`) and
+`n_tied_values`. `common.py` is not this task's file, so the choice lives in the export and the verdict rule is
+re-applied there (`_verdict_from`); the test pins that re-application against `common.compare` itself on untied
+data, where the two must agree field for field.
+
+Effect on the re-exported ladder: `p_method` is `exact` on 263 rows and `asymptotic_tie_corrected` on 25; **21 of
+those 25 p-values changed and no verdict did**. The four `result` rows among them move from the exact-U floor
+0.0079365 to 0.0106-0.0119 (`diff_rate_hz_max_cell`: LC16 and LPLC2 at 20 deg, LC16 and LC4 at 30 deg) -- still
+`<= 0.05`, so still `result`. The drive rows Neurome quoted are untied and unchanged: LC11 and LC10a at 30 deg keep
+p 0.0079365 and z 4.85 / 8.65.
+
+### 14.5 An optional Holm column within a predeclared family
+
+`family` and `p_holm` are new columns; they are **empty by default** and no verdict anywhere rests on them. A family
+is declared by the caller -- `--family lc_drive` (a key of `export.FAMILY_SPECS`), a JSON spec
+`{"name": ..., "where": {column: [values]}, "by": [...]}`, or nothing. `export.holm` adjusts within each label
+(sort ascending, multiply the k-th by m-k, running maximum, capped at 1).
+
+The shipped `lc_drive` family is Neurome's own post-hoc sensitivity calculation: LC11 + LC10a x
+`diff_max_over_cells_mean_mv` x the four sizes = 8 comparisons. Applied to the re-exported ladder it gives
+**p_holm 0.063492 for both 30 deg rows** (Neurome's 0.06349), then LC10a / LC11 0.571 / 0.754 at 20 deg,
+1.000 / 0.889 at 11.4 deg and 1.000 / 1.000 at 4.5 deg. The family
+is applied where it exists -- the ladder-wide `size_tuning` table of the summary export -- and *not* inside a
+per-size directory, where only two of its eight members are present; the per-size `family` / `p_holm` columns are
+empty for that reason.
+
+### 14.6 The re-export: what ran, and what changed in the numbers
+
+New generator, shipped in the file this task owns:
+
+```bash
+# CPU: re-export the recorded ladder into NEW run directories (never a write into an existing one)
+PYTHONIOENCODING=utf-8 python scripts/interp_export.py ladder \
+  --runs-csv out/export/export-20260913T014635Z-db22e3ea/runs.csv --out out/export \
+  --json-dir out/interp/export --family lc_drive --expect-counts '{"LC11": 143, "LC10a": 275}'
+```
+
+`ladder` reads the **recordings** the earlier summary's `runs.csv` names (40 probe JSONs under
+`out/apply_object/ladder/`, with their `_cells.npz`, `_prov.json` and `_retina.npz` siblings) -- never a finished
+export -- and rebuilds each size through the same `result_from_object_sweep` + `export` path, then one summary
+Result. `--dir out/apply_object/ladder` is the equivalent entry when no `runs.csv` is at hand.
+
+| size | new run directory | old (revision 1, untouched) |
+|---|---|---|
+| 4.5 deg | `out/export/objsize-d045-20260913T065428Z-07e3f4dd/` | `objsize-d045-20260913T014556Z-47ed1383/` |
+| 11.4 deg | `out/export/objsize-d114-20260913T065428Z-d1e4eae6/` | `objsize-d114-20260913T014606Z-7a4eadbd/` |
+| 20 deg | `out/export/objsize-d200-20260913T065428Z-23a951ae/` | `objsize-d200-20260913T014616Z-5ece62d6/` |
+| 30 deg | `out/export/objsize-d300-20260913T065428Z-05fd4a45/` | `objsize-d300-20260913T014626Z-d5048f74/` |
+| summary | `out/export/export-20260913T065509Z-5dc2aa41/` | `export-20260913T014635Z-db22e3ea/` |
+
+Console `out/interp/export/ladder_reexport_console.txt`, Results
+`out/interp/export/ladder_{d045,d114,d200,d300}_20260913T065428Z.json` +
+`ladder_summary_20260913T065428Z.json`. 66 MB per size against revision 1's 46 MB -- `retina_radiance_blank` 11 MB,
+`retina_object_track` 0.2 MB, and ~9 MB for the two new id columns, which are run-level strings repeated on all
+26,482 rows of `readout_per_body.csv` and again inside `result.json`. That is the price of the columns Neurome
+asked for on the row; the manifest's `stimulus.controls` holds the same two lists once. 0.9 MB for the summary.
+The revision-1 directories are untouched, as is `out/apply_object/ladder/`.
+
+Per-size tables: `readout_per_body` 26,482, `retina_columns` 1,466, `retina_bodies` 5,895, `retina_radiance`
+1,759,200, **`retina_radiance_blank` 1,759,200**, **`retina_object_track` 1,200**, `per_type` 72. Summary:
+`size_tuning` 288, `retina_footprint` 4, `runs` 40 (now with `record_id` and a `reference_role` saying which of the
+two references each recording is). **`verify()` reports `problems: none` for all five directories** (hashes, decimal
+ids, every bodyId in `cache/neurons.parquet`, LC11 143 / LC10a 275 with both quantities, the alias rule of 14.1 and
+the mode rule of 14.3), and the round trip reproduces every `readout_per_body` number to 1.4e-14 (the CSV float
+repr; `checks.json` per directory).
+
+`size_tuning` keeps revision 1's geometry columns (`nominal_deg`, `angular_diameter_deg_probe`,
+`angular_diameter_deg_from_eye`, `ball_radius_m`) so an existing join still works, and adds
+`centre_elevation_deg_at_azimuth_0` / `distance_eye_to_centre_m_at_azimuth_0` -- the suffix saying where those hold,
+because both move along the sweep.
+
+**What changed in the numbers, checked row by row against revision 1:**
+
+* `readout_per_body`: all 4 x 26,482 rows, the same bodies in the same order, **max |old - new| = 0** over all 14
+  numeric columns, and every `verdict` string identical.
+* `size_tuning`: 288 rows joined on (size, type, statistic); **max |old - new| = 0** for `stim_mean`, `null_mean`,
+  `z`, `welch` and `U`. Only `p` moved, on the 21 tied rows of 14.4, and **no verdict changed**.
+* The retinal footprint reproduces the intake's table exactly (columns dimmed > 5 % per frame 1.51 / 4.78 / 12.41 /
+  26.78; > 50 % 0.14 / 2.26 / 7.64 / 19.73; centre elevation 0.88 / 4.34 / 8.66 / 13.71 deg).
+
+**The one provenance regression, stated plainly.** Revision 1's manifests read
+`commit 0d32fd6e...` with `commit_verified: "by source hash (loaded scope): every one of the 28 source files the run
+loaded holds the content of this checkout"`. The re-export's read **`commit: unknown`**: `match_sources` finds
+**24 of the recordings' 28 loaded source files identical to this checkout** and four different --
+`flyverse/interp/__init__.py`, `flyverse/interp/common.py` (changed by their owner between the recording and now:
+the toolkit was committed in `d4e34b3` / `ec91182`) and `flyverse/interp/export.py`, `scripts/interp_export.py`
+(changed by this revision itself). The per-file evidence is in `flyverse_commit.source_match.differ` and the
+recorded hashes in `source_fingerprint`, so a skeptic can check any one of them; nothing is asserted that is not
+true. The *recording* is the same one revision 1 exported -- the 40 NPZ / JSON files are unchanged on disk and the
+per-body numbers are bit-identical -- but the claim "this run ran exactly this checkout" is no longer available, and
+the export does not make it.
+
+### 14.7 Tests
+
+`tests/test_interp.py::ExportTests` is now **12** tests (`PYTHONIOENCODING=utf-8 python -m pytest tests/test_interp.py
+-q` -- **84 passed**; `tests/test_control.py` 18 passed; `import flyverse.interp` still pulls in no torch). The four
+new ones:
+
+| test | what it pins |
+|---|---|
+| `test_paired_and_null_references_are_named_apart` | both id sets present and different runs, the `#arm_b` suffix, `control_value` = arm b of the stimulus records while `null_mean` = the independent runs, `control_ids` equal to `null_reference_ids` row for row, the manifest documenting the alias and its deprecation, `statistic_definitions` saying "not an absolute membrane voltage", and `verify` catching an alias that stops being one |
+| `test_the_rank_test_is_tie_aware_and_a_declared_family_gets_holm` | `compare_tie_aware` == `common.compare` field for field on untied data; `asymptotic_tie_corrected` and a different p on tied data; `p_method 'none'` when no test is possible; Holm on the 8-member synthetic family (0.063492 from 0.0079365), monotone, never below the raw p, NaN outside the family, and empty when nothing is declared |
+| `test_retina_mode_blank_radiance_and_the_object_track` | the five retina tables, `mode` = `geometry_replay` / `unknown` / `in_loop_capture` by what the record says, the pinned pose carried beside it, the blank arm in the identical schema, the track's azimuth / 13.71 deg elevation / 30.18 deg diameter and its shrinking at the sweep edge, the empirical dimmed-column columns, the "cannot be rebuilt" note when no blank is given, and `verify` refusing radiance with no mode |
+| `test_cli_ladder_re_exports_the_recordings_into_new_directories` | `ladder_runs` from a `runs.csv` and from a directory agreeing, `--sizes`, `--family` parsing, the geometry read from the probe config, and the whole subcommand end to end on synthetic recordings: two new per-size directories plus a summary, `checks.json` clean in each, the blank npz picked up per size, and the family applied to `size_tuning` (and only there) |

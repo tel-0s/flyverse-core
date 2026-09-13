@@ -12,8 +12,12 @@
     sensitivity.csv        lesion / hold deltas with replicate scatter
     retina_columns.csv     the 1,466 hex columns: direction, azimuth / elevation and the photoreceptor bodies in each
     retina_bodies.csv      the 5,895 photoreceptors: bodyId, type, column, spectral sensitivity
-    retina_radiance.csv    the radiance actually presented, per column per frame, [UV, B, G, R]  (Parquet above
+    retina_radiance.csv    the radiance of the OBJECT arm, per column per frame, [UV, B, G, R]  (Parquet above
                            `parquet_rows`, as every table is)
+    retina_radiance_blank  the matched BLANK arm's radiance in the SAME schema, from the blank run's own record --
+                           written whenever the caller supplies it, so the footprint is portable without the npz
+    retina_object_track    the ball per frame as the eye sees it: offset, azimuth, centre elevation, angular diameter,
+                           and (with the blank) the columns it dims -- size and retinal position both on file
     <tool tables>.csv      the tool's own tables (`per_type`, `reference_per_type`, `delta_links`, ...), hashed the
                            same way and marked `role: tool`, so the directory does not depend on parsing result.json
 
@@ -36,6 +40,20 @@ Two adapters live here because the export's own validation needs them and they a
 
 CPU only; no torch, no GPU. `verify(run_dir)` re-reads a finished export and re-checks it (hashes, keys, row counts,
 the two-rows-per-body rule, bodyId membership in cache/neurons.parquet).
+
+Revision 2 (Neurome's intake of the size ladder, `D:\\Projects\\neurome\\reports\\flyverse-size-tuning-intake.md`):
+
+  * the two references are **split**. `control_value` is the matched blank arm (arm b) of the SAME recording ->
+    `paired_control_ids`; `null_mean` / `null_sd` / `z_vs_null` / `verdict` come from INDEPENDENT blank/blank runs ->
+    `null_reference_ids`. Revision 1 wrote the second set under `control_ids` while the first set produced the
+    numbers; `control_ids` survives as a **deprecated alias of `null_reference_ids`** for one revision and the
+    manifest's `conventions` block says so.
+  * `manifest.statistic_definitions` gives one sentence per quantity / per-type statistic, so a headline drive figure
+    cannot be read as an absolute membrane voltage.
+  * the retina record declares `retina.mode` (`geometry_replay` | `in_loop_capture`) with the pinned pose and what
+    was replayed -- never "capture" where it is replay.
+  * the rank test is tie-aware: exact U only on untied data, otherwise the asymptotic test WITH the tie correction,
+    and every row says which was used (`p_method`). A caller may predeclare a family and get `p_holm` beside it.
 """
 from __future__ import annotations
 
@@ -51,12 +69,17 @@ import pandas as pd
 from . import common
 from .common import EXPORT_TABLES, Result, body_str, to_jsonable
 
-EXPORT_SCHEMA = "flyverse.neurome.export/1"
+EXPORT_SCHEMA = "flyverse.neurome.export/2"
+EXPORT_REVISION = 2                                          # revision 2: the Neurome intake corrections (module docstring)
 INTERCHANGE_KEY = ("dataset.name", "dataset.release", "bodyId")
 NEUROME_TABLES = ("readout_per_body", "contributions", "sensitivity")
-RETINA_TABLES = ("retina_columns", "retina_bodies", "retina_radiance")
-ID_COLUMNS = ("bodyId", "body_pre", "body_post", "pre_bodies", "post_bodies", "bodies", "control_ids")
+RETINA_TABLES = ("retina_columns", "retina_bodies", "retina_radiance", "retina_radiance_blank", "retina_object_track")
+# the two references, split in revision 2, plus the deprecated alias that still equals `null_reference_ids`
+CONTROL_ID_COLUMNS = ("paired_control_ids", "null_reference_ids", "control_ids")
+ID_COLUMNS = ("bodyId", "body_pre", "body_post", "pre_bodies", "post_bodies", "bodies") + CONTROL_ID_COLUMNS
 PAIRED_QUANTITIES = ("upstream_drive_mV", "output_Hz")      # LC11 / LC10a get both, per body, never pooled
+ARM_B_SUFFIX = "#arm_b"                                      # a paired-control id names the record AND the arm within it
+RETINA_MODES = ("geometry_replay", "in_loop_capture", "unknown")
 
 # Physical units of the columns the export writes (the manifest declares them per table).
 COLUMN_UNITS = {
@@ -70,6 +93,87 @@ COLUMN_UNITS = {
     "radiance_r": "radiance (model units)", "ball_offset_m": "m", "sens_uv": "dimensionless", "sens_b": "dimensionless",
     "sens_g": "dimensionless", "sens_r": "dimensionless", "dir_x": "unit vector (body frame, x forward)",
     "dir_y": "unit vector (body frame, y left)", "dir_z": "unit vector (body frame, z up)",
+    "p": "probability (two-sided rank test; see `p_method`)", "p_holm": "probability, Holm-Bonferroni adjusted within `family`",
+    "centre_azimuth_deg": "deg (+ left of the pinned heading)", "centre_elevation_deg": "deg (+ above the eye)",
+    "angular_diameter_deg": "deg (from the eye, 2 asin(r / distance))", "distance_eye_to_centre_m": "m",
+    "min_relative_radiance": "fraction of the matched blank frame", "columns_dimmed_5pct": "columns",
+    "columns_dimmed_50pct": "columns", "dimmed_centroid_azimuth_deg": "deg", "dimmed_centroid_elevation_deg": "deg",
+}
+
+# One sentence per exported quantity / per-type statistic (manifest `statistic_definitions`). Neurome read revision 1's
+# headline drive numbers as membrane voltages; every one of these is a DIFFERENCE of time-means, and the `*_over_cells`
+# ones take a maximum over cells WITHIN each run, so the maximising cell may differ from run to run.
+_DRIVE = ("the received optic drive of one cell (mV), i.e. the rate lobe's input to that spiking cell, time-averaged over "
+          "the analysis window -- not an absolute membrane voltage and not a distance to threshold")
+STATISTIC_DEFINITIONS = {
+    # ---- readout_per_body quantities (one row per body per quantity; the two arms of ONE recording)
+    "upstream_drive_mV": f"per body: {_DRIVE}. `stimulus_value` is the object arm (a) and `control_value` the matched "
+                         "blank arm (b) of the SAME recording (`paired_control_ids`); `null_mean` / `null_sd` / "
+                         "`z_vs_null` come from the independent blank/blank runs (`null_reference_ids`).",
+    "output_Hz": "per body: spikes emitted over the analysis window divided by its length (Hz), object arm minus the "
+                 "matched blank arm of the same recording; the null columns come from the independent blank/blank runs.",
+    "rate_deviation": "per graded (optic rate) unit: the time-mean signed deviation of its rate from its operating "
+                      "point (rate units [0-1]), object arm minus the matched blank arm of the same recording.",
+    "abs_rate_deviation": "per graded (optic rate) unit: the time-mean of |rate - operating point| (rate units [0-1]), "
+                          "object arm minus the matched blank arm of the same recording.",
+    # ---- per_type / size_tuning statistics (one row per type per statistic; arms of INDEPENDENT runs)
+    "diff_max_over_cells_mean_mv": "max over the cells of the type, within each run, of that cell's time-mean object-"
+                                   "minus-blank received optic drive (mV), compared with the same statistic in "
+                                   "independent blank/blank runs. A difference of time-means, never an absolute "
+                                   "membrane voltage; the maximising cell may differ from run to run.",
+    "diff_mean_over_cells_mean_mv": "mean over the cells of the type of that cell's time-mean object-minus-blank "
+                                    "received optic drive (mV), against the same statistic in blank/blank runs.",
+    "diff_tuning_peak_mv": "max over (cell, sweep-position bin) of the sweep-locked mean drive in the object arm minus "
+                           "the same bin in the blank arm (mV), against the same statistic in blank/blank runs.",
+    "diff_peak_100ms_mv": "peak over cells and time of the 100 ms boxcar of the frame-by-frame drive difference (mV). A "
+                          "frame-wise subtraction of two stochastic runs: read it only against its own blank/blank null.",
+    "diff_rate_hz_max_cell": "max over the cells of the type of (object-arm firing rate - blank-arm firing rate) over "
+                             "the window (Hz), against the same statistic in blank/blank runs.",
+    "diff_rate_hz_mean": "mean over the cells of the type of (object-arm - blank-arm) firing rate over the window (Hz), "
+                         "against the same statistic in blank/blank runs.",
+    "diff_abs_mean": "mean over the graded units of the type of the object-minus-blank change in mean |rate deviation| "
+                     "(rate units [0-1]), against the same statistic in blank/blank runs.",
+    "diff_abs_best_cell_mean": "max over the graded units of the type of the object-minus-blank change in mean |rate "
+                               "deviation| (rate units [0-1]), against the same statistic in blank/blank runs.",
+    "diff_signed_mean": "mean over the graded units of the type of the object-minus-blank change in signed mean rate "
+                        "deviation (rate units [0-1]), against the same statistic in blank/blank runs.",
+    "diff_signed_best_cell": "max over the graded units of |object-minus-blank change in signed mean rate deviation| "
+                             "(rate units [0-1]). Distinct from `diff_abs_best_cell_mean`: the two give different "
+                             "verdicts at 20 deg and must not be collapsed into one statement.",
+}
+
+# The manifest's `conventions` block: how to read the files, and -- since revision 2 -- which reference each column
+# came from and which field is deprecated.
+CONVENTIONS = {
+    "missing": "an empty field is the only missing value; read CSV with keep_default_na=False, na_values=['']",
+    "not_missing": "'null' is a value of `verdict` (common.compare: the stimulus arm sits inside the null), "
+                   "not a missing value; pandas' default NA list would eat it",
+    "ids": "bodyId / body_pre / body_post are decimal strings (int64 in the cache), never floats",
+    "lists": "a list-valued id column is '|'-joined in one field",
+    "roles": "role 'interchange' = the tables of docs/NEUROME_INTERFACE.md section 1; role 'tool' = the "
+             "tool's own tables, written and hashed but outside the (dataset, release, bodyId) contract",
+    "controls": "TWO references travel, and they are different runs. `control_value` (and `stimulus_minus_control`) "
+                f"is the matched blank arm -- arm b, id suffix '{ARM_B_SUFFIX}' -- of the SAME recording that gave "
+                "`stimulus_value`: `paired_control_ids`. `null_mean` / `null_sd` / `z_vs_null` / `verdict` come from "
+                "INDEPENDENT blank/blank runs of the same protocol: `null_reference_ids`.",
+    "control_ids": "DEPRECATED alias of `null_reference_ids`, kept for ONE revision (export schema "
+                   f"{EXPORT_SCHEMA}, revision {EXPORT_REVISION}) so revision-1 readers do not break, and equal to it "
+                   "row for row. Revision 1 wrote the independent blank/blank run ids here while `control_value` was "
+                   "computed from arm b of the stimulus recordings; use `paired_control_ids` / `null_reference_ids` "
+                   "and expect this column to be removed in the next revision.",
+    "statistics": "every `quantity` (readout_per_body) and `statistic` (per_type / size_tuning) is defined in "
+                  "manifest.statistic_definitions; the drive figures are DIFFERENCES of time-means in mV and the "
+                  "`max_over_cells` ones take the maximum within each run, so they are never absolute membrane "
+                  "voltages and never the tuning curve of one fixed cell",
+    "p_method": "`p_method` says which rank test produced `p` in that row: 'exact' (no ties in the pooled sample), "
+                "'asymptotic_tie_corrected' (ties present: the normal approximation WITH the tie correction, "
+                "continuity-corrected), or 'none' (no test was possible). An exact U on tied data is not computed.",
+    "family": "`family` is the multiple-comparison family the CALLER predeclared for that row ('' = none declared) "
+              "and `p_holm` the Holm-Bonferroni adjustment of `p` within it. Unadjusted `p` is unchanged; no verdict "
+              "in this export rests on `p_holm`.",
+    "retina_mode": "manifest.retina.mode is 'geometry_replay' (the presented scene re-rendered at the pinned pose) or "
+                   "'in_loop_capture' (the radiance recorded during the rollout itself). A replay is never labelled a "
+                   "capture; manifest.retina.replayed says exactly what was re-rendered.",
 }
 
 
@@ -103,8 +207,13 @@ def _decimal_ids(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _order_columns(name: str, df: pd.DataFrame) -> pd.DataFrame:
-    """The contract's columns first (common.EXPORT_TABLES), the tool's extra columns after, in their own order."""
+    """The contract's columns first (common.EXPORT_TABLES), the tool's extra columns after, in their own order.
+
+    The two split reference columns of revision 2 take the place of the contract's `control_ids` (which stays, as the
+    deprecated alias), so the three references read together instead of one of them landing among the tool's extras."""
     lead = [c for c in EXPORT_TABLES.get(name, ()) if c in df.columns]
+    if "control_ids" in lead:
+        lead[lead.index("control_ids"):lead.index("control_ids") + 1] = [c for c in CONTROL_ID_COLUMNS if c in df.columns]
     return df[lead + [c for c in df.columns if c not in lead]]
 
 
@@ -242,23 +351,225 @@ def match_sources(recorded: dict, root=None) -> dict:
     return out
 
 
+# ------------------------------------------------------------------------------------- tie-aware rank test, Holm
+def n_tied_values(stim, null) -> int:
+    """How many observations of the pooled two-arm sample repeat a value already present (0 = no ties at all).
+
+    The exact Mann-Whitney null distribution assumes no ties: it enumerates rank assignments, and tied observations
+    have no unique rank. `common.compare` asks scipy for `method='exact'` whenever the two arms hold <= 40 runs, which
+    is every arm this toolkit produces -- so on tied data it returns an exact p for a distribution the data do not
+    follow (25 of the 288 ladder statistics; Neurome's intake, 'Corrected interpretation of the numbers')."""
+    a = np.asarray([v for v in np.atleast_1d(stim) if np.isfinite(v)], dtype=float)
+    b = np.asarray([v for v in np.atleast_1d(null) if np.isfinite(v)], dtype=float)
+    pooled = np.concatenate([a, b]) if (len(a) or len(b)) else np.zeros(0)
+    return int(len(pooled) - len(np.unique(pooled))) if len(pooled) else 0
+
+
+def mann_whitney(stim, null, *, exact_max_n: int = 40) -> dict:
+    """Two-sided Mann-Whitney U and p by the method the data allow, with the method named.
+
+    `p_method`: `'exact'` when the pooled sample has NO ties and the arms are small enough to enumerate;
+    `'asymptotic_tie_corrected'` when there are ties (scipy's normal approximation applies the tie correction to the
+    variance and a continuity correction) or the arms are too large to enumerate; `'none'` when no test is possible.
+    Returns {'U', 'p', 'p_method', 'n_tied_values'}."""
+    from scipy import stats
+    a = [float(v) for v in np.atleast_1d(stim) if np.isfinite(v)]
+    b = [float(v) for v in np.atleast_1d(null) if np.isfinite(v)]
+    ties = n_tied_values(a, b)
+    out = {"U": float("nan"), "p": float("nan"), "p_method": "none", "n_tied_values": ties}
+    if not a or not b or (len(a) + len(b)) < 3:
+        return out
+    method = "exact" if (ties == 0 and (len(a) + len(b)) <= int(exact_max_n)) else "asymptotic"
+    try:
+        r = stats.mannwhitneyu(a, b, alternative="two-sided", method=method)
+    except ValueError:
+        return out
+    out.update(U=float(r.statistic), p=float(r.pvalue),
+               p_method="exact" if method == "exact" else "asymptotic_tie_corrected")
+    return out
+
+
+def _verdict_from(cmp: dict, *, z_min: float, min_n: int, alpha: float) -> str:
+    """`common.compare`'s verdict rule re-applied to a comparison whose `p` has been recomputed (docstring of
+    `common.compare`, in its order): underpowered -> undetermined -> result -> null. Tested against `common.compare`
+    itself on untied data, where the tie-aware p IS the exact p and the two must agree row for row."""
+    na, nb = int(cmp["stim"]["n"]), int(cmp["null"]["n"])
+    floor, z, p, diff = cmp["p_floor"], cmp["z"], cmp["p"], cmp["diff"]
+    if min(na, nb) < min_n or (np.isfinite(floor) and floor > alpha):
+        return "underpowered"
+    if cmp.get("null_sd_zero") and diff != 0 and not (np.isfinite(p) and p > alpha):
+        return "undetermined"
+    if np.isfinite(z) and abs(z) >= z_min and (not np.isfinite(p) or p <= alpha):
+        return "result"
+    return "null"
+
+
+def compare_tie_aware(stim, null, *, z_min: float = common.Z_RESULT, min_n: int = common.MIN_REPLICATES,
+                      alpha: float = 0.05) -> dict:
+    """`common.compare` with the rank test taken by `mann_whitney` -- exact only on untied data -- and the verdict
+    re-derived from the p that resulted. Adds `p_method` and `n_tied_values`; every other field is `compare`'s own."""
+    cmp = dict(common.compare(stim, null, z_min=z_min, min_n=min_n, alpha=alpha))
+    mw = mann_whitney(stim, null)
+    cmp.update(U=mw["U"], p=mw["p"], p_method=mw["p_method"], n_tied_values=mw["n_tied_values"])
+    cmp["verdict"] = _verdict_from(cmp, z_min=z_min, min_n=min_n, alpha=alpha)
+    return cmp
+
+
+# A family is a PREDECLARATION by the caller, never a default: `where` selects the rows, `by` (optional) splits them
+# into one family per group of those columns, `name` labels it. Nothing here changes an unadjusted p or any verdict.
+FAMILY_SPECS = {
+    "lc_drive": {"name": "LC drive comparisons (LC11 / LC10a x the size ladder)",
+                 "where": {"type": ["LC11", "LC10a"], "statistic": ["diff_max_over_cells_mean_mv"]}},
+}
+
+
+def family_labels(df: pd.DataFrame, spec=None) -> np.ndarray:
+    """One family label per row of `df` ('' = the row is in no declared family).
+
+    `spec`: None (nothing declared -- the default), a key of `FAMILY_SPECS`, one dict
+    `{'name': str, 'where': {column: [values]}, 'by': [column, ...]}`, or a list of such (first match wins)."""
+    n = len(df)
+    out = np.array([""] * n, dtype=object)
+    if spec is None:
+        return out
+    specs = [spec] if isinstance(spec, (str, dict)) else list(spec)
+    for s in specs:
+        s = FAMILY_SPECS[s] if isinstance(s, str) else dict(s)
+        m = np.ones(n, bool)
+        for col, vals in (s.get("where") or {}).items():
+            if col not in df.columns:
+                m[:] = False
+                break
+            m &= df[col].astype(str).isin([str(v) for v in np.atleast_1d(vals)]).to_numpy()
+        name = str(s.get("name", "family"))
+        by = [c for c in (s.get("by") or []) if c in df.columns]
+        for i in np.flatnonzero(m & (out == "")):
+            out[i] = name + ("" if not by else " | " + " ".join(str(df[c].iloc[i]) for c in by))
+    return out
+
+
+def holm(p, family=None) -> np.ndarray:
+    """Holm-Bonferroni adjusted p WITHIN each family label; NaN for a row in no family or without a finite p.
+
+    Holm: sort the family's m p-values ascending, multiply the k-th (0-based) by (m - k), then take the running
+    maximum so the adjusted values stay monotone, and cap at 1. A post-hoc sensitivity calculation, not a pass rule:
+    eight LC drive comparisons at p 0.0079365 come out at 0.0635 (Neurome's intake)."""
+    p = np.asarray([float(v) if v is not None else np.nan for v in np.atleast_1d(p)], dtype=float)
+    fam = np.array([""] * len(p), dtype=object) if family is None else np.asarray(family, dtype=object)
+    out = np.full(len(p), np.nan)
+    for label in {f for f in fam if str(f)}:
+        idx = np.flatnonzero(np.array([str(f) == str(label) for f in fam]) & np.isfinite(p))
+        if not len(idx):
+            continue
+        order = idx[np.argsort(p[idx], kind="stable")]
+        m = len(order)
+        adj = np.minimum(np.maximum.accumulate((m - np.arange(m)) * p[order]), 1.0)
+        out[order] = adj
+    return out
+
+
+def add_family_columns(df: pd.DataFrame, spec=None, *, p_col: str = "p") -> pd.DataFrame:
+    """`family` and `p_holm` on a table that already carries `p` (both empty / NaN when nothing was declared)."""
+    fam = family_labels(df, spec)
+    df = df.copy()
+    df["family"] = [str(f) for f in fam]
+    df["p_holm"] = holm(df[p_col].to_numpy() if p_col in df.columns else np.full(len(df), np.nan), fam)
+    return df
+
+
 # ------------------------------------------------------------------------------------------------- the retina record
-def retina_tables(retina, out_dir, parquet_rows: int = 1_000_000) -> tuple[list, dict]:
-    """The retinal sampling actually presented -> three tables + the manifest's `retina` block.
+EYE_ABOVE_TABLE_M = 0.0012      # the probe's pinned pose: eye z 0.7512 over a table top at 0.750035 m (the record logs)
+
+
+def retina_mode_of(sampling: str, *, in_loop: bool = False) -> dict:
+    """`retina.mode` from what the record itself says it did -- never a guess in the optimistic direction.
+
+    `'in_loop_capture'` only when the caller asserts it (the radiance was read out of the rollout that produced the
+    spikes); `'geometry_replay'` when the record's own `sampling` string says it replayed the presented geometry;
+    `'unknown'` otherwise, quoting the string verbatim. Revision 1 shipped a replay with no such field, and Neurome's
+    intake had to infer it from prose ('Do not silently relabel replayed input as recorded input')."""
+    s = str(sampling or "")
+    if in_loop:
+        mode, what = "in_loop_capture", "the radiance the optic lobe read during the rollout that produced the spikes"
+    elif "replay" in s.lower():
+        mode = "geometry_replay"
+        what = ("the presented scene geometry re-rendered frame by frame at the pinned pose, AFTER the rollout, by the "
+                "same deterministic ray tracer the rollout used -- the stimulus side is byte-identical across runs "
+                "while the spiking side is not, so this is the radiance the optic lobe received, but it is a replay "
+                "and no in-loop capture was recorded to test that equivalence against")
+    else:
+        mode, what = "unknown", "the record does not say how its radiance was obtained"
+    return {"mode": mode, "replayed": what, "sampling_recorded": s,
+            "in_loop": bool(in_loop), "modes": list(RETINA_MODES)}
+
+
+def object_track(offset_m, *, ball_radius_m, ahead_m, eye_above_table_m: float = EYE_ABOVE_TABLE_M) -> pd.DataFrame:
+    """Where the ball is, from the eye, at each frame: azimuth, centre elevation, angular diameter and distance.
+
+    The probe pins the fly and slides a ball of radius r along the eye's `left` axis at a fixed distance `ahead`,
+    resting on the table, so the centre sits `r - eye_above_table` above the eye whatever its size -- which is why
+    elevation and size move together along the ladder (0.88 deg at 4.5 deg, 13.71 deg at 30 deg: Neurome's intake,
+    'The retinal comparison is not yet a controlled size-tuning assay'). Angular diameter is 2 asin(r / distance) from
+    the eye, not the 2 atan(r / ahead) the probe's flags use."""
+    s = np.asarray(offset_m, dtype=float)
+    r, ahead = float(ball_radius_m), float(ahead_m)
+    dz = r - float(eye_above_table_m)
+    horiz = np.sqrt(ahead ** 2 + s ** 2)
+    dist = np.sqrt(horiz ** 2 + dz ** 2)
+    return pd.DataFrame({"ball_offset_m": s,
+                         "centre_azimuth_deg": np.degrees(np.arctan2(s, ahead)),
+                         "centre_elevation_deg": np.degrees(np.arctan2(dz, horiz)),
+                         "angular_diameter_deg": 2 * np.degrees(np.arcsin(np.clip(r / np.maximum(dist, 1e-12), 0, 1))),
+                         "distance_eye_to_centre_m": dist})
+
+
+def _radiance_long(z: dict, n_col: int) -> pd.DataFrame:
+    """The (frames, columns, 4) radiance array as the long table the manifest's row count refers to."""
+    rad = np.asarray(z["radiance"], dtype=np.float32)
+    n_f = rad.shape[0]
+    t_s = np.asarray(z.get("t_s", np.arange(n_f) * common.FRAME_MS / 1000.0), dtype=np.float64)
+    df = pd.DataFrame({"frame": np.repeat(np.arange(n_f), n_col), "t_s": np.repeat(t_s, n_col),
+                       "column_id": np.tile(np.arange(n_col), n_f),
+                       "radiance_uv": rad[:, :, 0].ravel(), "radiance_b": rad[:, :, 1].ravel(),
+                       "radiance_g": rad[:, :, 2].ravel(), "radiance_r": rad[:, :, 3].ravel()})
+    if "ball_offset_m" in z:
+        df["ball_offset_m"] = np.repeat(np.asarray(z["ball_offset_m"], dtype=np.float64), n_col)
+    return df
+
+
+def _as_npz(x):
+    """A path to an npz, a dict or an npz-like -> {name: array} (None stays None), plus the source path."""
+    if x is None:
+        return None, None
+    src = str(x) if isinstance(x, (str, Path)) else None
+    if src is not None:
+        x = dict(np.load(x, allow_pickle=False))
+    return {k: np.asarray(v) for k, v in dict(x).items() if not np.isscalar(v)}, src
+
+
+def retina_tables(retina, out_dir, parquet_rows: int = 1_000_000, *, blank=None, in_loop: bool = False,
+                  geometry=None, pose=None) -> tuple[list, dict]:
+    """The retinal sampling actually presented -> the retina tables + the manifest's `retina` block.
 
     `retina`: a path to the npz `scripts/interp_export.py record --retina` writes, or a dict / npz-like with
     `radiance` (n_frames, n_columns, 4 = [UV, B, G, R]), `t_s`, optionally `ball_offset_m`, and the column / body map
     `col_side`, `col_hex`, `col_az_el`, `col_dir`, `pr_body`, `pr_column`, `pr_sens`, `pr_type`, `pr_index`
     (flyverse/retina.py's Retina: 1,466 columns, 5,895 photoreceptors). Radiance is written long
     (frame x column), which is the form the row counts and the SHA-256 in the manifest refer to.
+
+    `blank`: the MATCHED blank arm's record in the same form. Its radiance is written as `retina_radiance_blank` with
+    the identical schema, so the object-minus-blank footprint is reconstructible from the run directory alone --
+    revision 1 shipped only the object arm and Neurome could only rebuild it because the blank npz happened to exist
+    in this checkout. `in_loop`: assert an in-loop capture (see `retina_mode_of`; the shipped protocol is a replay).
+    `geometry`: `{'ball_radius_m', 'ahead_m'[, 'eye_above_table_m']}` -- with it, and with `ball_offset_m` in the
+    record, `retina_object_track` gives the ball's azimuth / centre elevation / angular diameter per frame (and, with
+    the blank, the columns it dims), so size and retinal position are both on file. `pose`: the pinned pose the
+    sampling was taken at, which travels beside the mode (`export` fills it from the stimulus block).
     """
-    if retina is None:
-        return [], {"file": None, "n_columns": None, "column_to_bodies": None}
-    src = None
-    if isinstance(retina, (str, Path)):
-        src = str(retina)
-        retina = dict(np.load(retina, allow_pickle=False))
-    z = {k: np.asarray(v) for k, v in dict(retina).items() if not np.isscalar(v)}
+    z, src = _as_npz(retina)
+    if z is None:                       # no retinal record: no mode to declare, and `verify` asks for one only with radiance
+        return [], {"file": None, "n_columns": None, "column_to_bodies": None, "mode": None, "replayed": None}
+    zb, src_b = _as_npz(blank)
     out_dir = Path(out_dir)
     metas = []
     pr_body = z["pr_body"].astype(np.int64)
@@ -286,38 +597,118 @@ def retina_tables(retina, out_dir, parquet_rows: int = 1_000_000) -> tuple[list,
         for j, ch in enumerate(("uv", "b", "g", "r")):
             bodies[f"sens_{ch}"] = z["pr_sens"][:, j]
     metas.append(write_table(bodies, out_dir, "retina_bodies", parquet_rows))
+    sampling = str(z.get("sampling", "per frame of the probe window, at the pinned pose"))
     block = {"n_columns": n_col, "n_photoreceptors": int(len(pr_body)), "channels": ["UV", "B", "G", "R"],
              "column_to_bodies": "retina_columns.csv:photoreceptor_bodies",
-             "source_npz": src, "frame_ms": common.FRAME_MS,
-             "sampling": str(z.get("sampling", "per frame of the probe window, at the pinned pose")),
+             "source_npz": src, "frame_ms": common.FRAME_MS, "sampling": sampling,
+             **retina_mode_of(sampling, in_loop=in_loop), "pinned_pose": to_jsonable(pose) if pose else None,
              "files": {"columns": "retina_columns.csv", "bodies": "retina_bodies.csv"}}
     if "radiance" in z:
-        rad = np.asarray(z["radiance"], dtype=np.float32)
-        n_f = rad.shape[0]
-        t_s = np.asarray(z.get("t_s", np.arange(n_f) * common.FRAME_MS / 1000.0), dtype=np.float64)
-        frame = np.repeat(np.arange(n_f), n_col)
-        df = pd.DataFrame({"frame": frame, "t_s": np.repeat(t_s, n_col), "column_id": np.tile(np.arange(n_col), n_f),
-                           "radiance_uv": rad[:, :, 0].ravel(), "radiance_b": rad[:, :, 1].ravel(),
-                           "radiance_g": rad[:, :, 2].ravel(), "radiance_r": rad[:, :, 3].ravel()})
-        if "ball_offset_m" in z:
-            df["ball_offset_m"] = np.repeat(np.asarray(z["ball_offset_m"], dtype=np.float64), n_col)
-        meta = write_table(df, out_dir, "retina_radiance", parquet_rows)
+        n_f = int(np.asarray(z["radiance"]).shape[0])
+        meta = write_table(_radiance_long(z, n_col), out_dir, "retina_radiance", parquet_rows)
         metas.append(meta)
-        block.update({"n_frames": int(n_f), "file": meta["file"], "shape": [int(n_f), n_col, 4],
+        block.update({"n_frames": n_f, "file": meta["file"], "shape": [n_f, n_col, 4], "arm": "object (condition a)",
                       "files": dict(block["files"], radiance=meta["file"])})
+    # the matched blank arm, same schema, same replay: the footprint travels with the run directory
+    if zb is not None and "radiance" in zb:
+        nb = int(np.asarray(zb["radiance"]).shape[0])
+        if int(np.asarray(zb["radiance"]).shape[1]) != n_col:
+            raise ValueError(f"the blank retina record has {np.asarray(zb['radiance']).shape[1]} columns, "
+                             f"the object record {n_col}: they are not the same sampling")
+        meta_b = write_table(_radiance_long(zb, n_col), out_dir, "retina_radiance_blank", parquet_rows)
+        metas.append(meta_b)
+        rb = np.asarray(zb["radiance"], dtype=np.float32).sum(-1)
+        block["blank"] = {"file": meta_b["file"], "source_npz": src_b, "n_frames": nb, "arm": "blank (condition b)",
+                          "sampling_recorded": str(zb.get("sampling", "")),
+                          "identical_over_frames": bool(np.allclose(rb, rb[0][None])),
+                          "note": "the matched blank arm of the same protocol, replayed the same way; the same schema "
+                                  "as retina_radiance, so object / blank is a join on (frame, column_id)"}
+        block["files"] = dict(block["files"], radiance_blank=meta_b["file"])
+    elif "radiance" in z:
+        block["blank"] = {"file": None, "note": "no matched blank radiance was supplied to this export; the "
+                                                "object-minus-blank footprint cannot be rebuilt from this directory alone"}
+    # the ball itself, frame by frame, in the eye's own coordinates
+    if geometry and "radiance" in z and "ball_offset_m" in z:
+        g = dict(geometry)
+        track = object_track(np.asarray(z["ball_offset_m"], dtype=float), ball_radius_m=g["ball_radius_m"],
+                             ahead_m=g["ahead_m"], eye_above_table_m=g.get("eye_above_table_m", EYE_ABOVE_TABLE_M))
+        n_f = int(np.asarray(z["radiance"]).shape[0])
+        track.insert(0, "frame", np.arange(n_f))
+        track.insert(1, "t_s", np.asarray(z.get("t_s", np.arange(n_f) * common.FRAME_MS / 1000.0), dtype=np.float64))
+        if zb is not None and "radiance" in zb:               # what the ball actually did to the columns, per frame
+            ra = np.asarray(z["radiance"], np.float64).sum(-1)
+            rb0 = np.asarray(zb["radiance"], np.float64).sum(-1)[0][None]
+            rel = ra / np.maximum(rb0, 1e-9) - 1.0
+            hit = rel < -0.05
+            az_el = np.asarray(z["col_az_el"], float) if "col_az_el" in z else np.full((n_col, 2), np.nan)
+            w = np.where(hit, -rel, 0.0)
+            tot = w.sum(1)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                track["columns_dimmed_5pct"] = hit.sum(1)
+                track["columns_dimmed_50pct"] = (rel < -0.5).sum(1)
+                track["min_relative_radiance"] = 1.0 + rel.min(1)
+                track["dimmed_centroid_azimuth_deg"] = np.where(tot > 0, w @ az_el[:, 0] / np.maximum(tot, 1e-12), np.nan)
+                track["dimmed_centroid_elevation_deg"] = np.where(tot > 0, w @ az_el[:, 1] / np.maximum(tot, 1e-12), np.nan)
+        meta_t = write_table(track, out_dir, "retina_object_track", parquet_rows)
+        metas.append(meta_t)
+        block["object_track"] = {
+            "file": meta_t["file"], "geometry": to_jsonable({**g, "eye_above_table_m": g.get("eye_above_table_m", EYE_ABOVE_TABLE_M)}),
+            "definition": "per frame: the ball's offset along the eye's left axis, its azimuth atan2(offset, ahead), "
+                          "its centre elevation atan2(r - eye_above_table, hypot(ahead, offset)) and its angular "
+                          "diameter 2 asin(r / distance) from the eye. The ball rests on the table, so centre "
+                          "elevation rises with radius: size and retinal position change together along the ladder.",
+            "empirical_columns": ("the dimmed-column counts and centroid are computed from retina_radiance against "
+                                  "retina_radiance_blank, so the geometric track can be checked against the replay"
+                                  if "columns_dimmed_5pct" in track.columns else None)}
     return metas, block
 
 
 # ------------------------------------------------------------------------------------------------- the export itself
+def _stamp_ids(df: pd.DataFrame, column: str, ids) -> pd.DataFrame:
+    """`column` = the '|'-joined `ids` on every row that does not already carry its own value."""
+    if ids is None:
+        return df
+    joined = "|".join(str(x) for x in np.atleast_1d(ids))
+    if column not in df.columns:
+        df[column] = joined
+    else:
+        df[column] = [joined if (v is None or v == "" or (isinstance(v, float) and not np.isfinite(v))) else v
+                      for v in df[column]]
+    return df
+
+
+def _statistic_definitions(res) -> dict:
+    """The `statistic_definitions` this Result needs: every value its tables actually use under `quantity` /
+    `statistic`, defined. A name with no definition is listed with an explicit 'not defined in this revision' so the
+    gap is visible in the manifest rather than silently absent."""
+    names = []
+    for rows in res.tables.values():
+        for key in ("quantity", "statistic"):
+            names += [str(r.get(key)) for r in rows if isinstance(r, dict) and r.get(key)]
+    out = {}
+    for n in sorted(set(names)):
+        out[n] = STATISTIC_DEFINITIONS.get(n, "not defined in this revision of the export "
+                                              "(flyverse/interp/export.py::STATISTIC_DEFINITIONS)")
+    return out
+
+
 def export(result, *, out_root="out/export", run_id=None, retina=None, parquet_rows: int = 1_000_000,
-           control_ids=None) -> Path:
+           control_ids=None, paired_control_ids=None, null_reference_ids=None, retina_blank=None,
+           retina_in_loop: bool = False, retina_geometry=None) -> Path:
     """Serialize a `common.Result` into a Neurome probe-export run directory and return its path.
 
     `result`: a Result or the path of a Result JSON. `out_root` / `run_id`: the run directory is
     `<out_root>/<run_id>` (`run_id` defaults to the Result's own). `retina`: the retinal sampling record (a path to
-    the npz `scripts/interp_export.py record --retina` writes, or a dict; see `retina_tables`). Tables above
-    `parquet_rows` rows are written as Parquet instead of CSV. `control_ids`: the matched control run ids to stamp
-    on every `readout_per_body` row that does not carry its own.
+    the npz `scripts/interp_export.py record --retina` writes, or a dict; see `retina_tables`), `retina_blank` the
+    matched blank arm's record, `retina_geometry` the ball geometry for `retina_object_track`, `retina_in_loop` the
+    assertion that the radiance was captured in the loop (it is a replay in the shipped protocol). Tables above
+    `parquet_rows` rows are written as Parquet instead of CSV.
+
+    The two references (revision 2): `paired_control_ids` names the record / arm each row's `control_value` was
+    computed from (arm b of the SAME recording, id suffix `#arm_b`), `null_reference_ids` the INDEPENDENT blank/blank
+    runs behind `null_mean` / `z_vs_null` / `verdict`. `control_ids` is the deprecated alias of the second and is
+    always written equal to it; a caller that passes only `control_ids` (the revision-1 spelling) is taken to mean
+    `null_reference_ids`, which is what that argument has always held.
 
     Refuses (ValueError) a Result whose `Result.check()` is non-empty -- a missing provenance block, a table lacking
     the contract's columns, or an `execution.device` that is not the realised device. Every table is listed in
@@ -339,25 +730,32 @@ def export(result, *, out_root="out/export", run_id=None, retina=None, parquet_r
     out_dir.mkdir(parents=True, exist_ok=True)
     prov = res.provenance
     ds = prov.get("dataset_release", {})
+    if null_reference_ids is None and control_ids is not None:
+        null_reference_ids = control_ids                       # the revision-1 spelling of the independent-null ids
     tables = []
     for name in NEUROME_TABLES:
         rows = res.tables.get(name)
         if not rows:
             continue
         df = pd.DataFrame(rows)
-        if name == "readout_per_body" and control_ids is not None:
-            ids = "|".join(str(x) for x in np.atleast_1d(control_ids))
-            if "control_ids" not in df.columns:
-                df["control_ids"] = ids
-            else:
-                df["control_ids"] = [ids if (v is None or v == "" or (isinstance(v, float) and not np.isfinite(v))) else v
-                                     for v in df["control_ids"]]
+        if name == "readout_per_body":
+            df = _stamp_ids(_stamp_ids(df, "paired_control_ids", paired_control_ids),
+                            "null_reference_ids", null_reference_ids)
+            if "null_reference_ids" not in df.columns and "control_ids" in df.columns:
+                df["null_reference_ids"] = df["control_ids"]   # a revision-1 Result: its control_ids WERE the nulls
+            if "null_reference_ids" in df.columns:
+                df["control_ids"] = df["null_reference_ids"]   # the deprecated alias, equal row for row
         df = _order_columns(name, _decimal_ids(df))
         df.insert(0, "release", ds.get("release", common.DATASET_RELEASE))
         df.insert(0, "dataset", ds.get("name", common.DATASET_NAME))
         tables.append(write_table(df, out_dir, name, parquet_rows))
+    sp = (prov.get("stimulus") or {}).get("params") or {}
+    pose = {"pos_m": sp.get("pos"), "heading_rad": sp.get("heading_rad"), "frame_ms": common.FRAME_MS,
+            "pinned": "the fly is placed at this pose every frame and does not move (the probe pins it); the only "
+                      "thing that moves in the scene is the object"} if sp.get("pos") is not None else None
     retina_meta, retina_block = retina_tables(retina if retina is not None else prov.get("retina", {}).get("source_npz"),
-                                              out_dir, parquet_rows)
+                                              out_dir, parquet_rows, blank=retina_blank, in_loop=retina_in_loop,
+                                              geometry=retina_geometry, pose=pose)
     tables += retina_meta
     for name, rows in res.tables.items():                 # the tool's own tables, so the run directory stands alone
         if name in NEUROME_TABLES or name in RETINA_TABLES or not rows:
@@ -372,14 +770,13 @@ def export(result, *, out_root="out/export", run_id=None, retina=None, parquet_r
         "tool": res.tool, "tool_version": res.tool_version, "result_run_id": res.run_id,
         "dataset": {"name": ds.get("name", common.DATASET_NAME), "release": ds.get("release", common.DATASET_RELEASE)},
         "interchange_key": list(INTERCHANGE_KEY),
-        "conventions": {
-            "missing": "an empty field is the only missing value; read CSV with keep_default_na=False, na_values=['']",
-            "not_missing": "'null' is a value of `verdict` (common.compare: the stimulus arm sits inside the null), "
-                           "not a missing value; pandas' default NA list would eat it",
-            "ids": "bodyId / body_pre / body_post are decimal strings (int64 in the cache), never floats",
-            "lists": "a list-valued id column is '|'-joined in one field",
-            "roles": "role 'interchange' = the tables of docs/NEUROME_INTERFACE.md section 1; role 'tool' = the "
-                     "tool's own tables, written and hashed but outside the (dataset, release, bodyId) contract"},
+        "export_revision": EXPORT_REVISION,
+        "revision_note": "revision 2: paired vs independent controls split (`paired_control_ids` / "
+                         "`null_reference_ids`, `control_ids` deprecated), `statistic_definitions`, `retina.mode` "
+                         "with the matched blank radiance and the object track, and a tie-aware rank test "
+                         "(`p_method`) with an optional predeclared family (`family`, `p_holm`)",
+        "conventions": dict(CONVENTIONS),
+        "statistic_definitions": _statistic_definitions(res),
         "flyverse_commit": prov["flyverse_commit"], "dataset_release": ds, "compiled_connectome": prov["compiled_connectome"],
         "model": prov["model"], "execution": prov["execution"], "stimulus": prov["stimulus"], "retina": retina_block,
         "units": prov["units"], "populations": res.populations, "replicates": res.replicates,
@@ -483,8 +880,40 @@ def verify(run_dir, *, neurons=None, expect_paired=("LC11", "LC10a"), expect_cou
             got = int(df[df.type == ty].bodyId.nunique()) if "type" in df.columns else 0
             if got != int(n):
                 problems.append(f"readout_per_body: {ty} has {got} bodies, expected {n}")
+        problems += _check_control_ids(df, man)
+    if any(t.get("name") == "retina_radiance" for t in man.get("tables", [])):
+        if man.get("retina", {}).get("mode") not in RETINA_MODES:
+            problems.append("manifest.retina has radiance but no mode in "
+                            f"{RETINA_MODES} (a replay must not pass as a capture)")
     info["problems"] = problems
     return info
+
+
+def _check_control_ids(df: pd.DataFrame, man: dict) -> list:
+    """The revision-2 rule on the two references: the deprecated `control_ids` must be exactly `null_reference_ids`,
+    the paired and the independent ids must not be the same runs, and the manifest must document the alias. This is
+    the defect Neurome's intake found -- one column naming the blank/blank runs while `control_value` came from arm b
+    of the stimulus recordings -- so the export checks it rather than trusting the writer."""
+    def col(name):                                             # '' is the missing value; a str dtype reads it back as NA
+        return df[name].fillna("").astype(str)
+
+    out = []
+    has_null, has_paired = "null_reference_ids" in df.columns, "paired_control_ids" in df.columns
+    if "control_ids" in df.columns:
+        if not has_null:
+            out.append("readout_per_body: control_ids without null_reference_ids (the alias must name what it aliases)")
+        elif not (col("control_ids") == col("null_reference_ids")).all():
+            out.append("readout_per_body: control_ids is not equal to null_reference_ids (its documented alias)")
+        if not (man.get("conventions") or {}).get("control_ids"):
+            out.append("manifest.conventions does not document the deprecated control_ids alias")
+    if has_paired and has_null:
+        a, b = col("paired_control_ids"), col("null_reference_ids")
+        live = (a != "") & (b != "")
+        if live.any() and (a[live] == b[live]).all():
+            out.append("readout_per_body: paired_control_ids and null_reference_ids name the same runs; "
+                       "the paired control is arm b of the stimulus recordings, the null reference is the "
+                       "independent blank/blank runs (docs/audits/interp_export.md revision 2)")
+    return out
 
 
 # ------------------------------------------------------------------------------------------------- adapters
@@ -638,10 +1067,16 @@ def _cells_frame(npz_paths, window_s=None) -> pd.DataFrame:
     return df
 
 
-def _arm_table(stim: list, null: list) -> pd.DataFrame:
+def _arm_table(stim: list, null: list, *, paired_control_ids="", null_reference_ids="", family=None) -> pd.DataFrame:
     """One per-type arm table from loaded probe JSONs: for every type and every statistic of SWEEP_STATS the stimulus
-    arm, the null arm and `common.compare`'s z / Welch / U / p / verdict, with the per-run values kept. The same
-    function builds the reproduction and the reference arm, so the two tables are directly comparable row by row."""
+    arm, the null arm and the comparison's z / Welch / U / p / verdict, with the per-run values kept. The same
+    function builds the reproduction and the reference arm, so the two tables are directly comparable row by row.
+
+    The rank test is `compare_tie_aware`'s (exact only on untied data) and every row says which it used (`p_method`,
+    `n_tied_values`); `statistic_definition` spells out what the number is, and the two reference id columns say which
+    runs each arm came from -- a `diff_*` value is already object-minus-blank WITHIN each stimulus recording
+    (`paired_control_ids`, arm b), and the comparator arm is the independent blank/blank runs (`null_reference_ids`).
+    `family`, when the caller predeclares one, adds `family` / `p_holm` (see `add_family_columns`)."""
     head = (stim[0] if stim else null[0])["ball"]
     rows = []
     for t in head:
@@ -649,16 +1084,20 @@ def _arm_table(stim: list, null: list) -> pd.DataFrame:
             a, b = _arm_values(stim, stat, t), _arm_values(null, stat, t)
             if not a and not b:
                 continue
-            cmp = common.compare(a, b) if b else {"z": float("nan"), "welch": float("nan"), "U": float("nan"),
-                                                  "p": float("nan"), "verdict": "underpowered"}
+            cmp = compare_tie_aware(a, b) if b else {"z": float("nan"), "welch": float("nan"), "U": float("nan"),
+                                                     "p": float("nan"), "verdict": "underpowered", "p_method": "none",
+                                                     "n_tied_values": n_tied_values(a, b)}
             rows.append({"type": t, "statistic": stat, "kind": head[t]["kind"], "n_cells": head[t]["n_cells"],
                          "stim_n": len(a), "stim_mean": float(np.mean(a)) if a else np.nan,
                          "stim_sd": float(np.std(a, ddof=1)) if len(a) > 1 else np.nan,
                          "null_n": len(b), "null_mean": float(np.mean(b)) if b else np.nan,
                          "null_sd": float(np.std(b, ddof=1)) if len(b) > 1 else np.nan,
-                         "z": cmp["z"], "welch": cmp["welch"], "U": cmp["U"], "p": cmp["p"], "verdict": cmp["verdict"],
-                         "stim_values": a, "null_values": b})
-    return pd.DataFrame(rows)
+                         "z": cmp["z"], "welch": cmp["welch"], "U": cmp["U"], "p": cmp["p"],
+                         "p_method": cmp["p_method"], "n_tied_values": cmp["n_tied_values"], "verdict": cmp["verdict"],
+                         "stim_values": a, "null_values": b,
+                         "statistic_definition": STATISTIC_DEFINITIONS.get(stat, ""),
+                         "paired_control_ids": paired_control_ids, "null_reference_ids": null_reference_ids})
+    return add_family_columns(pd.DataFrame(rows), family)
 
 
 def _as_list(x) -> list:
@@ -681,8 +1120,18 @@ def _pool(df: pd.DataFrame, window) -> pd.DataFrame:
     return out
 
 
+def _run_stem(p) -> str:
+    """The record's own id from any of its files: `out/.../d045_stim_s0_cells.npz` -> `d045_stim_s0`."""
+    stem = Path(str(p)).stem
+    for suffix in ("_cells", "_prov", "_retina"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+    return stem
+
+
 def result_from_object_sweep(stim_jsons, null_jsons=(), *, cells=(), null_cells=(), provenance=None, reference=None,
-                             reference_null=None, retina=None, control_ids=None, run_id=None, generator=None,
+                             reference_null=None, retina=None, control_ids=None, paired_control_ids=None,
+                             null_reference_ids=None, family=None, run_id=None, generator=None,
                              label="object_sweep") -> Result:
     """The round-3 object sweep (`scripts/probe_object_sweep.py`) as an exportable Result.
 
@@ -699,7 +1148,14 @@ def result_from_object_sweep(stim_jsons, null_jsons=(), *, cells=(), null_cells=
     `tables['per_type']` are comparable row by row, and `validation.measured.reproduction` holds the two arms side by
     side on the primary statistic with both files' SHA-256 in `stimulus.reference_runs`.
 
-    Tables: 'per_type' (type, statistic, the stimulus and null arms, compare's z / Welch / U / p / verdict),
+    The two references (revision 2): `paired_control_ids` defaults to the stimulus records' own ids with the
+    `#arm_b` suffix -- every `control_value` and every `diff_*` statistic is object minus the blank arm of the SAME
+    recording -- and `null_reference_ids` to the independent blank/blank records, which is what `null_mean` /
+    `z_vs_null` / the per-type comparison arm are. `control_ids` is accepted as the revision-1 spelling of
+    `null_reference_ids`. `family`: a multiple-comparison family predeclared by the caller (`FAMILY_SPECS`, a dict, or
+    None), which adds `family` / `p_holm` to the per-type tables.
+
+    Tables: 'per_type' (type, statistic, the stimulus and null arms, z / Welch / U / p / p_method / verdict),
     'readout_per_body', 'reference_per_type'. Summary: the LC11 / LC10a / LPLC2 statistics of object_sweep.md 8.4.
     """
     stim = [_load_json(p) for p in stim_jsons]
@@ -722,11 +1178,27 @@ def result_from_object_sweep(stim_jsons, null_jsons=(), *, cells=(), null_cells=
     prov["stimulus"] = stimulus
     if retina is not None:
         prov["retina"] = {**(prov.get("retina") or {}), "source_npz": str(retina)}
+    # ---- the two references, named apart (revision 2: Neurome's control-labelling defect)
+    if null_reference_ids is None:
+        null_reference_ids = control_ids if control_ids is not None else [
+            _run_stem(p) for p in (null_cells or null_jsons)]
+    if paired_control_ids is None:
+        paired_control_ids = [f"{_run_stem(p)}{ARM_B_SUFFIX}" for p in (cells or stim_jsons)]
+    paired_ids = "|".join(str(x) for x in np.atleast_1d(paired_control_ids))
+    null_ids = "|".join(str(x) for x in np.atleast_1d(null_reference_ids))
+    stimulus["controls"] = {"paired_control_ids": paired_ids, "null_reference_ids": null_ids,
+                            "paired_control": "arm b (the matched blank) of each stimulus recording -- the source of "
+                                              "`control_value` and of every `diff_*` per-type statistic",
+                            "null_reference": "independent blank/blank runs of the same protocol -- the source of "
+                                              "`null_mean` / `null_sd` / `z_vs_null` and of the per-type comparison arm",
+                            "deprecated_control_ids": "an alias of null_reference_ids (CONVENTIONS['control_ids'])"}
+    prov["stimulus"] = stimulus
     res = Result.new("export", prov)
     if run_id:
         res.run_id = str(run_id)
     # ---- per-type arms
-    res.add_table("per_type", _arm_table(stim, null))
+    res.add_table("per_type", _arm_table(stim, null, paired_control_ids=paired_ids, null_reference_ids=null_ids,
+                                         family=family))
     # ---- per-body readouts
     if cells:
         df = _cells_frame(list(cells))
@@ -739,9 +1211,11 @@ def result_from_object_sweep(stim_jsons, null_jsons=(), *, cells=(), null_cells=
                 pooled["z_vs_null"] = (pooled.stimulus_minus_control - pooled.null_mean) / pooled.null_sd
             pooled["verdict"] = np.where(pooled.n_trials < common.MIN_REPLICATES, "underpowered",
                                          np.where(np.abs(pooled.z_vs_null) >= common.Z_RESULT, "result", "null"))
-        ids = control_ids if control_ids is not None else [Path(str(p)).stem for p in cells]
-        pooled["control_ids"] = "|".join(str(x) for x in np.atleast_1d(ids))
+        pooled["paired_control_ids"] = paired_ids
+        pooled["null_reference_ids"] = null_ids
+        pooled["control_ids"] = null_ids                       # the deprecated alias, equal to null_reference_ids
         pooled["run_files"] = "|".join(Path(str(p)).name for p in cells)
+        # `quantity` is defined in manifest.statistic_definitions rather than repeated on all 26,482 rows
         res.add_table("readout_per_body", pooled)
         res.replicates = {"n": len(cells), "unit": "runs",
                           "runs": [{"run_index": i, "file": str(p)} for i, p in enumerate(cells)],
@@ -752,7 +1226,9 @@ def result_from_object_sweep(stim_jsons, null_jsons=(), *, cells=(), null_cells=
     # ---- the earlier runs, side by side (the same reduction applied to both arms)
     measured = {}
     if ref_paths:
-        ref_tab = _arm_table([_load_json(p) for p in ref_paths], [_load_json(p) for p in ref_null_paths])
+        ref_tab = _arm_table([_load_json(p) for p in ref_paths], [_load_json(p) for p in ref_null_paths],
+                             paired_control_ids="|".join(f"{_run_stem(p)}{ARM_B_SUFFIX}" for p in ref_paths),
+                             null_reference_ids="|".join(_run_stem(p) for p in ref_null_paths), family=family)
         ref_tab.insert(0, "source", "reference")
         res.add_table("reference_per_type", ref_tab)
         per, primary = res.table("per_type"), "diff_max_over_cells_mean_mv"

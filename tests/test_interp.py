@@ -1788,6 +1788,252 @@ class ExportTests(unittest.TestCase):
             self.assertEqual({t["name"] for t in json.loads((run / "manifest.json").read_text(encoding="utf-8"))["tables"]},
                              {"readout_per_body", "per_type", "reference_per_type"})
 
+    # ------------------------------------------------------- revision 2: the Neurome intake corrections
+    def test_paired_and_null_references_are_named_apart(self):
+        """`control_value` comes from arm b of the STIMULUS recording; `null_mean` / `z_vs_null` / the per-type
+        comparison arm come from the INDEPENDENT blank/blank runs. Revision 1 wrote only the second set, under
+        `control_ids`, and Neurome's intake found the conflation (LC11 24647 at 11.4 deg: paired blank 0.1167 Hz vs
+        independent nulls 0.1333 / 0.0500). The two sets must both travel, be different runs, and `control_ids` must
+        be exactly the deprecated alias the manifest says it is."""
+        from flyverse.interp import export as ex
+        c = graph()
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            stim = [self._sweep_json(d / f"stim_s{i}.json", {"LC11": 10.0 + i}) for i in range(3)]
+            null = [self._sweep_json(d / f"null_s{i}.json", {"LC11": 0.1 * i}) for i in range(3)]
+            cells = [self._cells_npz(d / f"stim_s{i}_cells.npz", 2.0 + i, 3.0) for i in range(3)]
+            ncells = [self._cells_npz(d / f"null_s{i}_cells.npz", 0.5, 0.25) for i in range(3)]
+            res = ex.result_from_object_sweep(stim, null, cells=cells, null_cells=ncells, provenance=self._prov(c))
+            run = ex.export(res, out_root=d / "export")
+            ro = ex.read_table(run, "readout_per_body")
+            paired, nulls = ro.paired_control_ids.iloc[0], ro.null_reference_ids.iloc[0]
+            # both present, and they are different runs -- the paired one names the record AND the arm within it
+            self.assertEqual(paired, "stim_s0#arm_b|stim_s1#arm_b|stim_s2#arm_b")
+            self.assertEqual(nulls, "null_s0|null_s1|null_s2")
+            self.assertNotEqual(paired, nulls)
+            self.assertTrue(all(v.endswith(ex.ARM_B_SUFFIX) for v in paired.split("|")))
+            # the paired ids name the records that produced control_value: arm b of each cells npz is 0.0 / 1.0
+            drive = ro[(ro.quantity == "upstream_drive_mV") & (ro.bodyId == "1004")].iloc[0]
+            self.assertAlmostEqual(float(drive.control_value), 0.0)     # arm b of the STIMULUS recordings
+            self.assertAlmostEqual(float(drive.null_mean), 0.5 - 0.0)   # the independent blank/blank runs' difference
+            self.assertEqual(list(ro.control_ids), list(ro.null_reference_ids))   # the alias, row for row
+            man = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(man["export_revision"], 2)
+            # the manifest documents the alias, its deprecation and which reference is which
+            conv = man["conventions"]
+            self.assertIn("DEPRECATED", conv["control_ids"])
+            self.assertIn("null_reference_ids", conv["control_ids"])
+            self.assertIn("paired_control_ids", conv["controls"])
+            self.assertIn("null_reference_ids", conv["controls"])
+            # and one sentence per quantity, so a drive figure cannot be read as an absolute membrane voltage
+            self.assertIn("not an absolute membrane voltage", man["statistic_definitions"]["upstream_drive_mV"])
+            self.assertIn("max over the cells", man["statistic_definitions"]["diff_max_over_cells_mean_mv"])
+            self.assertEqual(ex.verify(run, expect_paired=("LC11",))["problems"], [])
+            # the per-type arms carry the same two references and the definition of their statistic
+            per = ex.read_table(run, "per_type")
+            self.assertEqual(set(per.paired_control_ids), {paired})
+            self.assertEqual(set(per.null_reference_ids), {nulls})
+            self.assertIn("never an absolute membrane voltage",
+                          per[per.statistic == "diff_max_over_cells_mean_mv"].statistic_definition.iloc[0])
+            # an alias that stops being an alias is a problem, not a silent field
+            p = run / "readout_per_body.csv"
+            # ...,<paired>,<null_reference_ids>,<control_ids>,... -> the alias overwritten, the reference kept
+            p.write_text(p.read_text(encoding="utf-8").replace(f"|null_s2,{nulls}", "|null_s2,SOMETHING_ELSE"),
+                         encoding="utf-8")
+            problems = ex.verify(run, expect_paired=())["problems"]
+            self.assertTrue(any("not equal to null_reference_ids" in s for s in problems), problems)
+            self.assertEqual(set(ex.read_table(run, "readout_per_body").control_ids), {"SOMETHING_ELSE"})
+
+    def test_the_rank_test_is_tie_aware_and_a_declared_family_gets_holm(self):
+        """An exact U assumes untied data. `common.compare` asks for `method='exact'` at any n <= 40, so 25 of the
+        288 ladder statistics shipped an exact p on tied arms. `compare_tie_aware` uses the exact test only when
+        there are no ties and the tie-corrected asymptotic one otherwise, records which in `p_method`, and agrees
+        with `common.compare` row for row where the data are untied."""
+        from flyverse.interp import export as ex
+        untied = ([10.0, 10.5, 11.0], [0.0, 0.1, 0.2])
+        a, b = ex.compare_tie_aware(*untied), common.compare(*untied)
+        self.assertEqual(a["p_method"], "exact")
+        self.assertEqual(a["n_tied_values"], 0)
+        for k in ("U", "p", "z", "welch", "verdict", "p_floor"):        # the untied case is unchanged, by construction
+            self.assertEqual(a[k], b[k], k)
+        tied = ([0.0, 0.0, 0.5, 1.0, 1.0], [0.0, 0.0, 0.0, 0.25, 0.5])  # the shape of a sparse-spike rate arm
+        t = ex.compare_tie_aware(*tied)
+        self.assertEqual(t["p_method"], "asymptotic_tie_corrected")
+        self.assertEqual(t["n_tied_values"], ex.n_tied_values(*tied))
+        self.assertGreater(t["n_tied_values"], 0)
+        self.assertNotAlmostEqual(t["p"], common.compare(*tied)["p"])   # the exact p on tied data is a different number
+        self.assertEqual(ex.mann_whitney([1.0], [])["p_method"], "none")
+        # Holm within a predeclared family: the eight LC drive comparisons of the ladder (Neurome's intake)
+        df = pd.DataFrame({"type": ["LC11", "LC10a"] * 4 + ["LPLC2"],
+                           "statistic": ["diff_max_over_cells_mean_mv"] * 8 + ["diff_rate_hz_mean"],
+                           "p": [0.4206349, 0.8412698, 0.2222222, 0.4206349, 0.1507937, 0.0952381,
+                                 0.0079365, 0.0079365, 0.0079365]})
+        out = ex.add_family_columns(df, "lc_drive")
+        self.assertEqual(int((out.family != "").sum()), 8)              # only the declared rows are in the family
+        self.assertEqual(out.family.iloc[8], "")                        # LPLC2 / a different statistic: not declared
+        self.assertTrue(np.isnan(out.p_holm.iloc[8]))
+        self.assertAlmostEqual(out.p_holm.iloc[6], 0.0634920, places=6)  # 8 x 0.0079365, the intake's number
+        self.assertAlmostEqual(out.p_holm.iloc[7], 0.0634920, places=6)
+        self.assertAlmostEqual(out.p_holm.iloc[5], 6 * 0.0952381, places=6)   # the third smallest: (m - k) = 6
+        self.assertLessEqual(out.p_holm.max(), 1.0)
+        srt = out[out.family != ""].sort_values("p")
+        self.assertTrue((np.diff(srt.p_holm.to_numpy()) >= -1e-12).all())  # monotone in p, as Holm requires
+        self.assertTrue((srt.p_holm.to_numpy() >= srt.p.to_numpy() - 1e-12).all())   # and never below the raw p
+        # nothing is declared by default: the columns exist and are empty
+        plain = ex.add_family_columns(df)
+        self.assertEqual(set(plain.family), {""})
+        self.assertTrue(plain.p_holm.isna().all())
+        self.assertEqual(list(ex.family_labels(df, None)), [""] * len(df))
+
+    def test_retina_mode_blank_radiance_and_the_object_track(self):
+        """The retina record says what it is (`mode`), carries the MATCHED blank arm in the same schema, and puts the
+        ball's own geometry per frame on file -- so size and retinal position are both there and the footprint does
+        not depend on an npz outside the export (Neurome's intake, 'The retinal comparison is not yet a controlled
+        size-tuning assay')."""
+        from flyverse.interp import export as ex
+        base = {"col_dir": np.eye(3, dtype=np.float32), "col_az_el": np.array([[45.0, 0.0], [0.0, 0.0], [-45.0, 5.0]]),
+                "col_hex": np.zeros((3, 2), np.int64), "col_side": np.array(["L", "L", "R"]),
+                "pr_index": np.array([0, 1, 2], np.int64), "pr_body": np.array([1001, 1002, 1003], np.int64),
+                "pr_column": np.array([0, 0, 2], np.int64), "pr_sens": np.ones((3, 4), np.float32),
+                "pr_type": np.array(["R1-R6", "R1-R6", "R7"]), "t_s": np.array([0.0, 0.01]),
+                "sampling": np.array("replay of the presented geometry, every frame (10 ms), pinned pose")}
+            # column 0 is dimmed to a tenth by the ball in frame 0, column 2 by a twentieth in frame 1
+        obj = dict(base, radiance=np.array([[[0.1] * 4, [1.0] * 4, [1.0] * 4], [[1.0] * 4, [1.0] * 4, [0.05] * 4]], np.float32),
+                   ball_offset_m=np.array([0.05, -0.05]))
+        blank = dict(base, radiance=np.ones((2, 3, 4), np.float32), ball_offset_m=np.array([np.nan, np.nan]))
+        geom = {"ball_radius_m": 0.0133975, "ahead_m": 0.05, "eye_above_table_m": 0.0012}
+        with tempfile.TemporaryDirectory() as d:
+            metas, block = ex.retina_tables(obj, d, blank=blank, geometry=geom)
+            self.assertEqual([m["name"] for m in metas],
+                             ["retina_columns", "retina_bodies", "retina_radiance", "retina_radiance_blank",
+                              "retina_object_track"])
+            # the mode is declared, and it is the replay it actually is -- never relabelled a capture
+            self.assertEqual(block["mode"], "geometry_replay")
+            self.assertIn("replay", block["replayed"])
+            self.assertFalse(block["in_loop"])
+            self.assertIsNone(block["pinned_pose"])                      # none given here; `export` fills it in
+            self.assertEqual(ex.retina_tables(obj, Path(d) / "p", pose={"pos_m": [1, 2, 3]})[1]["pinned_pose"],
+                             {"pos_m": [1, 2, 3]})
+            self.assertEqual(block["blank"]["file"], "retina_radiance_blank.parquet"
+                             if metas[3]["format"] == "parquet" else "retina_radiance_blank.csv")
+            self.assertTrue(block["blank"]["identical_over_frames"])
+            bl = pd.read_csv(Path(d) / "retina_radiance_blank.csv")
+            ob = pd.read_csv(Path(d) / "retina_radiance.csv")
+            self.assertEqual(list(bl.columns), list(ob.columns))         # the same schema: a join on (frame, column_id)
+            self.assertEqual(len(bl), 2 * 3)
+            self.assertTrue(bl.ball_offset_m.isna().all())               # no ball in the blank arm
+            track = pd.read_csv(Path(d) / "retina_object_track.csv")
+            self.assertEqual(len(track), 2)
+            self.assertAlmostEqual(track.centre_azimuth_deg.iloc[0], np.degrees(np.arctan2(0.05, 0.05)), places=6)
+            self.assertAlmostEqual(track.centre_azimuth_deg.iloc[1], -track.centre_azimuth_deg.iloc[0], places=6)
+            # the ball rests on the table, so a 30 deg ball sits 13.7 deg above the eye at azimuth 0 -- size and
+            # retinal position move together, which is what the ladder cannot separate
+            at0 = ex.object_track([0.0], **geom)
+            self.assertAlmostEqual(float(at0.centre_elevation_deg.iloc[0]), 13.71, places=2)
+            self.assertAlmostEqual(float(at0.angular_diameter_deg.iloc[0]), 30.18, places=2)
+            self.assertLess(track.angular_diameter_deg.iloc[0], float(at0.angular_diameter_deg.iloc[0]))  # farther at the edge
+            # the empirical columns are the object arm against the blank arm, frame by frame
+            self.assertEqual(list(track.columns_dimmed_5pct), [1, 1])
+            self.assertEqual(list(track.columns_dimmed_50pct), [1, 1])
+            self.assertAlmostEqual(track.min_relative_radiance.iloc[0], 0.1, places=6)
+            self.assertAlmostEqual(track.dimmed_centroid_azimuth_deg.iloc[0], 45.0, places=6)
+            self.assertAlmostEqual(track.dimmed_centroid_azimuth_deg.iloc[1], -45.0, places=6)
+            # no blank supplied: the table is absent and the manifest block says the footprint is not rebuildable
+            m2, b2 = ex.retina_tables(obj, Path(d) / "x", geometry=geom)
+            self.assertNotIn("retina_radiance_blank", [m["name"] for m in m2])
+            self.assertIsNone(b2["blank"]["file"])
+            self.assertIn("cannot be rebuilt", b2["blank"]["note"])
+            # a record that does not say how it was obtained is 'unknown', and only the caller can assert a capture
+            self.assertEqual(ex.retina_tables(dict(obj, sampling=np.array("")), Path(d) / "y")[1]["mode"], "unknown")
+            self.assertEqual(ex.retina_tables(obj, Path(d) / "z", in_loop=True)[1]["mode"], "in_loop_capture")
+        # an export that ships radiance without a declared mode is refused by verify
+        c = graph()
+        with tempfile.TemporaryDirectory() as d:
+            res = self._result(c)
+            res.provenance["stimulus"] = {"protocol": "toy", "params": {"pos": [-0.2, 0.1, 0.75], "heading_rad": -1.5708},
+                                          "control": "none"}
+            run = ex.export(res, out_root=Path(d) / "export", retina=obj)
+            man = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(man["retina"]["mode"], "geometry_replay")
+            # the mode travels with the pose it was sampled at, in the retina block itself
+            self.assertEqual(man["retina"]["pinned_pose"]["pos_m"], [-0.2, 0.1, 0.75])
+            self.assertEqual(man["retina"]["pinned_pose"]["heading_rad"], -1.5708)
+            self.assertEqual(ex.verify(run, expect_paired=())["problems"], [])
+            man["retina"].pop("mode")
+            (run / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
+            self.assertTrue(any("no mode" in s for s in ex.verify(run, expect_paired=())["problems"]))
+
+    def test_cli_ladder_re_exports_the_recordings_into_new_directories(self):
+        """`interp_export.py ladder` is the generator that re-exports a recorded size ladder: it reads the recordings
+        a `runs.csv` names (never a finished export), writes ONE NEW run directory per size plus a summary, and
+        applies the predeclared family to the ladder-wide `size_tuning` table -- the only table where a family
+        spanning the sizes exists."""
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+        import interp_export as cli
+        from flyverse.interp import export as ex
+        c = graph()
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            rec = d / "rec"; rec.mkdir()
+            rows = []
+            for sid, drive in (("d045", 2.0), ("d300", 9.0)):
+                for arm, vals in (("stim", (10.0, 10.5, 11.0)), ("null", (0.0, 0.1, 0.2))):
+                    for k, v in enumerate(vals):
+                        stem = rec / f"{sid}_{arm}_s{k}"
+                        p = self._sweep_json(f"{stem}.json", {"LC11": v, "LC10a": v})
+                        cfg = json.loads(Path(p).read_text(encoding="utf-8"))
+                        cfg["config"].update(ball_radius_m=0.001965 if sid == "d045" else 0.0133975, ahead_m=0.05)
+                        Path(p).write_text(json.dumps(cfg), encoding="utf-8")
+                        self._cells_npz(f"{stem}_cells.npz", drive if arm == "stim" else 0.5, 3.0)
+                        Path(f"{stem}_prov.json").write_text(json.dumps({"provenance": self._prov(c)}), encoding="utf-8")
+                        if k == 0:                               # the retina is captured at seed 0 of each arm
+                            np.savez(f"{stem}_retina.npz", radiance=np.full((2, 3, 4), 1.0 if arm == "null" else 0.5,
+                                                                           np.float32),
+                                     t_s=np.array([0.0, 0.01]), ball_offset_m=np.array([0.05, -0.05]),
+                                     col_dir=np.eye(3, dtype=np.float32), col_az_el=np.zeros((3, 2)),
+                                     col_hex=np.zeros((3, 2), np.int64), col_side=np.array(["L", "L", "R"]),
+                                     pr_index=np.array([0, 1, 2], np.int64), pr_body=np.array([1001, 1002, 1003], np.int64),
+                                     pr_column=np.array([0, 0, 2], np.int64), pr_sens=np.ones((3, 4), np.float32),
+                                     pr_type=np.array(["R1-R6", "R1-R6", "R7"]),
+                                     sampling=np.array("replay of the presented geometry, every frame (10 ms), pinned pose"))
+                        rows.append({"size_id": sid, "arm": arm, "file": Path(p).as_posix()})
+            runs_csv = d / "runs.csv"
+            pd.DataFrame(rows).to_csv(runs_csv, index=False)
+            self.assertEqual(list(cli.ladder_runs(runs_csv)), ["d045", "d300"])
+            self.assertEqual(cli.ladder_runs(runs_csv)["d045"]["stim"], cli.ladder_runs(None, rec)["d045"]["stim"])
+            self.assertEqual(cli.ladder_runs(runs_csv, sizes="d300"), {"d300": cli.ladder_runs(runs_csv)["d300"]})
+            self.assertIsNone(cli._family(""))                  # nothing is declared by default
+            self.assertEqual(cli._family("lc_drive"), "lc_drive")
+            self.assertEqual(cli._family('{"name": "x"}'), {"name": "x"})
+            self.assertAlmostEqual(cli._geometry(cli.ladder_runs(runs_csv)["d300"]["stim"])["ball_radius_m"], 0.0133975)
+            out = d / "export"
+            self.assertEqual(cli.main(["ladder", "--runs-csv", str(runs_csv), "--out", str(out),
+                                       "--json-dir", str(d / "json"), "--family", "lc_drive",
+                                       "--neurons", str(self._neurons(d, c)), "--paired", "LC11"]), 0)
+            dirs = sorted(p.name for p in out.iterdir())
+            self.assertEqual(len(dirs), 3)                       # two sizes + the summary, all new
+            per_size = [p for p in out.iterdir() if p.name.startswith("objsize-")]
+            summary = [p for p in out.iterdir() if p.name.startswith("export-")][0]
+            self.assertEqual(len(per_size), 2)
+            for p in per_size:
+                self.assertEqual(json.loads((p / "checks.json").read_text(encoding="utf-8"))["verify"]["problems"], [])
+                man = json.loads((p / "manifest.json").read_text(encoding="utf-8"))
+                self.assertEqual(man["retina"]["mode"], "geometry_replay")   # the blank arm travels with each size
+                self.assertEqual(man["retina"]["blank"]["source_npz"][-len("null_s0_retina.npz"):], "null_s0_retina.npz")
+                self.assertIn("retina_object_track", [t["name"] for t in man["tables"]])
+            tab = ex.read_table(summary, "size_tuning")
+            self.assertEqual(set(tab.size_id), {"d045", "d300"})
+            self.assertEqual(set(tab[tab.statistic == "diff_max_over_cells_mean_mv"].p_method), {"exact"})
+            fam = tab[tab.family.fillna("") != ""]
+            self.assertEqual(len(fam), 4)                        # LC11 + LC10a x two sizes, the declared family
+            self.assertEqual(set(fam.type), {"LC11", "LC10a"})
+            self.assertTrue((fam.p_holm >= fam.p).all())
+            self.assertTrue(ex.read_table(summary, "runs").record_id.str.contains("_s0").any())
+            self.assertEqual(len(ex.read_table(summary, "retina_footprint")), 2)
+            # the summary carries no radiance of its own: one size's object arm there would be a mislabelled record
+            self.assertNotIn("retina_radiance", [t["name"] for t in
+                                                 json.loads((summary / "manifest.json").read_text(encoding="utf-8"))["tables"]])
+
     def test_cli_analyse_and_verify(self):
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
         import interp_export as cli

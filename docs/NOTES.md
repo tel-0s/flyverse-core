@@ -834,9 +834,11 @@ body assumption, not the connectome:
   itself, 7% from TuTuA_2 (0 Hz), 6% AOTU042 (0.2 Hz), 6% Tm5Y (0.47 rate units), 4% LC9 (0), 4%
   LC10c (0), 3% TmY21 (0.44 ru): active optic-lobe units at the same level that feeds LC4 (T2 0.51,
   TmY3 0.46, Tm4 0.47), plus silent central cells. With a *static* apple 5 cm ahead of a pinned fly
-  both LC4 and LC10a are at 0 Hz -- and LC10 is a small-object motion detector in the animal, so the
+  both LC4 and LC10a are at 0 Hz -- and LC10 is a moving-object detector in the animal, so the
   object screen showed it the wrong stimulus. Next: the same with self-motion (the apple sweeping
-  the eye as the fly turns).
+  the eye as the fly turns). [2026-09-13: do not read "small-object" as LC11's optimum here --
+  **LC10a's own preferred width/height is 15-30 deg** (Schretter et al. 2024, Fig 3a); the small-object
+  optimum (8.8 deg height, ~4.4 deg width) is LC11's. See "Session 10, interpretability toolkit".]
 * `programs.KlinotaxisProgram`: near-field chemotaxis from the two antennae (bilateral contrast ->
   turn towards the stronger side; turn less while the odour rises) -- a subsystem approximation
   that reads the sensor, meant for offloading the olfactory brain, composable as
@@ -1716,17 +1718,49 @@ Windows: the empty string is ignored and a "CPU smoke" then runs on this desktop
 `ef23cc27bea13be7f6a96f3c04fd3737`, the effective-weight md5 `ed1df661716d240b0f9289607f95320c` and `export`'s
 source fingerprint -- md5s of run dirs are not portable.
 
-**Neurome hand-off: the size ladder, and a size ordering that is the animal's inverted.** Four sizes at 5 v 5 runs
-each with matched none-vs-none nulls and the retina captured (`docs/audits/deficit_object.md` 5; every export
+**Neurome hand-off: the size ladder, a scene baseline with a size-dependent LC drive.** Four sizes at 5 v 5 runs
+each with matched none-vs-none nulls and the retina replayed (`docs/audits/deficit_object.md` 5; every export
 `verify: problems none`, LC11 143 / LC10a 275 bodies x {`upstream_drive_mV`, `output_Hz`}):
 `out/export/objsize-d045-20260913T014556Z-47ed1383/` (4.5 deg),
 `objsize-d114-20260913T014606Z-7a4eadbd/` (11.4), `objsize-d200-20260913T014616Z-5ece62d6/` (20),
 `objsize-d300-20260913T014626Z-d5048f74/` (30), with the summary at
 `export-20260913T014635Z-db22e3ea/` (`size_tuning` 288 rows, `retina_footprint` 4, `runs` 40). At 4.5 / 11.4 / 20
-deg the two LC types and their small-field inputs sit at the null; **only at 30 deg** do LC11 (+4.8), LC10a (+8.6)
-and the small-field stage (Tm5Y +38.5, plus T2 / T3 / TmY21 / TmY13 / TmY5a) reach `result`, with the loom chain
-(LPLC2 / LC16 / LC4) coming in from 20 deg. **The model's size ordering is the animal's inverted** -- LC11 prefers
-5-10 deg objects -- which is the comparison to make against Neurome's LC11 / LC10a recordings at the four sizes.
+deg the two LC types and their small-field inputs sit at the null on the drive statistic; **only at 30 deg** do LC11
+(+4.8), LC10a (+8.6) and the small-field stage (Tm5Y +38.5, plus T2 / T3 / TmY21 / TmY13 / TmY5a) reach `result`,
+with the loom chain (LPLC2 / LC16 / LC4) coming in from 20 deg. The drive statistic is the **within-run maximum over
+cells of the time-mean object-minus-blank drive difference**, compared with the same statistic in independent
+blank/blank runs -- not an absolute voltage. What the ladder supports is a **weak, size-dependent LC drive response
+and no detected object effect in the 16 exported population firing-rate comparisons**; LC11's missing small-object
+response (preferred vertical extent 8.8 deg, width ~4.4 deg, Keles & Frye 2017) is the biological concern, while
+LC10a's own preference is 15-30 deg (Schretter et al. 2024), so its 30-deg response is not a reversal. Size and
+retinal position change together here (centre elevation 0.88 -> 13.71 deg), so this is a scene baseline, not yet a
+controlled size-tuning assay.
+
+[2026-09-13, Neurome intake: the hand-off's original wording -- "the model's size ordering is the animal's inverted"
+and "LC11 / LC10a never spike" -- is **retracted**, and the corrections are accepted
+(`D:\Projects\neurome\docs\flyverse-size-tuning-reply.md`, `D:\Projects\neurome\reports\flyverse-size-tuning-intake.md`;
+`docs/NEUROME_INTERFACE.md` 3b). (1) **LC10a's own target is 15-30 deg** (Schretter 2024, Fig 3a), so a 30-deg LC10a
+drive response is not inverted tuning; only LC11 is a small-object type (8.8 deg vertical extent, ~4.4 deg width,
+Keles & Frye 2017 Fig 3D/E, calcium). (2) **Firing is not literally zero**: 6/143 LC11 and 19/275 LC10a bodies have
+nonzero mean firing at 4.5 deg (LC11 `24647` 0.1833 Hz object vs 0.1167 Hz paired blank at 11.4 deg; LC10a `69463`
+0.8333 vs 0.7500 Hz at 4.5 deg). Comparing a time-mean drive difference with the 7 mV threshold gap cannot establish
+that no spikes occurred. (3) **Elevation confound**: 0.88 / 4.34 / 8.66 / 13.71 deg with columns dimmed > 50 % at
+0.14 / 2.26 / 7.64 / 19.73 per frame; the retina table is a geometry **replay** at a pinned pose (not in-loop
+capture) and the **matched blank radiance was omitted**. (4) **Field defect**: `control_ids` names the independent
+blank/blank runs while `control_value` comes from arm b of the stimulus recording -- the next export splits
+`paired_control_ids` from `null_reference_ids`, adds a blank-radiance table and a `retina.mode` field
+(`docs/audits/interp_export.md`). (5) **Statistics**: Holm across the eight LC drive comparisons gives p 0.0635 --
+exploratory; the exact U meets ties in 25/288 rows; `diff_signed_best_cell` and `diff_abs_best_cell_mean` stay
+distinct (different 20-deg verdicts). (6) Literature inputs now in the ledger: Keles 2020 (LC11 Rdl + nAChR
+alpha1/alpha6/alpha7; Rdl disruption -40 % small-dark-object response without releasing bars/gratings; T2/T3 ON+OFF;
+T3 -> LC11 functionally excitatory) and Tanaka & Clark 2020 (pooling of fast-adapting size-tuned inputs -- a
+competing hypothesis). No graph correction follows. **Agreed next round, "object round 2"**: a matched visual assay
+(fixed-centre square ladder, then separate height and width ladders; constant elevation and angular speed; per-body
+RF localizer; in-loop blank and object radiance; predeclared per-type primary statistics and Holm family; >= 5 runs
+per arm in one submission), then a fixed-anatomy model comparison (sum / per-presynaptic-stream rectification with
+signs preserved / adaptation + spatial suppression, with `gain_fb 0` and the feedback-hold as controls and a
+bright-dark / ON-OFF / flicker / bar / grating specificity battery), then a transfer test with fixed parameters and
+held-out stimuli.]
 
 ## Batched brains and the RL environment
 

@@ -20,6 +20,10 @@
     # CPU: the structural (static) decomposition of a target's input, exported through the contributions table
     PYTHONIOENCODING=utf-8 python scripts/interp_export.py static-decompose --target "LC11|LC10a" --json out/interp/decompose/lc_static.json --out out/export
 
+    # CPU: re-export a recorded size ladder (one run directory per size + the summary) from the recordings on file
+    PYTHONIOENCODING=utf-8 python scripts/interp_export.py ladder --runs-csv out/export/<summary run>/runs.csv \
+      --out out/export --family lc_drive --expect-counts '{"LC11": 143, "LC10a": 275}'
+
 `record` is the only GPU subcommand and runs on the cluster; everything else is CPU. Every run records the REALISED
 device (`sim.fb.brain.device`), the cache fingerprint and the resolved LIFParams / OpticParams, so the manifest alone
 reconstructs the run.
@@ -30,6 +34,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -237,6 +242,55 @@ def _sibling(paths, suffix) -> list:
     return out
 
 
+def _family(spec):
+    """`--family`: '' / 'none' -> nothing declared (the default), a key of `export.FAMILY_SPECS`, or a JSON spec.
+
+    A multiple-comparison family is a PREDECLARATION by the caller; the export never invents one, and `p_holm` never
+    moves an unadjusted p or a verdict (docs/audits/interp_export.md revision 2)."""
+    s = (spec or "").strip()
+    if not s or s.lower() == "none":
+        return None
+    if s in ex.FAMILY_SPECS:
+        return s
+    if s.startswith("{") or s.startswith("["):
+        return json.loads(s)
+    raise SystemExit(f"--family {spec!r}: not a key of {list(ex.FAMILY_SPECS)} and not a JSON spec")
+
+
+def _geometry(stim_jsons) -> dict:
+    """The ball geometry of a recording set, from the probe JSON's own config -- what `retina_object_track` needs."""
+    if not stim_jsons:
+        return {}
+    with open(stim_jsons[0], encoding="utf-8") as f:
+        cfg = json.load(f).get("config") or {}
+    if cfg.get("ball_radius_m") is None or cfg.get("ahead_m") is None:
+        return {}
+    return {"ball_radius_m": float(cfg["ball_radius_m"]), "ahead_m": float(cfg["ahead_m"]),
+            "eye_above_table_m": ex.EYE_ABOVE_TABLE_M}
+
+
+def _size_geometry(size_id: str, stim_jsons, geom: dict) -> dict:
+    """One ladder rung's size, in the column names the earlier export used plus the ones that say WHERE the numbers
+    hold: the probe's nominal 2 atan(r / ahead), the exact 2 asin(r / distance) from the eye AT AZIMUTH 0, and the
+    centre elevation there. Along the sweep both shrink (`retina_object_track` has them per frame)."""
+    if not geom:
+        return {"size_id": size_id}
+    at0 = ex.object_track([0.0], **geom).iloc[0]
+    with open(stim_jsons[0], encoding="utf-8") as f:
+        cfg = json.load(f).get("config") or {}
+    nominal = cfg.get("angular_diameter_deg")
+    try:
+        nominal = float(re.sub(r"^d", "", size_id)) / 10.0
+    except ValueError:
+        pass
+    return {"size_id": size_id, "nominal_deg": nominal, **geom,
+            "angular_diameter_deg_probe": float(cfg.get("angular_diameter_deg", float("nan"))),
+            "angular_diameter_deg_from_eye": float(at0.angular_diameter_deg),
+            "centre_elevation_deg_at_azimuth_0": float(at0.centre_elevation_deg),
+            "distance_eye_to_centre_m_at_azimuth_0": float(at0.distance_eye_to_centre_m),
+            "half_sweep_m": cfg.get("half_sweep_m"), "sweep_s": cfg.get("sweep_s")}
+
+
 def _stamp_commit(res) -> dict:
     """Name the commit a cluster-recorded run ran, by matching the source hashes the record job wrote against this
     checkout. A GPU job runs from an rsynced tree with no `.git`, so its own `git_state()` is `commit 'unknown'`;
@@ -279,7 +333,8 @@ def cmd_run(args) -> int:
         break
     res = ex.result_from_object_sweep(stim, nulls, cells=cells, null_cells=null_cells, provenance=prov,
                                       reference=_glob(args.reference), reference_null=_glob(args.reference_null),
-                                      retina=args.retina, control_ids=[Path(p).stem for p in nulls] or None,
+                                      retina=args.retina, null_reference_ids=[Path(p).stem for p in nulls] or None,
+                                      family=_family(getattr(args, "family", None)),
                                       generator="scripts/interp_export.py record + run")
     _stamp_commit(res)
     problems = res.check()
@@ -301,7 +356,9 @@ def cmd_run(args) -> int:
              "verdict": d["verdict"]} for t, d in rep.items()]), floatfmt="{:+.4f}")
     if problems:
         sys.exit(f"not exported: {problems}")
-    run_dir = ex.export(res, out_root=args.out, retina=args.retina, parquet_rows=args.parquet_rows)
+    blank = args.retina_blank or (_sibling(nulls, "_retina.npz") or [None])[0]
+    run_dir = ex.export(res, out_root=args.out, retina=args.retina, retina_blank=blank,
+                        retina_geometry=_geometry(stim), parquet_rows=args.parquet_rows)
     _report(run_dir, res, args)
     print(f"Result {json_path}\nexport {run_dir}")
     return 0
@@ -334,8 +391,11 @@ def cmd_analyse(args) -> int:
     problems = res.check()
     if problems:
         sys.exit(f"the export refuses {args.result}: {problems}")
-    run_dir = ex.export(res, out_root=args.out, run_id=args.run_id, retina=args.retina, parquet_rows=args.parquet_rows,
-                        control_ids=args.control_ids.split(",") if args.control_ids else None)
+    run_dir = ex.export(res, out_root=args.out, run_id=args.run_id, retina=args.retina,
+                        retina_blank=args.retina_blank, parquet_rows=args.parquet_rows,
+                        control_ids=args.control_ids.split(",") if args.control_ids else None,
+                        paired_control_ids=args.paired_control_ids.split(",") if args.paired_control_ids else None,
+                        null_reference_ids=args.null_reference_ids.split(",") if args.null_reference_ids else None)
     _report(run_dir, res, args)
     print(f"export {run_dir}")
     return 0
@@ -349,6 +409,173 @@ def cmd_verify(args) -> int:
     print(json.dumps({k: v for k, v in info.items() if k != "problems"}, indent=1))
     print("problems:", info["problems"] or "none")
     return 1 if info["problems"] else 0
+
+
+# ------------------------------------------------------------------------------------------------- ladder (CPU)
+def ladder_runs(runs_csv=None, recordings_dir=None, sizes=None) -> dict:
+    """{size_id: {'stim': [...], 'null': [...]}} of probe JSONs, from a previous summary export's `runs.csv` (its
+    `size_id` / `arm` / `file` columns name every recording the ladder was built from) or from the recordings
+    directory itself (`<dir>/<size>_<arm>_s*.json`). Re-exporting reads the recordings, never a finished export."""
+    out = {}
+    if runs_csv:
+        tab = pd.read_csv(runs_csv, keep_default_na=False, na_values=[""])
+        for r in tab.itertuples():
+            if Path(str(r.file)).exists():
+                out.setdefault(str(r.size_id), {}).setdefault(str(r.arm), []).append(Path(str(r.file)).as_posix())
+            else:
+                print(f"[{r.size_id}] missing recording {r.file}", flush=True)
+    else:
+        d = Path(recordings_dir)
+        for p in sorted(d.glob("*_s*.json")):
+            m = re.match(r"^(?P<sid>[^_]+)_(?P<arm>stim|null)_s\d+$", p.stem)
+            if m:
+                out.setdefault(m["sid"], {}).setdefault(m["arm"], []).append(p.as_posix())
+    if sizes:
+        keep = {s.strip() for s in sizes.split(",") if s.strip()}
+        out = {k: v for k, v in out.items() if k in keep}
+    return {k: {a: sorted(v) for a, v in arms.items()} for k, arms in sorted(out.items())}
+
+
+def _footprint(stim_npz, blank_npz, geom: dict) -> dict:
+    """One size's retinal footprint from the two replayed radiance records: the columns the ball dims, their extent,
+    and the geometry that moved with the size (centre elevation at azimuth 0, angular diameter from the eye)."""
+    a, b = np.load(stim_npz), np.load(blank_npz)
+    ra, rb = a["radiance"].sum(-1), b["radiance"].sum(-1)
+    rel = ra / np.maximum(rb[0][None], 1e-9) - 1.0
+    hit = rel < -0.05
+    any_col = np.flatnonzero(hit.any(0))
+    az_el = a["col_az_el"]
+    track = ex.object_track(a["ball_offset_m"], **geom) if geom else pd.DataFrame()
+    out = {"n_columns": int(ra.shape[1]), "n_frames": int(ra.shape[0]),
+           "columns_dimmed_5pct_any_frame": int(len(any_col)),
+           "columns_dimmed_5pct_per_frame_mean": float(hit.sum(1).mean()),
+           "columns_dimmed_50pct_per_frame_mean": float((rel < -0.5).sum(1).mean()),
+           "min_relative_radiance": float(1 + rel.min()),
+           "azimuth_deg_min": float(az_el[any_col, 0].min()) if len(any_col) else float("nan"),
+           "azimuth_deg_max": float(az_el[any_col, 0].max()) if len(any_col) else float("nan"),
+           "elevation_deg_min": float(az_el[any_col, 1].min()) if len(any_col) else float("nan"),
+           "elevation_deg_max": float(az_el[any_col, 1].max()) if len(any_col) else float("nan"),
+           "blank_radiance_identical_over_frames": bool(np.allclose(rb, rb[0][None])),
+           "stim_sampling": str(a["sampling"]) if "sampling" in a else "",
+           "blank_sampling": str(b["sampling"]) if "sampling" in b else ""}
+    if len(track):
+        out.update({"centre_elevation_deg_at_azimuth_0": float(track.centre_elevation_deg.max()),
+                    "centre_elevation_deg_min": float(track.centre_elevation_deg.min()),
+                    "angular_diameter_deg_max": float(track.angular_diameter_deg.max()),
+                    "angular_diameter_deg_min": float(track.angular_diameter_deg.min()),
+                    "centre_azimuth_deg_min": float(track.centre_azimuth_deg.min()),
+                    "centre_azimuth_deg_max": float(track.centre_azimuth_deg.max())})
+    return out
+
+
+def cmd_ladder(args) -> int:
+    """Re-export a recorded size ladder from the recordings on file: one NEW run directory per size plus a summary
+    directory, never a write into an existing one (a run is a directory and is immutable, NEUROME_INTERFACE 1).
+
+    Every number comes from the recordings, not from the earlier export: the probe JSONs give the arms, the
+    `_cells.npz` the per-body rows, the `_retina.npz` of each arm the object AND blank radiance, and the probe's own
+    config the ball geometry. The declared `--family` is applied to the ladder-wide `size_tuning` table, which is the
+    only table where a family spanning the sizes can be formed."""
+    runs = ladder_runs(args.runs_csv, args.dir, args.sizes)
+    if not runs:
+        sys.exit(f"no ladder recordings found ({args.runs_csv or args.dir})")
+    family = _family(args.family)
+    json_dir = Path(args.json_dir); json_dir.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    run_dirs, rows, foot, runs_tab, results = {}, [], [], [], {}
+    for sid, arms in runs.items():
+        stim, nul = arms.get("stim", []), arms.get("null", [])
+        if not stim:
+            print(f"[{sid}] no stimulus runs; skipped"); continue
+        cells, ncells = _sibling(stim, "_cells.npz"), _sibling(nul, "_cells.npz")
+        prov = (_sibling(stim, "_prov.json") or [None])[0]
+        ret = (_sibling(stim, "_retina.npz") or [None])[0]
+        ret_blank = (_sibling(nul, "_retina.npz") or [None])[0]
+        geom = _geometry(stim)
+        res = ex.result_from_object_sweep(
+            stim, nul, cells=cells, null_cells=ncells, provenance=prov, retina=ret, family=None,
+            generator="scripts/interp_export.py ladder (re-export of the recorded size ladder)",
+            run_id=f"objsize-{sid}-{stamp}-{os.urandom(4).hex()}")
+        size_geom = _size_geometry(sid, stim, geom)
+        res.provenance["stimulus"]["size_geometry"] = common.to_jsonable(size_geom)
+        res.summary["size_geometry"] = common.to_jsonable(size_geom)
+        res.provenance["retina"] = {**(res.provenance.get("retina") or {}),
+                                    "blank_npz": ret_blank, "object_npz": ret}
+        _stamp_commit(res)
+        problems = res.check()
+        if problems:
+            print(f"[{sid}] Result.check(): {problems}")
+        res.save(json_dir / f"ladder_{sid}_{stamp}.json")
+        run_dir = ex.export(res, out_root=args.out, retina=ret, retina_blank=ret_blank, retina_geometry=geom,
+                            parquet_rows=args.parquet_rows)
+        _report(run_dir, res, SimpleNamespace(neurons=args.neurons, expect_counts=args.expect_counts,
+                                              paired=args.paired))
+        run_dirs[sid] = str(run_dir); results[sid] = res
+        per = res.table("per_type")
+        geo_cols = {k: v for k, v in (res.summary.get("size_geometry") or {}).items() if k != "size_id"}
+        for r in per.to_dict("records"):
+            rows.append({"size_id": sid, **geo_cols, **r, "export_run_dir": str(run_dir)})
+        runs_tab += [{"size_id": sid, "arm": "stimulus", "record_id": ex._run_stem(p), "file": p,
+                      "reference_role": "object arm (a) and, as `paired_control_ids`, its own blank arm (b)"} for p in stim]
+        runs_tab += [{"size_id": sid, "arm": "null", "record_id": ex._run_stem(p), "file": p,
+                      "reference_role": "independent blank/blank reference run (`null_reference_ids`)"} for p in nul]
+        if ret and ret_blank:
+            foot.append({"size_id": sid, **_footprint(ret, ret_blank, geom), "stim_retina": ret, "null_retina": ret_blank})
+        print(f"[{sid}] {len(stim)} stim + {len(nul)} null runs -> {run_dir}", flush=True)
+    if not run_dirs:
+        sys.exit("nothing to summarise")
+    tab = ex.add_family_columns(pd.DataFrame(rows), family)      # the family spans the ladder, so it is applied here
+    first = results[list(run_dirs)[0]]
+    prov = dict(first.provenance)
+    # the summary carries no radiance of its own: one size's object arm here would be a mislabelled retina record
+    prov["retina"] = {"source_npz": None, "per_size_exports": run_dirs,
+                      "summary_note": "the retinal record of each size -- retina_radiance, retina_radiance_blank, "
+                                      "retina_object_track and the mode block -- lives in that size's run directory; "
+                                      "this summary carries only the reduced `retina_footprint` table"}
+    prov["stimulus"] = {"protocol": "object_sweep size ladder",
+                        "params": {"sizes": [results[s].summary.get("size_geometry") or {"size_id": s} for s in run_dirs],
+                                   "runs_per_arm": {s: len(runs[s].get("stim", [])) for s in run_dirs}},
+                        "control": "per size: the matched blank arm (b) of each stimulus recording for every "
+                                   "`control_value` / `diff_*`, and the independent blank/blank runs of the same "
+                                   "protocol for every null column (see conventions.controls)",
+                        "per_size_exports": run_dirs}
+    out = common.Result.new("export", prov)
+    out.add_table("size_tuning", tab)
+    out.add_table("retina_footprint", foot)
+    out.add_table("runs", runs_tab)
+    key = tab[tab.statistic.isin(["diff_max_over_cells_mean_mv", "diff_abs_best_cell_mean"])]
+    out.summary = {"per_size_exports": run_dirs, "family": family if isinstance(family, (str, type(None))) else "custom",
+                   "p_methods": tab.p_method.value_counts().to_dict(),
+                   "n_rows_with_ties": int((tab.n_tied_values > 0).sum()),
+                   "lc_tuning": {t: {r.size_id: {"z": float(r.z), "stim_mean": float(r.stim_mean),
+                                                 "null_mean": float(r.null_mean), "null_sd": float(r.null_sd),
+                                                 "p": float(r.p), "p_method": r.p_method, "p_holm": float(r.p_holm),
+                                                 "verdict": r.verdict, "statistic": r.statistic}
+                                     for r in key[key.type == t].itertuples()}
+                                 for t in ["LC11", "LC10a", "T2", "T3", "Tm5Y", "TmY21", "LPLC2"] if t in set(key.type)}}
+    out.replicates = {"n": int(np.median([len(runs[s].get("stim", [])) for s in run_dirs])), "unit": "runs",
+                      "runs": runs_tab, "null": {"per_size": True}}
+    out.files = {"generator": " ".join(sys.argv), "per_size_results": {s: str(json_dir / f"ladder_{s}_{stamp}.json") for s in run_dirs},
+                 "source": args.runs_csv or args.dir}
+    out.validation = dict(out.validation, status="not run",
+                          measured={"note": "each per-size run directory carries its own round-trip and verify report "
+                                            "in checks.json; this summary re-reduces their per_type tables"})
+    _stamp_commit(out)
+    jp = Path(args.json) if args.json else json_dir / f"ladder_summary_{stamp}.json"
+    out.save(jp)
+    sum_dir = ex.export(out, out_root=args.out, parquet_rows=args.parquet_rows)
+    _report(sum_dir, out, SimpleNamespace(neurons=args.neurons, expect_counts=None, paired=""))
+    show = key[key.statistic == "diff_max_over_cells_mean_mv"]
+    common.print_table(show[["size_id", "type", "stim_mean", "null_mean", "z", "p", "p_method", "p_holm", "verdict"]],
+                       floatfmt="{:+.4f}", max_rows=60)
+    if foot:
+        common.print_table(pd.DataFrame(foot)[["size_id", "columns_dimmed_5pct_per_frame_mean",
+                                               "columns_dimmed_50pct_per_frame_mean", "centre_elevation_deg_at_azimuth_0",
+                                               "angular_diameter_deg_max", "min_relative_radiance"]], floatfmt="{:.2f}")
+    print(f"\nsummary Result {jp}\nsummary export {sum_dir}")
+    for sid, rd in run_dirs.items():
+        print(f"  {sid}: {rd}")
+    return 0
 
 
 def cmd_static_decompose(args) -> int:
@@ -381,6 +608,8 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--expect-counts", default=None, help='JSON {"LC11": 143, "LC10a": 275} the verifier must find')
         p.add_argument("--paired", default="LC11,LC10a", help="types whose every body must carry BOTH quantities "
                        "(upstream_drive_mV and output_Hz) in readout_per_body; '' turns the check off")
+        p.add_argument("--family", default=None, help=f"multiple-comparison family to predeclare for `p_holm`: a key "
+                       f"of {list(ex.FAMILY_SPECS)}, a JSON spec, or nothing (the default: no family, p_holm empty)")
 
     rec = sub.add_parser("record", help="GPU: run the object-sweep protocol and capture per-body readouts + the retina")
     common.add_common_args(rec)
@@ -402,7 +631,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--reference", nargs="*", default=[], help="earlier runs of the same protocol, globs allowed "
                                                                 "(out/r3obj/ball_off_s*.json)")
     run.add_argument("--reference-null", nargs="*", default=[], help="their nulls (out/r3obj/null_off_s*.json)")
-    run.add_argument("--retina", default=None, help="the retina npz of one of the runs")
+    run.add_argument("--retina", default=None, help="the retina npz of one of the stimulus runs")
+    run.add_argument("--retina-blank", default=None, help="the retina npz of the MATCHED blank run (default: the "
+                     "sibling of the first --null-runs entry); written as retina_radiance_blank")
     common_export_args(run)
     run.set_defaults(func=cmd_run)
 
@@ -411,9 +642,24 @@ def build_parser() -> argparse.ArgumentParser:
     an.add_argument("--result", required=True)
     an.add_argument("--run-id", default=None)
     an.add_argument("--retina", default=None)
-    an.add_argument("--control-ids", default=None, help="comma-separated matched control run ids for readout_per_body")
+    an.add_argument("--retina-blank", default=None, help="the matched blank arm's retina npz (retina_radiance_blank)")
+    an.add_argument("--control-ids", default=None, help="DEPRECATED spelling of --null-reference-ids (what this flag "
+                    "has always held); kept for one revision")
+    an.add_argument("--paired-control-ids", default=None, help="comma-separated record/arm ids the `control_value` "
+                    "column was computed from (arm b of the stimulus recordings)")
+    an.add_argument("--null-reference-ids", default=None, help="comma-separated ids of the INDEPENDENT blank/blank "
+                    "runs behind null_mean / z_vs_null / verdict")
     common_export_args(an)
     an.set_defaults(func=cmd_analyse)
+
+    lad = sub.add_parser("ladder", help="CPU: re-export a recorded size ladder into NEW run directories + a summary")
+    lad.add_argument("--runs-csv", default=None, help="runs.csv of an earlier summary export (size_id / arm / file)")
+    lad.add_argument("--dir", default=None, help="the recordings directory instead (<dir>/<size>_<arm>_s*.json)")
+    lad.add_argument("--sizes", default=None, help="comma-separated size ids to re-export (default: all found)")
+    lad.add_argument("--json", default=None, help="the summary Result JSON (default: <json-dir>/ladder_summary_<utc>.json)")
+    lad.add_argument("--json-dir", default="out/interp/export", help="where the per-size Result JSONs are written")
+    common_export_args(lad)
+    lad.set_defaults(func=cmd_ladder)
 
     ver = sub.add_parser("verify", help="CPU: re-check a finished export directory")
     ver.add_argument("--run-dir", required=True)
@@ -434,7 +680,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    known = {"record", "run", "analyse", "verify", "static-decompose", "-h", "--help"}
+    known = {"record", "run", "analyse", "verify", "static-decompose", "ladder", "-h", "--help"}
     if not argv or argv[0] not in known:
         argv = ["analyse"] + argv                          # docs/INTERP.md section 7: `--result ... --out out/export`
     args = build_parser().parse_args(argv)

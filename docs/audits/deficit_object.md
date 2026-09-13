@@ -102,8 +102,14 @@ scatter of section 4.4 and the deterministic projection of section 4.5:
    LC10a (+8.6) all reach 'result' in 5 v 5 runs, behind the loom chain, whose threshold lies **below** 20 deg
    (LPLC2 / LC16 / LC4 reach `result` at 20 deg here, and LPLC2's verdict at 11.4 deg **flips between batches** --
    z +2.05 / +1.51 / +2.60 / +2.82 over four batches of the same stimulus, so this file's own 11.4 deg point does
-   not reproduce object_sweep.md 8.7's +5.4; section 5). The model's
-   size ordering is the opposite of the animal's (LC11 ~5-10 deg objects; LPLC2 expansion).
+   not reproduce object_sweep.md 8.7's +5.4; section 5). **What that ladder supports, corrected with Neurome's
+   intake (section 5.1): a weak, size-dependent LC drive response and no detected object effect in the 16 exported
+   population firing-rate comparisons** -- on a statistic that is the within-run maximum over cells of the time-mean
+   object-minus-blank drive difference, against the same statistic in independent blank/blank runs. The biological
+   mismatch it names is **LC11's**: LC11 is the small-object type (preferred vertical extent 8.8 deg, width ~4.4 deg,
+   Keles & Frye 2017 Fig 3D/E, calcium), while **LC10a's own preference is 15-30 deg** (Schretter et al. 2024, Fig
+   3a), so LC10a's 30-deg response is **not** inverted tuning. Size and retinal position change together along this
+   ladder (centre elevation 0.88 -> 13.71 deg), so it is a scene baseline, not yet a controlled size-tuning assay.
 
 So: **the object is lost by the convergence of opposite-figure carriers at the small-field stage (a wiring fact under a linear sum),
 whose residual the stochastic spiking feedback then destroys (a dynamics fact), and what survives is pooled away at
@@ -466,7 +472,8 @@ closes the argument.
 
 `PYTHONIOENCODING=utf-8 python scripts/interp_apply_object.py ladder-plan --out out/apply_object/ladder --runs 5 --name apobj-lad`
 -> `out/apply_object/ladder/batch.sh` (ONE call, 40 jobs = 4 sizes x {ball, none-vs-none null} x 5 runs of
-`scripts/interp_export.py record`, the retina captured at seed 0 of both arms of every size) and `ladder.json`.
+`scripts/interp_export.py record`, the retina written at seed 0 of both arms of every size -- a **replay of the
+scene geometry at a pinned pose, not an in-loop capture of the input the brain received**) and `ladder.json`.
 Cluster run **`apobj-lad-287a43`: 40 job(s), 0 failed, 11.6 min** (`out/apobj-lad_cluster.log`; every job `device
 cuda` NVIDIA B200, torch 2.11.0+cu128, the shipped model `sign` / `abs`, 12 s window after 3 s settle; recordings
 `out/apply_object/ladder/d{045,114,200,300}_{stim,null}_s{0..4}.{json,_cells.npz,_prov.json,.txt}` + the two
@@ -501,10 +508,14 @@ pass, 12 s scored after 3 s settle -- the object-sweep protocol with only the ra
 | d200 | 20 deg | 0.008816 | 20.00 | 20.08 | +8.7 |
 | d300 | 30 deg | 0.013397 | 30.00 | 30.18 | +13.7 |
 
-**The retinal sampling actually presented** (`retina_footprint`, from the replayed radiance of the seed-0 ball run
-against the seed-0 blank run, which is identical over its 1,200 frames): columns dimmed by > 5 % at any frame of
-the sweep, per-frame mean of columns dimmed > 5 % and > 50 %, the darkest column's radiance relative to the blank,
-and the azimuth / elevation extent of the dimmed columns.
+**The retinal sampling presented, as a geometry REPLAY** (`retina_footprint`, from the replayed radiance of the
+seed-0 ball run against the seed-0 blank run, which is identical over its 1,200 frames): columns dimmed by > 5 % at
+any frame of the sweep, per-frame mean of columns dimmed > 5 % and > 50 %, the darkest column's radiance relative to
+the blank, and the azimuth / elevation extent of the dimmed columns. **This is a replay of scene geometry at a
+pinned pose, not an in-loop capture of the input the brain received** (the manifest says so), and the delivered
+per-size tables carry only the ball radiance -- **the matched blank radiance was omitted** from the export and had
+to be read from the local blank NPZs. Both are corrected in the next export (`docs/NEUROME_INTERFACE.md` 3b:
+`manifest.retina.mode` = `in_loop_capture` | `geometry_replay`, plus the matched `retina_radiance_blank` table).
 
 | size | columns dimmed (any frame) | per frame > 5 % | per frame > 50 % | darkest ratio | azimuth | elevation |
 |---|---|---|---|---|---|---|
@@ -519,7 +530,12 @@ columns per frame.
 
 **Size tuning** (`size_tuning`; the primary statistics: spiking `diff_max_over_cells_mean_mv` (mV of optic drive),
 rate units `diff_abs_best_cell_mean` (rate units); 5 ball runs vs 5 none-vs-none runs per size, exact U p floor
-0.0079; z on the null SD; the full 288-row table including the firing-rate statistics is in the summary export):
+0.0079; z on the null SD; the full 288-row table including the firing-rate statistics is in the summary export).
+**What `diff_max_over_cells_mean_mv` is**: the maximum, *over cells within one run*, of that cell's time-mean
+(ball-arm drive - blank-arm drive); each run's maximum may come from a different cell, and the comparator is the same
+maximum statistic in the independent blank/blank runs. It is **not** an absolute membrane voltage and **not** the
+tuning curve of one identified neuron, so it cannot be set against the 7 mV threshold gap to argue that no spikes
+occurred. Cells are not independent replicates; runs are the replicate unit:
 
 | type | 4.5 deg: stim / null / z / verdict | 11.4 deg | 20 deg | 30 deg |
 |---|---|---|---|---|
@@ -541,9 +557,15 @@ rate units `diff_abs_best_cell_mean` (rate units); 5 ball runs vs 5 none-vs-none
 
 Per-run draws of the two LC types at 30 deg (stim / null, mV): LC11 .192 .112 .175 .178 .199 / .072 .013 .050 .066
 .068; LC10a .169 .218 .181 .221 .254 / .077 .051 .077 .090 .087 -- every ball draw above every null draw in both.
-The LC firing rates never move at any size (LC11 `diff_rate_hz_max_cell` 0.07-0.13 Hz vs null 0.08-0.17; LC10a
-0.28-0.42 vs 0.35-0.48): the 30 deg signal is +0.12 / +0.13 mV of drive, 50x below the 7 mV pass level, on cells
-that fire 0.002 / 0.02 Hz.
+**No object effect is detected in the firing-rate statistics at any size** -- all 16 exported LC population
+mean / max firing-rate comparisons across the four sizes carry the `null` verdict (LC11 `diff_rate_hz_max_cell`
+0.07-0.13 Hz vs null 0.08-0.17; LC10a 0.28-0.42 vs 0.35-0.48). **That is a non-detection, not silence**: exported
+object-arm firing is nonzero in both populations -- 6/143 LC11 and 19/275 LC10a bodies have nonzero mean firing at
+4.5 deg, e.g. LC11 body `24647` 0.1833 Hz with the ball vs 0.1167 Hz on its paired blank at 11.4 deg, and LC10a body
+`69463` 0.8333 vs 0.7500 Hz at 4.5 deg (Neurome's `lc_firing.csv`). Those are examples of firing, not individually
+established object responses. The 30 deg drive excess is +0.12 / +0.13 mV on the drive statistic defined above; that
+number is a maximum of time-mean differences and **comparing it with the 7 mV threshold gap does not establish that
+no spikes occurred**.
 
 **Reading.** (1) The medulla carries every size including the one-column 4.5 deg step (Mi1 +4.5, Mi4 +5.1; Tm3 not
 at 4.5 deg, +21.5 from 11.4 deg). (2) The small-field stage and the two LC types carry **only the 30 deg ball** --
@@ -553,8 +575,10 @@ silhouette that darkens ~20 columns at once, the regime in which cancellation be
 carriers no longer removes the mean and a residual survives the feedback. (3) The loom chain (LPLC2, LC16, LC4)
 reaches `result` at 20 deg with z 5-100 -- its threshold is below 20 deg, not at it (point 5) -- and LPLC2's best
 cell fires (+3.3 Hz at 30 deg): the size ordering of the model is
-loom detectors < LC10a < LC11 in threshold and the opposite of the animal's (LC11 prefers ~5-10 deg objects, LPLC2
-expansion). (4) The 20 deg point is where LC10a (+2.8, U 21) and T2 (U 24, p 0.016) begin to separate from their
+loom detectors < LC10a < LC11 in threshold. Against the animal, **only the LC11 half of that is a mismatch**: LC11 is
+the small-object type (8.8 deg preferred vertical extent, ~4.4 deg width, Keles & Frye 2017 Fig 3D/E) whereas
+**LC10a's own preference is 15-30 deg** (Schretter et al. 2024 Fig 3a), so LC10a responding at 30 deg is the
+expected range, not a reversal; LPLC2 is an expansion detector and this ladder does not loom. (4) The 20 deg point is where LC10a (+2.8, U 21) and T2 (U 24, p 0.016) begin to separate from their
 nulls without reaching the |z| >= 3 rule; at 4 sizes x 5 runs the threshold lies between 20 and 30 deg for both LC
 types. (5) **The loom chain's threshold lies *below* 20 deg, and this ladder's own 11.4 deg point does not
 reproduce object_sweep.md 8.7.** There LPLC2 at the 11.4 deg ball is stim +0.351 +- 0.038 vs null +0.139 +- 0.040,
@@ -565,6 +589,41 @@ the nulls are 0.165 +- 0.066, 0.178 +- 0.110, 0.176 +- 0.072 and 0.165 +- 0.065,
 flips between batches; quote the difference over the null, not the z. This is the diagnostic Neurome asked for, with the per-body tables and the retinal sampling in the run
 directories above; it is not a pass criterion and nothing was tuned.
 
+### 5.1 Neurome's intake of this ladder (2026-09-13) -- what it changes in the reading above
+
+`D:\Projects\neurome\docs\flyverse-size-tuning-reply.md` and
+`D:\Projects\neurome\reports\flyverse-size-tuning-intake.md` (constraints also as
+`reports\flyverse-size-tuning-biological-constraints.json`). Neurome re-derived every number from the exports and the
+40 recording NPZs: 26 table hashes, 105,928 readout rows, all 288 summary statistics, the cache fingerprint and a
+3,344-row anatomy/readout join over all 143 LC11 + 275 LC10a bodies. **Everything reproduces**, including the
+unadjusted p-values. Their corrections are accepted and are applied above; the five that bear on this section:
+
+1. **The drive statistic is a within-run maximum over cells of a time-mean difference**, against the same statistic in
+   independent blank/blank runs -- not a membrane voltage, and no basis for a claim about spiking. Their excess-above-
+   null values: LC11 -0.0126 / +0.0188 / +0.0206 / **+0.1172** mV and LC10a -0.0023 / +0.0137 / +0.0225 / **+0.1321**
+   mV across 4.5 / 11.4 / 20 / 30 deg.
+2. **16/16 firing-rate comparisons are `null` = no detected object effect; the cells are not silent** (6/143 LC11 and
+   19/275 LC10a bodies fire at 4.5 deg; per-body examples above).
+3. **LC10a's biological target is 15-30 deg; LC11's is the small-object one.** The 30-deg LC10a response is not
+   inverted tuning.
+4. **The ladder confounds size with retinal position and speed**: centre elevation 0.88 / 4.34 / 8.66 / 13.71 deg and
+   columns dimmed > 50 % at 0.14 / 2.26 / 7.64 / 19.73 per frame, with the lateral sweep changing angular speed and
+   apparent diameter along each pass. The retinal contrast footprint may itself drive the ordering; its causal
+   contribution is not isolated. The retina tables are a **replay**, and the matched blank radiance was omitted.
+   **This is a scene baseline, not a controlled size-tuning assay.**
+5. **Statistics.** Both 30-deg comparisons separate completely (p 0.0079365, z 4.85 / 8.65) but **Holm across the
+   eight LC drive comparisons gives p 0.0635** -- a post-hoc sensitivity calculation, not a pass rule; keep them
+   exploratory. The exact U meets **ties in 25 of the 288** statistics. And the two upstream statistics stay distinct:
+   at 20 deg T2 / T3 / Tm5Y / TmY21 reach `result` on `diff_signed_best_cell` while `diff_abs_best_cell_mean` and the
+   population `diff_signed_mean` stay `null` -- never collapse them into "the stage is active / silent".
+
+One export defect of this delivery, fixed in the next one (`docs/NEUROME_INTERFACE.md` 3b): `control_ids` named the
+independent blank/blank runs while `control_value` came from **arm b of the stimulus recording** (for LC11 `24647` at
+11.4 deg the paired blank is 0.1167 Hz, the independent null arms 0.1333 / 0.0500 Hz). The values are right; the
+identifiers conflated two references, and the next export carries `paired_control_ids` and `null_reference_ids`
+separately. **No graph correction follows from this ladder**: a non-response in the simulation is not evidence of a
+missing connection.
+
 ## 6. What follows (diagnoses, not proposals)
 
 * The **two facts compose**: a wiring fact (the ON / OFF convergence leaves a 4-30 % residual) and a dynamics fact
@@ -574,8 +633,25 @@ directories above; it is not a pass criterion and nothing was tuned.
   per-cell level -- and still not to LC11 / LC10a, whose loss is the pooling.
 * Whether the animal's T3 / T2 do something the linear sum cannot (ON / OFF rectification before summation, a
   nonlinearity the rate unit lacks) is a question about the unit model, not about the data: `rect` (a ReLU at the
-  T-cell output) is not it; a rectification of each input class before the sum was not tested and is the natural
-  next arm (an `edges`-kind lesion cannot express it; it needs an OpticParams hook).
+  T-cell output) is not it -- **a rectifier after the final sum cannot recover terms that already cancelled** -- and a
+  rectification of each input class before the sum was not tested and is the natural next arm (an `edges`-kind lesion
+  cannot express it; it needs an OpticParams hook).
+* **The literature inputs to that model comparison** (Neurome's intake, section 5.1; constraints, not parameters):
+  * **Keles et al. 2020, Cell Reports** (`10.1016/j.celrep.2020.01.061`, Figures 2, 4, S1). LC11 expresses **Rdl**
+    and nicotinic **alpha1 / alpha6 / alpha7** subunits; **LC11-specific Rdl disruption reduces small-dark-object
+    responses by ~40 % without releasing bar / grating responses** (unlike bath pharmacology); **T2 and T3 respond to
+    both ON and OFF transitions**; **T3 -> LC11 is functionally excitatory**. These are *output* constraints on the
+    types this file localizes the loss to. They do **not** show that rectification happens separately at each T3 input
+    synapse, supply no conductances or gains, and do not resolve LC11's glutamate sign; they may support the ACh /
+    GABA signs the fallback already uses.
+  * **Tanaka & Clark 2020, Current Biology** (`10.1016/j.cub.2020.04.068`): an LC11 model that pools tightly
+    size-tuned, **fast-adapting** inputs -- i.e. a **competing hypothesis (adaptation + spatial suppression)** to the
+    per-stream rectification arm, to be run as our own arm on fixed anatomy, not a parameter set to copy.
+  * So the next round is a three-arm comparison on **fixed anatomy with signs preserved** -- existing sum vs local
+    per-presynaptic-stream rectification vs adaptation + spatial suppression -- with `gain_fb 0` and the feedback-hold
+    arms as controls and a specificity battery (bright and dark objects, isolated ON / OFF transitions, stationary
+    flicker, bars, gratings) so that an apparent rescue can also fail. It runs **after** the matched visual assay of
+    `docs/NEUROME_INTERFACE.md` 3b, because the present ladder cannot separate size from elevation.
 * The unprofiled types (Tm5Y, TmY21, LC11: fallback tier on 100 %) were not sign-tested. Their deterministic figures
   exist at the medulla's size, so a receptor profile would change their sign fact only if it changed a carrier
   edge's sign; the receptor data for those types is the open item, not a sign choice.
