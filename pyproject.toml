@@ -1,12 +1,73 @@
+[build-system]
+# PEP 639 SPDX `license`/`license-files` need setuptools >= 77.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "flyverse"
 version = "0.1.0"
 description = "Simulations, games and other strange places to put the MaleCNS fly connectome"
-requires-python = ">=3.11"
+readme = "README.md"
+# MIT, decided 2026-09-13; the text is in LICENSE at the repo root.
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "tel0s" }]
+# 3.12 is the floor because that is what is deployed and tested: every cluster venv is 3.12, CI is 3.12,
+# and the development machine is 3.13. (`X | None` annotations, used throughout, need >= 3.10 on their
+# own; nothing below 3.12 is tested, so nothing below 3.12 is claimed.)
+requires-python = ">=3.12"
+# torch here is whatever index pip is pointed at: the default PyPI wheel is CPU-only on Windows/macOS and
+# CUDA on Linux; for a specific CUDA build install torch first from the cu128 index (docs/INSTALL.md, and
+# the `cuda` extra below), then `pip install -e .` -- the dependency is already satisfied and left alone.
+# pygame is a hard dependency today (flyverse/room_ui.py and scripts/room_demo.py import it eagerly, and
+# tests/test_room_ui.py drives the real event loop); the `ui` extra below exists to name that, not to gate it.
 dependencies = ["numpy", "pandas", "pyarrow", "scipy", "torch", "pygame", "imageio", "pillow"]
+# No "License :: OSI Approved :: MIT License" classifier on purpose: PEP 639 superseded the license
+# classifiers with the SPDX `license` expression above, and setuptools >= 77 REFUSES to build when both
+# are present ("License classifiers have been superseded by license expressions"). The metadata carries
+# the licence as `License-Expression: MIT`, which is what PyPI reads.
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[project.urls]
+Repository = "https://github.com/tel-0s/flyverse"
+
+[project.optional-dependencies]
+# The observatory UI (flyverse/room_ui.py, scripts/room_demo.py). pygame is ALREADY a hard dependency --
+# this extra is here so `pip install flyverse[ui]` is not a lie and so the dependency can be moved here
+# later without breaking anyone's install command.
+ui = ["pygame"]
+# GPU use needs a CUDA build of torch, which does not come from PyPI. There is nothing to install from
+# here: the wheel comes from the PyTorch index, and this extra documents the command.
+#
+#     pip install torch --index-url https://download.pytorch.org/whl/cu128
+#
+# The optional runtime-compiled CUDA kernels (flyverse/cuda.py, FLYVERSE_CUDA_KERNELS=1 or
+# `cuda_kernels=True`) additionally need nvcc on PATH -- a CUDA toolkit, not a Python package.
+cuda = []
+# The interpretability toolkit (flyverse/interp, scripts/interp_*.py) needs pandas, pyarrow and scipy,
+# which are already hard dependencies. Nothing extra to install; the extra exists to be documented.
+interp = []
+dev = ["pytest", "ruff", "pyyaml"]
 
 [tool.setuptools]
-packages = ["flyverse"]
+packages = ["flyverse", "flyverse.interp"]
 
 [tool.setuptools.package-data]
-flyverse = ["data/*.csv", "kernels/*.cu"]
+flyverse = ["data/*.csv", "data/*.json", "kernels/*.cu"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gpu: needs a GPU (CUDA or MPS) or the runtime-compiled kernels",
+    "data: needs the MaleCNS download and/or a compiled cache/ (the 3 GB that is not in the repo)",
+    "cluster: needs a live GPU cluster (SSH/job manager); tests/test_cluster_run.py is NOT this -- it is fully mocked",
+]
