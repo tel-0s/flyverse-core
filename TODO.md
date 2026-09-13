@@ -13,10 +13,10 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       `<cluster-host>`, `$CLUSTER_RUNS`, … in 19 files); decide whether to rewrite history before the announcement
       (`git filter-repo` on the same patterns) — the identifiers are internal hostnames and paths, nothing secret,
       but they were committed. `docs/CLUSTER.md` and `.cluster.json` stay git-ignored.
-- [ ] **Packaging**: `pip install -e .` from a clean clone works (pyproject has the deps; add `python_requires`,
+- [~] **Packaging** (2026-09-13: pyproject metadata, extras, `flyverse.interp` now shipped in wheels, `CITATION.cff` validated, `docs/INSTALL.md`; still owed: a clean-clone CUDA run-through and a lock file): `pip install -e .` from a clean clone works (pyproject has the deps; add `python_requires`,
       optional extras `[cuda]`, `[ui]`, `[interp]`), `python scripts/fetch_data.py --malecns` then
       `python scripts/room_demo.py` runs on CPU-only and on CUDA; pin torch/numpy minimums; a `requirements-lock`.
-- [ ] **CI**: GitHub Actions running the CPU test subset (`tests/test_control.py`, `test_world.py`,
+- [x] **CI** (2026-09-13: `.github/workflows/ci.yml`, data-free subset via `tests/conftest.py` markers — 236 passed locally; first GitHub run still to shake out; `ruff --select F821` reports 12 undefined names in `scripts/cx_shift.py` / `cx_wedge.py` nested closures — verify whether those paths are dead or rely on an enclosing scope, then fix). Original item: GitHub Actions running the CPU test subset (`tests/test_control.py`, `test_world.py`,
       `test_nt_readout.py`, `test_interp.py -k "not cluster"`, `test_receptor_model.py`) on a synthetic /
       subset connectome so it needs no 3 GB download; lint.
 - [ ] **README pass**: one page a newcomer can follow — run it, what is simulated, what emerges unprompted,
