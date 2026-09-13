@@ -2,21 +2,28 @@
 
 Tool: `flyverse/interp/lesion.py` (`lesion(manifest, *, out_dir, mode, ...)`; `plan` / `run` / `analyse`), CLI
 `scripts/interp_lesion.py`, tests `tests/test_interp.py::LesionTests` (8 CPU tests). Contract: `docs/INTERP.md`
-section 4.4. Data: `out/les_holds/` and `out/les_holds_run1/` (the two GPU batches, 12 job JSONs each),
-`out/les_holds_all/` (the two merged: 4 draws per arm), `out/les_cpu/` and `out/les_cpu2/` (two independent CPU runs,
-24 job JSONs each), `out/les_orn/` (9 job JSONs, the weight-mask arm). Results:
-`out/interp/lesion/holds_all.json` (the GPU matrix), `holds.json` (the second batch alone), `holds_cpu.json` /
-`holds_cpu2.json` (the CPU dissociation), `orn.json`, `holds_plan.json` (the resolved manifest + batch). Console logs:
+section 4.4. Data: `out/les_holds/` and `out/les_holds_run1/` (this round's two GPU batches, 12 job JSONs each),
+`out/les_holds_all/` (the two merged: 4 draws per arm), plus two independent GPU batches since --
+`out/sk_les_holds_all/` (4 draws per arm) and `out/sk2_les_holds/` (3) -- **11 GPU draws per arm on record**;
+`out/les_cpu/` and `out/les_cpu2/` (two independent CPU runs, 24 job JSONs each) plus `out/sk_les_cpu/` and
+`out/sk2_les_cpu/`; `out/les_orn/` (9 job JSONs, the weight-mask arm). Results:
+`out/interp/lesion/holds_all.json` (the GPU matrix), `holds.json` (the second batch alone), `sk_holds_all.json` /
+`sk2_holds.json` (the independent GPU batches), `holds_cpu.json` / `holds_cpu2.json` / `sk_holds_cpu.json` /
+`sk2_holds_cpu.json` (the CPU dissociation), `orn.json`, `holds_plan.json` (the resolved manifest + batch). Console logs:
 `out/les-holds_cluster_bd4380.log`, `out/les-holds_cluster_1df2ca.log`, `out/les-holds_cluster_80f423_failed.log`
-(the first, failed submission), `out/les_cpu/run_console.txt`, `out/les_cpu2/run_console.txt`,
+(the first, failed submission), `out/sk-les_cluster.log`, `out/sk-les2_cluster.log`, `out/sk2-les_cluster.log`
+(the later independent batches), `out/les_cpu/run_console.txt`, `out/les_cpu2/run_console.txt`,
 `out/les_orn/run_console.txt`, and the printed matrices in `out/les_holds_all/analyse_console.txt`,
 `out/les_cpu/analyse_console.txt`.
 
-**Result in one line.** The tool reproduces the round-4 / round-5 hold attribution: **59 of 60 published GPU numbers
-and 32 of 32 published per-seed CPU numbers**, all six hold tables' changed-entry counts and md5s exactly, and it
-extracts the `(holdBrainGlu, holdBrainHis) x (smell.KC_active, taste.MN9_hz)` double dissociation automatically. The
-single miss is `loom.GF_peak_hz` under `holdOptic` -- the check `receptor_integration.md` E.2 itself flagged as
-scattering.
+**Result in one line.** The tool reproduces the round-4 / round-5 hold attribution: **56 / 57 / 59 of 60 published GPU
+numbers across the three batches now on record** (`out/interp/lesion/sk_holds_all.json`, `sk2_holds.json`,
+`holds_all.json`) **and 32 of 32 published per-seed CPU numbers in every CPU run on record**, all six hold tables'
+changed-entry counts and md5s exactly, and it extracts the
+`(holdBrainGlu, holdBrainHis) x (smell.KC_active, taste.MN9_hz)` double dissociation automatically. The GPU misses are
+not one row: **`holdOptic` is the unstable arm**, and which of its four walk / loom rows misses depends on the draws
+(section 4). 59/60 and "the single miss" are properties of one particular set of four draws, not a reproducible score
+of the tool.
 
 ---
 
@@ -85,17 +92,25 @@ manifest there, all eight in `holds_cpu.json`). The KC and DN1 tables are byte-i
 ## 4. Validation B -- the GPU hold matrix (E.2 and the round-4 re-score)
 
 **The batches.** `out/les_holds/batch.sh` -> one `cluster_run.py` call, 12 jobs (6 arms x 2 replicates),
-`--fetch out/les_holds/`. Run twice, exactly as E.2's own (accidental) duplicate batch did, so every arm has **4
-independent runs**:
+`--fetch out/les_holds/`. Run twice here, exactly as E.2's own (accidental) duplicate batch did, giving this round's
+**4 independent runs per arm**; two further independent submissions have since added 4 and 3 more, so the record is
+**11 draws per arm**, every job `device cuda` and every job on cache md5 `ef23cc27bea13be7f6a96f3c04fd3737` (the 42
+later jobs all record `device_name` NVIDIA B200; 12 of this round's 24 do not -- see below):
 
 | run dir | jobs | failed | wall | log |
 |---|---|---|---|---|
 | `les-holds-80f423` | 12 | **12** | 1.5 min | `out/les-holds_cluster_80f423_failed.log` (the bug of section 8.1) |
 | `les-holds-bd4380` | 12 | **0** | 2.9 min | `out/les-holds_cluster_bd4380.log` |
 | `les-holds-1df2ca` | 12 | **0** | 2.7 min | `out/les-holds_cluster_1df2ca.log` |
+| `sk-les-4e2e7b` + `sk-les2-5d8a8d` | 12 + 12 | **0** | -- | `out/sk-les_cluster.log`, `out/sk-les2_cluster.log`; merged into `out/sk_les_holds_all/` (4 draws per arm) |
+| `sk2-les-56c4c0` | 18 | **0** | -- | `out/sk2-les_cluster.log`; `out/sk2_les_holds/` (3 draws per arm) |
 
-Every job: `device` = **cuda**, `device_name` **NVIDIA B200** (the realised device out of `brain_probe`, never the
-request), `receptor_model 'sign'`, `receptor_net_rule 'abs'`, receptor table md5 `0381a446107e6050e75cc87b16d7f830`,
+Every job: `device` = **cuda** (all 24). `device_name` **NVIDIA B200** in only **12 of the 24** -- the 12 from the
+later batch (`les-holds-1df2ca`, `out/les_holds/`, dated 23:38-23:39). The 12 from the earlier batch
+(`les-holds-bd4380`, `out/les_holds_run1/`, 23:31-23:32) record `device_name` **null** and carry no
+`execution.backend.variants` list, because the provenance fix of defect 5 landed between the two batches. **The
+merged `holds_all.json` therefore mixes two versions of `lesion.py`.** Otherwise identical across all 24:
+`receptor_model 'sign'`, `receptor_net_rule 'abs'`, receptor table md5 `0381a446107e6050e75cc87b16d7f830`,
 `w_syn 0.275`, `conn_cap 60`, `type_path_gain [('^(LC4|LPLC2)$', '^DNp01$', 3.0)]` (post-retirement), body thresholds
 `gf_hz 33`, `takeoff_power_hz 50`. 1.5-2.0 min per job. The cluster's run-copy cache and this desktop's cache compile
 to the **same graph**: md5 `ef23cc27bea13be7f6a96f3c04fd3737`, 25,578,600 stored entries, sum |W| 121,460,584,
@@ -107,10 +122,13 @@ is built with the native backend flags** -- all 8 per job are plain torch CSR on
 warp)` label, which the job JSON copies, describes the flags `Context.sim()` hands the room demo, i.e. the demo
 sections this manifest does not run.
 
-**The matrix** (`out/interp/lesion/holds_all.json`, 24 jobs; `x4` = the four draws are bit-identical). Published =
-E.2's table for `baseline` / `holdBrain` / `holdOptic` / `off`, the round-4 re-score for `holdKC` / `holdDN1`.
+**The matrix** (`out/interp/lesion/holds_all.json`, 24 jobs; `x4` = the four draws of that batch are bit-identical).
+Published = E.2's table for `baseline` / `holdBrain` / `holdOptic` / `off`, the round-4 re-score for `holdKC` /
+`holdDN1`. Where a row is **draw-dependent**, the last column also gives its range over all **11 GPU draws on record**
+(`out/les_holds_all/` 4 + `out/sk_les_holds_all/` 4 + `out/sk2_les_holds/` 3, 11 per arm, all `device cuda`, same
+cache md5 `ef23cc27bea13be7f6a96f3c04fd3737`).
 
-| check | arm | published | this tool (4 draws) |
+| check | arm | published | this tool (4 draws; 11-draw range where draw-dependent) |
 |---|---|---|---|
 | `rest.spikes_per_step` | all six | 0.0000 | 0.0000 x4 |
 | `taste.MN9_hz` | baseline / holdKC / holdDN1 / holdOptic | 10.9342 / 10.93 / 10.93 / 10.9342 | **10.9342 x4** in all four |
@@ -121,55 +139,82 @@ E.2's table for `baseline` / `holdBrain` / `holdOptic` / `off`, the round-4 re-s
 | `bitter.calibrated_sugar_bitter_MN9_hz` | all six | 0.0000 | 0.0000 x4 |
 | `bitter.shiu_sugar_MN9_hz` | same order | 139.8985 / 139.90 / 129.27 / 139.8985 / 123.5394 / 123.5394 | 139.8985 / 139.8985 / **129.2657** / 139.8985 / 123.5394 / 123.5394, x4 |
 | `bitter.shiu_sugar_bitter_MN9_hz` | same order | 0.8178 / 0.00 / 0.82 / 0.8178 / 2.1243 / 2.1243 | 0.8178 / 0.0000 / 0.8178 / 0.8178 / 2.1243 / 2.1243, x4 |
-| `walk.GF_max_hz` | baseline / holdOptic / holdBrain / off | 4.6292 / 13.3109 / 12.5174 / 4.9641 | **4.6292 / 13.3109 / 12.5174 / 4.9641**, x4 each |
+| `walk.GF_max_hz` | baseline / holdBrain / off | 4.6292 / 12.5174 / 4.9641 | **4.6292 / 12.5174 / 4.9641**, x4 each -- and x11 over the three batches |
+| | holdOptic | 13.3109 | 13.3109 x4; **11 draws: 13.3109 x10, 4.5364 x1** -- a 3x collapse in one draw |
 | | holdKC / holdDN1 | (8.41 / 4.72, pre-retirement) | 8.4497 x4 / 4.7458 x4 -- **new** |
-| `walk.power_max_hz` | baseline / holdOptic / holdBrain | 48.4805 / 64.9147 / 47.0012 | **48.4805 / 64.9147 / 47.0012**, x4 each |
-| | off | 95.5416 / 97.1014 (E.2), 96.46 (skeptic) | 95.5416 x3 / **96.4573** |
+| `walk.power_max_hz` | baseline / holdBrain | 48.4805 / 47.0012 | **48.4805 / 47.0012**, x4 each |
+| | holdOptic | 64.9147 | 64.9147 x4; **11 draws: 56.17-68.04** (64.9147 x9, 56.1737, 68.0376) |
+| | off | 95.5416 / 97.1014 (E.2), 96.46 (skeptic) | 95.5416 x3 / **96.4573**; **11 draws: 72.65-96.46** |
 | | holdKC / holdDN1 | (55.63 / 59.04, pre-retirement) | 42.2556 x4 / 59.0372 x4 -- **new** |
-| `walk.power_sustained_hz` | baseline / holdOptic / holdBrain | 20.1091 / 33.5072 / 21.3426 | **20.1091 / 33.5072 / 21.3426**, x4 each |
-| | off | 49.1802 / 50.5960 | 49.1802 x3 / **49.6141** |
+| `walk.power_sustained_hz` | baseline / holdBrain | 20.1091 / 21.3426 | **20.1091 / 21.3426**, x4 each |
+| | holdOptic | 33.5072 | 33.5072 x4; **11 draws: 27.08-34.17** (33.5072 x9, 27.0777, 34.1701) |
+| | off | 49.1802 / 50.5960 | 49.1802 x3 / **49.6141**; **11 draws: 41.45-49.61** |
 | | holdKC / holdDN1 | (23.68 / 30.75, pre-retirement) | 17.0012 x4 / 30.7489 x4 -- **new** |
-| `loom.GF_peak_hz` | baseline | 43.5929 / 46.4969 | 43.5929 / 44.1239 / 47.2162 / 47.2162 |
-| | holdBrain | 50.0089 / 50.0089 / 51.2904 / 60.0354 | 50.0089 / 60.0354 x3 |
-| | holdOptic | 31.7754 x3 / 32.0792 | 31.7754 / 32.1402 / 34.1576 x2 -- **the one miss** |
-| | off | 27.9926 / 29.0034 | 26.4500 / 27.5783 / 27.9926 / 30.0596 |
+| `loom.GF_peak_hz` | baseline | 43.5929 / 46.4969 | 43.5929 / 44.1239 / 47.2162 / 47.2162; **11 draws: 43.59-47.24** |
+| | holdBrain | 50.0089 / 50.0089 / 51.2904 / 60.0354 | 50.0089 / 60.0354 x3; **11 draws: 50.01-60.04** |
+| | holdOptic | 31.7754 x3 / 32.0792 | 31.7754 / 32.1402 / 34.1576 x2; **11 draws: 26.40-37.22, 8 distinct values** |
+| | off | 27.9926 / 29.0034 | 26.4500 / 27.5783 / 27.9926 / 30.0596; **11 draws: 24.43-30.06** |
 | | holdKC / holdDN1 | (49.01 x2 / 48.72, 53.76, pre-retirement) | 42.2293 x2 / 43.1074 / 47.6674; 47.2542 / 55.3060 / 55.5591 x2 |
 | `loom.escape_cm` | all six | 3.50 | 3.50 x4 |
-| `rotate.DNp20_flip_hz` | baseline | -41.8507 / -39.8623 | -40.7614 / -34.6514 / -33.5969 / -30.5012 |
-| | holdBrain / holdOptic / off | -26.20..-42.68 / -26.38..-31.47 / -30.05, -30.62 | -28.00..-32.08 / -12.76..-24.26 / -23.61..-30.42 |
+| `rotate.DNp20_flip_hz` | baseline | -41.8507 / -39.8623 | -40.7614 / -34.6514 / -33.5969 / -30.5012; **11 draws: -43.14..-30.50, all distinct** |
+| | holdBrain / holdOptic / off | -26.20..-42.68 / -26.38..-31.47 / -30.05, -30.62 | -28.00..-32.08 / -12.76..-24.26 / -23.61..-30.42; **11 draws: -40.40..-28.00 / -35.51..-12.76 / -32.34..-18.15** |
 
-**59 of 60 compared rows reproduced** (`validation.measured.n_reproduced`). **Ten** of the fourteen checks are
-bit-identical across all four draws in **every** arm -- taste, both smell checks, all four bitter checks,
-`walk.GF_max_hz`, `rest.spikes_per_step`, `loom.escape_cm` -- so those attributions carry no scatter at all, exactly
-as E.2 reported for its nine bit-stable checks. `walk.power_max_hz` and `walk.power_sustained_hz` are bit-identical in
-five of the six arms; only `off` varies, in 1 of 4 draws (96.4573 and 49.6141), and both of those values sit inside
-the published set (95.54 / 96.46 / 97.10 and 49.18 / 49.61 / 50.60), so those two checks fall through to the scatter
-rule, which at four draws still calls every arm moved.
+**The score is 56 / 57 / 59 of 60 across the three batches** (`validation.measured.n_reproduced` of
+`sk_holds_all.json` / `sk2_holds.json` / `holds_all.json`), not a fixed 59. **Nine** of the fourteen checks are
+bit-identical in **every** arm across all **11 draws** -- taste, both smell checks, all four bitter checks,
+`rest.spikes_per_step`, `loom.escape_cm` (9 checks x 6 arms = 54 of 54 (check, arm) pairs, one value each) -- so those
+attributions carry no scatter at all, close to E.2's nine bit-stable checks. `walk.GF_max_hz` looked like a tenth at
+4 draws and is not: it is bit-stable in five arms but takes **two** values under `holdOptic` (13.3109 x10, 4.5364 x1).
+`walk.power_max_hz` and `walk.power_sustained_hz` are bit-stable in four arms and vary in **two** -- `off` (72.65-96.46
+and 41.45-49.61 over 11 draws, i.e. below the published set 95.54 / 96.46 / 97.10 and 49.18 / 49.61 / 50.60 in one
+draw) and `holdOptic` (56.17-68.04 and 27.08-34.17). Those checks fall through to the scatter rule, which at four
+draws still calls every arm moved -- see the caveat in section 7.
 
-**The miss.** `loom.GF_peak_hz` under `holdOptic`: two of our four draws are inside E.2's range (31.7754 -- bit-equal
-to one of its draws -- and 32.1402), two are 2.1 Hz above it (34.1576), and the mean 33.0577 lies 1.0 Hz above the
-top of the published range, so the row is scored `not reproduced` and the whole GPU arm's status is `not reproduced`.
-This is the check E.2 itself refused to quote as a value (10.0 Hz of spread inside `holdBrain` there). The direction
-is unchanged: `holdOptic` 33.06 sits between `off` 28.02 and `baseline` 45.54, i.e. the Brain side alone recovers
-29 % of the default's loom GF, against E.2's 20-22 %.
+**What `reproduced` means here is not digit equality.** `validate()` scores each GPU row with
+`_close()` (`flyverse/interp/lesion.py:903`): rtol **5e-3** for a scalar, and for a published `[lo, hi]` range it
+widens the interval by **half its span on each side**. So `baseline` `loom.GF_peak_hz` mean **47.2202** scores
+`reproduced` against a published `[43.5929, 46.4969]` (`sk_holds_all.json`). The "every digit" language below belongs
+to the CPU arm, where the per-seed comparison runs at rtol 2e-4 and is literally true.
 
-**The dissociation the tool extracts here** (bit-identical criterion, 4 draws): `holdDN1` moves
-`bitter.shiu_sugar_MN9_hz` (-10.6328) and not `bitter.shiu_sugar_bitter_MN9_hz`, while `holdKC` moves the bitter
-check (0.8178 -> 0.0000) and not Shiu sugar -- so within the Brain side's glutamate group, **the DN1 flips carry
-65 % of Shiu sugar and none of the bitter suppression, and the KC flips the reverse**, bit-exactly, in 4 of 4 draws.
-Round 4 had both halves of this in its table (`holdDN1` 129.27, `holdKC` bitter 0.00) but did not pair them.
+**The misses: `holdOptic` is the unstable arm, not one row.** Over the 11 draws it gives `walk.GF_max_hz` 13.3109 in
+10 and 4.5364 in 1, `walk.power_max_hz` 56.17-68.04, `walk.power_sustained_hz` 27.08-34.17 and `loom.GF_peak_hz`
+26.40-37.22 (8 distinct values). Which rows score `not reproduced` follows the draws: `holds_all.json` misses only
+`loom.GF_peak_hz` (mean 33.0577 against published [31.7754, 32.0792]); `sk_holds_all.json` misses all four
+`holdOptic` walk / loom rows (`walk.GF_max_hz` mean 11.1172, `walk.power_max_hz` 63.5102, `walk.power_sustained_hz`
+32.0656, `loom.GF_peak_hz` 32.4786); `sk2_holds.json` misses `loom.GF_peak_hz` under `holdOptic` plus
+`walk.power_max_hz` / `walk.power_sustained_hz` under `off`. **E.2's published `holdOptic` walk values (64.9147 /
+33.5072) and anything derived from them are single-mode readings of a multi-valued arm and should be quoted as
+ranges, not values** -- including E.2's "the Brain side alone recovers 66 % / 55 %". The same goes for the loom direction here:
+`holdOptic` 26.40-37.22 sits between `off` 24.43-30.06 and `baseline` 43.59-47.24, i.e. the Brain side recovers
+roughly a quarter to a third of the default's loom GF, against E.2's 20-22 %; the check is the one E.2 itself refused
+to quote as a value (10.0 Hz of spread inside `holdBrain` there). Outside the `walk.*` and `loom.GF_peak_hz` families
+nothing has ever missed: **44 of the 60 compared rows** -- the 38 published taste / smell / bitter / rest check rows
+plus the six `entries_changed` rows -- are bit-identical in all 11 draws over the three batches.
+
+**The dissociation the tool extracts here** (bit-identical criterion): `holdDN1` moves `bitter.shiu_sugar_MN9_hz`
+(-10.6328) and not `bitter.shiu_sugar_bitter_MN9_hz`, while `holdKC` moves the bitter check (0.8178 -> 0.0000) and not
+Shiu sugar -- so within the Brain side's glutamate group, **the DN1 flips carry 65 % of Shiu sugar and none of the
+bitter suppression, and the KC flips the reverse**, bit-exactly, in all 11 draws. Round 4 had both halves of this in
+its table (`holdDN1` 129.27, `holdKC` bitter 0.00) but did not pair them. **The GPU dissociation _count_ is not
+stable** -- 8 (`holds_all.json`), 1 (`sk_holds_all.json`), 17 (`sk2_holds.json`), because most candidates rest on
+`rotate.DNp20_flip_hz` and `loom.GF_peak_hz`. This `(holdDN1, holdKC) x (Shiu sugar, Shiu bitter)` pair is the **only
+one that survives all three batches**; quote it, not the count.
 
 **`walk.power_max` is non-monotone in the number of applied flips**, as round 4 said, and now under the current
-default: baseline 48.4805, `holdKC` 42.2556 (**below** the default), `holdDN1` 59.0372, `holdBrain` 47.0012,
-`holdOptic` 64.9147, `off` 95.5416 -- the two complementary single-side holds move it by -1.48 and +16.43 while
-removing both moves it by +47.29, so the sides are strongly non-additive. Per the project rule this check is reported,
-never used as a verdict and never tuned to.
+default: baseline 48.4805, `holdKC` 42.2556 (**below** the default), `holdDN1` 59.0372, `holdBrain` 47.0012 (all four
+bit-stable over 11 draws), `holdOptic` **56.17-68.04** and `off` **72.65-96.46** (both draw-dependent, quoted as
+ranges) -- the two complementary single-side holds move it by -1.48 and +7.7 to +19.6 while removing both moves it by
++24.2 to +48.0, so the sides are strongly non-additive. Per the project rule this check is reported, never used as a verdict
+and never tuned to.
 
 ## 5. Validation C -- the CPU double dissociation (E.4)
 
 `interp_lesion.py run --manifest holds_cpu --device cpu --sections taste,smell --replicates 3`: 8 arms x 3 brain
-seeds = 24 jobs in one local process, ~13 s of simulation each. Run **twice** (`out/les_cpu/`, `out/les_cpu2/`); the
-two runs agree in **24 of 24 matrix rows, every digit**, and each reproduces **32 of 32** published per-seed numbers.
+seeds = 24 jobs in one local process, ~13 s of simulation each. Run **twice here** (`out/les_cpu/`, `out/les_cpu2/`)
+and twice independently since (`out/sk_les_cpu/`, `out/sk2_les_cpu/`); all four agree in **24 of 24 matrix rows, every
+digit**, each reproduces **32 of 32** published per-seed numbers, and each extracts the same **6** dissociations
+(`holds_cpu.json`, `holds_cpu2.json`, `sk_holds_cpu.json`, `sk2_holds_cpu.json`). Unlike the GPU matrix, the CPU
+protocol's rows and its dissociation count are stable.
 
 | condition | check | E.4 per seed 0 / 1 / 2 | this tool |
 |---|---|---|---|
@@ -225,8 +270,9 @@ drop-in replacement for `screen.ablate`, and why the job record carries `fan_in_
 
 `matrix` decides "did this lesion move this check" by three criteria, in order, and prints which one it used:
 
-1. **bit-identity within every arm** (10 of our 14 GPU checks): any difference at all is a move. This is E.2's own
-   criterion and needs no scatter.
+1. **bit-identity within every arm** (9 of our 14 GPU checks over 11 draws; 10 at 4 draws, before `walk.GF_max_hz`
+   showed a second value under `holdOptic`): any difference at all is a move. This is E.2's own criterion and needs no
+   scatter.
 2. **paired by brain seed** (the CPU protocol): moved iff every paired difference is non-zero, not moved iff every
    one is zero -- E.4's "= off, every digit".
 3. **the scatter rule** otherwise: beyond twice the pooled replicate sd = moved, at or below one pooled sd = not
@@ -240,10 +286,19 @@ rows become `underpowered` and the count drops to **1**. With both batches (4 dr
 the tool says: `holdOptic` moved it (-34.88 -> -20.44, pooled sd 4.81), `holdBrain` and `off` **unclear**, `holdKC`
 not moved. E.2, with 12 draws, declined to attribute the check at all because its `holdBrain` draws spanned every
 condition; ours are unclear there too. The `holdOptic` call is therefore **new and provisional** -- 4 draws on a check
-with 5 Hz of scatter -- and is not a result of this round.
+with 5 Hz of scatter -- and is not a result of this round. The 11 draws now on record widen it further: `holdOptic`
+-35.51..-12.76 against `baseline` -43.14..-30.50, and all 11 draws are distinct values in five of the six arms.
+
+**A caveat the scatter rule needs.** When both an arm and the baseline happen to be bit-stable, `pooled_sd` is exactly
+0 and the rule degenerates to bit-identity, so at >= 3 draws a *luckily* stable arm is called `moved` with no scatter
+budget at all. That is exactly what happens to `walk.power_max_hz` / `walk.power_sustained_hz` / `walk.GF_max_hz`
+under `holdOptic` in `holds_all.json`'s four draws, where the 11 draws on record show the arm actually spanning
+56.17-68.04 Hz / 27.08-34.17 Hz / 4.54-13.31 Hz. Either widen the `underpowered` rule to any check whose arms are not
+*all* bit-stable, or require >= 3 draws in **every** arm before the pooled-sd branch may call a row moved.
 
 Summary of the merged GPU run: 38 moved rows, 0 underpowered, 8 dissociations, 10 bit-identical checks
-(`out/interp/lesion/holds_all.json`, `summary`).
+(`out/interp/lesion/holds_all.json`, `summary`) -- but the dissociation count is batch-dependent (1 / 8 / 17 over the
+three batches, section 4) and the bit-identical count is 9 over 11 draws.
 
 ## 8. Defects this validation found (all fixed in `flyverse/interp/lesion.py`)
 
@@ -290,9 +345,13 @@ PYTHONIOENCODING=utf-8 python scripts/interp_lesion.py analyse --manifest holds_
     --json out/interp/lesion/holds_cpu.json
 
 # C. a weight-mask lesion, manifest given inline
+# NOTE: as written this declares only no_ORN, so it writes 6 job JSONs (baseline + no_ORN x 3 seeds).
+# out/les_orn/ holds 9 -- section 6's directory also has holdBrainHis; add it to the "lesions" list to regenerate it.
 PYTHONIOENCODING=utf-8 python scripts/interp_lesion.py run --manifest '{"name":"orn_cpu","sections":"taste,smell",
   "brain_seeds":[0,1,2],"baseline":{"id":"baseline","kind":"none","receptor_model":"sign","receptor_net_rule":"abs"},
-  "lesions":[{"id":"no_ORN","kind":"population","spec":"~^ORN","receptor_model":"sign","receptor_net_rule":"abs"}]}' \
+  "lesions":[{"id":"no_ORN","kind":"population","spec":"~^ORN","receptor_model":"sign","receptor_net_rule":"abs"},
+    {"id":"holdBrainHis","kind":"hold_table","spec":"out/receptors_holdBrainHis.csv",
+     "receptor_model":"sign","receptor_net_rule":"abs"}]}' \
   --out out/les_orn --device cpu --replicates 3
 
 PYTHONIOENCODING=utf-8 python -m pytest tests/test_interp.py::LesionTests -q     # 8 CPU tests, seconds
@@ -300,16 +359,25 @@ PYTHONIOENCODING=utf-8 python -m pytest tests/test_interp.py::LesionTests -q    
 
 ## 10. Limits and open questions
 
-* **Two replicates are not enough for `loom.GF_peak_hz` or `rotate.DNp20_flip_hz`.** The default `--replicates 3`
-  (six arms = 18 jobs, ~3 min of cluster time) should be used for any matrix that includes them; at 2 the tool now
-  says `underpowered` instead of guessing.
+* **Four replicates are not enough for `loom.GF_peak_hz`, `rotate.DNp20_flip_hz` or the three `walk.*` checks.** The
+  11 draws on record show `holdOptic` taking two values on `walk.GF_max_hz` and three on each power check, and `off`
+  taking three on each power check -- none of it visible in this round's four draws. The default `--replicates 3`
+  (six arms = 18 jobs, ~3 min of cluster time) is the floor, not the target, for any matrix that includes them; at 2
+  the tool says `underpowered` instead of guessing, but at 3-4 it can still call a multi-modal arm `moved` on one
+  mode (section 7).
 * **`holdKC` / `holdDN1` walk and loom numbers are new** (round 4 measured them before the GF-damping retirement) and
   have no published counterpart to check against. `walk.power_max` `holdDN1` 59.0372 and `power_sustained` 30.7489
   happen to equal round 4's pre-retirement values to 2 dp while every other arm moved; that is not explained here and
   is not claimed as stability.
-* **The bit-identity criterion is a property of the protocol, not of the tool.** It holds for 10 of these 14 checks on
-  the GPU (12 of 14 at two draws, before `off`'s walk pair showed a second value); a manifest whose sections draw RNG (the room / hops sections) will fall through to the scatter rule, where
-  three runs per arm is the floor.
+* **The bit-identity criterion is a property of the protocol, not of the tool -- and of the number of draws.** It
+  holds for **9** of these 14 checks over the 11 GPU draws on record (12 of 14 at two draws, 10 at four, before
+  `off`'s walk pair and then `holdOptic`'s walk triple each showed a second value); a manifest whose sections draw RNG
+  (the room / hops sections) will fall through to the scatter rule, where three runs per arm is the floor -- and
+  three runs in **every** arm, not just the one being called (section 7).
+* **`--null` is advertised but inert in this tool.** `scripts/interp_lesion.py` accepts `--null` via
+  `common.add_common_args`, but it is never forwarded to `lesion()`, which has no `null` parameter, so
+  `Result.replicates['null']` stays `null` in every output (`flyverse/interp/lesion.py:1042, 1074`). Wire it to a
+  baseline-vs-baseline arm or drop it from this tool's CLI.
 * **A weight mask changes the fan-in normalisation** of the lesioned cells' targets (section 6). A `scope='graph'`
   variant that also reaches the optic lobe exists but was not exercised on the full connectome in this round.
 * **The tool never applies a lesion to the model on disk**; it applies parameter overrides and an in-process mask, and

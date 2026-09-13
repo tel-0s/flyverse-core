@@ -13,11 +13,19 @@ changes it. Design, schema, composition, GPU / CPU split, validation targets and
     export     the read-only Neurome probe export (docs/NEUROME_INTERFACE.md) from any Result
 
 Each tool is a function in `flyverse/interp/<tool>.py` with the signature fixed in `stubs` below and a CLI wrapper
-`scripts/interp_<tool>.py`. Until an implementer's module lands, `flyverse.interp.<tool>` resolves to the stub (which
-raises NotImplementedError naming the module to create); once `flyverse/interp/<tool>.py` exists and defines the
-function, the same attribute returns it -- so `from flyverse.interp import trace` is the stable import path. The
-shared machinery (selection, shaped weights, Recorder / Recording, null helpers, Result, provenance) is in
-`flyverse.interp.common` and is real code, not a stub.
+`scripts/interp_<tool>.py`. The shared machinery (selection, shaped weights, Recorder / Recording, null helpers,
+Result, provenance) is in `flyverse.interp.common` and is real code, not a stub.
+
+**Two namespaces, kept apart** (docs/INTERP.md 11, defect 6 -- until this revision `flyverse.interp.trace` was the
+function before anything imported the submodule and the submodule afterwards, which made the contract test depend on
+import order):
+
+* `flyverse.interp.<tool>` is the **module** -- `from flyverse.interp import trace as tr` in every wrapper, always,
+  whether or not anything imported it first.
+* `flyverse.interp.tools.<tool>` (and `flyverse.interp.tool('<tool>')`) is the **function** -- the implementation in
+  `flyverse/interp/<tool>.py` when that module exists and defines it, and the stub of `stubs` (which raises
+  NotImplementedError naming the module to create) until it does. `flyverse.interp.HealthReadout` resolves the same
+  way.
 """
 from __future__ import annotations
 
@@ -25,11 +33,12 @@ import importlib
 
 from . import common
 from .common import (Population, Recorder, Recording, Result, EffectiveWeights, TOOLS, VALIDATION, SCHEMA,
-                     resolve, population, populations, effective_weights, links, silent_flags, compare, provenance)
+                     resolve, population, populations, effective_weights, links, silent_flags, compare, p_floor,
+                     provenance)
 
-__all__ = ["common", "stubs", "HealthReadoutStub", "Population", "Recorder", "Recording", "Result", "EffectiveWeights",
-           "TOOLS", "VALIDATION", "SCHEMA", "resolve", "population", "populations", "effective_weights", "links",
-           "silent_flags", "compare", "provenance", *TOOLS, "HealthReadout"]
+__all__ = ["common", "stubs", "tools", "tool", "HealthReadoutStub", "Population", "Recorder", "Recording", "Result",
+           "EffectiveWeights", "TOOLS", "VALIDATION", "SCHEMA", "resolve", "population", "populations",
+           "effective_weights", "links", "silent_flags", "compare", "p_floor", "provenance", *TOOLS, "HealthReadout"]
 
 
 def _todo(name: str):
@@ -214,13 +223,20 @@ class HealthReadoutStub:
         _todo("health")
 
 
-def _implementation(name: str, attr: str, fallback):
-    """The implementer's `attr` from flyverse/interp/<name>.py when the module exists, else `fallback`."""
+def _module(name: str):
+    """flyverse/interp/<name>.py as a module, or None when it does not exist yet."""
     try:
-        mod = importlib.import_module(f".{name}", __name__)
+        return importlib.import_module(f".{name}", __name__)
     except ImportError as e:
         if e.name not in (f"{__name__}.{name}", name):       # a real import error inside the implementer's module
             raise
+        return None
+
+
+def _implementation(name: str, attr: str, fallback):
+    """The implementer's `attr` from flyverse/interp/<name>.py when the module exists, else `fallback`."""
+    mod = _module(name)
+    if mod is None:
         return fallback
     obj = getattr(mod, attr, None)
     if obj is None:
@@ -228,9 +244,45 @@ def _implementation(name: str, attr: str, fallback):
     return obj
 
 
+def tool(name: str):
+    """The tool FUNCTION named `name` -- the implementation when `flyverse/interp/<name>.py` defines it, else the stub.
+
+    The function namespace: `flyverse.interp.<name>` is the module (the import system owns that attribute), so the
+    callable is reached through here or through `flyverse.interp.tools.<name>`, and neither depends on what has been
+    imported already."""
+    if name not in TOOLS:
+        raise ValueError(f"unknown tool {name!r}; choose from {TOOLS}")
+    return _implementation(name, name, getattr(stubs, name))
+
+
+class _Tools:
+    """`flyverse.interp.tools`: attribute access over `tool()` -- `tools.trace(c, source, ...)` is the function."""
+
+    def __getattr__(self, name: str):
+        if name not in TOOLS:
+            raise AttributeError(name)
+        return tool(name)
+
+    def __call__(self, name: str):
+        return tool(name)
+
+    def __dir__(self):
+        return list(TOOLS)
+
+    def __repr__(self) -> str:
+        return "<flyverse.interp.tools: " + ", ".join(f"{t}{'' if _module(t) else ' (stub)'}" for t in TOOLS) + ">"
+
+
+tools = _Tools()
+
+
 def __getattr__(name: str):
-    if name in TOOLS:
-        return _implementation(name, name, getattr(stubs, name))
+    if name in TOOLS:                                        # the MODULE namespace (the import system sets the same
+        mod = _module(name)                                  # attribute once anything imports the submodule)
+        if mod is None:
+            raise AttributeError(f"flyverse/interp/{name}.py does not exist yet; `flyverse.interp.tools.{name}` is its "
+                                 f"stub (docs/INTERP.md, section 4)")
+        return mod
     if name == "HealthReadout":
         return _implementation("health", "HealthReadout", HealthReadoutStub)
     raise AttributeError(name)

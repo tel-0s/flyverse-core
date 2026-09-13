@@ -57,7 +57,10 @@ v_rest = v_reset = -52 mV, v_th = -45 mV, tau_m = 20 ms, tau_syn = 5 ms, refract
 exponential Euler at dt = 0.5 ms in torch on the GPU: whole CNS at ~1,700 steps/s on an RTX 4090
 (~0.85x real time). Optional extras that Shiu's model does not have: constant current injection per
 neuron (mV; a drive D > 7 mV makes a neuron fire at 1/(2.2 ms + 20 ms ln(D/(D-7)))), Poisson forcing,
-and spike-frequency adaptation.
+and spike-frequency adaptation. [2026-09-13: the **realised** refractory period is **2.5 ms**, not 2.2 --
+`t_ref` 2.2 ms holds a cell for 5 steps of dt = 0.5 ms and it fires again on the 6th, so the minimum ISI
+is 3.0 ms (333 Hz) and the analytic rate above, plus every "refractory-limited" ceiling in this file, is
+that bound. `docs/audits/interp_health.md` 4; see "Session 10, interpretability toolkit".]
 
 ### What we learned driving it
 
@@ -263,6 +266,10 @@ and spike-frequency adaptation.
   al. 2022, so the model recovers a known flight pathway. Giant fibre DNp01 -> TTMn 47 Hz (the jump).
   Legs: DNp27, DNp43, DNge035, DNg100, DNge130 (5-9 Hz both sides); MDN 3.7/2.9; DNp09 only 0.6.
   Proboscis: DNge080 28 Hz, DNge062 17, DNge059 10. 37 of 473 DN types drive wing power above 15 Hz.
+  [2026-09-13: the 981-population atlas adds the *lateralised* map this screen does not have: **DNge035
+  is the strongest lateralised leg driver**, +7.50 / -6.19 Hz of leg L-R and *contralateral*, three times
+  DNa02's +2.24 / -1.45, then DNa13, DNge037, DNge049, DNge073. A measurement, not a readout change --
+  `body.py` is untouched. `docs/audits/interp_atlas.md` 6.1; "Session 10, interpretability toolkit".]
 
 * **RL, second attempt.** Retraining the DN-rate decoder under the new model with a 12 cm spawn
   curriculum gave the same nothing after 12 generations (mean return -5), so it was stopped. The
@@ -335,6 +342,13 @@ and spike-frequency adaptation.
   the opposite side (-37 / +64), then DNge016, DNg99, DNge175, DNg05_a, DNp19 and DNpe017 (doomfly's
   choice, which does carry a wind signal). The DN rates are identical with and without an odour plume:
   the odour gate on upwind turning is not at the DN level in this model.
+  [2026-09-13: the atlas reproduces these flips **without a room**, by stimulating the 335 JO-C/E cells at
+  the exact per-cell rates `senses.Wind` would produce (DNp18 +50.98 / +50.59 against the suite's +45.2; the
+  +12 % is the atlas fixing the wind at 180 deg against the room's 20 deg meander -- with the meander, +47.5),
+  so JO stimulation equals sense-driven wind through `fb.wind`. And under *symmetric* head-on drive the same
+  DNs keep a **fixed anatomical L-R offset**: DNp18 +13.45, DNp73 +19.51, WED080 -17.07, DNge016 +9.89,
+  DNp33 -10.68 Hz -- half of DNp73's apparent flip is that offset, not the wind.
+  `docs/audits/interp_atlas.md` 3.1; "Session 10, interpretability toolkit".]
 * body.py: anemotaxis term `k_wind * gate * upwind`, upwind = 0.5 [(DNp18-group L - R) - (DNp33-group
   L - R)]; gate = clip((mean PN rate - 10 Hz) / 15 Hz), held with a 1.5 s decay after the plume is lost
   (the surge), plus a small forward bonus at full gate. The gate is the one behavioural assumption
@@ -1312,7 +1326,11 @@ settled the attribution. The plan is closed; `docs/NT_INTEGRATION.md` section 7 
 **The default model now.** Synapse signs from the presynaptic transmitter, corrected per postsynaptic type by the
 receptor-expression table where six transcriptomic sources decide it (`receptor_model 'sign'` / `abs`, 48,295 entries =
 0.15 % of the weight; `None` restores the presynaptic rule byte for byte); the GF x0.3 input damping retired
-(`DEFAULT_TYPE_PATH_GAIN` keeps LC4/LPLC2 -> DNp01 x3; `GF_DAMPED_TYPE_PATH_GAIN` restores it); `TYPE_NT_OVERRIDE`
+(`DEFAULT_TYPE_PATH_GAIN` keeps LC4/LPLC2 -> DNp01 x3; `GF_DAMPED_TYPE_PATH_GAIN` restores it) [2026-09-13: still
+exactly this -- `brain.py:221` -- and the cluster runs' own provenance shows only the x3 pair, but
+`docs/audits/interp_atlas.md` 6.1 and 8 quote the retired five-type x0.3 damp (SAD073 / GNG300 / DNp70 / CL367 /
+PVLP010 -> DNp01) as if it were in force; it is not, and any reading resting on it (e.g. "DNp70 is damped") is
+void. "Session 10, interpretability toolkit"]; `TYPE_NT_OVERRIDE`
 for TmY14 / Mi19 / aMe8. Four weight md5s pinned in the tests. Suite 27/0/2 in 4 of 4 draws (walk.power_max 48.5 Hz
 against the hand-set 50 Hz bound, in 14/14 draws) -- the tally gain is the retirement's, and the two changes
 interact: off with the damping retired fails walk.power_max at 95-97 Hz, so under the shipped gains the receptor
@@ -1326,7 +1344,13 @@ by a quarter to a half (inside rerun scatter: the same seed gives 19 hops in one
 excess over off survives at 6x with an unmoved walking-GF tail (median 31.9 vs 27.2 Hz; 19/48 vs 8/48 flies at the
 33 Hz escape threshold). The shipped default's voluntary entry is a KNOWN GAP in substance. Neither the KC / DN1
 holds (round 4) nor the DNp01 inhibition (round 5) accounts for it, and walk.GF_max shows the two halves of the
-receptor signs cancel (either half alone raises the walking GF 2.5-2.9x) -- a dynamics question the sustain / RL
+receptor signs cancel (either half alone raises the walking GF 2.5-2.9x) [2026-09-13: **retracted as a
+cancellation** -- that was a seed-0 reading. The seed-0 digits (off 4.964, default 4.629, holdBrain 12.517,
+holdOptic 13.311 Hz) reproduce exactly, but seeds 0-2 scatter as widely as the effect (off 4.96 / 9.38 / 13.41,
+default 4.63 / 4.96 / 0.00), every arm vs off is `null`, at n = 4 holdBrain minus off is +0.006 Hz, and DNp01's
+1,455 input entries are *identical* in all four arms: the difference is in presynaptic rates, not in DNp01's
+synapses, and `walk.GF_max` is not a quantity a cancellation can be read from at three runs.
+`docs/audits/interp_decompose.md` 2; "Session 10, interpretability toolkit"] -- a dynamics question the sustain / RL
 work inherits, with the room hold pair as the first experiment.
 
 **Attribution closed.** Taste, smell and the sugar checks are Brain-side (bit-exact in three run dirs), direction
@@ -1362,7 +1386,13 @@ shows what did: `Locomotion.k_opto` was deg2rad(150)/15 rad/s per Hz of DNp04 / 
 it (commit c4ec33d: the optomotor readout never flipped under imposed rotation and HSN / DNp20 / HSE respond to the
 fly's own walking). The old fly's turns were that optomotor term reacting to self-motion -- an artefact -- and with
 it gone the only turning signals left in the plain body, DNa02 R-L and leg-MN L-R asymmetry, are symmetric with no
-directed input. Starvation does nothing in the plain model by design: hunger-driven search exists only as programs
+directed input. [2026-09-13: localized, and it is not only an absence of input at DNa02 -- DNa02 is held **below
+threshold** in the room by sign-correct tonic inhibition (-326 / -392 mV/s = -1.6 / -2.0 mV of steady conductance
+against a 7 mV threshold gap) while its three lateralised excitatory classes are silent at source (PFL3 and
+AOTU015 / AOTU001 at 0.000 Hz, most of LLPC1 never firing and LPT22 cancelling what survives at corr -0.86) and the
+one live lateralised route, the wind, is ~90x under dose; and the **VNC runs open-loop** -- every `vnc_sensory` cell
+is at 0 Hz in the room, so the walking body reports nothing back. `docs/audits/deficit_turning.md`; "Session 10,
+interpretability toolkit".] Starvation does nothing in the plain model by design: hunger-driven search exists only as programs
 (`--program anemotaxis` / `cx`).
 
 So this is a real, previously masked deficit of the full model rather than a regression: the connectome model has no
@@ -1394,7 +1424,11 @@ does not steer (yaw first harmonic 0.006-0.021 rad/s = 0.3-1.2 deg/s against a h
 20-31 deg), and leaves PFN at 0.59-0.78 Hz and hDelta at 1.47-1.86 Hz under a 220-260 Hz bump, so **PFN ->
 hDelta -> PFL3 is answered NO**. It is also pinned: the realised centre snaps to 5-7 attractor sites out of 16
 wedges ({1.5, 3.9, 8.4, 10.6, 13.2} at gE 2/15, identical to 0.1 wedge across seeds and programs) and then
-freezes (centre circular sd 0.02-0.09 wedges over 38 s, 0 jumps). PFL3's L-R offset is a fixed anatomical
+freezes (centre circular sd 0.02-0.09 wedges over 38 s, 0 jumps). [2026-09-13: `health` gives the pinning its
+membrane signature -- the **undriven EPG sit ~250 mV below threshold** under gD 15 (there is no lower clamp on `v`
+in the LIF), so a cell that far down cannot be recruited by a few Hz of ring input, and the bump's own cells are
+refractory-limited at a load of 0.440 +- 0.004. `docs/audits/interp_health.md` 3; "Session 10, interpretability
+toolkit".] PFL3's L-R offset is a fixed anatomical
 gradient that the gains scale rather than create (amplitude 2.09-3.31 Hz, phase 12.3-12.9 wedges, r2 0.72-0.80,
 p 0.018-0.042 with the bump position as the unit and duplicate tile pairs collapsed, n = 8; the shipped control
 reproduces the same phase at 0.19 Hz), and DNa02 follows it at 0.08-0.24 Hz against a within-fly temporal sd of
@@ -1411,7 +1445,14 @@ The deflection is **elastic**, relaxing to or past its start once the drive stop
 wedges at seeds 0-2). Imposed visual rotation at 90 deg/s moves the bump 0.00 +- 0.01 wedges/s against a
 4.0 w/s ideal while HSN / HSE / Nod1 / DNp20 flip at d' -2.5 to -4.5 in the same runs: **no visual route to
 PEN**. The efferent route the structure points at is untested -- the rig teleports the fly (R2-1).
-`out/verify_cx_shift_shift.md`, `out/vcx_*_s345.json`.
+`out/verify_cx_shift_shift.md`, `out/vcx_*_s345.json`. [2026-09-13: the efferent route was run (the fly turning
+itself at 86-113 deg/s) and the bump does not follow that either -- 0.00 +- 0.01 wedges/s. The block is two layers
+deep: **PS196_b, which would bring the turn into GLNO, never fires** (0.03-0.16 Hz, null in 24/24 traces), **DNa02
+makes 0 synapses onto the PS196_b / LAL / GLNO chain** (so the efferent arm tests visual reafference plus a VNC
+loop, and the sided report the VNC does send up reaches nothing in the PEN chain), and what the eye delivers arrives
+at GLNO / ER1_a **direction-blind** and at 0.1 % of GLNO's drive -- so signing GLNO would carry nothing (the gaba
+arms: -3,752 / -3,797 vs -3,749 mV/s onto PEN_a). `docs/audits/deficit_rotation.md`; "Session 10, interpretability
+toolkit".]
 
 **Where the small object is lost, named at last.** The static-apple figure is carried by the lamina (L1 z
 +18.4, L2 +12.0), the medulla (Mi1 -8.8, Tm3 -6.8, Tm20 +5.3, Tm4 +4.8, Tm1 +4.5) and T4c/d / LPLC2, and it is
@@ -1508,6 +1549,184 @@ corrections into `receptor_integration.md` G.5, `optic_measures.md` and `feeding
 skeptic verdicts verbatim into `receptor_verification.md`.
 
 The interpretability-toolkit workflow (`flyverse/interp/`) was launched immediately after this round.
+
+## Session 10, interpretability toolkit (2026-09-12/13)
+
+Eight tools, one skeptic pass each, three applications. **No model default changed**: `brain.py` / `optic.py` /
+`body.py` and the weights are untouched, and the only code edited anywhere was the toolkit's own
+(`flyverse/interp/trace.py`'s raw-count fix; a documented `--by-side` alias in `scripts/interp_atlas.py`).
+Shipped: `flyverse/interp/` (**decompose** -- what drives a cell
+set per frame by presynaptic type / transmitter / receptor tier; **trace** -- where along the depth a stimulus is
+lost; **paths** -- effective k-step signed gains and which links are silent; **lesion** -- check x lesion delta
+matrices and the double dissociations; **atlas** -- what every motor readout does when population X is stimulated;
+**health** -- per-type operating point of a rollout; **ledger** -- measured responses against curated expectations;
+**export** -- the Neurome serializer), one CLI per tool (`scripts/interp_*.py`), **65 CPU tests**
+(`tests/test_interp.py`), a validation record per tool (`docs/audits/interp_<tool>.md`), three applications
+(`docs/audits/deficit_{turning,object,rotation}.md`), the procedure (`docs/INTERP.md` 10) and ten open contract
+defects in the shared files (`docs/INTERP.md` 11: `common.raw_counts`, a floor on the null SD, `MIN_REPLICATES`, the
+`--null` flag, `VALIDATION['health']` 3,407 -> 3,312, the submodule/function namespace clash). It is **one system**
+at the data layer -- one selection grammar, one weight accessor (`effective_weights` = `Brain._W_cpu` bit-for-bit,
+md5 `ed1df661...` in every JSON), one Result schema (`Result.check()` empty on every shipped JSON of all eight
+tools), one provenance block with the realised device and the cache fingerprint `ef23cc27...`, one comparison
+primitive -- and **seven scripts at the statistics layer**: five private `raw_counts` fixes, four null-CLI
+conventions, three answers to the deterministic null, and `result` / `reproduced` meaning something different per
+tool. That seam is exactly the layer that decides whether a number is a finding, and it is what `INTERP.md` 11 fixes.
+
+**Every tool reproduced a hand-made localization; two did not reproduce as written, and both are findings rather
+than tool failures.** `paths` 63/63 checks, deterministic and independently re-derived by brute force (GLNO -> PEN
+84 entries / 16,371 syn / 19.4 % / sign 0; the two-step ExR6 / ER4m / ExR4 ranking; only prose errors: one omitted
+runner-up and "203 LAL types" for 204). The taste carrier bit-identically (123 entries / 282 synapses histamine
+0 -> -1 onto OA-AL2i3 62 / TmY14 25 / DNge138 5; MN9 0 entries). The hold tables 8/8 entry counts and md5s and the
+CPU double dissociation 32/32 per-seed rows in three independent runs. The compass bump seed-matched to the digit
+(EPG_in 199.8 +- 1.6 Hz, refractory load 0.440 +- 0.004 inside the 0.40-0.57 band) and the NT-audit sign-0 shares to
+the synapse (3,312 / 2,683 / 2,701,289 of 124,161,873). The LH odour gate to 0.00-0.17 Hz over 11,147 rows. The wind
+/ PFL3 / DNa02 atlas arms at the criterion on fresh seeds (DNp18 +50.98 / +50.59 vs +45.2; PFL3_L at 80 Hz ->
+DNa02_R 24.11 / 21.57 vs 22.6, DNa02_L exactly 0.00; DNa02_L -> leg L-R +2.13 / +2.24 / +2.29 vs 2.58). The round-3
+object sweep and its retina bit-identically (round-trip max_abs_diff 1.4e-14, 16/16 Neurome edge counts exact). The
+suite's own 9 references. **The two that did not:** (1) `walk.GF_max`'s G.4 "cancellation" is a **seed-0 reading** --
+the seed-0 digits 4.964 / 4.629 / 12.517 / 13.311 Hz reproduce exactly on a second cluster batch, but seeds 0-2
+scatter as widely as the effect (off 4.96 / 9.38 / 13.41, default 4.63 / 4.96 / 0.00; every arm vs off `null`; at
+n = 4 holdBrain minus off is +0.006 Hz), and **DNp01's 1,455 input entries are identical in all four arms**, so the
+tool localizes the arms to presynaptic rates, not to DNp01's synapses (`docs/audits/interp_decompose.md` 2).
+(2) The GPU hold matrix's `walk.GF_max` / `walk.power_max` / `walk.power_sustained` / `loom.GF_peak_hz` rows are
+**draw-dependent** -- 56 / 57 / 59 of 60 over three batches, with off `walk.power_max` reading 72.65 in one draw
+against the published 95.5-97.1 -- so "59 of 60" is one batch's property and the shipped status is honestly `not
+reproduced`; the reproducible core is the 44 bit-identical taste / smell / bitter / rest / escape rows and the
+(holdDN1, holdKC) x (Shiu sugar, bitter) dissociation, the only one of 1 / 8 / 17 extracted dissociations that
+survives all three batches (`docs/audits/interp_lesion.md`). One qualification to carry: the object-stage `trace`
+reproduces **at the verdict level only** (Mi4 z +6.6 / Mi1 +17.2 / Tm3 +10.5 `result`, the six small-field types
+`null`, 5 v 5) -- the z magnitudes do not (the reference's Mi4 +22.3 / +28.6 against a 5-draw null SD 3x larger
+here), and under the contract's own default statistic (`figure_z`) the same target reads `not reproduced`. Read
+every `validation.status = reproduced` with its tool's own definition of the word.
+
+**Turning: DNa02 sits under tonic sign-correct inhibition and its lateralised excitation is silent at source.**
+(`docs/audits/deficit_turning.md`; 3 room rollouts x 16 flies x 60 s plus a 963-population atlas x 3 runs; **nothing
+changed in `flyverse/`**.) The plain fly walks straight -- yaw-rate SD 2.45-2.57 deg/s, straightness 0.99-1.00 --
+and the deficit is **MISSING INPUT on three of four routes plus an OPERATING-POINT fact at DNa02** (dynamics), with
+**WIRING** contributing on the fourth. DNa02's room input is net inhibitory, -326 / -392 mV/s per cell = **-1.6 /
+-2.0 mV of steady conductance against a 7 mV threshold gap** (wired per volley it is net *excitatory*, +466 / +448
+mV), from sign-correct GABA / glutamate cells firing at 3-14 Hz (IN12B014, GNG562, PS059, LT51, IN19A003, LPT22);
+reproduced from the raw npz, from scratch through `effective_weights`, and on a fresh seed (-323 / -388). The three
+lateralised excitatory classes are silent at source: **PFL3 0.000 Hz** in 24 cells x 48 flies -- though the atlas
+shows PFL3 -> DNa02 works when driven (+45 Hz at 150 Hz) and **eight other CX populations move DNa02 by 0.6-1.6 Hz**
+(hDeltaI both sides, ExR8 both, hDeltaA_L, vDeltaK_R, PFL2_L, PEN_b_L), so "PFL3 is the only CX gate" overstates;
+**AOTU015 / AOTU001 0.000 Hz** (downstream of the object deficit); and **LLPC1**, with 63.5 % of its 104
+DNa02-presynaptic cells firing at some point but the median cell at 0 Hz, and LPT22 (GABA) cancelling 85 % of the
+surviving motion signal at corr -0.85 to -0.86 (the sd of the sum is 34-36 mV/s against 63-68 for each term:
+wiring). The wind route (JO -> PS230 -> DNa02) is live and lateralised (r -0.61 with the wind side across 48 flies)
+at ~0.08 mV -- **~90x under the dose needed, not the audit's 25x**. And the VNC runs **open-loop**: every
+`vnc_sensory` cell is at 0 Hz in the room (SNpp39 / 45 / 50, LgLG), a missing-input fact of the body model.
+Data-driven route: (a) the JO transducer's rate-vs-wind-speed calibration against measured JO responses (a sensor
+calibration, not a gain); (b) proprioceptive / haltere drive of the `vnc_sensory` superclass from the body's
+realised state, the cells picked from what MaleCNS says those ascending neurons receive (the same route as the
+rotation deficit); (c) `health` on the tonic VNC / GNG / PS inhibitors and `trace` T4a / T5a -> LLPC1 / LPT22 (why
+the majority of LLPC1 is silent; whether LPT22 sees the same flow). **Hand-crafting, named and not done:** any gain
+on PFL3 / LLPC1 / PS230 -> DNa02, a DNa02 bias / noise / threshold, `k_turn` / `k_leg_turn` changes, reading the leg
+DNs (DNge035 +7.1 / -6.4 Hz of leg L-R, 3x DNa02) as a readout redefinition, ablating LPT22 as a default, or the
+`cx` / `anemotaxis` programs (already documented stop-gaps).
+
+**Object: the ball dies at T3 by ON/OFF convergence, its residual is destroyed by the stochastic feedback, and what
+survives is pooled away at the LCs.** (`docs/audits/deficit_object.md`; `apobj-les-e38d76` 96 jobs and
+`apobj-lad-287a43` 40 jobs, 0 failed; **nothing changed in `flyverse/`**.) The moving ball / static apple is carried
+by lamina, medulla, T4c/d and LPLC2 and lost at LC11 / LC10a's inputs: classified **WIRING + DYNAMICS** at the
+small-field stage, **WIRING x output-normalisation (pooling)** at the LC cells; *not* a rate-model artefact, *not* a
+sign fact, and specifically a **small-object** fact. Wiring: T3 sums ON (Mi1 22.5 %, Tm3 8.2 %) and OFF (Tm1 16.0 %,
+Tm4 6.7 %) carriers through excitatory exact-tier synapses whose figures for the sweeping ball have opposite sign,
+and holding either class at 0 restores T3 (0.062 / 0.072 against the shipped 0.024, z +3.5 / +4.8 at 4 v 4;
+reproduced by the skeptic on a fresh batch at 0.063 / 0.074, and a size-matched control hold of non-carrier inputs
+does not restore). Dynamics: with `gain_fb = 0` the deterministic lobe passes per-cell figures of the medulla's size
+(T3 0.041, T2 0.066, Tm5Y 0.072, TmY21 0.062, four digits across batches) while under the shipped stochastic
+feedback those very cells carry **7-26 %** of it and the medulla's keep 100 % -- a residual of two opposing sums is
+scrambled, a direct response is not. The skeptic's bounds, which travel with the verdict: "lost at T3 / Tm5Y" is a
+**threshold call** (Tm5Y reads z +0.9 / +2.2 / +2.6 / +3.65 over four batches of the same model); the "cancellation
+fraction 0.96" is a descriptive ratio that does not predict T3's measured figure in sign or size (linear estimate
++4.2e-6 against the measured -2.25e-4); "LC11 / LC10a not restored in any arm" is an **underpowered non-detection**
+(null SD 0.02-0.05 mV), not a measurement; at T3 the split is carriers-of-opposite-figure (Tm2, an OFF type, raises
+with Mi1 / Tm3) rather than strictly ON vs OFF; and LPLC2's z at 11.4 deg flips between batches (+1.5 to +2.8 --
+`object_sweep.md` 8.7's +5.4 does not reproduce). Data-driven route: receptor profiles for the unprofiled types
+(Tm5Y, TmY21, LC11 are fallback tier on 100 %); a per-input-class rectification arm before the sum at T3 (a question
+about the unit model that needs an `OpticParams` hook, not an edge lesion); a per-body comparison of the LC pooling
+(94 / 32 columns, `out_norm l1`, `gain_out` 100 mV -- the one place no data in the tree decides) against Neurome's
+LC11 / LC10a recordings at four sizes. **Hand-crafting, named and not done:** any optic measure on the small-field
+edges, a sign flip of Tm1|Tm4 -> T3 (the counterfactual restores T3 at z +5.8, but the data say + at exact tier), or
+a gain on LC10 / AOTU015.
+
+**Rotation: the efference-copy chain never fires, the eye's report arrives direction-blind, and the one silent link
+would carry nothing.** (`docs/audits/deficit_rotation.md`; two 20-job batches, 40 runs, pooled and per batch;
+**nothing changed in `flyverse/`**.) The ring bump does not follow the fly's rotation -- 0.00 +- 0.01 wedges/s at
+90 deg/s visual and now also under an **86-113 deg/s self-turn**, against 4.0 ideal, with all 80 shipped-cache
+phases inside -0.008..+0.010 and a third independent batch agreeing. Classified **MISSING INPUT (primary) behind a
+SIGN-0 LINK (structural)**. PEN's one nodulus input, GLNO -> PEN (84 entries, 16,371 synapses, 19.4 %,
+contralateral, sign 0 because GLNO's transmitter is unknown: MaleCNS `unclear` at conf 0.48, T-bars Glu 0.505 / ACh
+0.373, FlyWire gaba 0.30-0.33 -- all below the 0.5 the project accepts), is the strongest silent link **at k = 3 for
+every yaw source and at k = 2 for `optic_yaw` and efference** (the audit's "k = 2 and 3 for every source" is false
+for `jo` and `descending_yaw`), and no yaw carrier -- HS / VS / H2 / Nod / LPT, DNp20 / DNp15, JO, DNa02, PS196_b,
+LAL139 / 184, WED040_a -- makes one synapse onto PEN. Dynamically **PS196_b, the population that would bring the
+turn into GLNO on the efference-copy route, never fires** (0.03-0.16 Hz, max cell 0.57, null in 24/24 traces,
+reproduced on fresh seeds), nor do LAL184 / WED040_a / CB2037 / LPsP or the ascending neurons that feed them
+(AN07B037_a, PS239); the visual route delivers a signed flip to PLP078 / WED153 / PS047_b (+0.5-1 Hz) but arrives at
+GLNO / ER1_a **direction-blind** (LAL139 -10 -> -20 mV/s equal for ccw and cw; 0.1 % of GLNO's +15,200 mV/s drive,
+which is 97 % PEN + EPG -- GLNO is an efference copy of *the bump*, not of the body), so signing GLNO would carry
+nothing (the GLNO = gaba arms: GLNO -> PEN_a -3,752 / -3,797 against -3,749 mV/s, z +1.5 / +0.3). Caveats: the
+"efferent" arm drives DNa02 and the VNC but **DNa02 makes 0 synapses onto PS196_b / LAL / GLNO**, so it tests visual
+reafference plus a VNC loop rather than the efference-copy chain; the VNC *does* send a sided report up (56
+`vnc_intrinsic` types and the ascending AN07B035 / AN06A026 flip) that **reaches nothing in the PEN chain**; every
+run tests one bump site (wedge ~1.5); and the 0.1 % is specific to the gE 2 / gD 15 operating point. Data-driven
+route -- the connectome implies a missing afferent: (a) PS196_b's ascending inputs are named (AN07B037_a/b 419 / 52
+syn, PS239 312, AN08B026 -> LAL104 269), (b) a `paths` query of what those ascending neurons receive in the VNC (leg
+sensory, haltere, `vnc_intrinsic`), (c) drive those afferents as a sensor from the leg / haltere state the VNC motor
+neurons actually produce -- **not** from `body.Locomotion`'s yaw scalar, which would close a loop through a
+hand-written module -- then repeat the efferent arm in two batches with `verify-batch`; if PS196_b / LAL / WED fire
+and GLNO gains a body-locked sided term, the GLNO sign becomes testable on a signal. **Hand-crafting, named and not
+done:** a GLNO `TYPE_NT_OVERRIDE`, a gain on PS196_b / PLP078, the EPG <-> PEN gains as a default, or a module that
+writes PFL3 / PEN.
+
+**Facts that supersede earlier readings in this file** (each is cross-referenced at the entry it corrects):
+
+* `walk.GF_max`'s "cancellation" (round 5) was a **seed-0 reading**: off 4.96 / 9.38 / 13.41 Hz over seeds 0-2,
+  every arm-vs-off comparison `null`, and DNp01's 1,455 input entries identical across the arms.
+* The LIF's **effective refractory period is 2.5 ms, not 2.2**: `t_ref` 2.2 ms holds a cell for 5 steps of
+  dt = 0.5 ms and it fires again on the 6th, so the minimum ISI is 3.0 ms = **333 Hz** (`interp_health.md` 4).
+* **Undriven EPG sit ~250 mV below threshold** under gD 15 -- there is no lower clamp on `v` in the LIF -- which is
+  the membrane signature of the pinned bump: a cell 250 mV down cannot be recruited by a few Hz (`interp_health.md`
+  3).
+* The atlas' **JO stimulation equals sense-driven wind** through `fb.wind` (`INTERP.md` 9's open question, answered
+  yes: +47.5 Hz with the room's meander against +51.3 at a fixed 180 deg and the room's own +45.3), and the wind DNs
+  carry a **fixed anatomical L-R offset under symmetric drive** -- head-on, DNp18 +13.45, DNp73 +19.51, WED080
+  -17.07 Hz, which is half of DNp73's apparent flip (`interp_atlas.md` 3.1).
+* **DNge035 is the strongest lateralised leg driver** in this model: +7.50 / -6.19 Hz of leg L-R, contralateral,
+  three times DNa02's +2.24 / -1.45 -- a measurement, not a readout change (`interp_atlas.md` 6.1).
+* The retired `GF_DAMPED` list is **not in force**: `brain.py:221` `DEFAULT_TYPE_PATH_GAIN` is LC4|LPLC2 -> DNp01 x3
+  alone, and the runs' own provenance shows only that pair; `interp_atlas.md` 6.1 and 8 quote the retired five-type
+  x0.3 damp as if it were the default and are wrong.
+* The VNC is **open-loop** (every `vnc_sensory` cell at 0 Hz in the room) and **DNa02 makes 0 synapses onto the
+  PS196_b / LAL139 / LAL184 / WED040_a / GLNO chain** (its 14,446 outputs go to the VNC; 669 onto 1,846 ascending
+  neurons in total): the body's own turn has no route back to the compass.
+
+**Process rules this round paid for.** Replicates are **jobs, and >= 4 per arm** (5 for small effects), because
+`common.compare`'s exact-U floor is p = 0.10 at 3 v 3 (0.029 at 4 v 4, 0.0079 at 5 v 5) -- a 3 v 3 "result" cannot
+reach significance whatever the effect. The **GPU rollout is not seed-reproducible**: a verbatim `record --seed 0`
+repeat gives leg L-R +0.190 against +0.208 (printed yaw-rate SD 9.42 vs 7.54) and same-seed ring histories differ
+between batches (gaba-visual seed 4 rest drift -2.657 vs +0.005), so the replicate unit is the run and a second
+batch is a replication, not a check -- the aggregates that carry a verdict move ~0.3 %. **Never let two clients
+`--fetch` one directory** (35 of 80 files in `out/rot/` were an interleaving of two batches) and **verify a fetched
+batch before analysing it** (`interp_apply_rotation.py verify-batch`). `CUDA_VISIBLE_DEVICES` must be `"-1"` on
+Windows: the empty string is ignored and a "CPU smoke" then runs on this desktop's GPU. And the `commit` field is
+`unknown` in every cluster JSON (the run directory is not a checkout), so code is identified by the compiled-`W` md5
+`ef23cc27bea13be7f6a96f3c04fd3737`, the effective-weight md5 `ed1df661716d240b0f9289607f95320c` and `export`'s
+source fingerprint -- md5s of run dirs are not portable.
+
+**Neurome hand-off: the size ladder, and a size ordering that is the animal's inverted.** Four sizes at 5 v 5 runs
+each with matched none-vs-none nulls and the retina captured (`docs/audits/deficit_object.md` 5; every export
+`verify: problems none`, LC11 143 / LC10a 275 bodies x {`upstream_drive_mV`, `output_Hz`}):
+`out/export/objsize-d045-20260913T014556Z-47ed1383/` (4.5 deg),
+`objsize-d114-20260913T014606Z-7a4eadbd/` (11.4), `objsize-d200-20260913T014616Z-5ece62d6/` (20),
+`objsize-d300-20260913T014626Z-d5048f74/` (30), with the summary at
+`export-20260913T014635Z-db22e3ea/` (`size_tuning` 288 rows, `retina_footprint` 4, `runs` 40). At 4.5 / 11.4 / 20
+deg the two LC types and their small-field inputs sit at the null; **only at 30 deg** do LC11 (+4.8), LC10a (+8.6)
+and the small-field stage (Tm5Y +38.5, plus T2 / T3 / TmY21 / TmY13 / TmY5a) reach `result`, with the loom chain
+(LPLC2 / LC16 / LC4) coming in from 20 deg. **The model's size ordering is the animal's inverted** -- LC11 prefers
+5-10 deg objects -- which is the comparison to make against Neurome's LC11 / LC10a recordings at the four sizes.
 
 ## Batched brains and the RL environment
 

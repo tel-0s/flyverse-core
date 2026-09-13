@@ -108,23 +108,11 @@ def resolve_loose(c: cn.Connectome, spec) -> np.ndarray:
 
 
 def raw_counts(c: cn.Connectome, with_sign0: bool = True) -> tuple[sp.csr_matrix, bool]:
-    """Unsigned, uncapped raw synapse count per stored entry of c.W (post x pre): |W| on the signed entries and, for the
-    explicit-zero entries (sign-0 presynaptic cells), the count from cache/sign0_counts.npz when it is available
-    (connectome.sign0_counts, which is non-zero ONLY on those entries -- common.raw_counts installs that array as the
-    whole data vector, which zeroes every signed entry's count, so this tool builds the matrix itself). Returns
-    (counts, sign0_available)."""
-    W = c.W.tocsr()
-    C = abs(W).tocsr(); C.data = C.data.astype(np.float32)
-    if not with_sign0:
-        return C, False
-    try:
-        cnt = cn.sign0_counts(c, W=W, build=False)
-    except Exception:  # noqa: BLE001 -- the raw weights table is not on every machine
-        cnt = None
-    if cnt is None or len(np.asarray(cnt)) != W.nnz:
-        return C, False
-    C.data = np.where(W.data == 0, np.asarray(cnt, dtype=np.float32), np.abs(W.data).astype(np.float32))
-    return C, True
+    """`common.raw_counts`: |W| merged with cache/sign0_counts.npz on the explicit-zero (sign-0) entries.
+
+    The private copy this tool carried while the shared accessor SUBSTITUTED the sign-0 array for the whole count
+    vector is gone (docs/INTERP.md 11, defect 1, closed): the merge is `common.raw_counts`'s own."""
+    return common.raw_counts(c, with_sign0)
 
 
 def structure_matrix(counts: sp.csr_matrix) -> sp.csr_matrix:
@@ -803,10 +791,8 @@ def _contributions(c, g: NodeGraph, ew, link_keys, receptor, counts, frozen_idx,
         df = common.links(c, ew, pre_cells, post_cells, receptor=receptor, counts=counts, flags=flags)
         if len(df) == 0:
             continue
-        # the silent string from the flags with NaN (no rates given) read as False -- common.links reads bool(NaN) as True
-        fl = flags.set_index("index").reindex(df.pre_index.to_numpy())
-        df["silent"] = ["|".join(f for f in SILENT_FLAGS if f in fl and fl[f].iloc[i] is not None and not pd.isna(fl[f].iloc[i]) and bool(fl[f].iloc[i]))
-                        for i in range(len(df))]
+        # `silent` comes from common.links: its flags are booleans and a not-evaluated never_firing is False
+        # (docs/INTERP.md 11, defect 2, closed -- this tool used to rebuild the string to undo bool(NaN) == True).
         mag = np.asarray(Aif[df.post_index.to_numpy(), df.pre_index.to_numpy()]).ravel()
         df["value_if_signed"] = np.where(df.effective_mv != 0, df.effective_mv, mag)
         df = df.reindex(df.value_if_signed.abs().sort_values(ascending=False).index).head(int(per_link))

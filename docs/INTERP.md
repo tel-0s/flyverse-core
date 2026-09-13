@@ -85,8 +85,13 @@ links(c, ew, pre, post, receptor=None, counts=None, flags=None) -> DataFrame   #
    # uncapped; from cache/sign0_counts.npz when available so sign-0 entries carry their real count), effective_mv,
    # sign, sign_rule ('nt_sign' | 'receptor:<tier>'), gain_rule (the factors in force), fanin_scale_post, silent
 silent_flags(c, pre_idx, frozen_idx=fb.optic.rate_idx, prune_frozen=True, rates=recording.quantities['rate_hz'])
-   # sign0 | frozen | pruned | never_firing (max rate over the rollout < 0.5 Hz; NaN without rates)
-raw_counts(c) -> (counts csr, sign0_available)
+   # sign0 | frozen | pruned | never_firing (max rate over the rollout < 0.5 Hz) -- all four are BOOLEAN columns, and
+   # with no `rates` the never_firing question was not asked, so it is False (not NaN, which every bool(flag) reader
+   # turned into 'every cell never fires' and stamped on every structural table)
+raw_counts(c, with_sign0=True, dtype=np.float32) -> (counts csr, sign0_available)
+   # the TRUE raw count of every stored entry: C.data = maximum(|W.data|, connectome.sign0_counts) -- merged, never
+   # substituted (sign0_counts is non-zero ONLY on the explicit zeros). with_sign0=False leaves those entries at 0,
+   # i.e. counts only what the LIF can carry; dtype=np.float64 where an exact whole-model total is wanted.
 unit_kinds(c, fb=None) -> 'spiking' | 'graded' | 'photoreceptor' per cell     # docs/NEUROME_INTERFACE.md section 2
 ```
 
@@ -123,14 +128,27 @@ provenance block of section 3 so a recording is self-describing).
 ### 2.4 Null and replicate helpers -- the scatter rule, in code
 
 ```python
-compare(stim_values, null_values, z_min=3.0, min_n=3) -> {"stim": ArmStats, "null": ArmStats, "diff", "z", "welch", "U", "p", "verdict"}
+compare(stim_values, null_values, z_min=3.0, min_n=3, alpha=0.05)
+  -> {"stim": ArmStats, "null": ArmStats, "diff", "z", "welch", "U", "p", "p_floor", "null_sd_zero", "verdict", ...}
+p_floor(n_a, n_b)   # 2 / C(n_a + n_b, n_a): 3 v 3 -> 0.10, 4 v 4 -> 0.029, 5 v 5 -> 0.0079
 ```
 
 `z = (mean stim - mean null) / SD(null)`, Welch = the difference over the standard error of the two means, exact
 Mann-Whitney U and p for small arms (`docs/audits/object_sweep.md` 8.4; the test reproduces LPLC2 sign-abs z +5.4 /
-Welch +8.6 / U 25 / p 0.0079 and LC11 off z -0.1 / U 12 from the audit's numbers). **Verdict `underpowered` whenever an
-arm has fewer than three runs, whatever the numbers**; `result` needs |z| >= 3 and p <= 0.05; else `null`. Every tool
-that reports a difference reports this dict, never a bare z. `replicate_seeds(n, seed0)` names the runs.
+Welch +8.6 / U 25 / p 0.0079 and LC11 off z -0.1 / U 12 from the audit's numbers). The verdict, in this order:
+
+* **`underpowered`** -- an arm has fewer than `min_n` runs, **or** `p_floor > alpha`: at this many runs the exact rank
+  test cannot reach alpha however large the effect. `MIN_REPLICATES` stays 3 (three runs buy the scatter) but four per
+  arm is the smallest that can be *called*, five when the effect is small.
+* **`undetermined`** -- the null arm is deterministic (SD 0 up to float noise: bit-identical draws, an all-silent
+  readout, `gain_fb=0`), the arms differ, and the rank test does not settle it as null. z is the criterion and z is
+  undefined there: read `diff` and `p`. A tool may rank such rows by a declared effect size of its own -- the atlas'
+  `z_floor` (diff over the null SD floored at 0.05 Hz, `atlas.called`), trace's `CARRIER_VERDICTS` -- but the verdict
+  column is `compare`'s in every tool.
+* **`result`** -- |z| >= `z_min` and p <= `alpha` (when a p exists).
+* **`null`** -- otherwise, a deterministic null with no difference at all included.
+
+Every tool that reports a difference reports this dict, never a bare z. `replicate_seeds(n, seed0)` names the runs.
 
 Why 'runs' and not 'seeds': the figure-stage pipeline is not reproducible at a fixed seed on the GPU (median |dz| 0.4-0.5,
 max 5-7; the object sweep's LC10b ball moved 0.084 -> 0.251 at the same seed), so a per-type z carries +-1.5 and the
@@ -147,6 +165,7 @@ prov = provenance(c, lif, optic, fb=sim.fb, device=args.device, seeds=[...], env
 | block | content | source |
 |---|---|---|
 | `flyverse_commit` | `commit`, `dirty`, `modified_files` | `git rev-parse HEAD`, `git status --porcelain` |
+| `source_fingerprint` | the code's identity when git cannot give it: `{computed: false, commit}` when `git_state()` resolved the commit, else the SHA-256 of every simulation / probe source under ROOT **and** of the modules the process actually imported (`files`, `files_lf`, `files_loaded`), which `export.match_sources` matches against a checkout by content | `common.source_fingerprint` -> `export.source_fingerprint(include_loaded=True)` |
 | `dataset_release` | name `male-cns`, release `v1.0 flat-connectome`, the four file names + SHA-256 | `flyverse/data/manifest.json` |
 | `compiled_connectome` | `md5_data / md5_indices / md5_indptr / md5` of the reference `W` (= `cache/W_post_pre.npz` when the cache is what was loaded), `sum_abs_W`, `nnz`, `n_neurons`, `nt_counts`, `cache_dir`, `type_nt_override`, `unknown_nt_override_regex`, `subset` | in memory, memoised |
 | `model` | `lif` = every `LIFParams` field with defaults RESOLVED (`path_gain`, `type_path_gain`, `adapt_by_type`, `std_u_by_type`, receptor gain classes, slow classes), `receptor_table` + md5, `optic` = every `OpticParams` field resolved (`pair_gain`, `tau_by_type`, `baseline_by_type`), `body` = `gf_hz 33`, `takeoff_power_hz 50`, `takeoff_hold_s 0.3`, `mdn_threshold_hz 15`, `k_opto` | `brain.py`, `optic.py`, `body.py` defaults (read, not edited) |
@@ -160,10 +179,18 @@ it. A cluster log that says `device cpu` means the job is resubmitted, not repor
 
 ### 2.6 The CLI flags every wrapper accepts (`add_common_args`)
 
-`--json PATH` (default `out/interp/<tool>/<run_id>.json`), `--replicates N` (default 3), `--seed S`, `--null`,
-`--device`, `--cache-dir`, `--receptor-model default|off|sign|sign+gain|full`, `--receptor-net-rule`,
-`--receptor-table PATH`, `--lif KEY=VALUE` (repeatable, JSON / literal values), `--optic KEY=VALUE`, `--quiet`.
-`params_from_args(args) -> (LIFParams, OpticParams)`. Every wrapper ends with `print_table(...)` and the JSON path.
+`--json PATH` (default `out/interp/<tool>/<run_id>.json`), `--replicates N` (default 3), `--seed S`,
+**`--null-runs GLOB [GLOB ...]`**, `--device`, `--cache-dir`, `--receptor-model default|off|sign|sign+gain|full`,
+`--receptor-net-rule`, `--receptor-table PATH`, `--lif KEY=VALUE` (repeatable, JSON / literal values),
+`--optic KEY=VALUE`, `--quiet`. `params_from_args(args) -> (LIFParams, OpticParams)`. Every wrapper ends with
+`print_table(...)` and the JSON path.
+
+**One null convention.** `--null-runs` names the finished control-vs-control runs on an `analyse` subcommand and
+reaches the tool as `args.null_runs` (a list of globs; the wrappers that label arms take `LABEL=GLOB`, e.g.
+`--null-runs "off=out/dec/off_r*.npz"`). `--null-arm` and `--null-recordings` are hidden aliases of it, as is the
+ledger's `--null`, so the round's command lines still run. A subcommand that has to **generate** the null arm
+declares its own bare `--null` switch (`interp_export.py record --null`); `add_common_args` no longer does, which is
+what made `analyse --null-arm X --null` silently drop the control.
 
 ---
 
@@ -205,6 +232,11 @@ bodies live in `readout_per_body`). (5) numbers come out of `to_jsonable` (numpy
 ---
 
 ## 4. The tools (contract = `flyverse/interp/__init__.py::stubs`; every parameter there is kept by the implementation)
+
+**Two namespaces.** `flyverse.interp.<tool>` is the **module** (`from flyverse.interp import trace as tr`, what every
+wrapper does) and `flyverse.interp.tools.<tool>` / `flyverse.interp.tool('<tool>')` is the **function** -- the
+implementation when `flyverse/interp/<tool>.py` defines it, `stubs.<tool>` (NotImplementedError naming the file to
+write) until then. Neither depends on what has been imported already, which is what the contract test now enforces.
 
 ### 4.1 decompose -- `flyverse/interp/decompose.py`, `scripts/interp_decompose.py`
 
@@ -349,8 +381,9 @@ quantities live from `fb.brain` (`rate`, `v`, `adapt`, `refrac`, `input_scale`) 
 
 Validation: the **200 Hz refractory-limited bump** -- EPG 180-260 Hz at t_ref 2.2 ms = refractory load 0.40-0.57, PEN
 40-65 Hz, Delta7 90-112 Hz (`cx_wedge.md` 7, `cx_glno.md` 5) -- and the **sign-0 / silent populations of the NT audit**:
-3,407 sign-0 presynaptic bodies (2.2 % of synapses), the mushroom body losing 9.8 % of input / 12.5 % of output, the
-octopaminergic visual centrifugal cells 17.6 % of output (`nt_audit.md`).
+3,312 sign-0 bodies, 2,683 of them presynaptic (2,701,289 of 124,161,873 synapses = 2.2 %), the mushroom body losing
+9.8 % of input / 12.5 % of output, the octopaminergic visual centrifugal cells 17.6 % of output (`nt_audit.md`; the
+tool reproduces all of it from the shipped cache -- `interp_health.py structure --by module`).
 
 ### 4.7 ledger -- `flyverse/interp/ledger.py`, `scripts/interp_ledger.py`, `flyverse/data/expected_responses.csv`
 
@@ -423,7 +456,7 @@ per-type figure z carries +-1.5. Every generator of every quoted number lives in
 | paths | GLNO silent on rotation -> PEN; the ExR -> EPG loop | GLNO -> PEN 84 entries / 16,371 syn / 19.4 % / sign 0 / 16.5 mV per pair if signed; EPG -> PEN +5.05 per pair, +79.9 per PEN volley; Delta7 -> PEN -4.70; ExR loop -2,760..-3,210 mV^2 vs PEN +2,465, Delta7 -433 | cx_glno.md 1; cx_wedge.md 2-3 |
 | lesion | the hold double dissociation | holdBrain = off, holdOptic = default (bit-exact, 3 seeds); holdBrainGlu / holdBrainHis mirror on taste vs smell; holdKC 1225 / 464 / 1006, holdDN1 525 / 433 / 540 | receptor_integration.md E.4 |
 | atlas | wind DN flips; PFL3 -> DNa02; DNa02 -> legs | DNp18 +45, DNp33 -49 Hz; PFL3_L 80 Hz -> DNa02_R 22.6 / DNa02_L 0.0; DNa02_L 150 Hz -> leg L 3.1 / R 0.1 | NOTES session 8; benchmark wind.*, dn.* |
-| health | the refractory-limited bump; the sign-0 populations | EPG 180-260 Hz = load 0.40-0.57 at t_ref 2.2; PEN 40-65, Delta7 90-112; 3,312 sign-0 bodies (2,683 presynaptic; `common.VALIDATION` still carries 3,407 = the pre-`TYPE_NT_OVERRIDE` cache's count, interp_health.md 2), MB 9.8 % input silenced | cx_wedge.md 7, cx_glno.md 5; nt_audit.md |
+| health | the refractory-limited bump; the sign-0 populations | EPG 180-260 Hz = load 0.40-0.57 at t_ref 2.2; PEN 40-65, Delta7 90-112; 3,312 sign-0 bodies (2,683 presynaptic; `common.VALIDATION` carries 3,312 since this revision, with a note that 3,407 was the pre-`TYPE_NT_OVERRIDE` cache's count -- interp_health.md 2; `docs/NEUROME_INTERFACE.md` line 73 still says 3,407), MB 9.8 % input silenced | cx_wedge.md 7, cx_glno.md 5; nt_audit.md |
 | ledger | the suite's own references | motion.min_dsi 0.16; loom GF 34-56; HSN 4.2 / DNp20 3.1 / HSE 2.2; MN9 4.6 -> 0.0, Shiu 123.5 -> 2.1 | benchmark.py REFERENCES |
 | export | a round trip; LC11 / LC10a two rows per body | every number back; key (dataset, release, bodyId) | NEUROME_INTERFACE.md 1 |
 
@@ -449,8 +482,8 @@ each implementer checks is that the fetched files agree with them.)
 python scripts/cluster_run.py --name dec-gf --minutes 40 \
   "python -c 'import torch; assert torch.cuda.is_available()' && python scripts/interp_decompose.py record --target DNp01 --protocol walk --seed 0 --out out/dec/default_r0 > out/dec/default_r0.txt; cat out/dec/default_r0.txt" \
   "... --receptor-table out/receptors_holdBrain.csv --out out/dec/holdBrain_r0 ..." "..." --fetch out/dec/
-PYTHONIOENCODING=utf-8 python scripts/interp_decompose.py analyse --target DNp01 --recordings "default=out/dec/default_r*.npz" --null-arm "off=out/dec/off_r*.npz" --by type,transmitter,tier --window 0.5,1.5 --json out/interp/decompose/gf_walk.json
-# static, CPU: the taste carrier
+PYTHONIOENCODING=utf-8 python scripts/interp_decompose.py analyse --target DNp01 --recordings "default=out/dec/default_r*.npz" --null-runs "off=out/dec/off_r*.npz" --by type,transmitter,tier --window 0.5,1.5 --json out/interp/decompose/gf_walk.json
+# static, CPU (runs as written on the shipped cache): the taste carrier
 PYTHONIOENCODING=utf-8 python scripts/interp_decompose.py analyse --target "OA-AL2i3|TmY14|DNge138|DNge149|DNge150" --static --receptor-table out/receptors_holdBrainHis.csv --json out/interp/decompose/taste_static.json
 
 # trace: the moving ball from the photoreceptors, 3 stimulus + 3 control + 3 null runs in ONE batch, then CPU
@@ -463,12 +496,13 @@ PYTHONIOENCODING=utf-8 python scripts/interp_trace.py analyse --source "type:R1-
 PYTHONIOENCODING=utf-8 python scripts/interp_paths.py --a "LNO1|LNO2|LNOa|SpsP|PS196_b|~^LAL" --b "PEN_a|PEN_b" --k 3 --json out/interp/paths/rot_pen.json
 PYTHONIOENCODING=utf-8 python scripts/interp_paths.py --a EPG --b EPG --k 2 --level cell --wedge --json out/interp/paths/epg_loop.json
 
-# lesion: plan -> one batch -> analyse
-PYTHONIOENCODING=utf-8 python scripts/interp_lesion.py plan --manifest docs/interp/lesions_holds.json --out out/les_holds --replicates 3
+# lesion: plan -> one batch -> analyse (`--manifest` takes a builtin name -- 'holds', 'holds_cpu',
+# `lesion.BUILTIN_MANIFESTS` -- a JSON / YAML path or a JSON string)
+PYTHONIOENCODING=utf-8 python scripts/interp_lesion.py plan --manifest holds --out out/les_holds --replicates 4
 bash out/les_holds/batch.sh            # the single cluster_run.py call plan wrote; ships out/les_holds_cluster.log
 PYTHONIOENCODING=utf-8 python scripts/interp_lesion.py analyse --out out/les_holds --json out/interp/lesion/holds.json
 # the CPU validation (taste / smell, no optic lobe): --device cpu runs every job locally in-process
-PYTHONIOENCODING=utf-8 python scripts/interp_lesion.py run --manifest docs/interp/lesions_holds.json --sections taste,smell --device cpu --out out/les_cpu --replicates 3
+PYTHONIOENCODING=utf-8 python scripts/interp_lesion.py run --manifest holds_cpu --sections taste,smell --device cpu --out out/les_cpu --replicates 3
 
 # atlas: 64 populations per batch, three runs, on the cluster; then CPU
 python scripts/cluster_run.py --name atlas-dn --minutes 45 "python -c 'import torch; assert torch.cuda.is_available()' && python scripts/interp_atlas.py run --populations superclass=descending_neuron --by-side --hz 150 --ms 400 --seed 0 --out out/atlas/dn_r0 > out/atlas/dn_r0.txt; cat out/atlas/dn_r0.txt" "... --seed 1 ..." "... --seed 2 ..." --fetch out/atlas/
@@ -476,13 +510,34 @@ PYTHONIOENCODING=utf-8 python scripts/interp_atlas.py analyse --runs "out/atlas/
 
 # health: from a compass-room recording; and live in the observatory
 PYTHONIOENCODING=utf-8 python scripts/interp_health.py analyse --recordings "out/health/compass_r*" --window 5.5,8 --groups meta --json out/interp/health/compass.json
-PYTHONIOENCODING=utf-8 python scripts/interp_health.py analyse --recordings "out/health/walk_default_r*" --null-recordings "out/health/walk_off_r*" --window 0.5,1.5 --json out/interp/health/walk.json
+PYTHONIOENCODING=utf-8 python scripts/interp_health.py analyse --recordings "out/health/walk_default_r*" --null-runs "out/health/walk_off_r*" --window 0.5,1.5 --json out/interp/health/walk.json
+# CPU, no rollout: the sign-0 / frozen shares of the shipped cache (reproduces the NT audit: 3,312 sign-0 bodies)
+PYTHONIOENCODING=utf-8 python scripts/interp_health.py structure --by module --json out/interp/health/structure_module.json
 python -c "from flyverse.interp import HealthReadout; ...; fb.nt_source = HealthReadout(fb)"     # then N in the map
 
-# ledger and export
-PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py --results "out/interp/*/*.json" out/bench.json --json out/interp/ledger/all.json
-PYTHONIOENCODING=utf-8 python scripts/interp_export.py --result out/interp/trace/ball.json --retina out/tr/retina.npz --out out/export
+# ledger and export (both CPU; the ledger scores whatever it is pointed at, the export serializes any Result)
+PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py --results "out/interp/*/*.json" out/benchmark_suite.json --null-runs "out/r3obj/null_*.json" --json out/interp/ledger/all.json
+PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py validate --json out/interp/ledger/validate.json      # VALIDATION['ledger']
+PYTHONIOENCODING=utf-8 python scripts/interp_export.py analyse --result out/interp/paths/rot_pen.json --out out/export
+# `analyse` / `run` / `static-decompose` take `--paired LC11,LC10a` (default): the types whose every body must carry
+# BOTH readout quantities (upstream_drive_mV and output_Hz) in readout_per_body -- the LC pooling rule of
+# docs/NEUROME_INTERFACE.md section 1, checked by the export's own verify pass. `--paired ""` turns the check off for
+# a Result that has no per-body readouts (a structural one).
+PYTHONIOENCODING=utf-8 python scripts/interp_export.py static-decompose --target "LC11|LC10a" --json out/interp/export/lc11_lc10a_static.json --out out/export
+PYTHONIOENCODING=utf-8 python scripts/interp_export.py verify --run-dir out/export/<run_id> --paired LC11,LC10a
 ```
+
+Every CPU line above runs as written wherever its inputs are in the tree -- the cache (paths, static decompose,
+`health structure`, `export static-decompose`), `out/dec`, `out/health`, `out/atlas`, `out/les_cpu`, `out/interp`
+(ledger, export) -- and the `analyse` lines that read a batch need that batch fetched first: the trace pair above
+writes and reads `out/tr/`, while the round's own odour batch is `out/trv/`, which runs today:
+
+```bash
+PYTHONIOENCODING=utf-8 python scripts/interp_trace.py analyse --source "class=olfactory" --stimulus "out/trv/od_stim_r*" \
+  --control "out/trv/od_ctrl_r*" --null-runs "out/trv/od_null_r*" --stat mean --min-cells 2 --json out/interp/trace/odour_mean.json
+```
+
+`--help` works on every wrapper and every subcommand.
 
 ---
 
@@ -494,7 +549,8 @@ ledger `flyverse/data/expected_responses.csv`. Do not edit `common.py` or `__ini
 say so in your report and keep the stub's parameters.
 
 1. The function keeps every parameter of `stubs.<tool>` (the test `StubTests` enforces it) and returns `common.Result`.
-2. Every stochastic measurement has `--null` or `--replicates` (default 3) and reports `compare`'s dict.
+2. Every stochastic measurement has `--null-runs` and `--replicates` (default 3; >= 4 per arm to reach a `result`,
+   5 for a small effect) and reports `compare`'s dict -- its `verdict`, not one the tool invents.
 3. The CLI has `record` / `run` (GPU, cluster) and `analyse` (CPU) subcommands where the tool has a GPU part; the JSON
    carries the provenance block with the REALISED device; `Result.check()` is empty.
 4. The Neurome tables use `common.EXPORT_TABLES` columns; bodyIds are decimal strings; LC11 / LC10a are never pooled.
@@ -589,9 +645,12 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
 
 ### 10.2 Reading rules (the ones this round had to learn)
 
-* A `result` needs |z| >= 3 **and** p <= 0.05 over >= 3 runs; at 3 v 3 that is unreachable, so a 3-run comparison
-  reports z and the values and is not a result. A deterministic null (SD 0) makes z NaN / astronomical: read the
-  magnitude, never the verdict (`note null_sd_zero`).
+* A `result` needs |z| >= 3 **and** p <= 0.05, and p <= 0.05 is not reachable at 3 v 3 runs (the exact U floors at
+  0.10): `common.compare` reports that floor as `p_floor` and returns `underpowered`, so a 3-run comparison is z and
+  the values and never a result. A deterministic null (SD 0) makes z NaN or astronomical; `compare` returns
+  `undetermined` (`null_sd_zero` true) and the reading is the magnitude `diff` with `p`, plus whatever effect size
+  the tool declares (atlas `z_floor`). Neither verdict is a tool's own invention any more -- both come from
+  `compare`, in every JSON.
 * A `result` whose stimulus value did not move from the baseline arm's is the null's scatter (LPLC2 / L5 under the
   T3 arms; Tm5Y at z +0.9 / +2.2 / +2.6 / +3.65 over four batches of the same protocol): read `delta_vs_base` and the
   per-run draws, not the per-arm verdict. Per-body `verdict` columns (`readout_per_body.z_vs_null`) are an
@@ -607,8 +666,35 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
 * `first_lost_depth` is informative only for a single-pathway stimulus; `lost_top_by_share` and the named chain are
   what to read. `figure_z` (signed) is not survived by a moving object; `best_cell` is the object sweep's statistic.
 * Every cluster JSON says `flyverse_commit.commit: unknown` (the run copy has no `.git`); the identity of the code is
-  `provenance.compiled_connectome.md5` + `files.effective_weights_md5` + the export's `source_fingerprint` (28 loaded
-  files, matched by content); quote those, not the commit.
+  `provenance.compiled_connectome.md5` + `files.effective_weights_md5` + `provenance.source_fingerprint` (the loaded
+  files, matched by content -- written by `provenance()` itself since this revision, no longer only by the export);
+  quote those, not the commit.
+
+### 10.4 Process rules the round learned (rules, not advice)
+
+1. **Replicates are jobs, and four is the floor.** The replicate unit is the cluster job, not the seed and not the
+   batch row. `>= 4 runs per arm, 5 when the effect is small`: the exact two-sided U floors at p 0.10 at 3 v 3
+   (`common.p_floor`), so three runs can only ever read `underpowered`. Three runs still buy the scatter and are
+   right for a bit-identical check (taste, smell, the pinned walk).
+2. **The GPU rollout is not seed-reproducible.** Two same-code batches at the same seeds are different draws
+   (same-seed leg L-R +0.190 vs +0.208; ring histories differ). Never quote a seed as if it pinned a number, never
+   compare a new batch to an old one row by row, and quote a one-batch claim as a one-batch claim.
+3. **Never point two clients at one `--fetch` directory.** Two `cluster_run.py` calls fetching into the same
+   directory interleave and silently mix runs of different arms. One batch, one NAMED subdirectory, `mkdir -p` in
+   every job line.
+4. **Verify the batch before any analysis.** Read `'<n> job(s), 0 failed'` and every job's `device cuda` from the
+   console log, then run the batch check (`interp_apply_rotation.py verify-batch <dir>`, or the tool's own
+   console-vs-meta check) -- a job that fell back to the CPU or died mid-write produces a file that analyses fine
+   and means nothing.
+5. **A CPU smoke on Windows needs `CUDA_VISIBLE_DEVICES=-1`, set before torch is imported.** The empty string
+   (`""`) is what `--device cpu` used to export, and Windows *unsets* an empty environment variable, so the "CPU"
+   smoke runs on the desktop's GPU and writes `device_requested cpu` / `device cuda` into the provenance. `-1` is
+   the value that works on both platforms.
+6. **Identify the code by content, not by the commit.** Quote the compiled-W md5
+   (`provenance.compiled_connectome.md5`, `ef23cc27...` for the shipped cache), the effective-weights md5
+   (`files.effective_weights_md5`, `ed1df661...`) and `provenance.source_fingerprint` when
+   `flyverse_commit.commit` is `unknown`; `export.match_sources(fp)` turns that fingerprint back into a local
+   commit when every file matches.
 
 ### 10.3 The minimal command sequence (an odour-to-DN question, as an example)
 
@@ -625,38 +711,86 @@ PYTHONIOENCODING=utf-8 python scripts/interp_export.py analyse --result out/inte
 
 ---
 
-## 11. Contract defects the build round found in the shared files (open; owner: the design task)
+## 11. Contract defects -- closed in this revision / still open
 
-Each was worked around inside a tool and reported by its implementer and skeptic; none is fixed in `common.py` /
-`__init__.py`, so a new tool built on the contract inherits it.
+The build round found ten defects in the shared files (`common.py`, `__init__.py`); each had been worked around
+inside a tool. **Eight are closed here**, in the shared layer, and the private workarounds are gone with them. What a
+tool must do now is stated with each.
 
-1. `common.raw_counts(c)` replaces the whole count vector with `connectome.sign0_counts` (non-zero only on explicit
-   zeros): every signed edge reads 0 synapses, `common.links` writes `synaptic_pair_count 0` -- a mandatory Neurome
-   column. Five private copies of the fix exist (`paths.raw_counts`, `decompose.counts_matrix`, `health.full_counts`,
-   `trace.full_raw_counts`, `export.raw_counts`). Fix: `C.data = np.maximum(np.abs(c.W.data), cnt)`.
-2. `common.silent_flags(rates=None)` returns `never_firing = NaN` and `links` tests `bool(flag)`, so every structural
-   table reads `never_firing`. Fix: `False` when no rollout, or `flag is True`.
-3. `common.compare` requires p <= 0.05 at `MIN_REPLICATES = 3`, where the exact two-sided U floor is 0.10: three runs
-   is simultaneously the floor for not being `underpowered` and a guaranteed `null`. Fix: `MIN_REPLICATES = 4`, or
-   test p against its own floor and report `p_floor` (trace does).
-4. `compare` on a deterministic null (SD 0) gives z NaN and verdict `null` (+83 Hz called null) or, with p reachable,
-   `result` on nothing; trace overrides, atlas floors the SD at 0.05 Hz, decompose does neither (z 1e18-1e41 on
-   near-zero groups). Fix: a declared `undetermined` verdict with the magnitude when SD(null) == 0.
-5. `add_common_args` declares `--null` as `store_true`; four wrappers need a value and each chose a different name
-   (`--null-arm`, `--null-runs`, `--null-recordings`, the ledger's resolved `--null PATH...`), section 7 of this
-   document was wrong on two lines until this revision, and `decompose analyse ... --null-arm X --null` silently drops
-   the control. Fix: one `--null-runs GLOB` in `add_common_args`; the bare flag only on `record`.
-6. `flyverse.interp.<tool>` is shadowed by the submodule once it is imported (`__getattr__` never runs again), so
-   `StubTests` fails under `python -m unittest` (alphabetical order) and passes under pytest; `globals()[name] = obj`
-   would break every wrapper's `from flyverse.interp import atlas as atlas_mod`. Fix: keep the two namespaces apart
-   (the tests import the function from the submodule).
-7. `common.VALIDATION['health'].sign0_presynaptic_bodies = 3407` is the pre-override cache's count; the adopted
-   model's is 3,312 (`docs/NEUROME_INTERFACE.md` line 73 carries the same 3,407).
-8. `common.provenance` records no source fingerprint, so every cluster JSON says `commit: unknown`;
-   `export.source_fingerprint` / `match_sources` exist and should be called from `provenance()` whenever
-   `git_state()` fails.
-9. `--device cpu` in `scripts/interp_trace.py` sets `CUDA_VISIBLE_DEVICES=""`, which Windows unsets: a CPU smoke
-   runs on this desktop's GPU with corrupt provenance (`device_requested cpu`, `device cuda`). `-1` before torch is
-   imported is the fix (`interp_apply_rotation.py` has it); the same guard belongs in `add_common_args`.
-10. `scripts/interp_lesion.py` advertises `--null` and `--seed` and never reads them; `scripts/interp_health.py
-    record` advertises `--replicates` / `--null` and writes one stem. Either wire them or drop them per wrapper.
+### 11.1 Closed
+
+1. **`raw_counts` merges instead of substituting.** `C.data = maximum(|W.data|, connectome.sign0_counts)`, so every
+   signed edge keeps its own count and the sign-0 entries gain theirs; `with_sign0=False` means *exclude the sign-0
+   entries* (they stay 0), and `dtype=np.float64` gives the exact whole-model total. The five private copies
+   (`paths.raw_counts`, `decompose.counts_matrix`, `health.full_counts`, `trace.full_raw_counts`,
+   `export.raw_counts`) are one-line delegations to it and agree entry for entry (tested). Effect: the mandatory
+   Neurome column `synaptic_pair_count` is no longer 0 on every signed edge -- `trace`'s `depth_edges` read 0.0 on
+   11,090 of 11,094 rows and its `lost_inputs.raw_synapses_per_post` on 96 of 96 in the shipped
+   `out/interp/trace/odour_mean.json`, and both now carry the counts (2,619 / 6,546 / 47.5 ...).
+2. **`silent_flags` returns booleans.** With no `rates` the never_firing question was not asked and the column is
+   `False`, and `links` reads a missing or unevaluated flag as False rather than `bool(NaN) == True`. Effect: a
+   structural table no longer marks every row `never_firing` (it did on 5,000 of 5,000 rows of
+   `out/interp/apply_turning/static_legMN.json`, whose `silent_entries` equalled `n_entries` on all 21,905 per-type
+   rows). The private handling in `paths._contributions` and `export.silent_flags` is gone.
+3. **`compare` reports `p_floor` and calls three runs `underpowered`.** `MIN_REPLICATES` stays 3 for the scatter
+   rule, but the verdict now tests p against the floor the arm sizes allow (`common.p_floor`, 2 / C(n_a+n_b, n_a)):
+   0.10 at 3 v 3, so no z can make a 3-run difference a result, and the JSON says so instead of saying `null`.
+   Effect: at 3 runs per arm a verdict column reads `underpowered` where it read `null` (13,999 rows of
+   `out/interp/decompose/taste_chain_by_type.json`); every z / p / value is unchanged.
+4. **A deterministic null is `undetermined`, not a tool's own answer.** SD(null) == 0 (up to float noise) leaves z
+   undefined; `compare` returns `undetermined` with `null_sd_zero`, unless the rank test settles it as null
+   (p > alpha), in which case it is `null`. The three private answers are gone: `trace` no longer overrides the
+   verdict to `result` (it declares `CARRIER_VERDICTS = ('result', 'undetermined')` -- a carrier is a carrier, and
+   the ORNs' +83 Hz under a bit-identical null is one), the atlas keeps `z_floor` as its **declared effect size**
+   with `atlas.called()` naming the rows it reports, and `decompose` no longer lets z stand as a verdict on a
+   near-zero group. Effect: verdict columns only. `out/interp/trace/odour_mean.json` moves 13 of 11,147 rows from
+   `result` to `undetermined` (carriers, lost stage, decomposition and `validation` identical); the atlas' shipped
+   tables move 3,212 -> 0 `result` and 0 -> 4,140 `undetermined` with **zero** change to the movers, the summary,
+   the per-body table or the validation.
+5. **One null flag.** `add_common_args` declares `--null-runs GLOB [GLOB ...]` (section 2.6) with `--null-arm` /
+   `--null-recordings` as hidden aliases, and no longer declares a bare `--null`; a subcommand that must GENERATE
+   the null arm declares its own (`interp_export.py record --null`). The ledger keeps `--null` as a hidden alias of
+   `--null-runs`. Section 7's examples all run.
+6. **The two namespaces are separate.** `flyverse.interp.<tool>` is the module, `flyverse.interp.tools.<tool>` /
+   `interp.tool('<tool>')` is the function (section 4). Nothing depends on import order, and every wrapper's
+   `from flyverse.interp import atlas as atlas_mod` keeps working. The contract test imports all eight submodules
+   first, on purpose, and then checks both namespaces.
+7. **`VALIDATION['health']` says 3,312**, the shipped cache's sign-0 body count (2,683 of them presynaptic), with a
+   note that 3,407 was the pre-`TYPE_NT_OVERRIDE` cache's. `interp_health.py structure --by module` reproduces
+   3,312 / 2,683 / 2,701,289 of 124,161,873 synapses from the cache.
+8. **`provenance()` carries `source_fingerprint`.** When `git_state()` cannot resolve the commit (a cluster copy has
+   no `.git`), `common.source_fingerprint` calls `export.source_fingerprint(include_loaded=True)`, so every Result
+   -- not only the export's -- can be matched to a checkout by content (`export.match_sources`). When git answers,
+   the block records that instead of hashing anything, so nothing pays for it twice. `commit: unknown` is now the
+   last resort, not the only answer.
+
+### 11.2 Still open (owner in brackets)
+
+9. **`--device cpu` sets `CUDA_VISIBLE_DEVICES=""` in `scripts/interp_trace.py`** [trace]. Windows unsets an empty
+   variable, so a "CPU smoke" runs on the desktop's GPU with `device_requested cpu` / `device cuda` in the
+   provenance. `-1`, set before torch is imported, is the fix (`interp_apply_rotation.py` has it); the guard belongs
+   in whatever `add_common_args` grows for `--device`, but the wrapper is the tool's file. Rule 5 of section 10.4
+   until then.
+10. **Advertised flags that are no-ops** [lesion, health, paths]: `interp_lesion.py` takes `--null-runs` / `--seed`
+    and reads neither; `interp_health.py record` takes `--replicates` / `--null-runs` and writes one stem;
+    `interp_paths.py` accepts the replicate flags for uniformity (documented -- the tool is deterministic). Wire
+    them or drop them per wrapper.
+11. **One validation semantics** [all eight]. `validation.status = 'reproduced'` still means eight different things
+    (paths: 63 numeric checks; trace: verdict-level, and qualitative for the odour gate; the atlas' `validate()`
+    bypasses the replicate floor; lesion's `_close` pads a published range by +-50 % and compares means, not draws;
+    the ledger's analyse-mode status compares nothing numerically). Every status should be a numeric comparison
+    against `VALIDATION[tool]['reference']` with its tolerance stated. The verdict half of this is closed
+    (11.1.3, 11.1.4); the validation half is not.
+12. **`lesion` cannot address one presynaptic class onto one postsynaptic class** [lesion]: the `edges` kind lives
+    only in `scripts/interp_apply_object.py`. Promote it, make the scatter rule use `max(sd_arm, sd_baseline)`, and
+    compare draws rather than means to a published range.
+13. **The atlas has no live null and no vision context** [atlas]: the shipped atlas' null is bit-identical 0.000 in
+    100 % of 26,487 rows, which is why 11.1.4 shows up there as 4,140 `undetermined` rows. Inhibitory movers are
+    invisible and the optic drive is absent. A context arm exists and was never used.
+14. **No front door** [design]: nothing runs section 10's procedure end to end from a failing ledger row
+    (`scripts/interp_deficit.py`, or `interp_ledger --explain <row>`).
+15. **Neurome-facing gaps** [export, trace]: graded units carry no received drive in mV; the per-body `verdict`
+    column is an uncorrected screen (5-11 % of bodies at chance) and should be labelled or gated as one.
+16. **`docs/NEUROME_INTERFACE.md` line 73 still says 3,407 sign-0 presynaptic bodies** [that document's owner], and
+    `scripts/interp_health.py`'s validate note still describes `VALIDATION['health']` as carrying 3,407, which it no
+    longer does [health].

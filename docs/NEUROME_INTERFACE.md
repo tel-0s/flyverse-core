@@ -70,18 +70,65 @@ Tables (CSV, Parquet when > 1e6 rows):
 - **Substituted signs**: `TYPE_NT_OVERRIDE` (TmY14 glutamate, Mi19 serotonin, aMe8 ACh, applied to those types'
   unknown-NT cells: 107 bodies) and `UNKNOWN_NT_OVERRIDE_REGEX` (27 antennal-lobe LN bodies -> GABA); the receptor
   model's per-edge sign changes (48,295 entries; listed by `body_pre`, `body_post` on request). Sign-0 (silenced)
-  presynaptic bodies: 3,407 (unknown NT, dopamine, octopamine, serotonin).
+  presynaptic bodies: 3,312 on the shipped cache (3,407 before `TYPE_NT_OVERRIDE`; unknown NT, dopamine, octopamine, serotonin).
 - **Nothing is combined**: no cells are merged; per-connection synapse counts are capped at 60 in the effective
   weight (the raw count is kept in the cache and can be exported).
 
-## 3. The first experiment (Neurome's request)
+## 3. The first experiment (Neurome's request) -- delivered
 
 Size tuning of **LC11 and LC10a, separately**: objects of ~4.5, 11, 20 and 30 degrees with matched blank controls,
-upstream T2 / T3 responses, and the actual retinal sampling. This is a diagnostic, not a pass criterion. Our
-`scripts/probe_object_sweep.py` already has `--ball-radius / --ahead / --null` (the round-4 skeptic ran a
-11 / 22 / 28 / 43 degree ladder: LPLC2 rose +0.11 / +0.97 / +1.37 / +3.67 mV, LC11 +0.05 / +0.12 / +0.12 / +0.21);
-the interp workflow's `apply:object` task runs the requested ladder through the export, with >= 3 replicates per
-size and matched nulls, and posts the run directory here.
+upstream T2 / T3 responses, and the actual retinal sampling. A diagnostic, not a pass criterion.
+
+**Export location** (local, git-ignored; `run_id` directories, never mutable files; each `manifest.json` carries the
+commit `0d32fd6` + a per-file source fingerprint verified against the cluster run, the cache fingerprint
+(sum|W| 121,460,584), the resolved `LIFParams` / `OpticParams`, device `cuda` / NVIDIA B200, seeds, stimulus geometry
+and the unit table):
+
+| size (nominal / from the eye) | ball radius | run directory (under `D:\Projects\flyverse\`) |
+|---|---|---|
+| 4.5 / 4.50 deg | 1.965 mm | `out/export/objsize-d045-20260913T014556Z-47ed1383/` |
+| 11.4 / 11.42 deg | 4.991 mm | `out/export/objsize-d114-20260913T014606Z-7a4eadbd/` |
+| 20 / 20.08 deg | 8.816 mm | `out/export/objsize-d200-20260913T014616Z-5ece62d6/` |
+| 30 / 30.18 deg | 13.397 mm | `out/export/objsize-d300-20260913T014626Z-d5048f74/` |
+| ladder summary | -- | `out/export/export-20260913T014635Z-db22e3ea/` (`size_tuning.csv` 288 rows, `runs.csv` 40 runs) |
+
+Protocol: `scripts/probe_object_sweep.py::run` through `scripts/interp_export.py record` -- a black ball 5 cm ahead
+of the eye sweeping 50 deg of azimuth, 12 s per run (3 s settle), 5 stimulus runs + 5 matched blank runs per size
+(replicate unit = independent cluster jobs; batch `apobj-lad-287a43`, 40 jobs, 0 failed). Each per-size directory
+holds `readout_per_body.csv` (26,482 rows: every LC11 / LC10a / LC10b / LPLC2 / LC4 body with `upstream_drive_mV` and
+`output_Hz` as separate rows, plus T2 / T3 / Tm5Y / TmY21 / Mi4 graded rows), `retina_columns.csv` (1,466),
+`retina_bodies.csv` (5,895 photoreceptor bodies -> column), `retina_radiance.csv` (1,759,200 rows: per-column
+[UV, B, G, R] per frame) and `per_type.csv`. Generator: `scripts/interp_apply_object.py ladder` (batch script in
+`out/apply_object/ladder/`).
+
+**Result** (stimulus minus blank, verdict = |z| >= 3 on the blank-run SD and exact U p <= 0.05, 5 v 5 runs):
+
+| type | statistic | 4.5 deg | 11.4 deg | 20 deg | 30 deg |
+|---|---|---|---|---|---|
+| LC11 | received drive, max over cells (mV) | z -0.9 | +0.6 | +1.6 | **+4.8** (0.171 vs 0.054) |
+| LC10a | same | -0.1 | +0.7 | +2.8 | **+8.6** (0.208 vs 0.076) |
+| LPLC2 | same (loom chain, for scale) | -0.5 | +2.6 | **+13.5** | **+98.7** (2.03 vs 0.12) |
+| LC11 / LC10a | output rate (Hz) | 0.00 | 0.00 | 0.00 | 0.00 (no body fires for the object at any size) |
+| T2 / T3 / Tm5Y / TmY21 | best-cell signed figure | null | null | **result** (z +7.5 / +11.9 / +6.5 / +3.4) | **result** (+56.6 / +36.5 / +27.5 / +17.5) |
+| T2 / T3 / Tm5Y / TmY21 | population signed mean | null | null | null | null |
+
+Reading: in the model the small-field stage and the LC10 / LC11 drive respond only to the two largest objects and
+the loom chain (LPLC2) from 20 deg -- the animal's size ordering (LC11 preferring 5-10 deg objects, Keles & Frye
+2017) is inverted -- and LC11 / LC10a never spike for the object at any size (their received drive stays 0.05-0.2 mV
+against a 7 mV threshold gap). The localization behind that is in `docs/audits/deficit_object.md`: at T3 the ON and
+OFF carriers converge through excitatory exact-tier synapses whose figures for a sweeping small object have opposite
+sign (holding either class restores T3; a size-matched control hold does not), the residual is then scrambled by the
+spiking feedback into the rate lobe, and what survives is pooled away at LC11 / LC10a (94 / 32 columns per cell under
+`out_norm l1`). Caveats from the Opus skeptic: the 'lost at T3 / Tm5Y' verdict at 11.4 deg is a threshold call
+(Tm5Y reads z +0.9 / +2.2 / +2.6 / +3.7 across four batches of the same model); the GPU pipeline is not seed-reproducible,
+so the replicate unit is runs and every z is +-1.5; LPLC2's 11.4 deg verdict flips between batches.
+
+What Neurome could decide, in order of leverage on this pathway: (1) the receptor tiers of the unprofiled types --
+Tm5Y, TmY21, TmY13 and LC11 run on the presynaptic-sign fallback for 100 % of their input (`contributions.csv`
+`sign_rule` column); (2) whether the Mi1 / Tm3 (ON) and Tm1 / Tm4 (OFF) inputs to T3 are, in the animal, rectified
+per class before summation (the model sums them linearly; a per-input-class rectification arm is the next
+physiology-parameter test, `deficit_object.md` section 6); (3) per-body LC11 / LC10a recordings at these four sizes
+against `readout_per_body.csv` (`bodyId` decimal strings; `n_trials` 5; `control_ids` = the blank run ids).
 
 ## 4. Neurome evidence bundles
 
@@ -95,12 +142,13 @@ suite before adoption.
 
 ## 5. Open items for Neurome
 
-- The schema and a checksummed example bundle (their side); we will adapt field names to the compiler's columns.
+- The schema and a checksummed example bundle (their side): received (`small_object_v2`); our export uses the `evidence-bundle-v1` field
+  names where they overlap (`body_pre` / `body_post`, `synaptic_pair_count`).
+- Delivered: the size-tuning export (section 3). Field changes needed on the compiler side: none so far.
 - Whether `bodyId` alone is stable across MaleCNS releases; we key on it and record the release.
 - Cluster paths: agreed -- Neurome's namespace is `/mnt/beegfs/neurome/neurome-reconstruction/{runs,evidence,exports}/`;
   flyverse keeps `/mnt/beegfs/neurome/flyverse/` and `/mnt/beegfs/neurome/runs/`.
-- Neurome's first bundle (`D:\Projects
-eurome\data\male_cns\small_object_v2\`, 680 MiB; `manifest.json`,
+- Neurome's first bundle (`D:\Projects\neurome\data\male_cns\small_object_v2\`, 680 MiB; `manifest.json`,
   `observed_edges.parquet` with 1,967,026 both-Traced edges incident to the 7,149 selected bodies, 91,727 endpoint
   bodies, a receptor-table excerpt, a 24-case fragment review packet) is accepted as read-only observations; no
   anatomical judgment in it is reviewed and none enters the simulator graph.

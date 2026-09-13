@@ -314,6 +314,7 @@ def _report(run_dir, res, args) -> None:
     therefore not one of the hashed tables -- it is a report of the checks, not part of the interchange."""
     trip = ex.round_trip_check(res, run_dir)
     info = ex.verify(run_dir, neurons=args.neurons if args.neurons else True,
+                     expect_paired=tuple(t for t in (getattr(args, "paired", None) or "").split(",") if t.strip()),
                      expect_counts=json.loads(args.expect_counts) if args.expect_counts else None)
     with open(Path(run_dir) / "manifest.json", encoding="utf-8") as f:
         man = json.load(f)
@@ -378,6 +379,8 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--parquet-rows", type=int, default=1_000_000, help="tables above this many rows go to Parquet")
         p.add_argument("--neurons", default=None, help="cache/neurons.parquet to check bodyIds against (default: the cache)")
         p.add_argument("--expect-counts", default=None, help='JSON {"LC11": 143, "LC10a": 275} the verifier must find')
+        p.add_argument("--paired", default="LC11,LC10a", help="types whose every body must carry BOTH quantities "
+                       "(upstream_drive_mV and output_Hz) in readout_per_body; '' turns the check off")
 
     rec = sub.add_parser("record", help="GPU: run the object-sweep protocol and capture per-body readouts + the retina")
     common.add_common_args(rec)
@@ -387,6 +390,8 @@ def build_parser() -> argparse.ArgumentParser:
     rec.add_argument("--ball-radius", type=float, default=0.005)
     rec.add_argument("--ahead", type=float, default=0.05)
     rec.add_argument("--half-sweep", type=float, default=0.06)
+    rec.add_argument("--null", action="store_true", help="record the matched control-vs-control arm (none vs none) "
+                     "instead of the stimulus arm; the bare switch belongs to `record`, --null-runs to the analysis")
     rec.add_argument("--retina", action="store_true", help="also capture the retinal sampling presented (frames x 1,466 columns)")
     rec.add_argument("--out", required=True, help="output prefix (<out>.json, <out>_cells.npz, <out>_prov.json, <out>_retina.npz)")
     rec.set_defaults(func=cmd_record)
@@ -394,7 +399,6 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="CPU: recorded object-sweep runs -> Result -> export")
     common.add_common_args(run)
     run.add_argument("--stim", nargs="+", required=True, help="probe JSONs of the stimulus runs (globs allowed)")
-    run.add_argument("--null-runs", nargs="*", default=[], help="probe JSONs of the none-vs-none null runs")
     run.add_argument("--reference", nargs="*", default=[], help="earlier runs of the same protocol, globs allowed "
                                                                 "(out/r3obj/ball_off_s*.json)")
     run.add_argument("--reference-null", nargs="*", default=[], help="their nulls (out/r3obj/null_off_s*.json)")

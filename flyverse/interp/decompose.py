@@ -135,24 +135,12 @@ def _receptor_for(c, params, receptor=None):
 
 
 def counts_matrix(c: cn.Connectome) -> tuple[sp.csr_matrix, bool]:
-    """Raw, unsigned, uncapped synapse counts per stored entry of c.W (post x pre): |W.data|, with the explicit-zero
-    entries (sign-0 presynaptic cells) rescued from cache/sign0_counts.npz when it exists. connectome.sign0_counts is
-    non-zero ONLY at the zero entries (it is built to fill them), so it must be merged into |W|, not substituted for it
-    -- common.raw_counts substitutes and therefore reports 0 for every signed entry on the real cache (reported to the
-    design task; this is the accessor the tool uses until common.py is fixed). Returns (counts, sign0_available)."""
-    C = c.W.tocsr().copy()
-    C.data = np.abs(C.data).astype(np.float32)
-    zero = C.data == 0
-    ok = False
-    if zero.any():
-        try:
-            cnt = cn.sign0_counts(c)
-        except Exception:  # noqa: BLE001 -- the raw weights table is not on every machine
-            cnt = None
-        if cnt is not None and len(np.asarray(cnt)) == C.nnz:
-            C.data[zero] = np.asarray(cnt, dtype=np.float32)[zero]
-            ok = True
-    return C, ok
+    """Raw, unsigned, uncapped synapse counts per stored entry of c.W (post x pre) -- `common.raw_counts`.
+
+    |W.data| merged with cache/sign0_counts.npz on the explicit-zero (sign-0) entries. The private merge this tool
+    carried while the shared accessor substituted the sign-0 array for the whole vector is gone (docs/INTERP.md 11,
+    defect 1, closed). Returns (counts, sign0_available)."""
+    return raw_counts(c)
 
 
 def edges(c: cn.Connectome, ew, target_idx, receptor=None, counts=None, frozen_idx=None, rates=None) -> tuple[pd.DataFrame, np.ndarray]:

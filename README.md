@@ -131,6 +131,12 @@ not propagate at all. Two pathway gains (descending -> VNC x3, visual projection
 stand in for per-cell-type synaptic strengths; they were the difference between motor commands that
 reach the legs and ones that do not.
 
+What is *not* added is a fix for a behaviour the model fails: the remaining deficits are now **localized rather than
+tuned** -- named population, named link, and what kind of fact the loss is (missing input, wiring, dynamics,
+operating point) with a data-driven next measurement and an explicit list of the hand-crafting that was not done
+(`docs/audits/deficit_{turning,object,rotation}.md`). The procedure to run when a behaviour fails is
+[`docs/INTERP.md` section 10](docs/INTERP.md); the tools it uses never edit the model.
+
 ## Food-finding, and what is the brain's and what is not
 
 The default model is the connectome plus a **plain body**: rates in, motion out (forward DNs ->
@@ -222,20 +228,34 @@ flyverse/surfaces.py     walkable faces: edges, corners, landings
 flyverse/programs.py     hand-designed behaviour programs (anemotaxis, escape gating), opt-in stand-ins for circuits
 flyverse/cx.py           CompassSteering: a simulated central-complex stage that drives PFL3 inside the brain
 flyverse/screen.py       condition screens, ranking, ablation: which cells carry what
+flyverse/interp/         the interpretability toolkit: eight tools that localize a deficit on the shipped weights (never edit them)
+  decompose.py           what drives a cell set, per frame, by presynaptic type / transmitter / receptor tier
+  trace.py               where along the depth from a sensory population a stimulus is lost
+  paths.py               effective k-step signed gains A -> B, and which links are silent (sign 0, never firing)
+  lesion.py              check x lesion delta matrices with scatter, and the double dissociations
+  atlas.py               what every motor readout does when population X is stimulated
+  health.py              per-type operating point of a rollout: silent, at threshold, refractory-limited, E/I, fan-in
+  ledger.py              measured per-type responses against the curated expectations (flyverse/data/expected_responses.csv)
+  export.py              the Neurome read-only probe export (manifest, tables, SHA-256)
+  common.py              shared by all eight: selection grammar, shaped-weight accessor, Result schema, provenance, null helpers
 flyverse/brainmap.py     soma projections for the --brain-map panel
 flyverse/room_ui.py      dense room console, controls and neural telemetry
 flyverse/env.py          vectorised RL environment
 scripts/room_demo.py     the interactive demo
 scripts/benchmark.py     the benchmark suite (14 sections, JSON for regression diffs);  scripts/probe_*.py  one behaviour each
 scripts/audit_nt.py, scripts/cx_wedge.py, scripts/retire_measures.py   the session-9 audits (reports in docs/audits/)
+scripts/interp_*.py      one CLI per interpretability tool (record / run on the GPU, analyse on the CPU)
+scripts/interp_apply_*.py   the three deficit applications: turning, object, rotation
 scripts/cluster_run.py   run a batch of commands on a GPU cluster job manager (config in a git-ignored .cluster.json)
 scripts/screen_dns.py    the DN activation screen;  scripts/find_sweet_grns.py  sugar GRNs
 scripts/screen_odour.py  the lateral-horn odour screen;  scripts/screen_steering.py  odour x wind steering
 scripts/profile_room.py  per-frame profile of the demo loop;  scripts/profile_brain.py  the brain alone
-tests/                   control-surface, world and integration tests
+tests/                   control-surface, world and integration tests;  tests/test_interp.py  the interpretability toolkit's CPU suite (65 tests)
 docs/NOTES.md            everything learned, session by session, with numbers
 docs/ARCHITECTURE.md, docs/CONTROL_SURFACE.md, docs/PERFORMANCE.md   the control surface and its cost
 docs/BENCHMARK_BATTERY.md   behavioural assays and how the plain model scores on each
+docs/INTERP.md              the interpretability toolkit: contract, the procedure to run when a behaviour fails (section 10), open defects (11)
+docs/audits/interp_*.md     one validation record per tool;  docs/audits/deficit_*.md  the turning / object / rotation localizations
 docs/audits/receptor_integration.md, docs/audits/receptor_verification.md   the receptor integration's scoring record and the skeptics' verdicts (rounds 1-5)
 docs/NT_INTEGRATION.md      receptor-expression data integration: findings, sources, task outline
 ```

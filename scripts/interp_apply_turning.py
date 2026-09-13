@@ -373,10 +373,17 @@ def _pair_of(target: str) -> str:
     raise KeyError(target)
 
 
-def lr_tables(runs: list[Run], c) -> dict[str, pd.DataFrame]:
+def lr_tables(runs: list[Run], c, t_skip_s: float = 0.0) -> dict[str, pd.DataFrame]:
     """Per pair: the per-(pre type) and per-(pre type, side) mean input to the L and the R target over flies and runs,
     the L-R difference with its scatter over 48 flies and over the 3 run means (the replicate unit), and the static
-    weight (mV per volley) alongside."""
+    weight (mV per volley) alongside.
+
+    `t_skip_s` drops the brain's start-up transient from the **totals** rows, which are per-frame series
+    (`z['tot'] / ['totE'] / ['totI']`, shape (T, n_targets, B)).  It cannot reach the per-(pre group) entries:
+    those come from `z['group_mean_flies']`, a mean the GPU `record` pass accumulates over every frame, so a
+    per-type number always covers the whole rollout and can only be re-windowed by re-recording.  Skeptic item:
+    the audit's protocol sentence 'the first 5 s are dropped' was true of behaviour / watch / cancellation /
+    wind-side and false of this function; with 5 s dropped the DNa02 totals move <= 3.5 mV/s."""
     out = {}
     for a, b in PAIRS:
         ia, ib = runs[0].targets.index(a), runs[0].targets.index(b)
@@ -423,11 +430,19 @@ def lr_tables(runs: list[Run], c) -> dict[str, pd.DataFrame]:
                 rows["pre_type"] = [k.split("/")[0] for k in uk]
             rows = rows.sort_values("abs_I_mean", ascending=False).reset_index(drop=True)
             out[f"{a}|{b}:{level}"] = rows
-        # the totals
-        totL = np.concatenate([r.z["tot"][:, ia].mean(0) for r in runs]); totR = np.concatenate([r.z["tot"][:, ib].mean(0) for r in runs])
+        # the totals -- per-frame series, so the start-up transient can be (and now is) dropped
+        def _k0(r: Run) -> int:
+            dt_s = float(np.diff(r.z["t_ms"][:2])[0]) / 1000.0
+            return min(int(round(t_skip_s / dt_s)), max(r.z["tot"].shape[0] - 1, 0))
+
+        def tot_of(key: str, it: int) -> np.ndarray:
+            return np.concatenate([r.z[key][_k0(r):, it].mean(0) for r in runs])
+
+        totL, totR = tot_of("tot", ia), tot_of("tot", ib)
         out[f"{a}|{b}:totals"] = pd.DataFrame({"fly": np.arange(len(totL)), "run": run_of, f"I_{a}": totL, f"I_{b}": totR, "LR": totL - totR,
-                                               f"E_{a}": np.concatenate([r.z["totE"][:, ia].mean(0) for r in runs]), f"I_neg_{a}": np.concatenate([r.z["totI"][:, ia].mean(0) for r in runs]),
-                                               f"E_{b}": np.concatenate([r.z["totE"][:, ib].mean(0) for r in runs]), f"I_neg_{b}": np.concatenate([r.z["totI"][:, ib].mean(0) for r in runs])})
+                                               f"E_{a}": tot_of("totE", ia), f"I_neg_{a}": tot_of("totI", ia),
+                                               f"E_{b}": tot_of("totE", ib), f"I_neg_{b}": tot_of("totI", ib),
+                                               "window_skip_s": float(t_skip_s), "entries_window_skip_s": 0.0})
     return out
 
 
@@ -461,7 +476,8 @@ def cancellation_tables(runs: list[Run], t_skip_s: float, n_shuffle: int, seed: 
         types = np.array([k.split("/")[0] for k in labels])
         ia, ib = runs[0].targets.index(a), runs[0].targets.index(b)
         per_fly = []; corr_rows = []; pair_rows = []
-        cov_share = []; var_group = []; var_tot = []; var_explained = []; sd_tot = []; sd_dna = []
+        cov_share = []; var_group = []; var_tot = []; var_explained = []; sd_tot = []; sd_dna = []; sd_read = []
+        readout_lr = f"{a}-{b}"        # the pair's OWN readout, not DNa02's (skeptic: line 521 copied sd_dna here)
         for r in runs:
             sa_all, keep_r = r.series(a, pair); sb_all, _ = r.series(b, pair)                       # (T, B, K_run)
             pos = {k: i for i, k in enumerate(keys[keep_r])}
@@ -485,6 +501,7 @@ def cancellation_tables(runs: list[Run], t_skip_s: float, n_shuffle: int, seed: 
                 var_tot.append(vt); cov_share.append(cov / vt if vt > 0 else np.full(len(cov), np.nan))
                 var_group.append(A_.var(0, ddof=1)); var_explained.append(A_.sum(1).var(ddof=1) / vt if vt > 0 else np.nan)
                 sd_tot.append(np.sqrt(vt)); sd_dna.append(dna[ok, bi].std(ddof=1))
+                sd_read.append((dna if a.startswith("DNa02") else leg)[ok, bi].std(ddof=1))
                 # correlations with the readouts
                 for name, y in (("DNa02_LR_hz", dna[ok, bi]), ("leg_LR_hz", leg[ok, bi]), ("yaw_cmd", yaw[ok, bi])):
                     if y.std() == 0 or t_.std() == 0:
@@ -518,7 +535,9 @@ def cancellation_tables(runs: list[Run], t_skip_s: float, n_shuffle: int, seed: 
         out[pair] = {"groups": groups, "per_fly": pd.DataFrame(per_fly), "correlations": pd.DataFrame(corr_rows), "anticorrelated_pairs": pd.DataFrame(pair_rows),
                      "summary": {"kept_groups": int(len(labels)), "kept_groups_per_run": [len(x) for x in kept_labels], "explained_var_share_mean": float(np.nanmean(var_explained)), "explained_var_share_min": float(np.nanmin(var_explained)),
                                  "sum_of_group_variances_over_total_var_mean": float(np.mean(vg.sum(1) / np.array(var_tot))),
-                                 "sd_total_LR_input_mV_s_mean": float(np.mean(sd_tot)), "sd_DNa02_LR_hz_mean": float(np.mean(sd_dna))}}
+                                 "sd_total_LR_input_mV_s_mean": float(np.mean(sd_tot)),
+                                 "readout_LR": readout_lr, "sd_readout_LR_hz_mean": float(np.mean(sd_read)),
+                                 "sd_DNa02_LR_hz_mean": float(np.mean(sd_dna))}}
     return out
 
 
@@ -593,6 +612,44 @@ def wind_side_table(runs: list[Run], t_skip_s: float) -> tuple[pd.DataFrame, pd.
     return df, pd.DataFrame(stats)
 
 
+#: the per-fly correlations quoted in deficit_turning.md 4.4 and 5.  Each is (watch type L-R, motor readout L-R)
+#: within a fly, over the non-airborne frames after the start-up skip; the reported statistic is the median over the
+#: run's flies (the audit's "median r"), with the per-run medians as the replicate unit.
+PER_FLY_CORRS = (("LLPC1", "DNa02"), ("DNge035", "leg"), ("HSS", "DNa02"), ("LPT22", "DNa02"), ("DNae007", "leg"))
+
+
+def per_fly_readout_corr(runs: list[Run], t_skip_s: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Per (run, fly, pair): corr(watch type L-R, readout L-R) over the fly's non-airborne frames; and the per-run
+    median with its scatter.  Ships the two numbers deficit_turning.md quotes from the task log --
+    corr(LLPC1 rate L-R, DNa02 L-R) = +0.287 / +0.308 / +0.318 and median corr(DNge035 L-R, leg L-R) =
+    -0.430 / -0.471 / -0.473 -- so every quoted number has a generator in `scripts/`."""
+    rows = []
+    for r in runs:
+        dt_s = float(np.diff(r.z["t_ms"][:2])[0]) / 1000.0; k0 = int(round(t_skip_s / dt_s))
+        j = {nm: i for i, nm in enumerate(r.meta["watch"])}
+        wr = r.z["watch_rates"][k0:]; air = r.z["airborne"][k0:]
+        readouts = {"DNa02": (r.motor("turn_L")[k0:] - r.motor("turn_R")[k0:]), "leg": (r.motor("leg_L")[k0:] - r.motor("leg_R")[k0:])}
+        for pre, ro in PER_FLY_CORRS:
+            if f"{pre}_L" not in j or f"{pre}_R" not in j or ro not in readouts:
+                continue
+            x_all = wr[:, :, j[f"{pre}_L"]] - wr[:, :, j[f"{pre}_R"]]; y_all = readouts[ro]
+            for b in range(r.B):
+                ok = ~air[:, b]
+                x, y = x_all[ok, b], y_all[ok, b]
+                rr = float(np.corrcoef(x, y)[0, 1]) if (ok.sum() > 2 and x.std() > 0 and y.std() > 0) else np.nan
+                rows.append({"run": r.seed, "fly": b, "pre_LR": f"{pre}_LR", "readout_LR": f"{ro}_LR", "r": rr, "n_frames": int(ok.sum())})
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df, pd.DataFrame()
+    per_run = df.groupby(["pre_LR", "readout_LR", "run"])["r"].median().reset_index()
+    stats = (per_run.groupby(["pre_LR", "readout_LR"])
+             .agg(median_r_per_run=("r", list), median_r_over_runs=("r", "median"), n_runs=("r", "size")).reset_index())
+    stats["sd_over_runs"] = [float(np.std(v, ddof=1)) if len(v) > 1 else np.nan for v in stats.median_r_per_run]
+    stats["min_fly_r"] = [float(df[(df.pre_LR == p) & (df.readout_LR == q)].r.min()) for p, q in zip(stats.pre_LR, stats.readout_LR)]
+    stats["max_fly_r"] = [float(df[(df.pre_LR == p) & (df.readout_LR == q)].r.max()) for p, q in zip(stats.pre_LR, stats.readout_LR)]
+    return df, stats
+
+
 def cmd_wind_side(args) -> int:
     files = sorted({str(Path(f).with_suffix("")) for pat in args.recordings for f in globmod.glob(pat + ".npz") + globmod.glob(pat)
                     if f.endswith(".npz") and not f.endswith(("_flies.npz", "_max.npz"))})
@@ -603,6 +660,13 @@ def cmd_wind_side(args) -> int:
     print(f"{len(runs)} runs, {len(df)} flies; wind_left_frac range {df.wind_left_frac.min():.2f}-{df.wind_left_frac.max():.2f}")
     common.print_table(st, max_rows=20)
     print(f"wrote {out} and {out.with_name(out.stem + '_stats.csv')}")
+    if args.per_fly_corr:
+        cdf, cst = per_fly_readout_corr(runs, args.skip)
+        cp = out.with_name(out.stem + "_readout_corr.csv"); cdf.to_csv(cp, index=False)
+        cst.to_csv(out.with_name(out.stem + "_readout_corr_stats.csv"), index=False)
+        print("\nper-fly corr(watch L-R, readout L-R), median over each run's flies:")
+        common.print_table(cst, max_rows=20)
+        print(f"wrote {cp} and {out.with_name(out.stem + '_readout_corr_stats.csv')}")
     return 0
 
 
@@ -703,10 +767,12 @@ def cmd_analyse(args) -> int:
     watch = watch_tables(runs, args.skip)
     wind_df, wind_stats = wind_side_table(runs, args.skip)
     summary["wind_side_per_readout"] = wind_stats.to_dict("records")
+    corr_df, corr_stats = per_fly_readout_corr(runs, args.skip)
+    summary["per_fly_readout_corr"] = corr_stats.to_dict("records") if len(corr_stats) else []
 
     # ---- (a) decompose: the tool on the per-fly recordings, then the L-R tables and the cancellation analysis
     dec_res = run_decompose(c, runs, None, args.top, out_dir) if not args.no_decompose else {}
-    lr = lr_tables(runs, c)
+    lr = lr_tables(runs, c, args.skip)
     canc = cancellation_tables(runs, args.skip, args.shuffles)
     # ---- (b) atlas
     atlas_summary = {}
@@ -758,7 +824,8 @@ def cmd_analyse(args) -> int:
         paths_summary["_movers"] = mover_list; paths_summary["_never_firing_recording"] = rec_max; paths_summary["_sources"] = sources
 
     # ---- write
-    tables = {"behaviour_per_fly": beh, "watch_types": watch, "atlas_movers": movers, "per_fly_wind_side": wind_df, "wind_side_per_readout": wind_stats}
+    tables = {"behaviour_per_fly": beh, "watch_types": watch, "atlas_movers": movers, "per_fly_wind_side": wind_df, "wind_side_per_readout": wind_stats,
+              "per_fly_readout_corr": corr_df, "per_fly_readout_corr_stats": corr_stats}
     for k, v in lr.items():
         tables[f"lr_{k}"] = v
     for pair, d in canc.items():
@@ -868,6 +935,9 @@ def main(argv=None) -> int:
     w = sub.add_parser("wind-side", help="CPU: the 48-fly wind-side table alone (which lateralised stage the room's wind reaches)")
     w.add_argument("--recordings", action="append", required=True); w.add_argument("--skip", type=float, default=5.0)
     w.add_argument("--out", default=str(OUT_DIR / "per_fly_wind_side.csv"))
+    w.add_argument("--per-fly-corr", action="store_true",
+                   help="also emit corr(watch type L-R, readout L-R) per fly and its median per run -- the generator of "
+                        "deficit_turning.md 4.4's corr(LLPC1 L-R, DNa02 L-R) and 5's median corr(DNge035 L-R, leg L-R)")
     for x in (r, a, p, n, w):
         common.add_common_args(x)
     args = ap.parse_args(argv)

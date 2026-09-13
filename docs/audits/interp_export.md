@@ -82,8 +82,11 @@ Logs `out/exp-obj{,2,3,4}_cluster.log`. In batch 3 the automatic `--fetch` retur
 that reduces the new runs (`_arm_table` -> `common.compare`), so the two tables are comparable row by row.
 Statistic: `diff_max_over_cells_mean_mv` (mV).
 
-**The reference arm reproduces `object_sweep.md` 8.4's `off` rows number for number** -- mean, SD, null mean, null
-SD, z, Welch, U and p, all twelve columns for all six types (`reference_per_type.csv` in the run directory):
+**The reference arm reproduces `object_sweep.md` 8.4's `off` rows number for number** -- the **12 columns x 6 `off`
+types** of that table, 72 numbers (per-seed ball values, mean, SD, per-seed null values, null mean, null SD, z,
+Welch, U, p). The export's own `reference_per_type.csv` is a different shape and should not be described as "12
+statistics": it holds **10 distinct statistics in 72 rows** (6 spiking types x 6 statistics + 9 rate types x 4), of
+which `diff_max_over_cells_mean_mv` is the one compared here:
 
 | type | cells | export mean | 8.4 mean | export SD | 8.4 SD | export null | 8.4 null | export z | 8.4 z | export Welch | 8.4 Welch | U | p |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -106,13 +109,19 @@ The `verdict` column reads `null` for every row including LPLC2 (p 0.0079 but |z
 | LC10a | 275 | 3 | +0.0602 | 0.0096 | +0.0573 | 0.0121 | +0.25 | +0.33 | 5 | 1.00 | null | +0.0813 | +0.27 |
 | LC10b | 95 | 3 | +0.0842 | 0.0459 | +0.1353 | 0.0679 | -0.75 | -1.08 | 2 | 0.40 | null | +0.1286 | +0.69 |
 | LC16 | 182 | 3 | +0.0861 | 0.0134 | +0.0809 | 0.0208 | +0.25 | +0.36 | 5 | 1.00 | null | +0.0962 | -0.14 |
-| LPLC2 | 185 | 3 | +0.3032 | 0.0391 | +0.1775 | 0.0329 | **+3.82** | +4.26 | 9 | 0.10 | null | +0.2885 | +2.03 |
+| LPLC2 | 185 | 3 | +0.3032 | 0.0391 | +0.1775 | 0.0329 | +3.82 (unstable, see below) | +4.26 | 9 | 0.10 | null | +0.2885 | +2.03 |
 | LC4 | 126 | 3 | +0.0740 | 0.0319 | +0.0705 | 0.0174 | +0.20 | +0.17 | 5 | 1.00 | null | +0.0857 | -0.07 |
 
 **Reading.** Every new arm mean lands inside the reference arm's scatter (LC11 +0.056 vs +0.066 +- 0.035; LC10a
 +0.060 vs +0.081 +- 0.019; LPLC2 +0.303 vs +0.289 +- 0.014), and every type except LPLC2 sits on its null, exactly
 as round 3 found: the object localization of `object_sweep.md` is unchanged by this export. LPLC2 is the one type
-above the null in both arms (+2.03 over 5 runs, +3.82 over 3), and its verdict still reads `null` because
+above the null in every arm -- but **quote the difference, not the z**. Over three independent submissions of the
+identical protocol the arm mean is stable to 5 % (**+0.2885** reference, `out/r3obj/` 5 seeds / **+0.3032** batch 4,
+`out/expobj4/` / **+0.2974** a third three-seed submission, `out/skexp/`) and so is the null **mean** (+0.1904 /
++0.1775 / +0.1950), but the null **SD** swings by 2.6x (0.0484 / 0.0329 / 0.0862), so z reads **+2.03 / +3.82 /
++1.19** on the same data-generating process. The reproducible quantity is the excess over the null: **+0.098 /
++0.126 / +0.102 mV**, above the null in 3 of 3 submissions. A z against a 3-run null SD is not a stable statistic and
+is not treated as one here. The verdict reads `null` in every case because
 `common.compare` also requires `p <= 0.05`, which three runs per arm cannot reach (section 10.3). Run-to-run
 scatter on the same protocol is again of order the effect (LC10b's arm moved from +0.158 in batch 1 to +0.084 in
 batch 4, its null from +0.080 to +0.135), which is the reason `runs` and not `seeds` is the replicate unit.
@@ -147,6 +156,17 @@ exact test (`common.compare`'s U test is a per-arm statistic, not a per-cell one
 quantities and a null SD from three runs, that count is what a heavy-tailed z on n = 3 produces, not evidence for
 ~1,500 responsive cells: **the per-type arms of section 3 are the verdict of record**, and the per-body columns are
 data for Neurome to re-reduce, which is why `n_trials`, `trial_sd` and `null_sd` travel with every row.
+
+**Defect in the interchange table, unfixed: 42 of those `result` rows are a division by zero.** In
+`out/export/export-20260912T235822Z-ef267800/readout_per_body.csv`, **739 of the 26,482 rows have `null_sd` exactly
+0** -- three null runs returning the identical value on sparse spike counts, so `trial_sd` is 0.
+`flyverse/interp/export.py:753-755` computes `z = (stimulus_minus_control - null_mean) / null_sd` under
+`np.errstate(divide="ignore")` and then `np.where(np.abs(z) >= common.Z_RESULT, "result", "null")`, so a non-zero
+numerator over a zero denominator gives `+-inf`, and `inf >= 3` is True. Those 42 rows therefore ship with
+`verdict = result` and an **empty** `z_vs_null` column (e.g. LC11 body 17476, `output_Hz`,
+`stimulus_minus_control -0.027778`, `null_mean 0.0`, `null_sd 0.0`, `z_vs_null` blank, `verdict result`). The other
+697 zero-SD rows have a zero numerator too, so `0/0` is NaN and they fall to `null`. A verdict must not be reachable
+without a finite z; the fix belongs in `export.py` and is not applied in this round.
 
 ---
 
@@ -227,8 +247,9 @@ same-type gain (0.1) and the 60-synapse cap, both named in every row's `gain_rul
 ## 7. Validation 5 -- every tool's Result goes through the same serializer
 
 `docs/NEUROME_INTERFACE.md` requires that every tool's JSON be exportable. Running `export` over one Result from
-each of the eight tools (`scripts/interp_export.py analyse --result ...`), all eight pass `Result.check()`, write a
-manifest with matching hashes, and come back clean from `verify` (bodyIds checked against `cache/neurons.parquet`):
+each of the eight tools (`scripts/interp_export.py analyse --result ...`), all eight pass `Result.check()` and write
+a manifest with matching hashes. **Seven come back clean from `verify`; the atlas does not** (bodyIds checked
+against `cache/neurons.parquet`):
 
 | tool | Result | tables written | verify |
 |---|---|---|---|
@@ -236,13 +257,36 @@ manifest with matching hashes, and come back clean from `verify` (bodyIds checke
 | trace | `out/interp/trace/object_best_cell.json` | readout_per_body 13,396 + 10 tool tables | no problems |
 | paths | `out/interp/paths/validate_rot_pen.json` | contributions 4,003 + paths 83, links 91, b_inputs 106 | no problems |
 | lesion | `out/interp/lesion/holds_cpu.json` | sensitivity 21 + matrix 24, dissociations 6, lesions 24 | no problems |
-| atlas | `out/interp/atlas/validation.json` | readout_per_body 2,128 + atlas 660, movers 396 | no problems |
+| atlas | `out/interp/atlas/validation.json` | readout_per_body 2,128 + atlas 660, movers 396 | **EXIT=1** -- `readout_per_body: no rows for LC11`, `readout_per_body: no rows for LC10a` |
 | health | `out/interp/health/validation.json` | 10 tool tables, 414 rows | no problems |
 | ledger | `out/interp/ledger/validate.json` | ledger 111, sources 2, observations 66, validation 9 | no problems |
 | export | `out/interp/export/object_sweep.json` | readout_per_body 26,482 + retina 1,766,561 + 144 | no problems |
 
+**The atlas row is the tool's own default biting an unrelated tool.** `verify`'s signature is
+`verify(run_dir, *, neurons=None, expect_paired=("LC11","LC10a"), expect_counts=None)`
+(`flyverse/interp/export.py:415`), and both the CLI (`scripts/interp_export.py:417`, `--paired` default
+`"LC11,LC10a"`) and `_report` (`scripts/interp_export.py:316`, the function `analyse` calls) use it
+**unconditionally, for every tool's export**. The rule only fires on exports that carry a `readout_per_body` table
+(`export.py:469`), which is why decompose / paths / lesion / health / ledger sail past it; trace carries LC11 143 /
+LC10a 275 and passes on the merits. The atlas `readout_per_body` holds 2,128 rows over 98 types, **none of them LC11
+or LC10a**, so `interp_export.py verify --run-dir out/export/atlas-20260912T233906Z-f8234031` exits 1 with the two
+problems above (`export.py:475`, `cmd_verify` returns `1 if info["problems"]`). Today the only escape is
+`verify --paired ''` (`scripts/interp_export.py:346` drops empty entries); `analyse` has no such flag. **The fix the
+record asks for: a documented `--paired` option on `analyse`, or an `expect_paired` rule that fires only when the
+readout actually contains those types.** The object-pathway expectation is not a property of every tool's Result.
+
 The trace export independently satisfies the paired-quantity rule (LC11 143 / LC10a 275 bodies with both
 quantities), i.e. two different tools produce the shape Neurome asked for.
+
+**Provenance of this table.** The eight rows above are quoted from `out/interp/export/exportability.csv`, and **that
+file's generator is not in the repo** -- `grep -rn exportability --include=*.py --include=*.sh --include=*.md .`
+returns nothing, which breaks the round-1 process rule "ship every generator of every quoted number into `scripts/`
+or `flyverse/interp/`." It was not produced off the shipped code path: six of the run directories it names --
+`atlas-20260912T233906Z-f8234031`, `health-20260912T233347Z-527eabd9`, `ledger-20260912T233657Z-d1762311`,
+`lesion-20260912T233535Z-10b172fd`, `paths-20260912T233911Z-4047cc00`, `decompose-20260912T233259Z-174a5418` --
+contain **no `checks.json`**, so no round trip and no `verify` report was ever written into them, and its `export`
+row names `export-20260912T233810Z-bf35208f`, which does not exist under `out/export/` at all. Its `problems: none`
+for those rows is not reproducible, and the atlas one is wrong.
 
 ---
 
@@ -275,7 +319,7 @@ From `out/export/<run_id>/manifest.json` of the shipped object-sweep run, with n
   **replicates**, **conventions** (the NA rule, decimal ids, `|`-joined lists, the table roles), **tables** (row
   counts, columns, units, SHA-256 each) and the source Result's SHA-256.
 
-### The one hole, and how it is closed
+### The one hole, and how far it is closed (not all the way)
 
 `common.provenance` takes the commit from `common.git_state()`. A cluster job runs from
 `/mnt/beegfs/neurome/runs/<run>/` -- `scripts/cluster_run.py` rsyncs the cluster's own checkout **without `.git`** and
@@ -305,6 +349,16 @@ commit into the manifest with `commit_verified` saying **how** it is known. Two 
 A skeptic who distrusts the inference still has the raw evidence: `flyverse_commit.source_fingerprint.files` and
 `files_loaded` list the per-file SHA-256 the job saw, so any single file can be checked against any commit.
 
+**The hole is closed for this tool's own recordings and nowhere else.** `_stamp_commit` can pin a commit only when
+the recording carried a `source_fingerprint`, and only `export`'s own `record` writes one, so three of the four
+GPU-recorded tools still ship an unknown commit: `out/export/atlas-20260912T233906Z-f8234031/manifest.json`,
+`.../health-20260912T233347Z-527eabd9/manifest.json` and `.../trace-20260912T233909Z-94902d11/manifest.json` all read
+`flyverse_commit.commit = "unknown"` with `commit_verified = null`. Worse, `verify()` returns **no problems** for the
+health and trace directories anyway: `docs/NEUROME_INTERFACE.md` section 1 makes `flyverse_commit` mandatory, but
+`Result.check()` and `verify()` test only that the **key exists**, never that it names a commit. So "the commit hole
+is closed" would be false as a general claim -- it is closed for the object-sweep export in this record, and section
+10.4 is the change that would close it for the other seven tools.
+
 ---
 
 ## 9. Defects found and fixed in this task (in the files this task owns)
@@ -322,7 +376,9 @@ A skeptic who distrusts the inference still has the raw evidence: `flyverse_comm
    the sixteen Neurome edge counts of section 6 are the check that the override is right.
 4. **`common.silent_flags(..., rates=None)` marks every link `never_firing`** (section 10); `export.silent_flags`
    leaves the flag `False` when no rollout was given and the table says so in `silent_rule`.
-5. **The commit hole of section 8**, closed with `source_fingerprint` / `match_sources`.
+5. **The commit hole of section 8**, closed with `source_fingerprint` / `match_sources` **for this tool's own
+   `record` path only** -- the atlas, health and trace exports still ship `commit: unknown` with
+   `commit_verified: null`, and `verify()` does not flag it (section 8, section 10.4).
 
 ## 10. Findings for other owners (not fixed here -- `flyverse/interp/common.py` is not this task's file)
 
@@ -357,6 +413,13 @@ A skeptic who distrusts the inference still has the raw evidence: `flyverse_comm
   for its rate types, so the export ships `rate_deviation` / `abs_rate_deviation` in rate units and no mV column for
   the 12,235 graded bodies. Adding it needs a change in the probe or the optic lobe's per-cell input accessor, not
   in the export.
+* **`verify`'s `expect_paired` default is object-pathway-specific and hard-wired for every tool.**
+  `expect_paired=("LC11","LC10a")` (`flyverse/interp/export.py:415`) is the default of the function, of the CLI
+  (`scripts/interp_export.py:417`) and of `_report` (`:316`), which does not pass one through -- so there is no CLI
+  route to export another tool's Result through `analyse` without the two spurious problems, and the atlas export
+  fails `verify` for that reason alone (section 7). Either the rule should fire only when `readout_per_body`
+  actually contains those types, or `analyse` needs a `--paired` flag; `verify --paired ''` is the only escape
+  today, and it is not documented anywhere but here.
 * **The export never re-derives anything.** A Result with a wrong number exports cleanly; `check()` and `verify`
   test the *shape*, the provenance block and the hashes, never the physiology. The ledger tool is where a number is
   judged against an expectation.
@@ -395,8 +458,9 @@ PYTHONIOENCODING=utf-8 python scripts/interp_export.py verify --run-dir out/expo
 ## 13. Tests
 
 `tests/test_interp.py::ExportTests`, 8 CPU tests on the 8-neuron synthetic graph of `graph()`, no dataset and no GPU
-(`python -m pytest tests/test_interp.py -q` -- 64 passed, the whole toolkit file, at the time of writing;
-`tests/test_control.py` 18 passed; `import flyverse.interp` still pulls in no torch):
+(`python -m pytest tests/test_interp.py -k "AtlasTests or ExportTests" -q` -- **14 passed**, of which
+`ExportTests` is **8 passed in 3.3 s**. No whole-file total is quoted: `tests/test_interp.py` is shared and its count
+moves under other owners. `tests/test_control.py` 18 passed; `import flyverse.interp` still pulls in no torch):
 
 | test | what it pins |
 |---|---|

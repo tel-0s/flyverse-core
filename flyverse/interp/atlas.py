@@ -693,9 +693,13 @@ def analyse_runs(runs, *, c: cn.Connectome | None = None, top: int = 20, z_min: 
 
     `runs`: AtlasRun objects or paths. The stimulus arm of a (population, readout) is that population's value in each
     run (the replicate unit is the run); the null arm is every unstimulated row of every run for the same readout.
-    `common.compare` gives z / Welch / U / p / verdict; `z_floor` and `verdict_atlas` repeat it with the null SD
-    floored at `sd_floor` Hz so a readout with a bit-identical null (SD 0, z NaN) is still judged instead of being
-    reported as null. `summary` picks which pulse-window statistic is the headline ('mean', 'half', 'final', 'pre').
+
+    **`verdict` is `common.compare`'s**, one semantics with every other tool: 'result', 'null', 'underpowered' (too
+    few runs, or a p floor above alpha) and 'undetermined' where the atlas' null is bit-identical (SD 0), which is
+    most of it. `z_floor` -- the difference over the null SD floored at `sd_floor` Hz -- stays as the declared
+    EFFECT SIZE of exactly those rows (it is what ranks them), and `verdict_z_floor` records what that column alone
+    would say; neither is a verdict (docs/INTERP.md 11, defect 4, closed). `summary` picks which pulse-window
+    statistic is the headline ('mean', 'half', 'final', 'pre').
     """
     runs = [r if isinstance(r, AtlasRun) else AtlasRun.load(r) for r in runs]
     if not runs:
@@ -720,13 +724,14 @@ def analyse_runs(runs, *, c: cn.Connectome | None = None, top: int = 20, z_min: 
             cmp = compare(stim, null, z_min=z_min, min_n=min_n)
             diff = cmp["diff"]
             sd = null_stats.sd if np.isfinite(null_stats.sd) else 0.0
-            z_floor = diff / max(sd, sd_floor)
+            z_floor = diff / max(sd, sd_floor)               # the declared effect size, not a verdict
+            verdict = cmp["verdict"]
             if min(cmp["stim"]["n"], cmp["null"]["n"]) < min_n:
-                verdict = "underpowered"
+                verdict_zf = "underpowered"
             elif abs(z_floor) >= z_min and (not np.isfinite(cmp["p"]) or cmp["p"] <= 0.05):
-                verdict = "result"
+                verdict_zf = "result"
             else:
-                verdict = "null"
+                verdict_zf = "null"
             p = pop_rec[lab]
             shared = int(overlap.get(lab, {}).get(ro, 0))
             rows.append({"self_drive": bool(shared), "readout_shared_cells": shared,
@@ -737,7 +742,8 @@ def analyse_runs(runs, *, c: cn.Connectome | None = None, top: int = 20, z_min: 
                          "readout": ro, "n_runs": int(cmp["stim"]["n"]), "stim_mean": cmp["stim"]["mean"],
                          "stim_sd": cmp["stim"]["sd"], "null_mean": cmp["null"]["mean"], "null_sd": cmp["null"]["sd"],
                          "null_n": int(cmp["null"]["n"]), "diff": diff, "z": cmp["z"], "z_floor": float(z_floor),
-                         "welch": cmp["welch"], "U": cmp["U"], "p": cmp["p"], "verdict_compare": cmp["verdict"],
+                         "welch": cmp["welch"], "U": cmp["U"], "p": cmp["p"], "p_floor": cmp["p_floor"],
+                         "verdict_compare": cmp["verdict"], "verdict_z_floor": verdict_zf,
                          "verdict": verdict, "stim_values": [float(x) for x in stim],
                          "final_mean": float(np.mean([runs[k].values["final"][pos[k][lab], rpos[k][ro]]
                                                       for k in range(len(runs))])),
@@ -794,10 +800,23 @@ def _movers(df: pd.DataFrame, top: int) -> pd.DataFrame:
             out.append({"readout": ro, "rank": rank, "population": r.population, "n_cells": r.n_cells,
                         "hz": r.hz, "stim_mean": r.stim_mean, "null_mean": r.null_mean, "diff": r["diff"],
                         "z": r.z, "z_floor": r.z_floor, "p": r.p, "verdict": r.verdict,
+                        "verdict_z_floor": r.get("verdict_z_floor", r.verdict),
                         "self_drive": bool(r.get("self_drive", False)),
                         "readout_shared_cells": int(r.get("readout_shared_cells", 0) or 0),
                         "stim_sd": r.stim_sd, "n_runs": r.n_runs})
     return pd.DataFrame(out)
+
+
+def called(df: pd.DataFrame) -> pd.DataFrame:
+    """The rows the atlas REPORTS as movers: `common.compare`'s 'result', plus the rows it calls 'undetermined'
+    because their null is bit-identical (SD 0) whose declared effect size `z_floor` clears `z_min`.
+
+    The verdict column stays compare's for every row (docs/INTERP.md 11, defect 4); this is the atlas' own
+    ranking rule, named once instead of being folded into the verdict."""
+    if not len(df) or "verdict" not in df:
+        return df
+    zf = df["verdict_z_floor"] if "verdict_z_floor" in df else df["verdict"]
+    return df[(df.verdict == "result") | ((df.verdict == "undetermined") & (zf == "result"))]
 
 
 def _per_body_table(c: cn.Connectome, runs, df: pd.DataFrame, per_body_for, summary: str) -> pd.DataFrame:
@@ -806,7 +825,7 @@ def _per_body_table(c: cn.Connectome, runs, df: pd.DataFrame, per_body_for, summ
     if not len(r0.body_idx):
         return pd.DataFrame(columns=common.EXPORT_TABLES["readout_per_body"])
     if per_body_for is None:
-        per_body_for = list(dict.fromkeys(df[df.verdict == "result"].sort_values("diff", key=abs, ascending=False)
+        per_body_for = list(dict.fromkeys(called(df).sort_values("diff", key=abs, ascending=False)
                                           .population.tolist()[:8]))
     per_body_for = [l for l in per_body_for if l in set(r0.labels)]
     if not per_body_for:
@@ -834,10 +853,10 @@ def _per_body_table(c: cn.Connectome, runs, df: pd.DataFrame, per_body_for, summ
 
 
 def _summary(df: pd.DataFrame, movers: pd.DataFrame, runs, summary: str, sd_floor: float) -> dict:
-    res = df[df.verdict == "result"]
+    res = called(df)
     top_pop = {}
     for ro, g in movers.groupby("readout", sort=False):
-        g = g[g.verdict == "result"]
+        g = called(g)
         if not len(g):
             continue
         top_pop[ro] = {"population": g.iloc[0].population, "diff": float(g.iloc[0]["diff"]),

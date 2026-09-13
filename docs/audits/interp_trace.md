@@ -100,12 +100,19 @@ Per-run values of the headline rows (stimulus draws / null draws): Mi4 .0485 .04
 .0471 .0911 .0527 .0491 .0561 / .0793 .0721 .0770 .0343 .0209; LPLC2 (mV) .2588 .2832 .3238 .2870 .3523 / .1451 .1565
 .2502 .0733 .2016.
 
-**Verdict: reproduced** (`validation.status`). The tool places Mi4 / Mi1 / Tm3 above the null (z +6.6 / +17.2 / +10.5,
-all five stimulus draws above all five null draws) and T2 / T3 / Tm5Y / TmY21 / LC11 / LC10a at it (|z| <= 0.9, U 9-20).
-LPLC2 repeats 8.4's `off` row exactly in kind (z +2.0 there, +2.1 here; U 25 / p 0.0079 in both) and is 'null' by the
-|z| >= 3 rule in both. The digits differ from 8.7 -- Mi4's null SD is 0.0055 here against 0.0017-0.0023 there, so its
-z is +6.6 against +22 to +35 -- which is the +-1.5 (and, on a 5-draw null SD, larger) scatter the design warned about:
-the target is the ordering and the verdicts, and those agree with 8.7 and with `optic_measures.md` 6 row for row.
+**Verdict: 'reproduced', verdict-level only** (`validation.status`). `trace.py:786-801` tests exactly one thing: that
+Mi4 / Mi1 / Tm3 come out 'result' and that the six named at-null types do not. The reference **z bands** of
+`docs/INTERP.md` 6 (and 4.2) -- Mi4 +22.3 / +28.6, Mi1 +7.8 / +27.9, Tm3 +7.8 / +15.6 -- are **not** tested, and the
+z magnitudes do **not** reproduce: Mi4's measured z is +6.6, 3.4x below its band, because the 5-draw null SD is 3x
+larger here (0.0055 against 0.0017-0.0023 in 8.7). Quote 'reproduced' with that qualification. The tool does place
+Mi4 / Mi1 / Tm3 above the null (z +6.6 / +17.2 / +10.5, all five stimulus draws above all five null draws) and
+T2 / T3 / Tm5Y / TmY21 / LC11 / LC10a at it (|z| <= 0.9, U 9-20). LPLC2 repeats 8.4's `off` row exactly in kind
+(z +2.0 there, +2.1 here; U 25 / p 0.0079 in both) and is 'null' by the |z| >= 3 rule in both. What agrees with 8.7 and
+with `optic_measures.md` 6 is **the carrier / at-null grouping and the stimulus-arm levels**, not the ordering: the ball
+means here against `optic_measures.md` 6 are Mi4 0.0478 / 0.047, Mi1 0.0724 / 0.073, Tm3 0.1081 / 0.108, Tm5Y 0.0512 /
+0.047, T2 0.0409 / 0.041, T3 0.0278 / 0.025, i.e. 0.001-0.005 rate units apart, while **the z ordering among the three
+carriers does not agree with either reference** -- Mi4 is the largest z in 8.7 `off` (+28.6) and in `optic_measures.md` 6
+(+35), and the smallest of the three here (+6.6).
 
 Carriers per depth / stage (result / scored): depth 1 7/27, 2 16/196, 3 15/670, 4 5/1967, 5 0/2223, 6 0/825; stage 1
 lamina 7/11, 2a medulla intrinsic 9/83, 2b Tm/TmY 7/57, 3 T cells 8/23, 4 Li/LPi 3/41, 5 VPN 8/178, 6 VCN 1/38. The
@@ -135,7 +142,7 @@ side with `optic_measures.md` 5.3 (the static apple, the optic lobe's own normal
 
 | target | input | share here | 5.3 share | sign | mV / volley | input verdict (z) | signed figure | term |
 |---|---|---|---|---|---|---|---|---|
-| T3 (z +0.2) | Mi1 | 22.4 % | 22.5 % | + | +14.7 | result (+17.2) | +2.15e-4 | +4.80e-5 |
+| T3 (z +0.2) | Mi1 | 22.3 % | 22.5 % | + | +14.7 | result (+17.2) | +2.15e-4 | +4.80e-5 |
 | | Tm1 | 16.0 % | 16.0 % | + | +10.5 | result (+4.4) | -2.18e-4 | -3.48e-5 |
 | | Tm3 | 8.1 % | 8.2 % | + | +5.3 | result (+10.5) | +1.85e-5 | +1.50e-6 |
 | | Tm4 | 6.6 % | 6.7 % | + | +4.3 | result (+4.3) | -1.27e-4 | -8.32e-6 |
@@ -148,11 +155,22 @@ side with `optic_measures.md` 5.3 (the static apple, the optic lobe's own normal
 | TmY21 (z -0.3) | TmY5a 8.4 % - (null); TmY13 6.4 % + (null); Tm20 4.9 % + (result); Tm5a 4.5 % + (result); Tm5Y 3.2 % + (null); TmY17 3.1 % + (null); Dm3a 2.9 % - (result) | 5.3: TmY5a 9.7, TmY13 7.6, Tm20 5.8, Tm5a 5.1, Tm5Y 3.8, TmY17 3.5, Dm3a 3.4 | | | | | |
 
 `lost_cancellation` (summary): **T3** -- carriers raising {Mi1, Tm3} +4.95e-5 vs lowering {Tm1, Tm4} -4.31e-5, linear
-estimate +6.4e-6 against T3's own signed figure -2.2e-5, cancellation fraction 0.93, carrier share 0.530, all of it
-excitatory (`receptor:exact` on every entry). **T2** -- {Tm2, L5, Tm3, Mi1} +2.09e-5 vs {C3} -2.04e-5, cancellation 0.99,
-carrier share 0.34. **Tm5Y** -- {Tm20, Dm8a} +2.55e-5 vs {Tm5a, TmY20} -2.03e-5, 0.89, carrier share 0.21. **TmY21** --
-{Tm20} +8.0e-6 vs {Tm5a, Dm3a} -9.5e-6, 0.91, carrier share 0.12. This is `optic_measures.md` 5.3's hand reading
-produced by the tool: at T3 the ON carriers (Mi1, Tm3) and the OFF carriers (Tm1, Tm4) arrive with opposite figures
+estimate +6.4e-6 against T3's own signed figure -2.2e-5, carrier share 0.530, all of it excitatory (`receptor:exact` on
+every entry). **T2** -- {Tm2, L5, Tm3, Mi1} +2.09e-5 vs {C3} -2.04e-5, carrier share 0.34. **Tm5Y** -- {Tm20, Dm8a}
++2.55e-5 vs {Tm5a, TmY20} -2.03e-5, carrier share 0.21. **TmY21** -- {Tm20} +8.0e-6 vs {Tm5a, Dm3a} -9.5e-6, carrier
+share 0.12.
+
+**`cancellation_fraction` is not a two-digit quantity and the toolkit's own >= 3-replicate scatter rule was not applied
+to it.** The figures in `object_stage.json` (T3 0.93, T2 0.99, Tm5Y 0.89, TmY21 0.91) are a single draw set. A second
+independent 5-run set (seeds 10-14, `out/trv_skep/`, same CLI) gives T3 0.55, T2 0.00, Tm5Y 0.83, TmY21 0.00: the
+per-input signed figures are the noisy per-column quantity and some flip sign between draw sets (T3's Pm1 -8.58e-5 ->
++2.73e-4, Tm1 -2.175e-4 -> -9.95e-5), so in those draws **T2's and TmY21's lowering-carrier set is empty and the
+fraction is undefined** (reported as 0). Report the fraction with its replicate scatter (two 5-run sets: T3 0.93 / 0.55,
+T2 0.99 / 0.00, Tm5Y 0.89 / 0.83, TmY21 0.91 / 0.00) or compute it per run and quote mean +- SD over runs; a
+cancellation ratio needs >= 3 runs of scatter. **The stable, structural part is the share table** (identical across both
+run sets) **and the sign pattern at T3** -- Mi1 + Tm3 raising vs Tm1 + Tm4 lowering through excitatory synapses -- not
+the fraction. That much is `optic_measures.md` 5.3's hand reading produced by the tool: at T3 the ON carriers (Mi1,
+Tm3) and the OFF carriers (Tm1, Tm4) arrive with opposite figures
 through excitatory synapses of comparable weight (30.5 % vs 22.6 % of T3's input) and cancel; at Tm5Y / TmY21 the
 carrier share is a fifth or an eighth of the input (dilution). Two differences from 5.3, both expected: the shares are
 the LIF's shaped weights (`A`; `same_type_gain` removes T2 -> T2, which 5.3's optic matrix keeps at 4.7 %), and the
@@ -164,9 +182,14 @@ gives T3 <- Mi1 +14.68 mV / volley over 6,659 entries from 1,773 cells, 103,700 
 25,230 synapses, 0.054); Pm1 -3.38 (246 cells, 23,810, 0.051). `lost_dynamic_per_type` (kind `optic_input`, the
 OpticParams rebuilt from the recording's provenance, 5 stimulus vs 5 control runs) is the whole-population
 rate-weighted recurrent input: T3 <- Mi1 +1.74e-3 vs +1.66e-3 (ball vs none; z +0.5), Tm3 +4.0e-4 vs +3.4e-4, Pm1
--1.03e-3 vs -0.98e-3, Tm1 -5.9e-4 vs -5.4e-4 -- no term differs beyond scatter (|z| <= 0.85, every verdict null),
-because the population mean over 1,940 T3 cells hides a figure that lives in ~40 columns. The retinotopic
-`lost_inputs` table is the reading; the dynamic table is the whole-field context.
+-1.03e-3 vs -0.98e-3, Tm1 -5.9e-4 vs -5.4e-4 -- **none of those six carrier terms differs beyond scatter** (Mi1 +0.51,
+Tm3 +0.48, Tm1 -0.61, Tm4 -0.12, Pm1 -0.28, Pm5 +0.09: |z| <= 0.85, every verdict null), because the population mean
+over 1,940 T3 cells hides a figure that lives in ~40 columns. The statement is about those terms only, not about the
+table: over the four decomposed targets `lost_dynamic_per_type` runs to max |stim_z| 5.23 (T3, `recurrent:T5a`, verdict
+result), 6.25 (T2), 8.21 (Tm5Y) and 10.92 (TmY21, `recurrent:T4a`, result), with 2 / 2 / 1 / 3 rows called 'result'
+(`recurrent:T5a`, `recurrent:T4a`, `recurrent:Tlp14` and three feedback rows). Those rows are 10-100x smaller in
+magnitude than Mi1's term, so the conclusion stands; only the scope of the no-difference statement was wrong. The
+retinotopic `lost_inputs` table is the reading; the dynamic table is the whole-field context.
 
 ### 2.3 What the default first-lost rules name (`object_default.json`)
 
@@ -174,7 +197,8 @@ The contract's depth rule gives `first_lost_depth = 5` (depth 4 still holds 5 ca
 none of 2,223): for a stimulus that the motion pathway carries to the lobula plate, the depth at which *no* type carries
 is past the optic lobe. The input rule lists 160 non-carriers taking >= 20 % of their input from carriers, by depth:
 at depth 1 aMe12 (0.29 from Dm9), Tm5c (0.27, L3 + Dm9; z +2.8) and MeVP11 (0.24, L3 + Mi4) -- these are what
-`--decompose-at first_lost` decomposes (Tm5c: L3 raising vs Dm9 lowering, cancellation 0.55; MeVP11: L3 vs Mi4, 0.96);
+`--decompose-at first_lost` decomposes (Tm5c: L3 raising vs Dm9 lowering; MeVP11: L3 vs Mi4 -- the fractions 0.55 / 0.96
+are one draw set and carry the scatter of 2.2, read the raising / lowering split, not the digits);
 ranked by carrier share instead: Pm1 0.88 (Mi1, Tm3, TmY14), VS 0.88 (T5d, T4d, T5a, T4a, LPi34, T4b), Dm19 0.88 (L2,
 Dm15), Li28 0.87, VST1 0.86, Pm7 0.85, Tlp14 0.84, Dm6 0.84; T3 sits at 0.53, TmY13 0.49, T2 0.34. So the tool's honest
 default answer is "the figure is discarded first by the wide-field pooling cells (Dm, Pm, Li, VS / VST) at every
@@ -301,13 +325,42 @@ cancellation records, the decompose composition status and the p floor.
 10. The CPU smoke test of `record` (`--quick --allow-cpu --device cpu`) initially ran on this desktop's GPU because
     `room_demo.Sim` picks CUDA when it is available; `--device cpu` now hides CUDA (`CUDA_VISIBLE_DEVICES=""`) before torch
     is imported. No number in this record comes from that smoke run.
+11. **`lost_inputs.raw_synapses_per_post` was broken on the real cache, and the shipped object Results still carry the
+    defect.** `trace.py` lines 132 and 347 called `common.raw_counts(c)` with the default `with_sign0=True`, and
+    `common.raw_counts` installs `connectome.sign0_counts`, which by its own docstring (`flyverse/connectome.py:310`) is
+    "non-zero only where `W.data == 0`" -- so every ordinary signed edge's count is destroyed. On the real cache
+    `with_sign0=True` gives 916,626 non-zero entries of 25,578,600 and sum 2.70e6, against 24,661,974 / 1.2146e8 with
+    `with_sign0=False`. The column reads **0.0 in all 48 rows of `object_stage.json` and all 36 of `object_default.json`**.
+    The fix is now in `flyverse/interp/trace.py` (`full_raw_counts`, line 111: `|W|` merged with the cache's
+    `sign0_counts`, used by `lost_inputs` at line 154 and by the decompose composition at line 369), but **the object
+    Results predate it** (`trace.py` 19:40, `object_stage.json` 17:03) and have not been re-emitted; re-run
+    `--decompose-at T3,T2,Tm5Y,TmY21` before quoting the column. The post-fix value is `lost_static_per_type`'s
+    `raw_count / n_post`, already correct in the same file through `decompose.counts_matrix`: T3 <- Mi1 103,723 / 1,940 =
+    **53.5 synapses per post cell** (Tm1 38.2, Tm3 19.3, Tm4 15.7, Pm5 13.0, Pm1 12.3).
+12. **Regression note: this defect needs a real-cache test.** `TraceTests` runs on the 8-neuron synthetic graph, where
+    `connectome.sign0_counts` warns "built for a graph of 167106 neurons, this reference has 8; ignored"
+    (`connectome.py:324`) and the code takes the fallback path -- so no synthetic-graph test can ever catch it. The
+    assertion has to be made against `cache/`: `full_raw_counts(c)[0].nnz` ~ 24.7 M, not ~0.9 M.
+13. **The `audit` subcommand prints one reference pair on every LH row.** `scripts/interp_trace.py:310` hard-codes
+    `(ref LHPD4d1 20.6 / 3.4; benchmark 17.4 / 4.4)` inside the loop over LHPD4d1 / LHAV4a1_a / LHAV4a1_b /
+    LHCENT12_a / LHPD2a1, so the other four are shown against LHPD4d1's screen value and the channel mean instead of
+    their own benchmark numbers (LHAV4a1_a 20.4 / 4.5, LHAV4a1_b 18.0 / 4.7, LHCENT12_a 17.4 / 4.7, LHPD2a1 15.9 / 4.3).
+    On an object-protocol Result it also prints an LHAV4a1_b row with that reference against 0.00 Hz (the type is
+    scored at 0.0 / 0.0 there; `object_stage_console.txt`). Each validation type needs its own reference pair, and the
+    LH rows should be suppressed when the protocol is not odour.
 
 ## 6. Files
 
-* `flyverse/interp/trace.py`, `scripts/interp_trace.py`, `tests/test_interp.py::TraceTests` (7 tests; the whole file
-  65 tests pass on the CPU in 14 s; `tests/test_control.py` 18 pass).
+* `flyverse/interp/trace.py`, `scripts/interp_trace.py`, `tests/test_interp.py::TraceTests`
+  (`-k TraceTests`: **7 passed** on the CPU in 3.8 s; the file is shared with the other tools, so quote the class, not
+  the file total; `tests/test_control.py` 18 pass).
 * Recordings `out/trv/{obj,od}_{stim,ctrl,null}_r{0..4}.{npz,json}` + `_series`, console `.txt` per job,
   `out/trv_cluster.log`.
 * Results `out/interp/trace/object_stage.json` (+ `_console.txt`), `object_default.json`, `object_figure_z.json`,
   `object_figure_z_abs.json`, `odour_mean.json`, `odour_dprime.json`; `python scripts/interp_trace.py audit --json <file>`
   prints the side-by-side of sections 2 and 3.
+* Also in the results directory and **declared, not used**: `out/interp/trace/object_best_cell.json` (+ `_console.txt`),
+  25 MB, `validation.status` `not run` -- an earlier `--stat best_cell` pass superseded by `object_stage.json`. No number
+  in this record comes from it.
+* Second 5-run draw set (seeds 10-14, both protocols, 150 files) `out/trv_skep/{obj,od}_{stim,ctrl,null}_r{10..14}.*` --
+  the replicate scatter of section 2.2's cancellation fractions.

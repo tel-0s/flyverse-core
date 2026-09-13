@@ -7,7 +7,7 @@
     python scripts/interp_health.py record --protocol walk --receptor-model off     --seed 0 --out out/health/walk_off_r0
     # CPU
     PYTHONIOENCODING=utf-8 python scripts/interp_health.py analyse --recordings "out/health/compass_r*" --window 5.5,8 --groups meta --json out/interp/health/compass.json
-    PYTHONIOENCODING=utf-8 python scripts/interp_health.py analyse --recordings "out/health/walk_default_r*" --null "out/health/walk_off_r*" --window 0.5,1.5 --groups meta --json out/interp/health/walk.json
+    PYTHONIOENCODING=utf-8 python scripts/interp_health.py analyse --recordings "out/health/walk_default_r*" --null-runs "out/health/walk_off_r*" --window 0.5,1.5 --groups meta --json out/interp/health/walk.json
     PYTHONIOENCODING=utf-8 python scripts/interp_health.py structure --by module --json out/interp/health/nt_structure_module.json
     PYTHONIOENCODING=utf-8 python scripts/interp_health.py validate --compass "out/health/compass_r*" --walk-default "out/health/walk_default_r*" --walk-off "out/health/walk_off_r*" --json out/interp/health/validation.json
 
@@ -306,7 +306,7 @@ def analyse_runs(stems, c, params=None, window=None, by="type", groups="meta", n
     runs = run_all(_stems(stems) if isinstance(stems, str) else list(stems))
     if not runs:
         raise SystemExit(f"no recordings match {stems}")
-    nulls = run_all(_stems(null_stems) if isinstance(null_stems, str) else list(null_stems)) if null_stems else []
+    nulls = run_all(_stems(null_stems)) if null_stems else []   # _stems takes one glob or a list of them (--null-runs)
     first = runs[0][2]
     prov = dict(first.provenance)
     prov["analysis"] = {"flyverse_commit": common.git_state(), "note": "the recordings' provenance is the recording job's (a cluster run dir is not a git checkout: "
@@ -481,7 +481,6 @@ def main(argv=None):
     a.add_argument("--window", default=None, help="start,end seconds"); a.add_argument("--by", default="type")
     a.add_argument("--groups", default="meta", help="'meta' (the recording's groups), 'none', or a JSON dict {label: spec}")
     a.add_argument("--no-structure", action="store_true", help="dynamic columns only (no Connectome load)")
-    a.add_argument("--null-recordings", default=None, help="glob of the other arm's recording stems (common.compare per group x statistic)")
     a.add_argument("--params-from", choices=("meta", "args"), default="meta", help="LIFParams from the recording's provenance (default) or the --lif / --receptor-* flags")
     common.add_common_args(a)
     s = sub.add_parser("structure", help="CPU: the sign-0 / frozen shares of every group of the cached connectome")
@@ -500,7 +499,7 @@ def main(argv=None):
         c = None if args.no_structure else load_connectome(args)
         groups = None if args.groups in ("none", "") else (json.loads(args.groups) if args.groups.startswith("{") else args.groups)
         res = analyse_runs(args.recordings, c, params=(lif if args.params_from == "args" else None), window=parse_window(args.window), by=args.by,
-                           groups=groups, null_stems=args.null_recordings)
+                           groups=groups, null_stems=(args.null_runs or None))
         table = res.table("replicates_group") if "replicates_group" in res.tables else res.table("replicates")
         if not args.quiet:
             common.print_table(table.drop(columns=["values"]) if "values" in table else table, max_rows=80)

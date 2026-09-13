@@ -532,11 +532,24 @@ def cmd_stage(args) -> int:
 
 
 # ----------------------------------------------------------------------------------------------- analyse (CPU)
+def trace_dir_for(args) -> Path:
+    """Where `analyse` writes its per-arm traces.  Derived from --trace-dir, else from --json's directory, else from
+    OUT_JSON -- never a fixed path, so analysing a second recording set with its own --json cannot silently
+    overwrite the first set's `trace_<lesion>.json` (skeptic defect: the path was hard-coded to
+    `OUT_JSON / trace_<lesion>.json` regardless of --dir and --json)."""
+    if getattr(args, "trace_dir", None):
+        return Path(args.trace_dir)
+    if getattr(args, "json", None):
+        return Path(args.json).parent
+    return OUT_JSON
+
+
 def cmd_analyse(args) -> int:
     """Every lesion arm's recordings -> its own trace (the same statistic and null as the baseline) -> the type x lesion
     matrix with scatter, the Neurome `sensitivity` table and the 'restores' calls; Result of tool 'lesion'."""
     c = load_c(args.cache_dir)
     d = Path(args.dir)
+    tdir = trace_dir_for(args); tdir.mkdir(parents=True, exist_ok=True)
     lids = [x for x in args.lesions.split(",") if x] if args.lesions else [l for l in LESIONS if glob.glob(f"{d}/{l}_stim_r*.json")]
     traces, provs = {}, {}
     ew = None
@@ -549,7 +562,7 @@ def cmd_analyse(args) -> int:
             ew = common.effective_weights(c, tr.params_from_provenance(stim[0].meta.get("provenance") or {}))
         res.files["generator"] = " ".join(sys.argv)
         res.summary["lesion"] = to_jsonable({k: v for k, v in (stim[0].meta.get("lesion") or {}).items() if k not in ("pre_bodies", "post_bodies")})
-        p = OUT_JSON / f"trace_{lid}.json"
+        p = tdir / f"trace_{lid}.json"
         res.save(p)
         traces[lid] = res; provs[lid] = stim[0].meta.get("provenance") or {}
         pt = res.table("per_type")
@@ -589,7 +602,7 @@ def cmd_analyse(args) -> int:
     mat = pd.DataFrame(rows); sd = pd.DataFrame(sens)
     prov = dict(provs[args.baseline]); prov["analysis"] = {"flyverse_commit": common.git_state(), "lesions": {lid: provs[lid].get("stimulus", {}).get("lesion") for lid in traces},
                                                            "devices": sorted({str((provs[l].get("execution") or {}).get("device")) for l in traces}),
-                                                           "traces": {lid: str(OUT_JSON / f"trace_{lid}.json") for lid in traces}}
+                                                           "traces": {lid: str(tdir / f"trace_{lid}.json") for lid in traces}}
     out = Result.new("lesion", prov)
     out.add_table("matrix", mat); out.add_table("sensitivity", sd)
     restores = mat[mat.restores]; loses = mat[mat.loses]
@@ -601,7 +614,7 @@ def cmd_analyse(args) -> int:
     out.replicates = {"n": int(traces[args.baseline].summary.get("n_stim_runs", 0)), "unit": "runs", "runs": traces[args.baseline].replicates.get("runs"),
                       "null": traces[args.baseline].replicates.get("null")}
     out.validation = dict(out.validation, measured={"note": "an application of the lesion pattern to the object protocol; the lesion tool's own validation is interp_lesion.md"}, status="not run")
-    out.files = {"generator": " ".join(sys.argv), "recordings_dir": str(d), "traces": {lid: str(OUT_JSON / f"trace_{lid}.json") for lid in traces}}
+    out.files = {"generator": " ".join(sys.argv), "recordings_dir": str(d), "traces": {lid: str(tdir / f"trace_{lid}.json") for lid in traces}}
     path = Path(args.json) if args.json else OUT_JSON / "lesions.json"
     out.save(path)
     print_matrix(mat, list(traces))
@@ -993,11 +1006,13 @@ def cmd_perrun(args) -> int:
         if ts and tc:
             sets.append((args.trace_prefix, ts, tc, Path(args.trace_json)))
     base_li = None
-    p_base = OUT_JSON / f"trace_{args.baseline}.json"
+    # where `analyse` put the per-arm traces (--arm-traces, else the tool's own output directory)
+    tdir = Path(args.arm_traces) if getattr(args, "arm_traces", None) else OUT_JSON
+    p_base = tdir / f"trace_{args.baseline}.json"
     if p_base.exists():
         base_li = Result.load(p_base).table("lost_inputs")
     for lid, (stim, ctrl) in arms.items():
-        p = OUT_JSON / f"trace_{lid}.json"
+        p = tdir / f"trace_{lid}.json"
         sets.append((lid, stim, ctrl, p if p.exists() else None))
     if not sets and not arms:
         raise SystemExit("nothing to do: no recordings")
@@ -1077,6 +1092,9 @@ def build_parser() -> argparse.ArgumentParser:
     a = sub.add_parser("analyse", help="CPU: per-lesion traces -> type x lesion matrix, sensitivity, restores")
     a.add_argument("--dir", default="out/apply_object/les"); a.add_argument("--lesions", default=None); a.add_argument("--baseline", default="base")
     a.add_argument("--decompose-at", default=",".join(STAGE_TYPES)); a.add_argument("--decompose-all", action="store_true")
+    a.add_argument("--trace-dir", default=None,
+                   help="where to write the per-arm trace_<lesion>.json (default: --json's directory, else the tool's own output directory). "
+                        "Analysing a second recording set with its own --json therefore no longer overwrites the first set's traces.")
     common.add_common_args(a); a.set_defaults(func=cmd_analyse)
 
     lp = sub.add_parser("ladder-plan", help="CPU: the size ladder batch (scripts/interp_export.py record per size / arm / run)")
@@ -1092,6 +1110,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--dir", default="out/apply_object/les"); pr.add_argument("--lesions", default=",".join(LESIONS)); pr.add_argument("--ref", default="fb0")
     pr.add_argument("--baseline", default="base", help="the arm whose decomposed trace supplies the carriers for arms whose trace was not decomposed")
     pr.add_argument("--trace-dir", default="out/trv"); pr.add_argument("--trace-prefix", default="obj"); pr.add_argument("--trace-json", default=str(OUT_JSON / "trace_obj.json"))
+    pr.add_argument("--arm-traces", default=None, help="directory holding analyse's per-arm trace_<lesion>.json (default: the tool's own output directory)")
     common.add_common_args(pr); pr.set_defaults(func=cmd_perrun)
 
     st = sub.add_parser("selftest", help="CPU: the pieces on the synthetic graph"); st.set_defaults(func=cmd_selftest)
