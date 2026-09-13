@@ -1,0 +1,108 @@
+cff-version: 1.2.0
+message: "If you use flyverse, please cite it as below, and cite the MaleCNS v1.0 connectome release and Shiu et al. 2024 as well -- flyverse is a simulator built on their data and their neuron model."
+title: "flyverse: the MaleCNS fly connectome in simulations, games and other strange places"
+abstract: "A whole-CNS Drosophila simulation driven by the Janelia FlyEM MaleCNS v1.0 connectome: a graded optic lobe feeding a leaky integrate-and-fire central brain and VNC, embodied in a ray-traced room, with an interpretability toolkit for localizing behavioural deficits to populations, synapses and links."
+type: software
+authors:
+  # An entity author (a handle, not a legal name); the GitHub account is tel-0s -- deliberately NOT in
+  # `alias:`, because cffconvert renders the alias in place of the name ("tel-0s (2026)").
+  - name: "tel0s"
+version: "0.1.0"
+date-released: "2026-09-13"
+license: MIT
+repository-code: "https://github.com/tel-0s/flyverse"
+url: "https://github.com/tel-0s/flyverse"
+keywords:
+  - connectomics
+  - Drosophila
+  - MaleCNS
+  - spiking-neural-network
+  - leaky-integrate-and-fire
+  - neural-simulation
+  - embodied-simulation
+  - interpretability
+
+references:
+  # The dataset flyverse runs on. Cited as the data release; the files flyverse reads and their SHA-256
+  # hashes are listed in flyverse/data/manifest.json (fetched by scripts/fetch_data.py).
+  # TODO: confirm and add the DOI of the MaleCNS release paper before the public announcement. The
+  # manifest records it as "Cell 2026, S0092-8674(26)00942-6"; that PII has not been checked against a
+  # registered DOI, so no `doi:` field is claimed here. Also confirm the data licence (the download page
+  # said CC BY 4.0 at the time of writing) and the canonical author list for the release.
+  - type: data
+    title: "MaleCNS v1.0: the adult Drosophila melanogaster male central nervous system connectome (flat connectome release)"
+    authors:
+      - name: "Janelia FlyEM Project Team"
+    year: 2026
+    version: "1.0"
+    url: "https://storage.googleapis.com/flyem-male-cns/"
+    repository: "https://male-cns.janelia.org/download/"
+    notes: "Janelia Research Campus, HHMI. Release paper DOI to be confirmed (see the TODO above)."
+
+  # The neuron model flyverse's LIF follows: v_rest = v_reset = -52 mV, v_th = -45 mV, tau_m = 20 ms,
+  # tau_syn = 5 ms, refractory 2.2 ms, delay 1.8 ms, w = 0.275 mV x synapse count x sign (docs/NOTES.md).
+  - type: article
+    title: "A Drosophila computational brain model reveals sensorimotor processing"
+    authors:
+      - family-names: "Shiu"
+        given-names: "Philip K."
+      - family-names: "Sterne"
+        given-names: "Gabriella R."
+      - family-names: "Spiller"
+        given-names: "Nico"
+      - family-names: "Franconville"
+        given-names: "Romain"
+      - family-names: "Sandoval"
+        given-names: "Andrea"
+      - family-names: "Zhou"
+        given-names: "Joie"
+      - family-names: "Simha"
+        given-names: "Neha"
+      - family-names: "Kang"
+        given-names: "Chan Hyuk"
+      - family-names: "Yu"
+        given-names: "Seongbong"
+      - family-names: "Kim"
+        given-names: "Jinseop S."
+      - family-names: "Dorkenwald"
+        given-names: "Sven"
+      - family-names: "Matsliah"
+        given-names: "Arie"
+      - family-names: "Schlegel"
+        given-names: "Philipp"
+      - family-names: "Yu"
+        given-names: "Szi-chieh"
+      - family-names: "McKellar"
+        given-names: "Claire E."
+      - family-names: "Sterling"
+        given-names: "Amy"
+      - family-names: "Costa"
+        given-names: "Marta"
+      - family-names: "Eichler"
+        given-names: "Katharina"
+      - family-names: "Bates"
+        given-names: "Alexander Shakeel"
+      - family-names: "Eckstein"
+        given-names: "Nils"
+      - family-names: "Funke"
+        given-names: "Jan"
+      - family-names: "Jefferis"
+        given-names: "Gregory S. X. E."
+      - family-names: "Murthy"
+        given-names: "Mala"
+      - family-names: "Bidaye"
+        given-names: "Salil S."
+      - family-names: "Hampel"
+        given-names: "Stefanie"
+      - family-names: "Seeds"
+        given-names: "Andrew M."
+      - family-names: "Scott"
+        given-names: "Kristin"
+    journal: "Nature"
+    volume: 634
+    issue: 8032
+    start: 210
+    end: 219
+    year: 2024
+    doi: "10.1038/s41586-024-07763-9"
+    repository-code: "https://github.com/philshiu/Drosophila_brain_model"

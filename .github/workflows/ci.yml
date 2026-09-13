@@ -1,0 +1,67 @@
+name: CI
+
+# The CPU job: no MaleCNS download, no compiled cache/, no GPU. FLYVERSE_DATA points at a path that does
+# not exist so anything reaching for the 3 GB dataset fails loudly instead of silently finding a stale copy.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: CPU tests (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      FLYVERSE_DATA: /nonexistent/malecns   # no dataset in CI; connectome.load() must never be reached
+      PYTHONIOENCODING: utf-8
+      SDL_VIDEODRIVER: dummy                # tests/test_room_ui.py drives the real pygame loop, headless
+      SDL_AUDIODRIVER: dummy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"            # pyproject's floor; the dev machine runs 3.13
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # torch first, from the CPU index: the default PyPI wheel on Linux is the CUDA build (~2.5 GB) and
+      # nothing here needs it. `pip install -e .` then finds the requirement already satisfied and keeps it.
+      - name: Install CPU torch
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install flyverse
+        run: pip install -e ".[dev]"
+
+      - name: Show the environment
+        run: |
+          python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+          pip check || echo "pip check reported conflicts (informational; the runner image preinstalls packages)"
+
+      # Syntax errors and undefined names only (E9, F63, F7, F82). Style is deliberately not gated:
+      # this step reports, it does not block.
+      - name: Lint (syntax and undefined names)
+        continue-on-error: true
+        run: ruff check flyverse scripts tests --select E9,F63,F7,F82
+
+      # testpaths = ["tests"] comes from pyproject. tests/conftest.py auto-marks by file name:
+      #   gpu     -> tests/test_cuda.py, tests/test_metal.py
+      #   data    -> tests/test_integration.py (also gpu)
+      #   cluster -> nothing today; tests/test_cluster_run.py is fully mocked and runs here.
+      # Everything else runs: test_batch_sim, test_cluster_run, test_control, test_interp, test_nt_readout,
+      # test_object_round2, test_optic_hooks, test_packaging, test_proprioception, test_receptor_model,
+      # test_room_ui, test_world. The three files with cache-backed classes skip those classes without cache/.
+      - name: Tests (no data, no GPU, no cluster)
+        run: python -m pytest -m "not gpu and not data and not cluster" -q -rs --durations=10
