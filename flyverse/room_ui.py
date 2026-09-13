@@ -463,7 +463,50 @@ class RoomUI:
         program = getattr(sim,"program",None)
         name = type(program).__name__ if program is not None else "none"
         end_right = self._row(surface,right,end_right+29,"program",name)
+        fb = getattr(sim, "fb", None)
+        attached = getattr(fb, "attached_modules", {})
+        hooks = getattr(fb, "hooks", [])
+        active_ids = {id(module) for module in attached.values()}
+        self._module_readouts = {key: value for key, value in getattr(self,"_module_readouts",{}).items() if key in active_ids}
+        if attached or hooks:
+            end_right += 14
+            self._rule(surface,pygame.Rect(right.x,end_right,right.w,22),"EXTENSIONS / OPT-IN",LILAC)
+            end_right += 29
+            for hook in hooks:
+                end_right = self._row(surface,right,end_right,hook["name"],"hook / "+hook["when"],LILAC)
+            for name,module in attached.items():
+                end_right = self._row(surface,right,end_right,name,module.kind if hasattr(module,"kind") else "module",LILAC)
+                readout = getattr(module,"readout",None)
+                if callable(readout):
+                    height = 21 * max(1,len(getattr(module,"channels",())))
+                    visible = surface.get_clip().colliderect(pygame.Rect(right.x,end_right,right.w,height))
+                    for label,value in self._module_readout(sim,module,visible):
+                        end_right = self._row(surface,right,end_right,label,value,LILAC)
         return max(end_left,end_right)
+
+    def _module_readout(self, sim, module, visible):
+        """Computed panels sample on demand at map cadence; paused/hidden panels do not copy device state."""
+        cache = getattr(self,"_module_readouts",{})
+        key = id(module)
+        entry = cache.get(key)
+        now = sim.brain.t
+        every_ms = 10 * max(1,int(getattr(sim,"map_every",4)))
+        if visible and (entry is None or now < entry[1] or now - entry[1] >= every_ms):
+            rows = []
+            try:
+                snap = module.readout(batch_index=0)
+                if snap is not None:
+                    for i,ch in enumerate(snap.channels):
+                        values = snap.levels[:,i]
+                        finite = values[np.isfinite(values)]
+                        value = f"{finite.mean():.3g} {ch.unit}" if len(finite) else "unavailable"
+                        rows.append((ch.name,value))
+            except Exception as exc:
+                rows = [("readout",str(exc))]
+            entry = (module,now,rows or [("readout","unavailable")])
+            cache[key] = entry
+            self._module_readouts = cache
+        return entry[2] if entry is not None else [(c.name,"not sampled") for c in getattr(module,"channels",())]
 
     def _motors(self, sim, surface, viewport, y):
         y = self._motor_values(sim,surface,viewport,y)

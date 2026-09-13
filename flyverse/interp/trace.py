@@ -546,7 +546,14 @@ def trace(c, source, *, stimulus, control, null=None, params=None, optic_params=
 
     # ---- provenance and the Result
     prov = _provenance(c, stim, ctrl, nul, params, optic_params, fb)
+    if stim and stim[0].meta.get("extensions"):
+        prov["model"] = {**prov.get("model", {}), **stim[0].meta["extensions"]}
     res = Result.new("trace", prov)
+    module_records = prov.get("model", {}).get("modules", [])
+    if stim:
+        module_records = stim[0].meta.get("extensions", {}).get("modules", module_records)
+    if module_records:
+        res.add_table("module_inputs", common.module_input_table(module_records))
     res.add_population(population(c, source, "source"), unit_kind=str(kinds[src_idx[0]]), keep_ids=len(src_idx) <= 10_000)
     for t in targets:
         res.add_population(population(c, t, f"lost:{t}"), unit_kind=str(kind_of_type[tg.pos[t]]), keep_ids=True)
@@ -845,6 +852,8 @@ class ArmAccumulator:
         self.t_ms = []
         self.types = ty
         self._b = b; self._o = o
+        self._input_sums = {}
+        self._extensions = None
 
     @staticmethod
     def _np(x, row=0):
@@ -860,6 +869,11 @@ class ArmAccumulator:
         if self.counts0 is None:
             self.counts0 = self._np(b.spike_counts).copy()
         self.n += 1
+        inputs = fb.module_inputs() if hasattr(fb, "module_inputs") else {}
+        for key, value in inputs.items():
+            self._input_sums.setdefault(key, np.zeros(self.N))[:] += self._np(value)
+        if inputs or getattr(fb, "attached_modules", {}):
+            self._extensions = {"hooks": fb.hooks, "modules": fb.module_records()}
         d = self._np(b.drive); self.drv_s += d; self.drv_a += np.abs(d)
         rate = np.asarray(b.rate_np(), dtype=np.float64).reshape(-1) if hasattr(b, "rate_np") else self._np(b.rate)
         if o is not None:
@@ -883,6 +897,9 @@ class ArmAccumulator:
         q = {"rate_hz": rate_hz[None].astype(np.float32), "drive_mv": (self.drv_s / n)[None].astype(np.float32),
              "drive_mv_abs": (self.drv_a / n)[None].astype(np.float32), "optic_dr": dr[None].astype(np.float32), "optic_dr_abs": dra[None].astype(np.float32)}
         m = dict(meta or {})
+        if self._extensions is not None:
+            q.update({k: (v / n)[None].astype(np.float32) for k, v in self._input_sums.items()})
+            m.update(extensions=self._extensions, input_classes=list(self._input_sums))
         m.update({"accumulated": True, "frames": int(self.n), "window_frames_ms": frame_ms, "quantities": list(q),
                   "unit_kind_note": "rate_hz from spike_counts over the window (NaN on rate units); optic_dr = rates() - r0 time-mean; "
                                     "drive_mv = brain.drive time-mean (the optic / sensory injected current)"})

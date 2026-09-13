@@ -60,6 +60,10 @@ See [batched room simulations](docs/BATCH_SIM.md) for per-row configuration, che
 random-stream semantics and profiling. The interactive demo and RL environment keep
 their existing APIs.
 
+Named hooks, optional neural modules, synthetic graph extensions, and trainable
+boundary encoders/decoders are documented in [Extensibility](docs/EXTENSIBILITY.md).
+All are opt-in and recorded in experiment provenance; shipped defaults stay unchanged.
+
 Data location defaults to `D:\Datasets\male-cns-connectome-v1.0\flat-connectome` (override with
 `FLYVERSE_DATA`); only `body-annotations`, `body-neurotransmitters` and `connectome-weights` are used
 (1.1 GB; `tbar-neurotransmitters`, 2.7 GB, only by the NT audit). None of it ships with the repo:

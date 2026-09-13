@@ -52,6 +52,9 @@ class EnvParams:
     cuda_compact: bool = True
     weight_dtype: str = "float32"
     sensory_cuda_graphs: bool | None = None  # None follows cuda_graphs; UI rendering is independent
+    modules_attached: object = None  # iterable of Modules, or factory(env) -> iterable (called once after construction)
+    action_adapter: object = None    # optional fn(env, policy_action) -> normalized (B, 2), e.g. decoder parameters -> output
+    motor_decoder: str | None = None # attached MotorDecoder used by step(None)
 
 
 class FlyRoomEnv:
@@ -107,6 +110,13 @@ class FlyRoomEnv:
         self.x = np.zeros(self.B); self.y = np.zeros(self.B); self.heading = np.zeros(self.B)
         self.t_frames = 0
         self.max_frames = int(self.p.episode_s * 1000 / self.p.frame_ms)
+        attached = self.p.modules_attached
+        if callable(attached):
+            attached = attached(self)
+        for module in attached or ():
+            self.fb.attach(module)
+        if self.p.motor_decoder is not None and self.p.motor_decoder not in self.fb.attached_modules:
+            raise ValueError(f"motor decoder {self.p.motor_decoder!r} is not attached")
 
     # ------------------------------------------------------------------ helpers
     def fruit_dist(self) -> np.ndarray:
@@ -185,7 +195,15 @@ class FlyRoomEnv:
             self.fb.taste(tasting)
         self.fb.step(self.p.frame_ms)
 
-    def step(self, action: np.ndarray):
+    def step(self, action: np.ndarray | None = None):
+        if self.p.action_adapter is not None:
+            action = self.p.action_adapter(self, action)
+        elif action is None:
+            if self.p.motor_decoder is None:
+                raise ValueError("step(None) requires EnvParams.motor_decoder")
+            action = self.fb.attached_modules[self.p.motor_decoder].action(self.fb.motor())
+        if isinstance(action, torch.Tensor):
+            action = action.detach().cpu().numpy()
         action = np.clip(np.asarray(action, dtype=np.float64), -1, 1).reshape(self.B, 2)
         dt = self.p.frame_ms / 1000
         speed = action[:, 0] * self.p.max_speed
@@ -202,6 +220,14 @@ class FlyRoomEnv:
         done = np.full(self.B, self.t_frames >= self.max_frames)
         info = {"dist_cm": dist * 100, "tasting": self.tasting}
         return self._obs(), reward.astype(np.float32), done, info
+
+    def provenance(self):
+        from .interp.common import provenance
+        from .modules import identifier
+        p = provenance(self.c, fb=self.fb, seeds=[self.p.seed], env_seeds=[self.p.seed])
+        p["model"]["action_adapter"] = identifier(self.p.action_adapter) if self.p.action_adapter else None
+        p["model"]["motor_decoder"] = self.p.motor_decoder
+        return p
 
     # convenience for evaluating hand-written policies
     def klinotaxis_action(self, obs: np.ndarray, gain: float = 4.0) -> np.ndarray:

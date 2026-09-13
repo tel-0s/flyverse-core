@@ -315,9 +315,17 @@ def _run_values(df: pd.DataFrame, rec: Recording, groups: pd.Series, n_post: dic
         if "drive_mv" in R.quantities:
             per_cell.loc[tin, "upstream_drive_mV"] = R.quantities["drive_mv"].astype(np.float64)[:, tpos.to_numpy()[tin].astype(int)].mean(axis=0)
     drive_rows = []
+    module_drive = np.zeros_like(R.quantities.get("drive_mv", r), dtype=np.float64)
+    for key, values in R.quantities.items():
+        if not key.startswith(("module:", "hook:")) or ":" not in key:
+            continue
+        _, channel = key.rsplit(":", 1)
+        if channel == "drive_mv":
+            module_drive += values
     if "drive_mv" in R.quantities and tin.any():
         pt = df.drop_duplicates("post_index").set_index("post_index").post_type
         d = per_cell[tin].assign(post_type=pt.reindex(per_cell.post_index[tin]).to_numpy())
+        d["upstream_drive_mV"] -= module_drive[:, tpos.to_numpy()[tin].astype(int)].mean(axis=0)
         for t, sub in d.groupby("post_type"):
             drive_rows.append({"post_type": t, "pre_group": "optic_drive", "value": float(sub.upstream_drive_mV.mean() * 1000.0 / tau_syn),
                                "value_E": np.nan, "value_I": np.nan, "rate_hz": np.nan, "g_mv": float(sub.upstream_drive_mV.mean()),
@@ -326,6 +334,25 @@ def _run_values(df: pd.DataFrame, rec: Recording, groups: pd.Series, n_post: dic
                 "presynaptic_cells_missing": int(df.pre_index[~have].nunique()), "frames": int(R.n_frames),
                 "window_s": [float(R.t_ms.min() / 1000.0), float(R.t_ms.max() / 1000.0)]}
     return per_group, drive_rows, per_cell, (series if keep_series else None), R.t_ms, entry_value, coverage
+
+
+def _module_rows(rec, c, target_idx, window, tau_syn):
+    R = rec.window(*window) if window else rec
+    target = np.isin(R.idx, target_idx)
+    types = c.neurons.type.fillna("").to_numpy()[R.idx]
+    rows = []
+    for key, values in R.quantities.items():
+        if not key.startswith(("module:", "hook:")):
+            continue
+        input_class, channel = key.rsplit(":", 1)
+        for t in np.unique(types[target]):
+            value = float(values[:, target & (types == t)].mean())
+            rows.append({"post_type": t, "pre_group": input_class,
+                         "value": value * 1000. / tau_syn if channel == "drive_mv" else value,
+                         "value_E": np.nan, "value_I": np.nan, "rate_hz": value if channel == "poisson_hz" else np.nan,
+                         "g_mv": value if channel == "drive_mv" else np.nan,
+                         "n_entries_missing": 0, "kind": DRIVE_KIND if channel == "drive_mv" else "poisson_hz"})
+    return rows
 
 
 def _arm_stats(values_by_run: list) -> dict:
@@ -466,7 +493,14 @@ def decompose(c, target, *, recording=None, params=None, optic_params=None, rece
         if prov["execution"].get("device") is None:
             prov["execution"]["device"] = "cpu"
             prov["execution"]["backend"] = dict(prov["execution"].get("backend", {}), structural=True, simulation=False)
+    if arms and meta0.get("extensions"):
+        prov["model"] = {**prov.get("model", {}), **meta0["extensions"]}
     res = Result.new("decompose", prov)
+    module_records = prov.get("model", {}).get("modules", [])
+    if arms:
+        module_records = meta0.get("extensions", {}).get("modules", module_records)
+    if module_records:
+        res.add_table("module_inputs", common.module_input_table(module_records))
     res.add_population(pop, unit_kind=("graded" if graded_target else ("mixed" if len(set(kinds[target_idx])) > 1 else str(kinds[target_idx][0]))))
     res.add_population(population(c, pre_idx, "presynaptic"), unit_kind=None, keep_ids=len(pre_idx) <= 10000)
 
@@ -535,6 +569,7 @@ def decompose(c, target, *, recording=None, params=None, optic_params=None, rece
                                                                                   eff=eff_by_arm[arm])
             pg["arm"] = arm; pg["run"] = k; pg["kind"] = DYNAMIC_KIND
             rows.append(pg)
+            drive_rows += _module_rows(rec, c, target_idx, window, tau_syn)
             if drive_rows:
                 rows.append(pd.DataFrame(drive_rows).assign(arm=arm, run=k))
             per_cell["arm"] = arm; per_cell["run"] = k
@@ -543,6 +578,10 @@ def decompose(c, target, *, recording=None, params=None, optic_params=None, rece
             if series is not None:
                 series_first = (t_ms, series, pg[["post_type", "pre_group"]].copy(), arm, entry_value)
     long = pd.concat(rows, ignore_index=True)
+    poisson = long[long.kind == "poisson_hz"]
+    if len(poisson):
+        res.add_table("module_poisson", _wide(poisson, arms, null_label, ["post_type", "pre_group"]).assign(unit="Hz"))
+        long = long[long.kind != "poisson_hz"]
     wide = _wide(long, arms, null_label, ["post_type", "pre_group"])
     first_arm = next(iter(arms))
     # the static weight per group alongside (mV per post cell per volley)

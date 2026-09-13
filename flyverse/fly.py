@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 import math
 import time
+import copy
 
 import numpy as np
 import torch
@@ -43,6 +44,8 @@ class FlyBrain:
         if self.c.n == 0:
             raise ValueError("FlyBrain needs at least one neuron")
         lp = lif_params or brain.LIFParams()
+        if lp.surrogate_grad and cuda_graphs:
+            raise ValueError("surrogate_grad cannot use CUDA graphs")
         # The optional receptor model (LIFParams.receptor_model): one per-edge lookup shared by the LIF and the optic lobe;
         # the slow term's resolved spec (None unless 'full' with a non-zero class scale) is shared the same way.
         self.slow = brain._slow_spec(lp)
@@ -61,7 +64,8 @@ class FlyBrain:
             if self.retina.n_columns:
                 self.optic = optic.OpticLobe(self.c, self.retina, optic_params, device=self.device, batch=self.B,
                                            cuda_kernels=cuda_kernels, cuda_sparse=cuda_sparse,
-                                           receptor=self.receptor, receptor_gain=brain._receptor_gain(lp), slow=self.slow)
+                                           receptor=self.receptor, receptor_gain=brain._receptor_gain(lp), slow=self.slow,
+                                           surrogate_grad=lp.surrogate_grad)
                 self.optic.relax()
                 self.brain.freeze(self.optic.rate_idx)
                 if self.brain.p.prune_frozen:
@@ -69,7 +73,7 @@ class FlyBrain:
         if self.brain.p.dt_by_module:
             lab = regions.labels(self.c); k = np.ones(self.c.n, np.int64); dt = self.brain.p.dt
             for mod, dt_mod in self.brain.p.dt_by_module.items():
-                if mod not in regions.MODULES:
+                if mod not in set(regions.MODULES) | set(lab):
                     raise ValueError(f"unknown module {mod!r} in dt_by_module")
                 m = int(round(dt_mod / dt))
                 if abs(m * dt - dt_mod) > 1e-9 or m < 1:
@@ -90,6 +94,78 @@ class FlyBrain:
         self._activity_ms = np.zeros(self.B)
         self._budget_estimate = None
         self.nt_source = nt_source
+        self._extensions = None
+        self._vision_has_advanced = False
+        self.brain._external_drive_writes = []
+        self.brain._track_external_drive = self.optic is not None
+
+    def _extension_runtime(self):
+        if self._extensions is None:
+            from .modules import ExtensionRuntime
+            self._extensions = ExtensionRuntime(self)
+            self._graphs.clear()
+        return self._extensions
+
+    @property
+    def hooks(self):
+        return self._extensions.hook_records() if self._extensions else []
+
+    @property
+    def attached_modules(self):
+        """Named live modules, distinct from the anatomical ``modules=`` subset selector."""
+        return dict(self._extensions.modules) if self._extensions else {}
+
+    def module_records(self):
+        return self._extensions.records() if self._extensions else []
+
+    def module_inputs(self):
+        """Held extension input classes for recording, in mV or Hz (read-only copies)."""
+        if self._extensions is None:
+            return {}
+        return {name: value.clone() for name, value in self._extensions.applied_inputs.items()}
+
+    def add_hook(self, fn, *, when="pre", name):
+        if not callable(fn) or when not in ("pre", "post") or not isinstance(name, str) or not name.strip():
+            raise ValueError("hook requires a callable, a nonempty name and when='pre' or 'post'")
+        runtime = self._extension_runtime()
+        if name in runtime.hooks:
+            raise ValueError(f"duplicate hook {name!r}")
+        runtime.hooks[name] = (fn, when)
+
+    def remove_hook(self, name):
+        if self._extensions is None:
+            raise KeyError(name)
+        self._extensions.remove(name, hook=True)
+        self._release_extensions()
+
+    def attach(self, module):
+        try:
+            self._extension_runtime().attach(module)
+        except Exception:
+            self._release_extensions()
+            raise
+        self._graphs.clear()
+        return module
+
+    def detach(self, name):
+        if self._extensions is None:
+            raise KeyError(name)
+        module = self._extensions.modules[name]
+        self._extensions.remove(name)
+        self._release_extensions()
+        return module
+
+    def _release_extensions(self):
+        runtime = self._extensions
+        self._graphs.clear()
+        if runtime and not runtime.hooks and not runtime.modules:
+            self.brain._input_target = None
+            self.brain.drive.copy_(runtime.base_drive + runtime.sensory_drive)
+            self.brain.poisson_p.copy_(torch.maximum(self._base_poisson, runtime.external_poisson))
+            self.brain._poisson_on = bool((self.brain.poisson_p > 0).any())
+            self._extensions = None
+            if self._pulses:
+                self._refresh_poisson()
 
     @property
     def t(self):
@@ -132,7 +208,7 @@ class FlyBrain:
             raise ValueError(f"radiance must have shape ({self.B}, {self.retina.n_columns}, 4) or ({self.retina.n_columns}, 4)")
         if not bool(torch.isfinite(value).all() & (value >= 0).all()):
             raise ValueError("radiance must be finite and nonnegative")
-        if self._radiance is None:
+        if self._radiance is None or self.brain.p.surrogate_grad:
             self._radiance = value.clone()
         else:
             self._radiance.copy_(value)
@@ -146,7 +222,7 @@ class FlyBrain:
         self.brain.poisson_p[:, ti] = prob
         self._base_poisson[:, ti] = prob
         self._inputs_on[name] = bool(np.any(np.asarray(hz) > 0))
-        if self._pulses:
+        if self._pulses or self._extensions is not None:
             self._refresh_poisson()
         else:
             self.brain._poisson_on = any(self._inputs_on.values())
@@ -178,6 +254,8 @@ class FlyBrain:
         self._refresh_poisson()
 
     def _refresh_poisson(self):
+        if self._extensions is not None:
+            return self._extensions.refresh_poisson()
         self.brain.poisson_p.copy_(self._base_poisson)
         self._pulses = [p for p in self._pulses if p[2] > self.t + 1e-9]
         for idx, hz, _ in self._pulses:
@@ -190,6 +268,35 @@ class FlyBrain:
         """Advance a frame; fractional LIF steps carry over. Return actual simulated ms."""
         if not math.isfinite(ms) or ms < 0:
             raise ValueError("ms must be finite and nonnegative")
+        if self._extensions is not None:
+            return self._step_extensions(ms)
+        return self._step_plain(ms)
+
+    def _step_extensions(self, ms):
+        runtime = self._extensions
+        runtime.run_hooks("pre")
+        total = self._pending_ms + ms
+        steps = int(math.floor((total + 1e-9) / self.brain.p.dt))
+        elapsed = steps * self.brain.p.dt
+        self._pending_ms = max(0., total - elapsed)
+        frame_steps = max(1, int(10. / self.brain.p.dt))
+        remaining = steps
+        while remaining:
+            count = min(remaining, frame_steps)
+            dt_ms = count * self.brain.p.dt
+            runtime.run_modules(dt_ms)
+            before = self.brain.spike_counts.clone()
+            # _step_plain handles pulses and capture; preserve the caller's fractional remainder.
+            pending = self._pending_ms
+            self._pending_ms = 0.
+            self._step_plain(dt_ms)
+            self._pending_ms = pending
+            runtime.previous_spikes = self.brain.spike_counts - before
+            remaining -= count
+        runtime.run_hooks("post")
+        return elapsed
+
+    def _step_plain(self, ms):
         total = self._pending_ms + ms
         steps = int(math.floor((total + 1e-9) / self.brain.p.dt))
         elapsed = steps * self.brain.p.dt
@@ -219,8 +326,29 @@ class FlyBrain:
         return elapsed
 
     def _vision_frame(self, elapsed):
+        if self.brain.p.surrogate_grad:
+            if self.optic is not None and self._radiance is not None:
+                intensity = self._extensions.vision_intensity if self._extensions else None
+                self.brain.drive = self.optic.step_frame(self._radiance, self.brain.rate, elapsed, intensity=intensity)
+                self._vision_has_advanced = True
+                self.brain._external_drive_writes.clear()
+                if self._extensions:
+                    self._extensions.sensory_drive = self.brain.drive
+                    self.brain.drive = self.brain.drive + self._extensions.drive
+            elif self._extensions:
+                self.brain.drive = self._extensions.drive
+            return
         if self.optic is not None and self._radiance is not None:
-            self.brain.drive.copy_(self.optic.step_frame(self._radiance, self.brain.rate, elapsed))
+            intensity = self._extensions.vision_intensity if self._extensions else None
+            kwargs = {} if intensity is None else {"intensity": intensity}
+            self.brain.drive.copy_(self.optic.step_frame(self._radiance, self.brain.rate, elapsed, **kwargs))
+            self._vision_has_advanced = True
+            self.brain._external_drive_writes.clear()
+            if self._extensions is not None:
+                self._extensions.sensory_drive.copy_(self.brain.drive)
+                self.brain.drive.add_(self._extensions.drive)
+        elif self._extensions is not None:
+            self.brain.drive.copy_(self._extensions.drive)
 
     def _frame(self, steps):
         self._vision_frame(steps * self.brain.p.dt)
@@ -365,6 +493,12 @@ class FlyBrain:
         return result[0] if self.B == 1 else result
 
     def reset(self, rows=None):
+        if self._extensions is not None:
+            if rows is not None:
+                for name, m in self._extensions.modules.items():
+                    if not callable(getattr(m, "reset_rows", None)):
+                        raise ValueError(f"module {name!r} must implement reset_rows for partial batch resets")
+            self._extensions.reset(rows)
         self.brain.reset(rows)
         if self.optic is not None:
             self.optic.reset(rows)
@@ -377,12 +511,26 @@ class FlyBrain:
             self._graphs.clear()
             self._budget_estimate = None
             self._radiance = None
+            self._vision_has_advanced = False
+            self.brain._external_drive_writes.clear()
             self.brain.t = 0.0; self.brain.step_count = 0; self.brain.buf_pos = 0
         else:
             self._activity_ms[np.asarray(rows)] = 0.0
             for _, hz, _ in self._pulses:
                 hz[np.asarray(rows)] = 0
         self._refresh_poisson()
+
+    def detach_state(self):
+        """Truncate the optional autograd history while retaining neural/module state."""
+        self.brain.detach_state()
+        if self.optic is not None:
+            self.optic.detach_state()
+        if self._radiance is not None:
+            self._radiance = self._radiance.detach().clone()
+        if self._extensions is not None:
+            from .modules import snapshot
+            for name in ("base_drive", "drive", "drives", "poisson", "previous_spikes", "vision_intensity", "sensory_drive", "applied_inputs"):
+                setattr(self._extensions, name, snapshot(getattr(self._extensions, name), self.device))
 
     def state_dict(self):
         b, o = self.brain, self.optic
@@ -395,16 +543,30 @@ class FlyBrain:
                 "rng": b.gen.get_state().cpu().clone(),
                 "optic": {k: getattr(o, k).detach().cpu().clone() for k in self.OPTIC_TENSORS} if o is not None else None,
                 "optic_pending_ms": o._pending_ms if o is not None else 0.0,
-                "radiance": self._radiance.cpu().clone() if self._radiance is not None else None,
+                "radiance": self._radiance.detach().cpu().clone() if self._radiance is not None else None,
                 "base_poisson": self._base_poisson.cpu().clone(), "inputs_on": dict(self._inputs_on),
                 "pulses": [(idx.copy(), hz.copy(), end) for idx, hz, end in self._pulses],
-                "pending_ms": self._pending_ms, "activity_ms": self._activity_ms.copy()}
+                "pending_ms": self._pending_ms, "activity_ms": self._activity_ms.copy(),
+                "hooks": self.hooks, "modules": self.module_records(),
+                "vision_has_advanced": self._vision_has_advanced,
+                "external_drive_writes": [(idx.detach().cpu().clone(), v.detach().cpu().clone())
+                                          for idx, v in self.brain._external_drive_writes],
+                "connectome_extension": copy.deepcopy(self.c._extension),
+                "extensions": self._extensions.state_dict() if self._extensions else None}
 
     def load_state_dict(self, state):
         if state["version"] != 1 or not np.array_equal(state["body_ids"], self.c.neurons.bodyId.to_numpy()):
             raise ValueError("state version/connectome does not match")
-        if state["lif_params"] != asdict(self.brain.p) or state["optic_params"] != (asdict(self.optic.p) if self.optic is not None else None):
+        if state.get("connectome_extension") != self.c._extension:
+            raise ValueError("state synthetic graph extension does not match")
+        lif_state = {"surrogate_grad": False, **state["lif_params"]}
+        if lif_state != asdict(self.brain.p) or state["optic_params"] != (asdict(self.optic.p) if self.optic is not None else None):
             raise ValueError("state simulation parameters do not match")
+        extension_state = state.get("extensions")
+        if (extension_state is None) != (self._extensions is None):
+            raise ValueError("checkpoint extensions differ; attach matching code before loading")
+        if self._extensions is not None:
+            self._extensions.validate_state(extension_state)
         for name, tensor in state["brain"].items():
             if tensor.shape != getattr(self.brain, name).shape:
                 raise ValueError(f"state shape mismatch for {name}")
@@ -416,6 +578,8 @@ class FlyBrain:
             raise ValueError("state clock accumulators do not match")
         self._graphs.clear()
         self._budget_estimate = None
+        if self.brain.p.surrogate_grad:
+            self.detach_state()
         for name, tensor in state["brain"].items():
             getattr(self.brain, name).copy_(tensor.to(self.device))
         for k,v in accumulators.items():
@@ -436,3 +600,7 @@ class FlyBrain:
         self._inputs_on = dict(state["inputs_on"])
         self._pulses = [(idx.copy(), hz.copy(), end) for idx, hz, end in state["pulses"]]
         self._pending_ms, self._activity_ms = state["pending_ms"], state["activity_ms"].copy()
+        self._vision_has_advanced = state.get("vision_has_advanced", self.optic is not None and self._radiance is not None)
+        self.brain._external_drive_writes = [(idx.to(self.device), v.to(self.device)) for idx, v in state.get("external_drive_writes", [])]
+        if self._extensions is not None:
+            self._extensions.load_state_dict(extension_state)

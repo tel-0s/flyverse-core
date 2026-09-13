@@ -311,6 +311,26 @@ def sign0_counts(c: "Connectome", W: sp.csr_matrix | None = None, cache_dir: Pat
     raw table has the edge. Reads cache/sign0_counts.npz (built from the raw weights table if absent and the table
     is available); None with a warning when neither exists, in which case the slow term skips sign-0 edges."""
     import warnings
+    if c._extension is not None:
+        # Extension lookups never build or rewrite the biological graph's shared cache.
+        coo = (c.W if W is None else W).tocoo()
+        ids = c.neurons.bodyId.to_numpy()
+        counts = {}
+        base = c._extension_base
+        if base is not None:
+            raw = sign0_counts(base, cache_dir=cache_dir, build=False)
+            if raw is not None:
+                old = base.W.tocoo(); old_ids = base.neurons.bodyId.to_numpy()
+                nonzero = np.flatnonzero(raw)
+                counts.update({(int(old_ids[r]), int(old_ids[q])): float(v)
+                               for r, q, v in zip(old.row[nonzero], old.col[nonzero], raw[nonzero])})
+        for pre, post, weight in c._extension.get("sign0_counts", []):
+            key = (int(post), int(pre))
+            counts[key] = counts.get(key, 0.) + weight
+        zero = np.flatnonzero(coo.data == 0)
+        out = np.zeros(coo.nnz, dtype=np.float32)
+        out[zero] = [counts.get((int(ids[r]), int(ids[q])), 0.) for r, q in zip(coo.row[zero], coo.col[zero])]
+        return out
     path = Path(cache_dir) / SIGN0_COUNTS_FILE
     if not path.exists():
         if not build or not (DATA_DIR / WEIGHTS_FILE).exists():
@@ -349,6 +369,9 @@ class Connectome:
     body_to_index: pd.Series   # bodyId -> row index
     _reference: Connectome | None = field(default=None, repr=False)
     _norm_cache: dict = field(default_factory=dict, repr=False)
+    _extension: dict | None = field(default=None, repr=False)
+    _extension_base: Connectome | None = field(default=None, repr=False)
+    _cache_dir: Path | None = field(default=None, repr=False)
 
     def __post_init__(self):
         # Fast synapse magnitudes; sign-zero neuromodulatory contacts contribute zero.
@@ -388,7 +411,121 @@ class Connectome:
         idx = self.indices(selection)
         neurons = self.neurons.iloc[idx].copy().reset_index(drop=True)
         return Connectome(neurons, self.W[idx][:, idx].tocsr(),
-                          pd.Series(np.arange(len(idx)), index=neurons.bodyId.to_numpy()), self.reference)
+                          pd.Series(np.arange(len(idx)), index=neurons.bodyId.to_numpy()), self.reference,
+                          _extension=self._extension, _extension_base=self._extension_base)
+
+    def prune(self, selection) -> Connectome:
+        """Remove selected cells (an induced subgraph); removing an extension restores its base reference.
+
+        Unlike Brain.prune, which silences outgoing weights, this removes graph rows.
+        """
+        keep = np.ones(self.n, dtype=bool)
+        keep[self.indices(selection)] = False
+        ids = self.neurons.bodyId.to_numpy()[keep]
+        base = self._extension_base
+        if base is not None and np.isin(ids, base.neurons.bodyId).all():
+            idx = base.index_of(ids)
+            return base if np.array_equal(idx, np.arange(base.n)) else base.subset(idx)
+        return self.subset(keep)
+
+    def extend(self, nodes: pd.DataFrame, edges: pd.DataFrame, *, cache_dir=None) -> Connectome:
+        """Append negative-int64 synthetic bodies and signed edges; persist only to a scratch cache.
+
+        Edges must touch a new cell; existing-to-existing edits cannot preserve the
+        original block. ``weight`` is a nonnegative count, ``sign`` is -1/0/+1
+        (or ``nt`` names a transmitter in NT_SIGN). Missing sign uses the new edge's
+        presynaptic NT. Omitted cache_dir allocates a temporary directory owned by
+        the caller; the resulting path is available as ``c2.cache_dir``.
+        """
+        import hashlib
+        import tempfile
+        from .interp.common import connectome_fingerprint, DATASET_NAME, DATASET_RELEASE
+
+        nodes, edges = nodes.copy(deep=True), edges.copy(deep=True)
+        if "bodyId" not in nodes:
+            raise ValueError("synthetic nodes need bodyId")
+        ids = nodes.bodyId.to_numpy()
+        if not np.issubdtype(ids.dtype, np.signedinteger) or np.any(ids >= 0) or len(np.unique(ids)) != len(ids):
+            raise ValueError("synthetic bodyIds must be unique negative int64 values")
+        if np.isin(ids, self.reference.neurons.bodyId).any():
+            raise ValueError("synthetic bodyIds overlap the existing graph")
+        nodes["bodyId"] = ids.astype(np.int64)
+        if "dataset" in nodes and not nodes.dataset.fillna("synthetic").eq("synthetic").all():
+            raise ValueError("new nodes must have dataset='synthetic'")
+        nodes["dataset"] = "synthetic"
+        defaults = {"type": "synthetic", "superclass": "synthetic", "nt": "unknown", "release": "v1",
+                    "class": "", "subclass": "", "instance": "", "somaSide": "?"}
+        if "side" in nodes and "somaSide" not in nodes:
+            nodes["somaSide"] = nodes.side
+        for key, default in defaults.items():
+            nodes[key] = nodes[key].fillna(default) if key in nodes else default
+        if not nodes.nt.isin(NT_SIGN).all():
+            raise ValueError("unknown synthetic node neurotransmitter")
+        nodes["sign"] = nodes.nt.map(NT_SIGN).astype(np.float32)
+        required = {"body_pre", "body_post", "weight"}
+        if not required.issubset(edges):
+            raise ValueError(f"edges need columns {sorted(required)}")
+        all_ids = np.concatenate([self.neurons.bodyId.to_numpy(), ids])
+        if not edges.body_pre.isin(all_ids).all() or not edges.body_post.isin(all_ids).all():
+            raise ValueError("edge endpoint is absent from the extended graph")
+        if not (edges.body_pre.isin(ids) | edges.body_post.isin(ids)).all():
+            raise ValueError("every new edge must touch a new synthetic node; existing block is immutable")
+        weight = edges.weight.to_numpy(dtype=np.float32)
+        if not np.isfinite(weight).all() or (weight < 0).any():
+            raise ValueError("edge weights must be nonnegative and finite")
+        nt_of = pd.Series(pd.concat([self.neurons.nt, nodes.nt], ignore_index=True).to_numpy(), index=all_ids)
+        nt = edges["nt"] if "nt" in edges else edges.body_pre.map(nt_of)
+        signs = nt.map(NT_SIGN)
+        if "sign" in edges:
+            signs = edges.sign.where(edges.sign.notna(), signs)
+        if not signs.isin([-1, 0, 1]).all():
+            raise ValueError("edge sign must be -1, 0 or 1, or nt must name a known transmitter")
+        edges["sign"] = signs.astype(np.float32)
+
+        def append(base):
+            old = base.neurons.copy()
+            # Preserve the interchange identity of every biological cell.
+            for key, default in (("dataset", DATASET_NAME), ("release", DATASET_RELEASE)):
+                old[key] = old[key].fillna(default) if key in old else default
+            n = pd.concat([old, nodes], ignore_index=True)
+            mapping = pd.Series(np.arange(len(n)), index=n.bodyId.to_numpy())
+            row = mapping.loc[edges.body_post].to_numpy()
+            col = mapping.loc[edges.body_pre].to_numpy()
+            addition = sp.csr_matrix((weight * signs.to_numpy(np.float32), (row, col)), shape=(len(n), len(n)), dtype=base.W.dtype)
+            # hstack/vstack preserve even stored zeros and the old block's ordering.
+            top = sp.hstack([base.W, addition[:base.n, base.n:]], format="csr")
+            W = sp.vstack([top, addition[base.n:]], format="csr")
+            for key in ("in_syn", "in_syn_l2"):
+                if key in n:
+                    n = n.drop(columns=key)
+            return Connectome(n, W, mapping)
+
+        c2 = append(self)
+        if self.reference is not self:
+            c2._reference = append(self.reference)
+        h = hashlib.sha256()
+        h.update(nodes.to_json(orient="split", index=False).encode())
+        h.update(edges.to_json(orient="split", index=False).encode())
+        c2._extension = {"base": connectome_fingerprint(self), "sha256": h.hexdigest(),
+                         "n_nodes": len(nodes), "n_edges": len(edges), "dataset": "synthetic",
+                         "body_ids": ids.tolist(), "releases": nodes.release.astype(str).tolist(),
+                         "sign0_counts": [[int(pre), int(post), float(w)] for pre, post, w in
+                                          edges.loc[edges.sign == 0, ["body_pre", "body_post", "weight"]].itertuples(index=False, name=None)]}
+        c2._extension_base = self
+        if c2.reference is not c2:
+            c2.reference._extension = c2._extension
+            c2.reference._extension_base = self.reference
+        path = Path(cache_dir) if cache_dir is not None else Path(tempfile.mkdtemp(prefix="flyverse-extension-"))
+        _scratch_only(path)
+        if (path / "W_post_pre.npz").exists():
+            raise ValueError("extension scratch cache must not overwrite an existing graph")
+        c2._cache_dir = path.resolve()
+        save(c2, path)
+        return c2
+
+    @property
+    def cache_dir(self):
+        return self._cache_dir
 
     @property
     def n(self) -> int:
@@ -513,11 +650,28 @@ def _assign_photoreceptor_columns(neurons: pd.DataFrame, W: sp.csr_matrix, log) 
     log(f"photoreceptors assigned to hex columns: {n_ok}/{len(pr_idx)}")
 
 
+def _scratch_only(path):
+    resolved, shared = Path(path).resolve(), Path(CACHE_DIR).resolve()
+    if resolved == shared or shared in resolved.parents:
+        raise ValueError("synthetic extensions must use a scratch cache outside the shared cache")
+
+
 def save(c: Connectome, cache_dir: Path = CACHE_DIR) -> None:
+    import json
     cache_dir = Path(cache_dir)
+    if c._extension is not None:
+        _scratch_only(cache_dir)
+        if (cache_dir / "W_post_pre.npz").exists() and not (cache_dir / "extension.json").exists():
+            raise ValueError("an extension cannot overwrite an existing biological graph cache; use a scratch cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
     c.neurons.to_parquet(cache_dir / "neurons.parquet")
     sp.save_npz(cache_dir / "W_post_pre.npz", c.W, compressed=False)
+    if c._extension is not None:
+        (cache_dir / "extension.json").write_text(json.dumps(c._extension, indent=2), encoding="utf-8")
+        if c._extension_base is not None:
+            save(c._extension_base, cache_dir / "extension_base")
+    else:
+        (cache_dir / "extension.json").unlink(missing_ok=True)
     # A saved subset must retain normalization under custom LIF parameters as well.
     if c.reference is not c:
         c.reference.neurons.to_parquet(cache_dir / "reference_neurons.parquet")
@@ -541,9 +695,16 @@ def load(cache_dir: Path = CACHE_DIR, rebuild: bool = False, verbose: bool = Tru
         rn = pd.read_parquet(cache_dir / "reference_neurons.parquet")
         reference = Connectome(rn, sp.load_npz(cache_dir / "reference_W.npz").tocsr(),
                               pd.Series(np.arange(len(rn)), index=rn.bodyId.to_numpy()))
+    import json
+    extension_file = cache_dir / "extension.json"
+    extension = json.loads(extension_file.read_text(encoding="utf-8")) if extension_file.exists() else None
+    base = load(cache_dir / "extension_base", verbose=False) if extension is not None and (cache_dir / "extension_base/W_post_pre.npz").exists() else None
+    if reference is not None:
+        reference._extension = extension
+        reference._extension_base = base.reference if base is not None else None
     return Connectome(neurons=neurons, W=W,
                       body_to_index=pd.Series(np.arange(len(neurons)), index=neurons.bodyId.to_numpy()),
-                      _reference=reference)
+                      _reference=reference, _extension=extension, _extension_base=base, _cache_dir=cache_dir.resolve())
 
 
 if __name__ == "__main__":
