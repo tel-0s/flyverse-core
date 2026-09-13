@@ -25,6 +25,9 @@ def labels(c: Connectome) -> np.ndarray:
     out[sc.eq("descending_neuron").to_numpy()] = "descending"
     out[sc.isin(["visual_projection", "visual_projection_tbc", "visual_centrifugal"]).to_numpy()] = "visual_projection"
     out[(sc.eq("ol_intrinsic") | ty.isin(PHOTORECEPTOR_TYPES)).to_numpy()] = "optic"
+    if "dataset" in n:
+        synthetic = n.dataset.eq("synthetic").to_numpy()
+        out[synthetic] = sc.replace("", "synthetic").to_numpy()[synthetic]
     return out
 
 
@@ -32,9 +35,10 @@ def select(c: Connectome, modules=None) -> np.ndarray:
     if modules is None:
         return np.arange(c.n)
     modules = [modules] if isinstance(modules, str) else list(modules)
-    unknown = set(modules) - set(MODULES)
+    available = set(MODULES) | set(labels(c))
+    unknown = set(modules) - available
     if unknown:
-        raise ValueError(f"unknown modules: {sorted(unknown)}; choose from {MODULES}")
+        raise ValueError(f"unknown modules: {sorted(unknown)}; choose from {sorted(available)}")
     return np.flatnonzero(np.isin(labels(c), modules))
 
 

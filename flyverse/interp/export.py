@@ -692,6 +692,38 @@ def _statistic_definitions(res) -> dict:
     return out
 
 
+def _dataset_columns(df, prov):
+    """Carry each endpoint's namespace across biological/synthetic graph boundaries."""
+    ds = prov.get("dataset_release", {})
+    default = (ds.get("name", common.DATASET_NAME), ds.get("release", common.DATASET_RELEASE))
+    synthetic = {}
+    fp = prov.get("compiled_connectome", {})
+    while fp.get("extension"):
+        ext = fp["extension"]
+        synthetic.update({str(i): ("synthetic", release) for i, release in zip(ext["body_ids"], ext["releases"])})
+        fp = ext.get("base", {})
+    def identity(ids):
+        return [synthetic.get(str(i), default) for i in ids]
+    if "bodyId" in df:
+        namespaces = identity(df.bodyId)
+    elif "body_post" in df:
+        namespaces = identity(df.body_post)
+    else:
+        namespaces = [default] * len(df)
+    for pos, (key, values) in enumerate((("dataset", [v[0] for v in namespaces]), ("release", [v[1] for v in namespaces]))):
+        if key in df:
+            df[key] = df[key].fillna(pd.Series(values, index=df.index))
+        else:
+            df.insert(pos, key, values)
+    if synthetic:
+        for endpoint in ("pre", "post"):
+            if "body_" + endpoint in df:
+                ns = identity(df["body_" + endpoint])
+                df["dataset_" + endpoint] = [v[0] for v in ns]
+                df["release_" + endpoint] = [v[1] for v in ns]
+    return df
+
+
 def export(result, *, out_root="out/export", run_id=None, retina=None, parquet_rows: int = 1_000_000,
            control_ids=None, paired_control_ids=None, null_reference_ids=None, retina_blank=None,
            retina_in_loop: bool = False, retina_geometry=None) -> Path:
@@ -746,8 +778,7 @@ def export(result, *, out_root="out/export", run_id=None, retina=None, parquet_r
             if "null_reference_ids" in df.columns:
                 df["control_ids"] = df["null_reference_ids"]   # the deprecated alias, equal row for row
         df = _order_columns(name, _decimal_ids(df))
-        df.insert(0, "release", ds.get("release", common.DATASET_RELEASE))
-        df.insert(0, "dataset", ds.get("name", common.DATASET_NAME))
+        df = _dataset_columns(df, prov)
         tables.append(write_table(df, out_dir, name, parquet_rows))
     sp = (prov.get("stimulus") or {}).get("params") or {}
     pose = {"pos_m": sp.get("pos"), "heading_rad": sp.get("heading_rad"), "frame_ms": common.FRAME_MS,

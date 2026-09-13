@@ -1,9 +1,13 @@
 """flyverse: put the MaleCNS v1.0 fly connectome into simulations, games and other strange places."""
 
-__all__ = ["FlyBrain", "MotorRates", "StepResult", "AsyncFlyBrain", "BatchSim", "NTChannel", "NTSnapshot", "NTSource"]
+__all__ = ["FlyBrain", "MotorRates", "StepResult", "AsyncFlyBrain", "BatchSim", "NTChannel", "NTSnapshot", "NTSource",
+           "Module", "FunctionModule", "TorchModule", "SNNModule", "ReadoutModule", "MotorDecoder"]
 
 
 def __getattr__(name):
+    if name in ("Module", "FunctionModule", "TorchModule", "SNNModule", "ReadoutModule", "MotorDecoder"):
+        from . import modules
+        return getattr(modules, name)
     if name == "BatchSim":
         from .batch_sim import BatchSim
         return BatchSim
