@@ -407,7 +407,9 @@ reproduce the benchmark's statuses on its own JSON.
 ### 4.8 export -- `flyverse/interp/export.py`, `scripts/interp_export.py`
 
 ```python
-export(result, *, out_root="out/export", run_id=None, retina=None, parquet_rows=1_000_000, control_ids=None) -> Path
+export(result, *, out_root="out/export", run_id=None, retina=None, parquet_rows=1_000_000,
+       control_ids=None, paired_control_ids=None, null_reference_ids=None,
+       retina_blank=None, retina_in_loop=False, retina_geometry=None) -> Path
 ```
 
 A serializer: `manifest.json` (every field of `docs/NEUROME_INTERFACE.md` section 1 from `provenance`; `tables` with row
@@ -415,6 +417,29 @@ counts, columns, units, SHA-256) and `readout_per_body.csv` / `contributions.csv
 `parquet_rows`) from `Result.tables`, `dataset` / `release` columns prepended, bodyIds as decimal strings, model index and
 type alongside. Refuses a Result whose `check()` is non-empty. Validation: a round trip of a Result through the export
 and back reproduces every number; LC11 / LC10a bodies have two rows.
+
+**Revision 2** (`manifest.schema` `flyverse.neurome.export/2`, `export_revision: 2`; Neurome's intake of the size
+ladder, `docs/audits/interp_export.md` section 14):
+
+* **two controls, named apart.** `paired_control_ids` names the record **and arm** each `control_value` came from
+  (arm b of the same recording, suffix `#arm_b`); `null_reference_ids` names the independent blank/blank runs behind
+  `null_mean` / `z_vs_null` / the verdict. `control_ids` stays for one revision as a **deprecated alias of
+  `null_reference_ids`**, written equal to it and documented in `manifest.conventions.control_ids`; a caller that
+  passes only `control_ids` is read as passing `null_reference_ids`. `verify()` checks all three rules.
+* **`manifest.statistic_definitions`**: one sentence per `quantity` / `statistic` the tables use, so a drive figure
+  ("max over cells within each run of the time-mean object-minus-blank optic drive, against the same statistic in
+  blank/blank runs") cannot be read as an absolute membrane voltage.
+* **retina**: `manifest.retina.mode` is `geometry_replay` | `in_loop_capture` | `unknown`, beside `pinned_pose` and a
+  statement of what was replayed -- a replay is never labelled a capture, and `verify()` refuses radiance without a
+  mode. `retina_blank` writes the matched blank arm as `retina_radiance_blank` in the identical schema, and
+  `retina_geometry` (`ball_radius_m`, `ahead_m`, `eye_above_table_m`) writes `retina_object_track`: the ball's
+  azimuth, centre elevation and angular diameter from the eye per frame, plus the columns it dims against the blank.
+* **tie-aware rank test**: `mann_whitney` / `compare_tie_aware` use the exact U only when the pooled arms have no
+  ties and the tie-corrected asymptotic test otherwise; every per-type row carries `p_method` and `n_tied_values`.
+  `holm` / `family_labels` / `add_family_columns` add an optional `family` / `p_holm` pair within a family the
+  **caller predeclares** (`FAMILY_SPECS`, a JSON spec, or nothing -- the default); no verdict rests on `p_holm`.
+* **`scripts/interp_export.py ladder`** re-exports a recorded size ladder (`--runs-csv <summary>/runs.csv` or
+  `--dir <recordings>`) into one NEW run directory per size plus a summary, on the CPU, from the recordings alone.
 
 ---
 
