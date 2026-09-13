@@ -288,8 +288,8 @@ suite before adoption.
   constraints are recorded as literature rows in `flyverse/data/expected_responses.csv` (op `report`), not adopted as
   gains or signs.
 - Whether `bodyId` alone is stable across MaleCNS releases; we key on it and record the release.
-- Cluster paths: agreed -- Neurome's namespace is `<cluster-fs>/neurome/neurome-reconstruction/{runs,evidence,exports}/`;
-  flyverse keeps `<cluster-fs>/neurome/flyverse/` and `<cluster-fs>/neurome/runs/`.
+- Cluster paths: agreed -- Neurome's namespace is `$NEUROME_NS/{runs,evidence,exports}/`;
+  flyverse keeps `$CLUSTER_FLYVERSE/` and `$CLUSTER_RUNS/`.
 - Neurome's first bundle (`D:\Projects\neurome\data\male_cns\small_object_v2\`, 680 MiB; `manifest.json`,
   `observed_edges.parquet` with 1,967,026 both-Traced edges incident to the 7,149 selected bodies, 91,727 endpoint
   bodies, a receptor-table excerpt, a 24-case fragment review packet) is accepted as read-only observations; no

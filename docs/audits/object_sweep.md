@@ -7,7 +7,7 @@ diagnostic `obj-diag` (section 5). Raw outputs: `out/obj/obj_{off,class,abs,rect
 aggregated by `out/obj/obj_aggregate.py` into `out/obj/obj_aggregate.md`; structural coverage by `out/obj/obj_coverage.py`
 into `out/obj/obj_coverage.json` (both scratch scripts, CPU, kept with the outputs; `out/` is git-ignored).
 Connectome: the adopted cache with `TYPE_NT_OVERRIDE` applied (the cluster's shared cache lacks it, so every job ran with
-`--cache-dir <cluster-fs>/neurome/runs/ntov-r2-e7706e/cache_override`, which equals the local `cache/` -- same NT counts,
+`--cache-dir $CLUSTER_RUNS/ntov-r2-e7706e/cache_override`, which equals the local `cache/` -- same NT counts,
 nnz 25,578,600, sum W 25,825,116, sum |W| 121,460,584). Receptor tables: the round-2 rebuild (`flyverse/data/receptors_by_type.csv`).
 
 ## 1. Protocol and pass criterion

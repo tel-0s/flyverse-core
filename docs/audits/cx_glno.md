@@ -51,7 +51,7 @@ base run; any difference between `sign-*` and `base` rows below comes from outsi
 whose PRE is a ring cell, and the 1,487 ER/ExR input entries under `abs`, i.e. the ring neurons' glutamate input
 from ExR5 / AOTU046 flipped by the GluR-led `abs` call) and from the rest of the brain (the model-wide 879,459 / 127,462 flipped synapses on the adopted TYPE_NT_OVERRIDE cache that every run used).
 
-## 3. Simulation runs (cluster batch `cx-glno-f2e987`, run dir `<cluster-fs>/neurome/runs/cx-glno-f2e987`)
+## 3. Simulation runs (cluster batch `cx-glno-f2e987`, run dir `$CLUSTER_RUNS/cx-glno-f2e987`)
 
 Five jobs (`cx_glno.py --run base | glu | ach | sign-class | sign-abs`, 2 gains x 3 seeds each = 30 runs) submitted
 2026-09-12 03:18 UTC, all completed 03:21-03:22 UTC (3.4-4.5 min each, B200, CUDA asserted). Results fetched to
@@ -333,7 +333,7 @@ skeptic's controls (seeds 0-2 silent on the same grid, seeds 3-5 at four points 
 edges moving by one seed. Which operating points hold the bump in **both** GLNO conditions over six seeds, i.e. which
 compass setting is robust to the sign the data cannot fix?
 
-**What was run.** One batch, three jobs, 0 failed, 8.3 min wall (run dir `<cluster-fs>/neurome/runs/r4-glno-d04de8`,
+**What was run.** One batch, three jobs, 0 failed, 8.3 min wall (run dir `$CLUSTER_RUNS/r4-glno-d04de8`,
 B200, torch 2.11.0+cu128, CUDA asserted in every job):
 
 | job | command | runs | s |

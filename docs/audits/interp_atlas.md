@@ -113,7 +113,7 @@ PYTHONIOENCODING=utf-8 python scripts/interp_atlas.py analyse --runs "out/atlas/
 PYTHONIOENCODING=utf-8 python scripts/interp_atlas.py analyse --runs "out/atlas/dn_r*"  --top 20 --json out/interp/atlas/dn_sensory.json
 ```
 
-`out/atlas_cluster.log` ends `6 job(s), 0 failed  (3.0 min)  run dir <cluster-fs>/neurome/runs/atlas-20c1b7`, and every
+`out/atlas_cluster.log` ends `6 job(s), 0 failed  (3.0 min)  run dir $CLUSTER_RUNS/atlas-20c1b7`, and every
 run's own log line reads `device cuda` (`NVIDIA B200`, torch 2.11.0+cu128, host <cluster-node>). Wall time per run: 114.8 /
 114.2 / 112.4 s for the 981-population batch, 48.8 s for the validation batch.
 

@@ -335,7 +335,7 @@ From `out/export/<run_id>/manifest.json` of the shipped object-sweep run, with n
 ### The one hole, and how far it is closed (not all the way)
 
 `common.provenance` takes the commit from `common.git_state()`. A cluster job runs from
-`<cluster-fs>/neurome/runs/<run>/` -- `scripts/cluster_run.py` rsyncs the cluster's own checkout **without `.git`** and
+`$CLUSTER_RUNS/<run>/` -- `scripts/cluster_run.py` rsyncs the cluster's own checkout **without `.git`** and
 overlays the locally-changed files -- so `git rev-parse` fails there and the block says `commit: unknown`. Four of
 the eight tools' Results in section 7 (every GPU-recorded one: atlas, health, trace, export) carry
 `commit: unknown`.

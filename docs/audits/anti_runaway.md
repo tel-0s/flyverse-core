@@ -214,7 +214,7 @@ every hook in the script raised `TypeError: _protected() takes 2 positional argu
 attempt at this batch produced 12 runs with all 29 checks MISSING.
 
 **The batch.** One cluster batch, 12 jobs (4 configurations x 3 replicates), `--seeds 0,1,2`, full suite, native
-backend, the shared override cache (sum|W| 121,460,584), run dir `<cluster-fs>/neurome/runs/r3-retire-33dbb1`, 10.3 min
+backend, the shared override cache (sum|W| 121,460,584), run dir `$CLUSTER_RUNS/r3-retire-33dbb1`, 10.3 min
 wall, 0 failed; 5.7-9.3 min per run. Results `out/retire_r3/<config>_r<N>/<config>.json` (+ `.log`), the full
 configuration x replicate x check matrix in `out/retire_r3/replicates.md` / `.json`
 (`python scripts/retire_measures.py --report-replicates out/retire_r3`). Rule, as above: **a check counts as broken
@@ -353,7 +353,7 @@ withdrawn: the baseline itself now fails `walk.power_max_hz`** (79.4650 against 
 replicates), and the three ablations that round 3 said "break" that check are the configurations that repair it.
 
 **The batch.** One cluster batch, 21 jobs (7 configurations x 3 replicates), `--seeds 0,1,2`, full suite, native
-backend, NVIDIA B200, shared override cache (sum|W| 121,460,584), run dir `<cluster-fs>/neurome/runs/r4-retire-4620b3`,
+backend, NVIDIA B200, shared override cache (sum|W| 121,460,584), run dir `$CLUSTER_RUNS/r4-retire-4620b3`,
 12.3 min wall, 0 failed, 6.4-10.9 min per run. Each job:
 
     python scripts/retire_measures.py --configs <cfg> --seeds 0,1,2 --receptor-model sign --receptor-net-rule abs \
@@ -375,7 +375,7 @@ simulation). Two configurations are new: `pair_gain_lpi_x2` / `pair_gain_lpi_x3`
 
 **The baseline is the shipped default and it is independently confirmed.** The three `baseline` runs here reproduce
 the re-score task's three no-flag suite runs exactly (`out/r4_rescore_fetch/r4_default_{1,2,3}.json`, run dir
-`<cluster-fs>/neurome/runs/r4-rescore-680005`, `config.receptor` = sign / abs / flag `default` / 48,295 entries):
+`$CLUSTER_RUNS/r4-rescore-680005`, `config.receptor` = sign / abs / flag `default` / 48,295 entries):
 `walk.power_max` 79.4650, `walk.GF_max` 4.6061, `walk.power_sustained` 37.8895, `loom.GF_peak` 50.3826 / 50.8586,
 `motion.min_dsi` 0.2334, `taste.MN9` 10.9342, `smell.KC_active` 816, `bitter.shiu_sugar` 139.8985,
 **26 PASS / 1 FAIL / 2 KNOWN GAP** in 6 of 6 runs. The three round-3 numbers the caveat named are therefore not what
@@ -586,7 +586,7 @@ DNp01 from those five types, by the factor 0.3; on the adopted cache the previou
 `fcb5bec2...`) and the same 48,295 / 30,916 / 17,379 sign-vs-None counts. `python -m pytest tests/ -q` on the CPU
 (`CUDA_VISIBLE_DEVICES=""`): 80 passed, 29 skipped, 200 subtests (40.9 s).
 
-### The batch (`scripts/r5_adopt_batch.sh`; run dir `<cluster-fs>/neurome/runs/r5-adopt-fb3608`)
+### The batch (`scripts/r5_adopt_batch.sh`; run dir `$CLUSTER_RUNS/r5-adopt-fb3608`)
 
 One cluster call, 7 jobs, 0 failed, 49.0 min wall (`out/r5_adopt_cluster.log`), submitted 2026-09-12 10:33 UTC while the
 instrument task's 14-job batch `r5-hops-218d81` (submitted 10:25) was running on the same node. `cluster_run.py` ships the

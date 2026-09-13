@@ -427,9 +427,9 @@ Runs:
 | candidate | out/r4_ntmaj_1.json | 2026-09-12 04:28 | NVIDIA B200 | sign / abs / changed 48295 | out/cache_605ab2bd | 2325 / 104080 | 26/1/2 | 474 |
 | candidate | out/r4_ntmaj_2.json | 2026-09-12 04:28 | NVIDIA B200 | sign / abs / changed 48295 | out/cache_605ab2bd | 2325 / 104080 | 26/1/2 | 464 |
 | candidate | out/r4_ntmaj_3.json | 2026-09-12 04:26 | NVIDIA B200 | sign / abs / changed 48295 | out/cache_605ab2bd | 2325 / 104080 | 26/1/2 | 370 |
-| baseline | out/r3_default_1.json | 2026-09-12 02:17 | NVIDIA B200 | None / - / changed - | <cluster-fs>/neurome/runs/r3-adopt-63e3de/cache | 2361 / 104044 | 27/0/2 | 402 |
-| baseline | out/r3_default_2.json | 2026-09-12 02:17 | NVIDIA B200 | None / - / changed - | <cluster-fs>/neurome/runs/r3-adopt-63e3de/cache | 2361 / 104044 | 27/0/2 | 408 |
-| baseline | out/r3_default_3.json | 2026-09-12 02:18 | NVIDIA B200 | None / - / changed - | <cluster-fs>/neurome/runs/r3-adopt-63e3de/cache | 2361 / 104044 | 27/0/2 | 465 |
+| baseline | out/r3_default_1.json | 2026-09-12 02:17 | NVIDIA B200 | None / - / changed - | $CLUSTER_RUNS/r3-adopt-63e3de/cache | 2361 / 104044 | 27/0/2 | 402 |
+| baseline | out/r3_default_2.json | 2026-09-12 02:17 | NVIDIA B200 | None / - / changed - | $CLUSTER_RUNS/r3-adopt-63e3de/cache | 2361 / 104044 | 27/0/2 | 408 |
+| baseline | out/r3_default_3.json | 2026-09-12 02:18 | NVIDIA B200 | None / - / changed - | $CLUSTER_RUNS/r3-adopt-63e3de/cache | 2361 / 104044 | 27/0/2 | 465 |
 
 Per check (columns c1.. = candidate runs, b1.. = baseline runs, in the order of the table above):
 

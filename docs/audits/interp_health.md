@@ -247,7 +247,7 @@ arm's noise, so "0 changed entries land on DNp01 / LC4 / LPLC2 / motor types" is
   passes unchanged (5 tests). Not run: the room UI (the contract says verify with the interface, not the UI).
 * Batch: `python scripts/cluster_run.py --name health-val --minutes 25 "<9 record commands>" --fetch out/health/`;
   console `out/health_val_cluster.log`, terminal line `9 job(s), 0 failed  (3.8 min)  run dir
-  <cluster-fs>/neurome/runs/health-val-5c6ad2`; every job asserted CUDA and printed `device cuda`. Recording jsons carry
+  $CLUSTER_RUNS/health-val-5c6ad2`; every job asserted CUDA and printed `device cuda`. Recording jsons carry
   the provenance block (resolved LIFParams / OpticParams, fingerprint, realised device, seeds, stimulus); the cluster's
   run dir is a file copy, not a checkout, so `flyverse_commit.commit` reads `unknown` there -- `analyse` adds
   `provenance.analysis.flyverse_commit` from the checkout that analysed. `Result.check()` is empty on every JSON.

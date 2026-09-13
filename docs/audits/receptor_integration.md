@@ -479,7 +479,7 @@ is the same configuration). Scripts: `scripts/benchmark.py --seeds 0,1,2 --json 
 cache>` (native backend: cuda_kernels, cuda_graphs, event_driven, warp); `scripts/probe_bitter.py --seed {0,1,2}` (`--seed` and
 `--receptor-nt-class-fallback` added this round; Brain seed = Poisson GRN drive, a real replicate); `scripts/probe_figure_ground.py
 --seed {0,1}` (`--seed` added: `room_demo.Sim(seed)`); `scripts/probe_loom.py --seed {0,1,2}` (deterministic probe, no Poisson
-input). The cluster's shared cache (`<cluster-fs>/datasets/flyverse/cache`, W md5 `289047c3...`) still lacks the override; it was
+input). The cluster's shared cache (`$CLUSTER_DATA/cache`, W md5 `289047c3...`) still lacks the override; it was
 not touched.
 
 Files: `out/rm2_{off,class,abs,nonmda,classfb}.{json,txt}`, `out/rm2_{off,abs}_r{2,3}.{json,txt}`, `out/bitter2_<mode>_s{0,1,2}.txt`,
@@ -1149,7 +1149,7 @@ independent brain RNGs, plus a fixed-seed rerun pair that measures the run-to-ru
 
 `scripts/batch_sustain.py --batch 16 --program cx --fruit apple --fence --minutes 5 --energy 0.9 --cuda-graphs --cuda-kernels
 --event-driven --cuda-sparse torch --seed <k> --seeds <16 env seeds>`, six jobs in one cluster batch (run dir
-`<cluster-fs>/neurome/runs/r4-sustain-f2857e`, 6 jobs, 0 failed, 44.2 min; every job log prints `cuda ok NVIDIA B200` and
+`$CLUSTER_RUNS/r4-sustain-f2857e`, 6 jobs, 0 failed, 44.2 min; every job log prints `cuda ok NVIDIA B200` and
 `device=cuda`), then a two-job fixed-seed replicate batch (`r4-sustain-rep-c6d643`, 2 jobs, 0 failed, 25.7 min). No `--cache-dir`:
 every job used the cluster's shared `TYPE_NT_OVERRIDE` cache. 30,000 frames = 300 simulated s per job; start energy 0.9 (round 3 used
 the 0.4 default, at which every fly of both conditions sat at energy 0 from t = 80 s and nothing ate).
@@ -1443,7 +1443,7 @@ protocol and the provisional entries, not results).**
 ### R5.1 The batch (landed: 14 jobs, 0 failed, 92.0 min; run dir r5-hops-218d81; NOTE: submitted at 03:25 local, before the 03:33 GF-damping retirement, so every number in it describes the DAMPED-gains default)
 
 `scripts/r5_cluster_batch.sh` -> `python scripts/cluster_run.py --name r5-hops --minutes 150 <14 commands> --fetch out/`,
-run dir `<cluster-fs>/neurome/runs/r5-hops-218d81`, 14 jobs submitted 2026-09-12 10:25:37-49 UTC, all `running` on <cluster-node-2>
+run dir `$CLUSTER_RUNS/r5-hops-218d81`, 14 jobs submitted 2026-09-12 10:25:37-49 UTC, all `running` on <cluster-node-2>
 from 10:25:47-49 (ids 147e2d7a1adf, bfbdcbc8efa8, 0f34ad6c03f6, 0064f5540a4a, 8055a2d7b028, cdc99c887aed, d3a57084e189,
 2fa47639c38b, 5c4160d8f842, c8fcdcb7506e, df24f1b39154, 88e6fa4ac4a1, 197bed82262d, a548f1c0e669 = jobs 0-13 in the order
 below). Shipped local files: the six edited / new files only (out/ is git-ignored). Every job's stdout header was read
@@ -1631,7 +1631,7 @@ and `holdDN1` applied together -- a condition round 4 never ran -- and `holdBrai
 
 ### E.1 The batch
 
-One batch, six jobs, run dir `<cluster-fs>/neurome/runs/r5-attr-6aa260`, **6 jobs, 0 failed, 3.4 min**
+One batch, six jobs, run dir `$CLUSTER_RUNS/r5-attr-6aa260`, **6 jobs, 0 failed, 3.4 min**
 (`scripts/r5_attr_batch.sh`, console log `out/r5_attr_cluster.log`); every job rebuilds the two tables in its own run
 copy (`out/` is not shipped; `build_hold_tables.write_atomic` keeps concurrent jobs of one run directory from tearing
 the file -- the in-job md5s equal the local ones) and then runs
@@ -1952,7 +1952,7 @@ the room cost is, it is not a sign change on the take-off pathway; it is an upst
 
 ### G.1 The batch
 
-One cluster batch, 9 jobs, 0 failed, 92.0 min wall (run dir `<cluster-fs>/neurome/runs/d1-hold-8ed117`; launcher
+One cluster batch, 9 jobs, 0 failed, 92.0 min wall (run dir `$CLUSTER_RUNS/d1-hold-8ed117`; launcher
 `out/d1_hold_batch.sh`, console log `out/d1_hold_cluster.log`, per-job logs `out/d1_hold_joblogs/`). Each job:
 
     python scripts/build_hold_tables.py --groups Brain,Optic [--verify] &&
@@ -2076,7 +2076,7 @@ scale (pinned 4.6-13.3 Hz over one fly's walking window against 26-32 Hz for the
    default's take-off rate in both routes and its walking-GF tail (3.611 vs 3.889 per 1,000 fly-s, voluntary 2.361 vs
    2.222, median 32.08 vs 31.90 Hz; p 0.53-0.80 on every measure). A **4th matched batch** puts a number on how well
    that is measured. The closing skeptic ran all four arms in ONE submission at a brain seed / env block no batch here
-   used (brain seed 3, env 48-63; 5 jobs, 0 failed, 56.2 min, run dir `<cluster-fs>/neurome/runs/sk-d1-hold-f691cf`,
+   used (brain seed 3, env 48-63; 5 jobs, 0 failed, 56.2 min, run dir `$CLUSTER_RUNS/sk-d1-hold-f691cf`,
    `scripts/sk_d1_hold_verify.sh`, console `out/sk_d1_hold_cluster.log`, results
    `out/sk_d1_{shipped,holdBrain,holdOptic,off}_4.json`): shipped 19 = 3 escape + 16 voluntary (GF med 31.56), optic
    side 7 = 1 + 6 (30.29), Brain side 3 = 3 + 0 (25.95), off 4 = 4 + 0 (27.76) -- there the optic side is 0.37x the

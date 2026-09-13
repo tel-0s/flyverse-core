@@ -163,7 +163,7 @@ synapse-equivalents (the -1 rows gained by Dop2R now un-tied carry larger counts
 
 ## 5. Cluster sweep (`slow-sweep-f8a6a4`; `benchmark.py --eager --receptor-model full --seeds 0,1,2`, classical 0)
 
-Two batches, 20 jobs, all on the adopted (TYPE_NT_OVERRIDE) cache (`--cache-dir <cluster-fs>/neurome/runs/ntov-r2-e7706e/
+Two batches, 20 jobs, all on the adopted (TYPE_NT_OVERRIDE) cache (`--cache-dir $CLUSTER_RUNS/ntov-r2-e7706e/
 cache_override`, the one the override-adoption run built on the cluster; `nt_counts.serotonin` 415 in every JSON), eager
 Torch path, seeds 0,1,2 for the loom section, one run per setting (the suite is chaotic: round 1 measured a run-to-run
 scatter of ~10 Hz on `walk_gf.p99` and 23-42 Hz on the loom GF peak, so a single PASS / FAIL within a few Hz of a
@@ -292,7 +292,7 @@ control. One cluster batch, `scripts/benchmark.py --eager --seeds 0,1,2 --recept
 `--slow-mode <m> --slow-gain-monoamine <g> --dopamine-lead dop1r1` (x2 each); commands in `out/r3_slow_abs_cmds.txt`,
 logs `out/r3_slow_abs_cluster.log`, results `out/r3_slow_abs_{ctl_1..3,add02_1..2,gain01_1..2,gain02_1..2,thr01_1..2}.json/.txt`,
 scores `out/r3_slow_abs_scores.txt`. Every JSON: device `NVIDIA B200`, backend `eager torch`, `cache_dir`
-`<cluster-fs>/neurome/runs/r3-slow-abs-4c1ba7/cache` (the shared override cache; `nt_counts.serotonin` 415), seeds
+`$CLUSTER_RUNS/r3-slow-abs-4c1ba7/cache` (the shared override cache; `nt_counts.serotonin` 415), seeds
 [0, 1, 2], 17.5-23.0 min per job (11 sharing 8 GPUs with two other batches; whole batch 23.9 min). Provenance checks:
 
 * **The control is the candidate default.** Its deterministic (Brain-only) sections are bit-identical to the native
@@ -460,7 +460,7 @@ section 7, round-4 item 8). Three questions: is the walk / motion pair bit-repro
 One batch, 12 concurrent jobs, `python scripts/slowdet_batch.py --name r4-slowdet --minutes 30` (the generator writes
 `out/r4_slowdet_cmds.txt` and calls `scripts/cluster_run.py ... --fetch out/`; no `--cache-dir`). Every job is
 `--eager --sections walk,motion --seeds 0,1,2 --receptor-model full --receptor-net-rule abs --receptor-gain 1,1,1`
-(`1,1,1` makes `full`'s fast weights the adopted `sign` / `abs` ones) on `cache <cluster-fs>/neurome/runs/r4-slowdet-f71ec1/cache`,
+(`1,1,1` makes `full`'s fast weights the adopted `sign` / `abs` ones) on `cache $CLUSTER_RUNS/r4-slowdet-f71ec1/cache`,
 device NVIDIA B200, backend `eager torch`, `fast_sign_changed_entries` 48,295 in all 12. Three conditions:
 
 | tag | n (det + non-det) | flags on top of the base | monoamine slow entries / syn-eq (from `config.receptor.slow`) |
