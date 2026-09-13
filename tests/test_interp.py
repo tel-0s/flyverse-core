@@ -2872,7 +2872,7 @@ class ApplyRotationTests(unittest.TestCase):
             drift_rec = drift if drift_rec is None else drift_rec
             phases = {ph: {"bump": {"drift_wedges_per_s": drift}, "heading": {"rate_dps": heading}} for ph, _ in m.PHASES}
             (d / f"{stem}_run.json").write_text(json.dumps({"device": "cuda", "phases": phases}), encoding="utf-8")
-            txt = [f"run dir /mnt/beegfs/neurome/runs/{run_dir}"]
+            txt = [f"run dir /cluster/runs/{run_dir}"]
             for ph, _ in m.PHASES:
                 (d / f"{stem}_{ph}.json").write_text(json.dumps({"meta": {"bump": {"drift_wedges_per_s": drift_rec}}}), encoding="utf-8")
                 (d / f"{stem}_{ph}_pen.json").write_text(json.dumps({"meta": {"bump": {"drift_wedges_per_s": drift_rec}}}), encoding="utf-8")

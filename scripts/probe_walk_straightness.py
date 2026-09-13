@@ -60,6 +60,9 @@ def main():
     ap.add_argument("--cache-dir", default=None, help="connectome cache to use (the session9 arm wants the pre-override backup)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--cuda-sparse", default="torch")
+    ap.add_argument("--proprioception", default=None, metavar="SPEC",
+                    help="opt-in senses.Proprioception ('all', a comma list of channels, 'all+haltere_coriolis' for the labelled "
+                         "stop-gap control arm); default off = the shipped path (docs/audits/proprioception_transducer.md)")
     args = ap.parse_args()
     import torch
     assert torch.cuda.is_available(), "no CUDA device (run this on the cluster)"
@@ -68,7 +71,8 @@ def main():
     c = connectome.load(cache_dir=Path(args.cache_dir), verbose=False) if args.cache_dir else None
     seeds = list(range(args.seed * 100, args.seed * 100 + args.batch))
     sim = BatchSim(args.batch, seed=args.seed, seeds=seeds, c=c, program=args.program, fruit_set="all", fence=args.fence,
-                   cuda_graphs=True, cuda_kernels=True, event_driven=True, cuda_sparse=args.cuda_sparse)
+                   cuda_graphs=True, cuda_kernels=True, event_driven=True, cuda_sparse=args.cuda_sparse,
+                   proprioception=args.proprioception)
     lp = sim.fb.brain.p
     print(f"arm {args.arm}: receptor_model {lp.receptor_model} ({lp.receptor_net_rule}), type_path_gain {lp.type_path_gain}, "
           f"cache {args.cache_dir or 'default'}, sum|W| {float(abs(sim.fb.c.W).sum()):,.0f}, device {sim.fb.brain.device}, B {args.batch}")
@@ -114,6 +118,7 @@ def main():
     summary = {k: agg(k) for k in ("yaw_sd_deg_s", "yaw_mean_abs_deg_s", "straightness", "path_m", "left_table_s", "frac_on_table", "min_fruit_cm", "frames_within_2cm", "hops", "dna02_abs_mean", "leg_abs_mean")}
     summary["n_left_table"] = int(sum(r["left_table_s"] is not None for r in rows))
     out = {"arm": args.arm, "seed": args.seed, "seconds": args.seconds, "program": args.program, "fence": args.fence, "cache_dir": args.cache_dir,
+           "proprioception": sim.proprioception,
            "lif": {"receptor_model": lp.receptor_model, "receptor_net_rule": lp.receptor_net_rule, "type_path_gain": lp.type_path_gain},
            "sum_abs_W": float(abs(sim.fb.c.W).sum()), "wall_s": time.time() - t0, "summary": summary, "rows": rows,
            "cmd_keys": sorted(sim.commands[0].keys()) if sim.commands and isinstance(sim.commands[0], dict) else None,

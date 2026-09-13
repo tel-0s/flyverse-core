@@ -16,7 +16,7 @@ section 2); the room runs use the shipped default (sign/abs). These are experime
 default moves here.
 
 **Provenance.** Section 1 (structure) is from the local CPU run. The GPU batch `cx-shift-eab402` (10 jobs, 0 failed,
-run dir `/mnt/beegfs/neurome/runs/cx-shift-eab402/`, `out/cx_shift_cluster.log`) landed after the thread returned; the
+run dir `$CLUSTER_RUNS/cx-shift-eab402/`, `out/cx_shift_cluster.log`) landed after the thread returned; the
 replication batch `cxshift-verify-85eb2e` (3 jobs, 0 failed, B200, `out/cxshift_verify_cluster.log`) added seeds 3-5 for
 the 40 Hz arm of experiment 1 and for the gains arm of experiment 2. Every run reports `device NVIDIA B200`. Sections 2-4
 below are the protocols and the landed results.

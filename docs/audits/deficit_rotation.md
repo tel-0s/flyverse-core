@@ -112,7 +112,7 @@ rotation (visual or efferent) that the link could carry if it were signed.
 20 jobs (`record --condition {default, gaba} --mode {visual, efferent} --seed {0..4}`, shipped sign/abs receptor
 default, gains 2/15, pooled series every 5 frames). The batch was submitted twice by the first pass of this task (a
 `nohup` client was taken for dead when its buffered log stayed empty; its jobs ran on as `rot-7de91e`, the same code
-and the same commands): **`20 job(s), 0 failed (57.5 min)`, run dir `/mnt/beegfs/neurome/runs/rot-cf0c43`** and
+and the same commands): **`20 job(s), 0 failed (57.5 min)`, run dir `$CLUSTER_RUNS/rot-cf0c43`** and
 **`20 job(s), 0 failed (59.3 min)`, run dir `rot-7de91e`** (`out/rot_cluster.log` lines 2467 and 2470). Every run of
 both batches realised `device cuda (NVIDIA B200)` (40/40 `_run.json`; 440-577 s wall each, the gaba jobs compiling
 their own `out/cache_72164311/` from the raw files), 0 airborne frames in 160 phases.

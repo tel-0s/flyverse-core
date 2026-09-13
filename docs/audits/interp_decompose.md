@@ -133,7 +133,7 @@ temp dir by build_hold_tables and applied to the synthetic graph, the CLI parser
 ## 2. Validation (a): the walk.GF_max cancellation
 
 **Batch** `scripts/interp_decompose_gf_batch.sh` -> `cluster_run.py --name dec-gf`, run dir
-`/mnt/beegfs/neurome/runs/dec-gf-37cc6e`, console `out/dec_gf_cluster.log`: **12 job(s), 0 failed (1.5 min)**, every
+`$CLUSTER_RUNS/dec-gf-37cc6e`, console `out/dec_gf_cluster.log`: **12 job(s), 0 failed (1.5 min)**, every
 job `device cuda` (NVIDIA B200, torch 2.11.0+cu128, cuda_sparse torch). The batch's `--fetch out/dec/` failed
 (`FETCH FAILED out/dec/`); the files were copied by `scp` from the run directory (process rule) and are in `out/dec/`
 (`<arm>_r<seed>.npz/.json/.txt`, 4 arms x seeds 0-2). Analysis: `scripts/interp_decompose.py validate --case gf --dir

@@ -38,6 +38,10 @@ def add_options(ap):
                     help="LIFParams.receptor_model: 'default' leaves the LIFParams default (sign / abs since round 3), "
                          "'off' selects the presynaptic-sign rule (receptor_model=None), 'sign' the receptor lookup")
     ap.add_argument('--receptor-net-rule',choices=('class','abs','nonmda'),default='abs',help="with --receptor-model sign")
+    ap.add_argument('--proprioception',default=None,metavar='SPEC',
+                    help="opt-in senses.Proprioception (BatchSim proprioception=): 'all', a comma list of chordotonal / hair_plate / "
+                         "campaniform / haltere, or 'all+haltere_coriolis' for the labelled stop-gap control arm; default off "
+                         "(the shipped path, docs/audits/proprioception_transducer.md)")
 
 
 def patch_receptor(model,net_rule,table=None):
@@ -63,7 +67,8 @@ def sim_options(args):
     return dict(seed=args.seed,program=args.program,fruit_set=args.fruit,fence=args.fence,
                 escape_gating=args.escape_gating,brain_dt=args.brain_dt,optic_dt=args.optic_dt,
                 cuda_graphs=args.cuda_graphs,cuda_kernels=args.cuda_kernels,event_driven=args.event_driven,
-                cuda_sparse=args.cuda_sparse,weight_dtype=args.weight_dtype,device=args.device)
+                cuda_sparse=args.cuda_sparse,weight_dtype=args.weight_dtype,device=args.device,
+                proprioception=getattr(args,'proprioception',None))
 
 
 def _lif_dump(lp):

@@ -24,7 +24,7 @@ figure (the `optic_measures.md` 5.3 reading as a table), then the decompose tool
 ## 1. The batch
 
 One `cluster_run.py` call, 30 jobs (2 protocols x 3 arms x 5 runs), 0 failed, 8.0 min submit-to-fetch, run dir
-`/mnt/beegfs/neurome/runs/trv-dee1e7`, console log `out/trv_cluster.log`, recordings `out/trv/` (150 files, 375 MB;
+`$CLUSTER_RUNS/trv-dee1e7`, console log `out/trv_cluster.log`, recordings `out/trv/` (150 files, 375 MB;
 `np.savez_compressed`, the pooled series every 5th frame). Every job realised `device cuda (NVIDIA B200)` (30/30
 `out/trv/*.txt`); the JSON sidecars carry the resolved LIFParams (receptor `sign` / `abs`) and OpticParams, the cache
 fingerprint `ef23cc27bea13be7f6a96f3c04fd3737`, the backend flags (event_driven, cuda_kernels, cuda_sparse warp) and

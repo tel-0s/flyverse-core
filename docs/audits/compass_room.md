@@ -75,7 +75,7 @@ shipped default (no compass gains, uniform adaptation), under which the ring is 
 
 ## 3. What landed
 
-Batch `cxroom-7f1fbb`: 12 jobs, 0 failed, 28.9 min, run dir `/mnt/beegfs/neurome/runs/cxroom-7f1fbb/`
+Batch `cxroom-7f1fbb`: 12 jobs, 0 failed, 28.9 min, run dir `$CLUSTER_RUNS/cxroom-7f1fbb/`
 (`out/cxroom_cluster.log`), fetched to `out/cxroom/cxroom_{g2-15,g2.5-25,ctrl}_{none,cx}_s{0,1}.{json,npz,txt}`;
 all 17 `.txt` report `device cuda (NVIDIA B200); torch 2.11.0+cu128`. The skeptic's replication batch `cxvfy-66b0ab` (6 jobs, 0 failed, 17.9 min,
 `out/cxvfy_cluster.log`) added five more runs at `out/cxvfy/rep_*.{json,npz,txt}`: `rep_g2-15_none_s0` (a same-config

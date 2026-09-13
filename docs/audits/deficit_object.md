@@ -670,7 +670,7 @@ arms), `lesions.json` (+ console), `perrun.json` (+ console), `ladder.json`, `la
 `out/apply_object/les/{batch.sh,manifest.resolved.json}` + 96 x 5 recording files, `out/apply_object/ladder/` + 40
 runs, `out/apply_object/smoke/`; cluster logs **`out/apobj-smoke2_cluster.log`** (the 3-job `apobj-smoke-84bc5f`
 run), `out/apobj-les_cluster.log`, `out/apobj-lad_cluster.log`. `out/apobj-smoke_cluster.log` is **not** that run:
-it is a 3-line ssh failure (`Could not resolve hostname node1.datasci.ath`) for an earlier run id,
+it is a 3-line ssh failure (`Could not resolve hostname <cluster-host>`) for an earlier run id,
 `apobj-smoke-15b44e`; it is kept as evidence of the retry, not cited. Every JSON carries the resolved LIFParams / OpticParams, `type_path_gain`, the realised
 device and the cache fingerprint (`ef23cc27bea13be7f6a96f3c04fd3737`). **Where the device evidence lives:** the
 `apobj-les` and `apobj-smoke2` consoles print a device line per job; the `apobj-lad` console does not, so "every
