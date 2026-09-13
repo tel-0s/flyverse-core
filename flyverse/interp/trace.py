@@ -109,25 +109,13 @@ def load_stage_table(spec) -> dict | None:
 
 # ---------------------------------------------------------------------------------------------- type-level graph
 def full_raw_counts(c: cn.Connectome) -> tuple[sp.csr_matrix, bool]:
-    """Raw, unsigned, uncapped synapse count per stored entry of c.W (post x pre): |W.data| on the signed entries, and
-    on the explicit-zero entries (sign-0 presynaptic cells) the count from cache/sign0_counts.npz when it exists.
-    connectome.sign0_counts is non-zero ONLY on the zero entries, and common.raw_counts(with_sign0=True) installs it as
-    the whole data vector, which zeroes every signed entry's count (the build skeptic's defect 1: every
-    lost_inputs.raw_synapses_per_post was 0.0) -- so the two are merged here, as paths.raw_counts and
-    decompose.counts_matrix do. Returns (counts, sign0_available)."""
-    C, _ = common.raw_counts(c, with_sign0=False)                       # |W| (float32 csr)
-    C = C.copy(); C.data = C.data.astype(np.float32)
-    zero = C.data == 0
-    ok = False
-    if zero.any():
-        try:
-            cnt = cn.sign0_counts(c)
-        except Exception:  # noqa: BLE001 -- the raw weights table is not on every machine
-            cnt = None
-        if cnt is not None and len(np.asarray(cnt)) == C.nnz:
-            C.data[zero] = np.asarray(cnt, dtype=np.float32)[zero]
-            ok = True
-    return C, ok
+    """Raw, unsigned, uncapped synapse count per stored entry of c.W (post x pre) -- `common.raw_counts`.
+
+    |W.data| on the signed entries and, on the explicit-zero entries (sign-0 presynaptic cells), the count from
+    cache/sign0_counts.npz. The private merge this tool carried while the shared accessor substituted the sign-0
+    array for the whole vector (every lost_inputs.raw_synapses_per_post read 0.0) is gone: docs/INTERP.md 11,
+    defect 1, closed. Returns (counts, sign0_available)."""
+    return common.raw_counts(c)
 
 
 class TypeGraph:
@@ -248,15 +236,23 @@ def _group_stat(d: np.ndarray, inv: np.ndarray, n_types: int, stat: str, obj=Non
     raise ValueError(f"unknown stat {stat!r}; choose from {STATS}")
 
 
-def p_floor(n_a: int, n_b: int) -> float:
-    """The smallest two-sided exact Mann-Whitney p two arms of n_a and n_b runs can reach (all of one arm above all of
-    the other): 2 / C(n_a + n_b, n_a). 3 v 3 runs floor at 0.10, 4 v 4 at 0.029, 5 v 5 at 0.0079 (object_sweep.md 8.4):
-    compare's verdict 'result' (p <= 0.05) needs at least four runs per arm, whatever the z."""
-    from math import comb
-    n_a, n_b = int(n_a), int(n_b)
-    if n_a < 1 or n_b < 1:
-        return float("nan")
-    return 2.0 / comb(n_a + n_b, n_a)
+#: The verdicts that make a type a CARRIER of the stimulus here: `common.compare`'s 'result', plus 'undetermined' --
+#: a deterministic null (SD 0: the ORNs under a fixed plume are bit-identical across runs) leaves z undefined, so the
+#: shared comparison declines to call it, and this tool's own rule is that a separation the exact rank test supports
+#: at a magnitude (+83 Hz for ORN_DM1) carries. The private 'override the verdict to result' that used to do this
+#: inside the per-type loop is gone (docs/INTERP.md 11, defect 4, closed); the verdict column stays compare's.
+CARRIER_VERDICTS = ("result", "undetermined")
+
+
+def carries(verdict) -> bool:
+    """Does this per-type verdict mean 'the stimulus is still here'? (CARRIER_VERDICTS)"""
+    return str(verdict) in CARRIER_VERDICTS
+
+
+#: The smallest two-sided exact Mann-Whitney p two arms of n_a and n_b runs can reach (3 v 3 floors at 0.10, 4 v 4 at
+#: 0.029, 5 v 5 at 0.0079). This lived here while `common.compare` ignored it; it is `common.p_floor` now and
+#: `compare` itself says 'underpowered' while the floor exceeds alpha (docs/INTERP.md 11, defect 3, closed).
+p_floor = common.p_floor
 
 
 def _quantity_for(kind: str, stat: str, quantity, meta: dict) -> str:
@@ -453,13 +449,10 @@ def trace(c, source, *, stimulus, control, null=None, params=None, optic_params=
         if not np.isfinite(sv).any():
             continue
         cmp = compare(sv, nv)
-        note = None
-        if not np.isfinite(cmp["z"]) and cmp["null"]["n"] >= MIN_REPLICATES and cmp["null"]["sd"] == 0 and np.isfinite(cmp["p"]):
-            # every null draw identical (a deterministic input stage: the ORNs under a fixed plume): z is undefined (NaN in
-            # the table; JSON has no inf), the exact rank test is not -- 'result' when p <= 0.05 and the difference is non-zero
-            if cmp["p"] <= 0.05 and cmp["diff"] != 0:
-                cmp["verdict"] = "result"
-            note = "null_sd_zero"
+        # every null draw identical (a deterministic input stage: the ORNs under a fixed plume): z is undefined (NaN in
+        # the table; JSON has no inf) and `compare` says 'undetermined' -- read `diff` and `p`. The private override to
+        # 'result' this tool used to apply here is gone (docs/INTERP.md 11, defect 4, closed).
+        note = "null_sd_zero" if cmp.get("null_sd_zero") else None
         t = tg.keys[i]
         first_cell = idx0[inv == i][0]
         row = {"type": t, "depth": int(depth[i]), "stage": stage_of(t, sc[first_cell], stages) if stages is not None else None,
@@ -485,17 +478,17 @@ def trace(c, source, *, stimulus, control, null=None, params=None, optic_params=
     z_of = dict(zip(per_type.type, per_type.z)) if len(per_type) else {}
 
     # ---- first stage lost: the depth rule and the input rule
-    carriers = [t for t, v in verdict_of.items() if v == "result"]
+    carriers = [t for t, v in verdict_of.items() if carries(v)]
     first_lost_depth = None
     for d in range(1, depth_max + 1):
         here = [t for t in verdict_of if depth_of[t] == d]; before = [t for t in verdict_of if depth_of[t] == d - 1]
-        if here and before and any(verdict_of[t] == "result" for t in before) and not any(verdict_of[t] == "result" for t in here):
+        if here and before and any(carries(verdict_of[t]) for t in before) and not any(carries(verdict_of[t]) for t in here):
             first_lost_depth = d
             break
     lost = []
     carrier_set = set(carriers)
     for t in verdict_of:
-        if verdict_of[t] == "result" or depth_of[t] == 0:
+        if carries(verdict_of[t]) or depth_of[t] == 0:
             continue
         inp = tg.inputs(t, min_share=min_share, top=50)
         inp = inp[inp.pre_type.isin(carrier_set)]
@@ -507,8 +500,8 @@ def trace(c, source, *, stimulus, control, null=None, params=None, optic_params=
     if len(lost_df):
         lost_df = lost_df.sort_values(["depth", "carrier_input_share"], ascending=[True, False]).reset_index(drop=True)
     lost_top_by_share = list(lost_df.sort_values("carrier_input_share", ascending=False).type[:max_lost]) if len(lost_df) else []
-    counts_by_depth = {int(d): {"carriers": int((g.verdict == "result").sum()), "scored": int(len(g))} for d, g in per_type.groupby("depth")} if len(per_type) else {}
-    counts_by_stage = ({str(st): {"carriers": int((g.verdict == "result").sum()), "scored": int(len(g))} for st, g in per_type.groupby("stage")}
+    counts_by_depth = {int(d): {"carriers": int(g.verdict.isin(CARRIER_VERDICTS).sum()), "scored": int(len(g))} for d, g in per_type.groupby("depth")} if len(per_type) else {}
+    counts_by_stage = ({str(st): {"carriers": int(g.verdict.isin(CARRIER_VERDICTS).sum()), "scored": int(len(g))} for st, g in per_type.groupby("stage")}
                        if len(per_type) and stages is not None and per_type.stage.notna().any() else {})
     # ---- what to decompose
     if decompose_at is None:
@@ -542,7 +535,7 @@ def trace(c, source, *, stimulus, control, null=None, params=None, optic_params=
     cancellation = []
     if len(lost_inputs):
         for t, g in lost_inputs.groupby("target_type", sort=False):
-            gc = g[g.pre_verdict == "result"]
+            gc = g[g.pre_verdict.isin(CARRIER_VERDICTS)]
             pos_t = float(gc.term[gc.term > 0].sum()) if len(gc) else 0.0; neg_t = float(gc.term[gc.term < 0].sum()) if len(gc) else 0.0
             own = float(signed_fig[tg.pos[t]])
             cancellation.append({"target_type": t, "carrier_inputs": list(gc.pre_type), "carrier_share": float(gc.share.sum()),
@@ -572,7 +565,7 @@ def trace(c, source, *, stimulus, control, null=None, params=None, optic_params=
     res.summary = {"stat": stat, "source": common.spec_repr(source), "n_source_cells": int(len(src_idx)), "min_share": min_share,
                    "min_obj": int(min_obj), "min_bg": int(min_bg),
                    "depth_max": depth_max, "types_scored": int(len(per_type)), "carriers": carriers,
-                   "carriers_by_depth": {int(d): list(per_type[(per_type.depth == d) & (per_type.verdict == "result")].type) for d in sorted(per_type.depth.unique())} if len(per_type) else {},
+                   "carriers_by_depth": {int(d): list(per_type[(per_type.depth == d) & per_type.verdict.isin(CARRIER_VERDICTS)].type) for d in sorted(per_type.depth.unique())} if len(per_type) else {},
                    "counts_by_depth": counts_by_depth, "counts_by_stage": counts_by_stage, "lost_min_carrier_share": lost_min_carrier_share,
                    "first_lost_depth": first_lost_depth, "lost_depth": lost_depth, "lost_types": list(lost_df.type[:max_lost]) if len(lost_df) else [],
                    "lost_top_by_share": lost_top_by_share, "n_lost_candidates": int(len(lost_df)),
@@ -790,8 +783,8 @@ def _validate(res: Result, protocol) -> None:
                 measured[t] = {"z": row[t]["z"], "verdict": row[t]["verdict"], "depth": row[t]["depth"], "stim_mean": row[t]["stim_mean"], "null_mean": row[t]["null_mean"]}
         measured["first_lost_depth"] = res.summary.get("first_lost_depth"); measured["lost_types"] = res.summary.get("lost_types")
         measured["decomposed"] = res.summary.get("decomposed")
-        ok_c = [t for t in carriers_ref if t in row and row[t]["verdict"] == "result"]
-        ok_n = [t for t in null_ref if t in row and row[t]["verdict"] != "result"]
+        ok_c = [t for t in carriers_ref if t in row and carries(row[t]["verdict"])]
+        ok_n = [t for t in null_ref if t in row and not carries(row[t]["verdict"])]
         present_c = [t for t in carriers_ref if t in row]; present_n = [t for t in null_ref if t in row]
         under = any(row[t]["verdict"] == "underpowered" for t in present_c + present_n)
         if not (present_c and present_n):
@@ -807,7 +800,7 @@ def _validate(res: Result, protocol) -> None:
         measured["lh_first_lost_depth"] = res.summary.get("first_lost_depth"); measured["lh_lost_types"] = res.summary.get("lost_types")
         if "LHPD4d1" in row:
             r = row["LHPD4d1"]
-            status_lh = "reproduced" if (r["verdict"] == "result" and r["depth"] <= 2 and r["diff"] > 0) else ("underpowered" if r["verdict"] == "underpowered" else "not reproduced")
+            status_lh = "reproduced" if (carries(r["verdict"]) and r["depth"] <= 2 and r["diff"] > 0) else ("underpowered" if r["verdict"] == "underpowered" else "not reproduced")
         else:
             status_lh = "not run"
         measured["lh_gate"] = {"status": status_lh}

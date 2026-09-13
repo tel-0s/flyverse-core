@@ -1,8 +1,9 @@
 # interp:decompose -- what drives a cell set, and the two validation targets
 
 **Task** build:decompose (interpretability toolkit, docs/INTERP.md 4.1). **Files:** `flyverse/interp/decompose.py`,
-`scripts/interp_decompose.py`, `scripts/interp_decompose_gf_batch.sh`, `tests/test_interp.py::DecomposeTests` (4 tests;
-the file's 52 tests pass on the CPU, 9.6 s). The toolkit reads the model: nothing under `flyverse/` outside `interp/`
+`scripts/interp_decompose.py`, `scripts/interp_decompose_gf_batch.sh`, `tests/test_interp.py::DecomposeTests`
+(`-k DecomposeTests`: **4 passed** on the CPU in 3.5 s; the file is shared with the other tools and has grown, so quote
+the class, not the file total). The toolkit reads the model: nothing under `flyverse/` outside `interp/`
 was edited. Every number below names its file; every generator is in `scripts/` or `flyverse/interp/`.
 
 ## 0. Verdict
@@ -18,17 +19,26 @@ was edited. Every number below names its file; every generator is in `scripts/` 
    comparison sees the weight change and the rate change together. `contrast(c, target, params_a, params_b)` is the
    structural difference of two parameter sets over any target (the whole brain in 18 s), split into **sign / gain
    changes** of the shaped weights and **rescaled-only** entries (the fan-in route of receptor_integration.md E.3).
-2. **Validation (a), walk.GF_max: reproduced to the digit at seed 0, NOT replicated over runs.** The four arms'
-   seed-0 maxima are 4.964 / 4.629 / 12.517 / 13.311 Hz exactly (`out/dec_gf_cluster.log`, 12 jobs, 0 failed,
-   device cuda). Seeds 1-2 scatter as widely as the effect: off 4.96 / 9.38 / 13.41, default 4.63 / 4.96 / 0.00,
-   holdBrain 12.52 / 13.68 / 9.61, holdOptic 13.31 / 4.89 / 12.13; every arm vs off is verdict `null` (z -1.4 / +0.6
-   / +0.2, exact U p 0.1 / 0.4 / 1.0). **DNp01's 1,455 input entries are identical in all four arms** (0 entries differ
-   between the arms' effective weights), so whatever the arms do to DNp01 they do through presynaptic rates. The
-   per-type input table shows **no group whose contribution is opposite-signed between the two halves**: the groups
-   that move in one half only are LC4 (+34 mV/s under holdBrain, z 4.3, sd 38) and CB3513 / PVLP017 / LHAD1g1 /
-   CL022_a / CB0115 / PVLP122 (holdBrain) vs LoVC5 / PVLP100 / LAL047 (holdOptic); 22 groups move the same way in
-   every arm (IN00A062 inhibition halved, z +6.4 / +6.0 / +4.4). The "cancellation" the handover quoted is a
-   seed-0 reading of a check whose run-to-run sd (2-4.6 Hz) equals its arm differences.
+2. **Validation (a), walk.GF_max: the seed-0 scalar reproduces to the digit; the cancellation does NOT replicate.**
+   The four arms' seed-0 maxima are 4.964 / 4.629 / 12.517 / 13.311 Hz exactly (`out/dec_gf_cluster.log`, 12 jobs, 0
+   failed, device cuda) -- but **the walk runs are not all bit-deterministic on the GPU, so that agreement is a
+   property of this particular scalar, not of run determinism**: three independent off seed-0 runs give
+   `walk.GF_max_hz` 4.96406364440918 to 15 digits in all three, while `walk.GF_mean_hz` reads 0.5798634228738956
+   (`out/dec/off_r0.json`) vs 0.5307307585212402 (`out/skdec/off_r0.json`), `power_max` 95.54158020019531 ->
+   96.45730590820312 and `frac_active` 0.0637020813136572 -> 0.0625231888741278; holdBrain's `frac_active` moves
+   0.050920 -> 0.050884 (`out/dec_skeptic/holdBrain_r0.json`). The default and holdOptic arms were bit-identical
+   throughout. **The "cancellation" was a seed-0 reading, not a replicated result.** Seeds 0-2 scatter as widely as the
+   effect: off 4.96 / 9.38 / 13.41, default 4.63 / 4.96 / 0.00, holdBrain 12.52 / 13.68 / 9.61, holdOptic 13.31 / 4.89 /
+   12.13; every arm vs off is verdict `null` (z -1.4 / +0.6 / +0.2, exact U p 0.1 / 0.4 / 1.0), and a fourth run
+   (seed 3: off 8.03, default 8.83, holdBrain 0.00, holdOptic 4.67; `out/dec_skeptic/`) drops **holdBrain - off to
+   +0.006 Hz at n = 4** (8.954 vs 8.948). The run scatter equals the effect. **DNp01's 1,455 input entries are identical
+   in all four arms** (0 entries differ between the arms' effective weights), so the tool localizes the arms to
+   presynaptic **rates**, not to DNp01's synapses. The per-type input table shows **no group whose contribution is
+   opposite-signed between the two halves**: the groups that move in one half only are LC4 (+34 mV/s under holdBrain,
+   z 4.3, sd 38) and CB3513 / PVLP017 / LHAD1g1 / CL022_a / CB0115 / PVLP122 (holdBrain) vs LoVC5 / PVLP100 / LAL047
+   (holdOptic); 22 groups move the same way in every arm at three runs, IN00A062 inhibition halved, z +6.4 / +6.0 /
+   +4.4 -- **but neither that reading nor LC4's 288 mV/s peak frame survived a 4th run**, so both are three-run
+   readings and not findings.
 3. **Validation (b), the 282 histamine synapses: reproduced, and localized further.** The whole-brain contrast
    default -> holdBrainHis changes the sign of exactly **123 entries / 282 raw synapses, all histamine 0 -> -1**, onto
    OA-AL2i3 62 (131 syn), TmY14 25 (63), DNge138 5, s-LNv 4, VP5+Z_adPN 4, DNge150 4, DNge149 4, OA-VUMa2 3, ... from
@@ -40,7 +50,9 @@ was edited. Every number below names its file; every generator is in `scripts/` 
    (R8 / HBeyelet are silent without an optic lobe) and the five named targets never fire (0.0 Hz, all arms)**; the
    current-carrying entries are GNG043's (a 56 Hz taste-driven GNG cell: -44 mV/s onto OA-VUMa2, -15 onto DNge150,
    -7.7 DNg34, -7.0 DNg104 / OA-VPM4 under holdBrainHis, 0 under the default) and AN27X004's (0.8 Hz, -0.4 to -0.8
-   onto DNge138 / 149 / 150) -- about 25 of the 282 synapses. MN9's input differs between the arms through one group
+   onto DNge138 / 149 / 150) -- about **28 of the 282 synapses** (GNG043 10: OA-VUMa2 6, DNge150 / DNg34 / DNg104 /
+   OA-VPM4 1 each; AN27X004 18 of its 24: DNge138 13, DNge149 3, DNge150 2 -- GNG043's 7 synapses onto VP5+Z_adPN and
+   AN27X004's 4 onto AVLP476 are in the changed set but report 0). MN9's input differs between the arms through one group
    beyond scatter, DNge051 (-983 vs -1029 mV/s, z +5.8; DNge051 fires 51.4 vs 53.8 Hz).
 4. **Two contract issues for the design task** (section 5): `common.raw_counts` reports 0 synapses for every signed
    entry on the real cache (it substitutes `sign0_counts`, which is non-zero only at explicit zeros) -- the tool uses
@@ -138,7 +150,12 @@ own max reproduces the section's scalar in all 12 runs):
 | holdOptic (Brain side alone) | 13.311 | **13.311** | 4.889 | 12.131 | 10.11 +- 4.56 | +0.20 / 4 / 1.00 / null |
 
 `validation.status` = `reproduced` (the four seed-0 numbers to 3 decimals); `measured.replicated_over_runs` = false.
-The installed matrices are the audited ones (md5 off `888fd350...`, default `ed1df661...`, holdBrain `6c5da91a...`,
+A fourth run (seed 3, `out/dec_skeptic/`) reads off 8.033, default 8.835, holdBrain 0.000, holdOptic 4.674, which puts
+**holdBrain - off at +0.006 Hz over n = 4** (8.954 vs 8.948): the run scatter *is* the effect. And the seed-0 agreement
+is a property of this scalar, not of run determinism -- `walk.GF_max_hz` repeats to 15 digits across three independent
+off seed-0 runs while `GF_mean` (0.57986 vs 0.53073), `power_max` (95.54158 -> 96.45731) and `frac_active` (0.063702 ->
+0.062523) do not (`out/dec/`, `out/dec_skeptic/`, `out/skdec/off_r0.json`); the default and holdOptic arms were
+bit-identical throughout. The installed matrices are the audited ones (md5 off `888fd350...`, default `ed1df661...`, holdBrain `6c5da91a...`,
 holdOptic `874ea6eb...`; receptor-changed entries 0 / 48,295 / 44,463 / 3,832 = G.0's counts), and the arms'
 effective weights onto DNp01 differ in **0 of 1,455 entries** (`summary.arm_weights`), i.e. G.0's "0 changed entries
 on DNp01" seen from the tool.
@@ -162,17 +179,19 @@ window, 3 runs per arm, mV/s per DNp01 cell; 455 presynaptic types, 1,261 cells,
 Totals (E / I, mV/s): off 304 / -502, default 247 / -414, holdBrain 315 / -406, holdOptic 295 / -424. At the frame of
 DNp01's peak (`<arm>_value_at_peak`, the frame `walk.GF_max` reads): LPLC2 566 / 377 / 488 / 637, LC4 2.8 / 54 /
 **288** / 5.3, SAD073 -24 / -32 / -59 / -36, CL367 -8 / -4 / -26 / -68 -- LPLC2 carries the peak in every arm and
-LC4's peak-frame excitation is the one quantity that separates the optic-side arm from the others (holdBrain 288
-mV/s, the rest <= 54), consistent with G.5's reading that the optic half is an upstream medulla state change that
-reaches the giant fibre through the loom pathway, and with the same caveat: three runs, sd 38.
+LC4's peak-frame excitation is the quantity that separates the optic-side arm from the others **at three runs**
+(holdBrain 288 mV/s, the rest <= 54), which would be consistent with G.5's reading that the optic half is an upstream
+medulla state change reaching the giant fibre through the loom pathway -- but **the 288 mV/s peak frame did not survive
+a 4th run** (sd 38 on three runs), so it is a three-run reading, not a finding.
 
 What the table does and does not show. **It does not show two opposite-signed halves that cancel.** Every group
 that differs from off under one half alone differs in the same direction as the default or not at all; the
 `nonadditivity` column (delta default - delta holdBrain - delta holdOptic) is large only for LC4 (-49) and SAD073
-(-28), which is the arithmetic of the seed-0 GF maxima restated, not a mechanism. The one replicated reading (|z| >= 3
-in all three arms, and the same sign) is that **every receptor arm halves the IN00A062 inhibition onto DNp01**
-(-26 -> -12 / -13 / -17 mV/s) and trims PVLP010 / PVLP026 -- a common consequence of any receptor table, on neither
-half. With the check's own run-to-run scatter (off 4.96-13.41 Hz at seeds 0-2), `walk.GF_max` is not a quantity a
+(-28), which is the arithmetic of the seed-0 GF maxima restated, not a mechanism. The nearest thing to a replicated
+reading at three runs (|z| >= 3 in all three arms, same sign) was that **every receptor arm halves the IN00A062
+inhibition onto DNp01** (-26 -> -12 / -13 / -17 mV/s) and trims PVLP010 / PVLP026 -- but **that reading did not survive
+a 4th run either**, so it too is a three-run reading. With the check's own run-to-run scatter (off 4.96-13.41 Hz at
+seeds 0-2, 8.03 at seed 3; holdBrain - off +0.006 Hz at n = 4), `walk.GF_max` is not a quantity a
 cancellation can be read from at three runs; the tool's honest output is the seed-0 reproduction plus the scatter.
 
 ## 3. Validation (b): the 282 histamine synapses of taste
@@ -201,8 +220,11 @@ what the tool adds is *where* the arms differ:
 
 * **The five named targets never fire in the protocol** (`readout_per_body` output_Hz 0.0 for all 14 bodies of
   OA-AL2i3 / TmY14 / DNge138 / DNge149 / DNge150, every arm, every run), so they relay nothing to MN9 whatever their
-  input does. The R8 / HBeyelet histamine entries onto OA-AL2i3 and TmY14 (100 of the 123, 194 of the 282 synapses)
-  carry **0.0 mV/s in every arm**: without an optic lobe the photoreceptors and the eyelet are silent (rate 0).
+  input does. The histamine entries onto OA-AL2i3 and TmY14 (**87 of the 123, 194 of the 282 synapses** -- 85 of them
+  R7 / R8 / HBeyelet, 2 T1) carry **0.0 mV/s in every arm**: without an optic lobe the photoreceptors and the eyelet are
+  silent (rate 0). Over the whole changed set the photoreceptor + eyelet entries are 90 / 211 syn, 92 / 213 counting T1
+  (also optic, also silent); the *100 / 231 syn* figure below is the entry count onto the **five named targets**, a
+  different set (`whole_brain_delta_per_type`, pre-type x post-type).
 * The current-carrying part of the 123 entries (`out/interp/decompose/taste_chain_by_transmitter.json`, histamine
   group per post type, holdBrainHis = the entries at -1, default = 0): GNG043 (56.4 Hz in the protocol) onto
   OA-VUMa2 **-44.3 mV/s** (6 syn, z 13.4 vs the default's 0), DNge150 -15.4 (1 syn, z 11.6), DNg34 -7.7 (3), DNg104
@@ -216,7 +238,7 @@ what the tool adds is *where* the arms differ:
   1 mV/s). DNge051's own input differs through DNge059 (+75 +- 15 vs +68 +- 2, z +3.0) only. E / I totals of MN9:
   default 2,105 / -1,592, holdBrainHis 2,153 / -1,619 mV/s.
 
-So the tool narrows E.4's "282 synapses" to the ~25 that carry current in `sec_taste` -- GNG043's and AN27X004's
+So the tool narrows E.4's "282 synapses" to the ~28 that carry current in `sec_taste` -- GNG043's and AN27X004's
 histamine onto OA-VUMa2 / DNge150 / DNg34 / DNg104 / OA-VPM4 / DNge138 / DNge149 -- and shows that the dynamic route
 from there to MN9 runs through DNge051 (the largest inhibitory input of MN9, -19 mV per volley over 231 synapses),
 not through the five targets E.4 named (silent here) and not through the fan-in rescaling (the seven rescaled cells
@@ -233,6 +255,7 @@ the z values are 5-49 because the hold arm's scatter is 0.01-3 mV/s).
 | `scripts/interp_decompose_gf_batch.sh` | the 12-job cluster batch of validation (a) |
 | `out/dec_gf_cluster.log` | its console (12 job(s), 0 failed; FETCH FAILED -> scp) |
 | `out/dec/<arm>_r<seed>.{npz,json,txt}` | the walk recordings (cuda), 4 arms x 3 seeds |
+| `out/dec_skeptic/<arm>_r{0,3}.*`, `out/skdec/<arm>_r0*.*` | the 4th run (seed 3) and the seed-0 re-runs behind the determinism and n = 4 statements of 0.2 / section 2 |
 | `out/dec_taste/<arm>_r<seed>.*`, `out/dec_taste_all/<arm>_r<seed>.*` | the taste recordings (cpu): MN9 + five targets, 3 arms x 3 seeds; the 20 chain types, 2 arms x 3 seeds |
 | `out/interp/decompose/validate_gf.json` + `.log` | validation (a): cancellation table, peak view, arm comparison, provenance (device cuda) |
 | `out/interp/decompose/validate_taste.json` + `.log`, `validate_taste_MN9_dynamic.json`, `validate_taste_targets_dynamic.json`, `validate_taste_targets_by_transmitter.json` | validation (b): whole-brain / five-target / MN9 contrasts, the CPU dynamics |
@@ -257,6 +280,12 @@ the z values are 5-49 because the hold arm's scatter is 0.01-3 mV/s).
 5. The walk arms differ in DNp01's inputs by 0 entries, so a decomposition of DNp01 alone can only report rate
    changes; where the halves act (LC4's peak-frame excitation under holdBrain) is a `trace` question from the
    medulla, with `gain_fb = 0` as the deterministic null arm and >= 4 runs per arm.
-6. The CPU taste protocol has no photoreceptor drive; the GPU suite's `taste.MN9` (5.85 -> 10.93, E.2) may use more
-   of the 282 synapses than the ~25 found here. The same `record --protocol taste` line on the cluster (3 seeds x 2
+6. **The module docstring of `scripts/interp_decompose.py` ships a broken worked example.** Line 7 shows
+   `--null "off=out/dec/off_r*.npz"`; that form exits 2 with `unrecognized arguments`, because the `analyse` flag is
+   `--null-arm` (`scripts/interp_decompose.py:480`, dest `null`) while `--null` is `common.add_common_args`' store_true
+   (`flyverse/interp/common.py:935`). The identical command with `--null-arm` runs (exit 0) and reproduces section 2's
+   table (LPLC2 +170.981 +- 3.851 vs off +192.433 +- 22.090; SAD073 -75.123 +- 2.261; LC4 holdBrain +61.697 +- 38.473,
+   z 4.310; IN00A062 -12.479 +- 2.058, z 6.424). The other three docstring examples run as written.
+7. The CPU taste protocol has no photoreceptor drive; the GPU suite's `taste.MN9` (5.85 -> 10.93, E.2) may use more
+   of the 282 synapses than the ~28 found here. The same `record --protocol taste` line on the cluster (3 seeds x 2
    arms, one batch) would settle it; not run in this task (validation (b) is CPU-only by the contract).

@@ -13,7 +13,7 @@ the cx_wedge one-step ring weights, the ExR -> EPG two-step loop) and writes the
     PYTHONIOENCODING=utf-8 python scripts/interp_paths.py validate --json out/interp/paths/validate.json
 
 `--a` / `--b` take the population grammar of docs/INTERP.md 2.1; a '|'-joined string with '~regex' tokens is split into
-an OR list (`paths.spec_from_cli`); both flags are repeatable (repeats OR). `--null` / `--replicates` / `--seed` /
+an OR list (`paths.spec_from_cli`); both flags are repeatable (repeats OR). `--null-runs` / `--replicates` / `--seed` /
 `--device` are accepted for uniformity: the tool is deterministic (there is nothing to replicate; the JSON records the
 host CPU as the realised device); the only rollout-dependent flag is `never_firing`, judged on the named `--recording`.
 """

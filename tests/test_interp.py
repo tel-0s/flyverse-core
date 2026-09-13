@@ -118,6 +118,31 @@ class EffectiveWeightTests(unittest.TestCase):
         sub = common.effective_weights(c.subset([3, 2, 4]), p)
         np.testing.assert_allclose(sub.A.toarray(), full.A.toarray()[[3, 2, 4]][:, [3, 2, 4]], rtol=1e-6)
 
+    def test_raw_counts_merge_the_sign0_counts(self):
+        """`raw_counts` MERGES |W.data| with cache/sign0_counts.npz -- maximum(|W.data|, sign0_counts) -- instead of
+        substituting the sign-0 array for the whole vector, which reported 0 synapses for every signed edge and wrote
+        `synaptic_pair_count 0` into the Neurome column (docs/INTERP.md 11, defect 1)."""
+        from unittest import mock
+        c = graph(); W = c.W.tocsr()
+        C, ok = common.raw_counts(c, with_sign0=False)
+        self.assertFalse(ok)                                   # 'exclude the sign-0 entries': they stay at 0
+        np.testing.assert_allclose(C.data, np.abs(W.data))
+        self.assertEqual(C[7, 6], 0.0); self.assertEqual(C[3, 2], 120.0)
+        s0 = np.zeros(W.nnz, np.float32); s0[W.data == 0] = 200.0        # what the npz holds: non-zero ONLY there
+        with mock.patch.object(cn, "sign0_counts", lambda *a, **k: s0):
+            C2, ok2 = common.raw_counts(c)
+            self.assertEqual(common.raw_counts(c, dtype=np.float64)[0].dtype, np.float64)   # health's exact total
+        self.assertTrue(ok2)
+        self.assertEqual(C2[7, 6], 200.0)                      # the GLNO -> PEN_a sign-0 entry's raw count, rescued
+        self.assertEqual(C2[3, 2], 120.0)                      # and every signed entry keeps its own (read 0 before)
+        self.assertAlmostEqual(float(C2.sum()), float(np.abs(W.data).sum()) + 200.0)
+        # the five tools that patched this privately now all call the shared accessor and agree entry for entry
+        from flyverse.interp import paths as P, trace as tr, health as H, export as ex, decompose as dec
+        with mock.patch.object(cn, "sign0_counts", lambda *a, **k: s0):
+            for got in (P.raw_counts(c)[0], tr.full_raw_counts(c)[0], H.full_counts(c)[0], ex.raw_counts(c)[0],
+                        dec.counts_matrix(c)[0]):
+                np.testing.assert_allclose(got.toarray(), C2.toarray())
+
     def test_links_and_silence(self):
         from flyverse.brain import LIFParams
         c = graph(); p = LIFParams(receptor_model=None, event_driven=False)
@@ -139,6 +164,13 @@ class EffectiveWeightTests(unittest.TestCase):
         self.assertEqual(lc4.sign_rule, "nt_sign")
         self.assertEqual(list(common.unit_kinds(c)), ["photoreceptor", "graded", "spiking", "spiking", "spiking", "spiking", "spiking", "spiking"])
         self.assertEqual(list(common.unit_kinds(c, fake_fb(c, np.zeros(8))))[1], "graded")
+        # with no rollout the never_firing question was not asked: the flag is False, and no structural row claims it
+        # (it was NaN, which every bool(flag) reader turned into True -- docs/INTERP.md 11, defect 2)
+        structural = common.silent_flags(c, np.arange(8), frozen_idx=[1])
+        self.assertEqual(structural.never_firing.dtype, bool); self.assertFalse(structural.never_firing.any())
+        ds = common.links(c, ew, pre=["GLNO", "LC4", "Mi4"], post=["PEN_a", "DNp01", "LC4"], counts=counts, flags=structural)
+        self.assertEqual(set(ds.silent), {"", "sign0", "frozen|pruned"})
+        self.assertNotIn("never_firing", "|".join(ds.silent))
 
 
 class RecordingTests(unittest.TestCase):
@@ -202,6 +234,35 @@ class NullHelperTests(unittest.TestCase):
         self.assertEqual(common.compare([10, 10], [0, 0])["verdict"], "underpowered")
         self.assertEqual(common.replicate_seeds(3, 4), [4, 5, 6])
         a = common.ArmStats.of([1, np.nan, 3]); self.assertEqual(a.n, 2); self.assertEqual(a.mean, 2.0)
+        self.assertAlmostEqual(r["p_floor"], 2 / 252); self.assertEqual(r["alpha"], 0.05)
+
+    def test_the_p_floor_is_part_of_the_verdict(self):
+        """MIN_REPLICATES stays 3 (the scatter rule) but a difference is CALLED only where the exact rank test can
+        reach alpha: compare reports `p_floor` and says 'underpowered' while it exceeds alpha (docs/INTERP.md 11,
+        defect 3). 3 v 3 floors at 0.10, 4 v 4 at 0.029, 5 v 5 at 0.0079."""
+        self.assertEqual(common.MIN_REPLICATES, 3)
+        self.assertAlmostEqual(common.p_floor(3, 3), 0.1); self.assertAlmostEqual(common.p_floor(4, 4), 2 / 70)
+        self.assertAlmostEqual(common.p_floor(5, 5), 2 / 252); self.assertTrue(np.isnan(common.p_floor(0, 3)))
+        r3 = common.compare([10.0, 10.1, 9.9], [0.0, 0.1, -0.1])          # a huge separation over three runs
+        self.assertGreater(r3["z"], 3); self.assertAlmostEqual(r3["p"], 0.1)
+        self.assertAlmostEqual(r3["p_floor"], 0.1); self.assertEqual(r3["verdict"], "underpowered")
+        r4 = common.compare([10.0, 10.1, 9.9, 10.2], [0.0, 0.1, -0.1, 0.2])
+        self.assertAlmostEqual(r4["p_floor"], 2 / 70); self.assertEqual(r4["verdict"], "result")
+
+    def test_a_deterministic_null_is_undetermined(self):
+        """SD(null) == 0 (bit-identical draws) leaves z undefined: the verdict is 'undetermined' and the magnitude is
+        `diff` -- not a z of NaN ('null' on +83 Hz), not one of 1e41 on a near-zero group, and not a per-tool
+        override (docs/INTERP.md 11, defect 4)."""
+        r = common.compare([83.0, 83.0, 83.0, 83.0], [0.0, 0.0, 0.0, 0.0])
+        self.assertTrue(np.isnan(r["z"])); self.assertTrue(r["null_sd_zero"])
+        self.assertEqual(r["verdict"], "undetermined"); self.assertEqual(r["diff"], 83.0)
+        # a null that is deterministic only to float noise is the same case, not a z of 1e41
+        tiny = common.compare([1e-20, 1.1e-20, 0.9e-20, 1e-20], [0.0, 1e-40, 0.0, 0.0])
+        self.assertEqual(tiny["verdict"], "undetermined")
+        # identical arms: there is nothing to call, deterministic or not
+        self.assertEqual(common.compare([5.0] * 4, [5.0] * 4)["verdict"], "null")
+        # and the run count still comes first
+        self.assertEqual(common.compare([83.0] * 3, [0.0] * 3)["verdict"], "underpowered")
 
 
 class ResultSchemaTests(unittest.TestCase):
@@ -231,6 +292,21 @@ class ResultSchemaTests(unittest.TestCase):
         self.assertEqual(prov["execution"]["device"], "cpu"); self.assertEqual(prov["execution"]["dt"]["lif_ms"], 0.5)
         self.assertEqual(prov["execution"]["replicate_unit"], "runs")
         self.assertIn(prov["flyverse_commit"]["commit"] == "unknown" or len(prov["flyverse_commit"]["commit"]) == 40, [True])
+        # the code identity: git when git can, the export's source fingerprint when it cannot (a cluster copy has no
+        # .git), 'unknown' only as the last resort -- docs/INTERP.md 11, defect 8
+        sf = prov["source_fingerprint"]
+        if prov["flyverse_commit"]["commit"] == "unknown":
+            self.assertTrue(sf["computed"])
+        else:
+            self.assertFalse(sf["computed"]); self.assertEqual(sf["commit"], prov["flyverse_commit"]["commit"])
+        from unittest import mock
+        with mock.patch.object(common, "git_state", lambda: {"commit": "unknown", "dirty": False, "modified_files": []}):
+            cluster = common.provenance(c, fb=fake_fb(c, np.zeros(8)))["source_fingerprint"]
+        self.assertTrue(cluster["computed"]); self.assertGreater(cluster["n_files"], 20)
+        self.assertIn("flyverse/interp/common.py", cluster["files"])
+        self.assertIn("flyverse/interp/common.py", cluster["files_loaded"])
+        from flyverse.interp import export as ex
+        self.assertEqual(ex.match_sources(cluster)["differ"], [])       # it matches this checkout, by content
         res = common.Result.new("paths", prov)
         res.add_population(common.population(c, "PEN_a", "target"), unit_kind="spiking")
         res.add_table("contributions", pd.DataFrame([{k: (0 if k in ("value", "synaptic_pair_count") else "x") for k in common.EXPORT_TABLES["contributions"]}]))
@@ -266,9 +342,33 @@ class ResultSchemaTests(unittest.TestCase):
 
 
 class StubTests(unittest.TestCase):
+    def test_the_two_namespaces_are_separate(self):
+        """`flyverse.interp.<tool>` is the MODULE and `flyverse.interp.tools.<tool>` / `interp.tool(<tool>)` is the
+        FUNCTION, whatever has been imported already (docs/INTERP.md 11, defect 6: the attribute used to be the
+        function until the submodule was imported and the module afterwards, so this class passed or failed on
+        test order)."""
+        import importlib
+        from types import ModuleType
+        for name in common.TOOLS:
+            importlib.import_module(f"flyverse.interp.{name}")          # the shadowing import, done first on purpose
+        for name in common.TOOLS:
+            self.assertIsInstance(getattr(interp, name), ModuleType, f"interp.{name} is not the module")
+            fn = interp.tool(name)
+            self.assertIs(fn, getattr(interp.tools, name))
+            self.assertTrue(callable(fn) and not isinstance(fn, ModuleType))
+            self.assertIs(fn, getattr(getattr(interp, name), name))     # the implementation, not the stub
+        self.assertEqual(sorted(dir(interp.tools)), sorted(common.TOOLS))
+        with self.assertRaises(ValueError):
+            interp.tool("nonesuch")
+        with self.assertRaises(AttributeError):
+            interp.tools.nonesuch
+        # the stub is what the function namespace returns while a module is missing; it names the file to write
+        self.assertTrue(inspect.getdoc(interp.stubs.paths))
+        self.assertIs(interp._implementation("no_such_tool", "no_such_tool", interp.stubs.paths), interp.stubs.paths)
+
     def test_stubs_import_and_signatures(self):
         for name in common.TOOLS:
-            fn = getattr(interp, name)
+            fn = interp.tool(name)
             self.assertTrue(callable(fn))
             self.assertTrue(inspect.getdoc(getattr(interp.stubs, name)))
             sig = inspect.signature(getattr(interp.stubs, name))
@@ -395,7 +495,9 @@ class HealthTests(unittest.TestCase):
         rt = H.replicate_table(runs).set_index(["group", "stat"])
         self.assertEqual(rt.loc[("LC4", "refractory_load")].n, 3); self.assertAlmostEqual(rt.loc[("LC4", "refractory_load")].sd, 0.0, places=12)
         cmp = H.compare_arms(runs, runs).set_index(["group", "stat"])
-        self.assertEqual(cmp.loc[("LC4", "rate_mean")].verdict, "null"); self.assertEqual(cmp.loc[("LC4", "rate_mean")]["diff"], 0.0)
+        # an arm against itself: no difference at all, and at 3 v 3 runs the exact U cannot reach alpha either
+        # (common.compare reports p_floor 0.10 and says so) -- neither reading is a result
+        self.assertEqual(cmp.loc[("LC4", "rate_mean")].verdict, "underpowered"); self.assertEqual(cmp.loc[("LC4", "rate_mean")]["diff"], 0.0)
         self.assertEqual(H.compare_arms(runs[:2], runs).set_index(["group", "stat"]).loc[("LC4", "rate_mean")].verdict, "underpowered")
         rec = self._recording(c)[0]
         with tempfile.TemporaryDirectory() as d:
@@ -568,10 +670,12 @@ class TraceTests(unittest.TestCase):
         # without a null arm the null draws are the ordered control pairs; two runs per arm are underpowered
         res2 = tr.trace(c, "R1-R6", stimulus=stim[:2], control=ctrl[:2], params=p, min_cells=1)
         self.assertEqual(res2.summary["null_source"], "control_pairs"); self.assertEqual(res2.table("per_type").set_index("type").loc["Mi4", "verdict"], "underpowered")
-        # three runs per arm: z is huge but the exact p floors at 0.10 -> compare says 'null' and the summary says why
+        # three runs per arm: z is huge but the exact p floors at 0.10 -> compare says 'underpowered' (its p_floor rule)
+        # and the summary says why
         res3b = tr.trace(c, "R1-R6", stimulus=stim[:3], control=ctrl[:3], null=nul[:3], params=p, min_cells=1)
         pt3b = res3b.table("per_type").set_index("type")
-        self.assertGreater(pt3b.loc["Mi4", "z"], 3); self.assertEqual(pt3b.loc["Mi4", "verdict"], "null"); self.assertAlmostEqual(pt3b.loc["Mi4", "p"], 0.1)
+        self.assertGreater(pt3b.loc["Mi4", "z"], 3); self.assertEqual(pt3b.loc["Mi4", "verdict"], "underpowered")
+        self.assertAlmostEqual(pt3b.loc["Mi4", "p"], 0.1); self.assertAlmostEqual(pt3b.loc["Mi4", "p_floor"], 0.1)
         self.assertIn("floors at 0.100", res3b.summary["p_floor_note"])
         # stat 'mean' on the odour-style quantity: LC4's rate rises 3 Hz
         for r in stim + ctrl + nul:
@@ -671,7 +775,8 @@ class TraceTests(unittest.TestCase):
 
     def test_untyped_cells_and_deterministic_null(self):
         """Untyped cells ('' type) are not a node of the depth graph (they would short-circuit every depth); a null arm
-        whose draws are identical (SD 0: a deterministic input stage) is decided by the exact rank test, not by z."""
+        whose draws are identical (SD 0: a deterministic input stage) is 'undetermined' -- z is not defined there, so
+        the magnitude and the exact p are what the reader gets (common.compare; docs/INTERP.md 11, defect 4)."""
         from flyverse.brain import LIFParams
         from flyverse.interp import trace as tr
         c = graph(); n = c.neurons.copy()
@@ -692,9 +797,10 @@ class TraceTests(unittest.TestCase):
             r.quantities["drive_mv"][:] = 0.0; r.quantities["rate_hz"][:] = 5.0
         res = tr.trace(c, "R1-R6", stimulus=stim, control=ctrl, null=nul, params=p, stat="best_cell", min_cells=1, decompose_at=None, per_body="none")
         pt = res.table("per_type").set_index("type")
-        self.assertEqual(pt.loc["LC4", "note"], "null_sd_zero"); self.assertEqual(pt.loc["LC4", "verdict"], "result")
+        self.assertEqual(pt.loc["LC4", "note"], "null_sd_zero"); self.assertEqual(pt.loc["LC4", "verdict"], "undetermined")
         self.assertTrue(np.isnan(pt.loc["LC4", "z"])); self.assertAlmostEqual(pt.loc["LC4", "p"], 2 / 252); self.assertGreater(pt.loc["LC4", "diff"], 0)
-        self.assertEqual(pt.loc["DNp01", "verdict"], "null")                                # no difference: stays null
+        # a deterministic null the rank test DOES settle (p 0.15 > alpha, the stim draws straddle it) is a plain null
+        self.assertEqual(pt.loc["DNp01", "verdict"], "null"); self.assertEqual(pt.loc["DNp01", "note"], "null_sd_zero")
         # OpticParams rebuilt from a provenance block (pair_gain rows back to tuples)
         prov = common.provenance(c, fb=fake_fb(c, np.zeros(8)))
         op = tr.optic_params_from_provenance(prov)
@@ -1026,9 +1132,13 @@ class AtlasTests(unittest.TestCase):
         def row(pop, ro):
             return df[(df.population == pop) & (df.readout == ro)].iloc[0]
         self.assertGreater(row("DNa02_L", "type.DNa02_L")["diff"], 10.0)   # the pulse drives the cell it names
-        self.assertEqual(row("DNa02_L", "type.DNa02_L")["verdict"], "result")
+        # the atlas' null rows are bit-identical (SD 0), so compare's verdict is 'undetermined' and the declared
+        # effect size z_floor (diff / max(SD, 0.05 Hz)) is what calls the row a mover (atlas.called)
+        self.assertEqual(row("DNa02_L", "type.DNa02_L")["verdict"], "undetermined")
+        self.assertEqual(row("DNa02_L", "type.DNa02_L")["verdict_z_floor"], "result")
         self.assertEqual(row("DNa02_L", "type.DNa02_L")["n_runs"], 3)
         self.assertEqual(row("LC4", "type.DNa02_L")["verdict"], "null")    # an unconnected pulse moves nothing
+        self.assertEqual(list(A.called(df[df.readout == "type.DNa02_L"]).population), ["DNa02_L"])
         self.assertAlmostEqual(row("LC4", "type.DNa02_L")["diff"], 0.0, places=6)
         self.assertLess(row("DNa02_R", "type.DNa02_LR")["diff"], -10.0)    # the left-right readout has the sign
         # movers lists only populations that actually moved the readout, and marks the ones inside it
@@ -1649,8 +1759,8 @@ class ExportTests(unittest.TestCase):
             self.assertAlmostEqual(r.stim_mean, 10.5); self.assertAlmostEqual(r.null_mean, 0.1)
             self.assertGreater(r.z, 3.0)
             # 3 runs per arm is the floor of the scatter rule but not of the exact test: the smallest two-sided
-            # Mann-Whitney p at n = 3, 3 is 0.1, so compare() can only say 'null' here, whatever the separation
-            self.assertAlmostEqual(r.p, 0.1); self.assertEqual(r.verdict, "null")
+            # Mann-Whitney p at n = 3, 3 is 0.1, so no separation can be called -- compare says 'underpowered'
+            self.assertAlmostEqual(r.p, 0.1); self.assertEqual(r.verdict, "underpowered")
             self.assertEqual(common.compare([10.0, 10.1, 9.9, 10.2, 9.8], [0.0, 0.1, -0.1, 0.2, -0.2])["verdict"], "result")
             # the reference arm is reduced exactly as the reproduction, so the two are comparable row by row
             rep = res.validation["measured"]["reproduction"]["LC11"]
@@ -1784,8 +1894,10 @@ class DecomposeTests(unittest.TestCase):
         self.assertAlmostEqual(t.loc["DNa02"].stim_mean, float(np.mean([(A[3, 4] * s.quantities["rate_hz"][1:5, 4]).mean() for s in stim])), places=5)
         self.assertEqual(t.loc["LC4"].unit, dec.DYNAMIC_UNIT); self.assertAlmostEqual(t.loc["LC4"].weight_mv_per_volley, A[3, 2], places=6)
         self.assertAlmostEqual(t.loc["LC4"].stim_g_mv, t.loc["LC4"].stim_mean * p.tau_syn / 1000.0)
-        # the arm comparison: z against the null scatter, and -- at exactly three runs -- never 'result' (exact U floors p at 0.1)
-        self.assertGreater(t.loc["LC4"].stim_z, 3); self.assertEqual(t.loc["LC4"].stim_verdict, "null"); self.assertAlmostEqual(t.loc["LC4"].stim_p, 0.1)
+        # the arm comparison: z against the null scatter, and -- at exactly three runs -- never 'result': the exact U
+        # floors p at 0.1, which compare reports as p_floor and calls 'underpowered'
+        self.assertGreater(t.loc["LC4"].stim_z, 3); self.assertEqual(t.loc["LC4"].stim_verdict, "underpowered")
+        self.assertAlmostEqual(t.loc["LC4"].stim_p, 0.1)
         two = dec.decompose(c, "DNp01", recording={"stim": stim[:2]}, null_recording={"null": null}, params=p, tiers=False)
         self.assertEqual(two.table("per_type").set_index("pre_group").loc["LC4"].stim_verdict, "underpowered")
         # the peak view: every group's input at the frame of the target's peak output
@@ -2214,6 +2326,329 @@ class LedgerTests(unittest.TestCase):
         led = res.table("ledger").set_index("row_id")
         self.assertEqual(led.loc["taste.MN9.rate_hz", "status"], "PASS")      # the shipped table, scored end to end
         self.assertEqual(led.loc["motion.T4_T5.min_dsi", "status"], "PASS")
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# The three application scripts (scripts/interp_apply_{turning,object,rotation}.py).  CPU only, no connectome cache and
+# no GPU: each class runs the script's own `selftest` logic plus the pieces the skeptic round fixed.  Before this the
+# ~2,500 lines of analysis behind docs/audits/deficit_*.md were exercised only by hand-run `selftest` subcommands.
+SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
+
+
+def _load_script(name):
+    """Import scripts/<name>.py as a module (the apply scripts are CLIs, not a package)."""
+    import importlib.util
+    if str(SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS))
+    spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules.setdefault(name, mod)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class ApplyTurningTests(unittest.TestCase):
+    """scripts/interp_apply_turning.py's CPU analysis on a synthetic room recording: the L-R tables (and the start-up
+    skip that now reaches their totals), the cancellation summary (which used to copy DNa02's readout SD into the leg
+    pair's block), and the per-fly readout correlations that deficit_turning.md 4.4 / 5 quote."""
+
+    T, B, G = 400, 3, 6      # frames, flies, presynaptic groups
+    SKIP_S = 1.0             # 100 frames at the 10 ms dt below
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_script("interp_apply_turning")
+
+    def _run(self, seed=0):
+        """A Run object with the arrays lr_tables / cancellation_tables / per_fly_readout_corr read.  The first
+        SKIP_S seconds carry a large transient on the totals, so dropping them changes the totals and nothing else."""
+        m = self.m
+        rng = np.random.default_rng(seed)
+        T, B, G = self.T, self.B, self.G
+        keys = np.array(["IN12B014/L", "IN12B014/R", "LLPC1/L", "LLPC1/R", "DNge035/L", "DNge035/R"])
+        targets = ["DNa02_L", "DNa02_R", "leg_L", "leg_R"]
+        k0 = int(round(self.SKIP_S / 0.01))
+
+        tot = rng.normal(0.0, 1.0, (T, 4, B)).astype(np.float32)
+        tot[:, 0] -= 300.0; tot[:, 1] -= 400.0                       # DNa02 L / R steady inhibition
+        tot[:k0] -= 1000.0                                            # the start-up transient the skip removes
+        totE = np.abs(tot) + 700.0
+        totI = tot - totE
+
+        # per-fly, per-group mean input to each target (the GPU pass accumulates these over ALL frames)
+        gm = rng.normal(0.0, 2.0, (4, B, G)).astype(np.float32)
+        gm[0, :, 0] -= 90.0; gm[1, :, 1] -= 124.0                     # the inhibitor's fixed L-R offset
+
+        # a planted within-fly correlation: LLPC1 L-R drives DNa02 L-R, DNge035 L-R drives leg L-R contralaterally
+        watch = ["DNa02_L", "DNa02_R", "LLPC1_L", "LLPC1_R", "DNge035_L", "DNge035_R"]
+        wr = rng.normal(2.0, 0.5, (T, B, len(watch))).astype(np.float32)
+        llp = wr[:, :, 2] - wr[:, :, 3]
+        dng = wr[:, :, 4] - wr[:, :, 5]
+        turn_l = (0.5 * llp + rng.normal(0, 0.05, (T, B))).astype(np.float32)
+        turn_r = np.zeros((T, B), np.float32)
+        leg_l = (-0.5 * dng + rng.normal(0, 0.05, (T, B))).astype(np.float32)
+        leg_r = np.zeros((T, B), np.float32)
+
+        keep = np.arange(G, dtype=np.int32)
+        series = rng.normal(0.0, 5.0, (T, B, G)).astype(np.float16)
+
+        z = {"t_ms": (np.arange(T) * 10.0).astype(np.float64), "group_keys": keys, "target_names": np.array(targets),
+             "pre_idx": np.arange(G), "pre_group": np.arange(G, dtype=np.int32), "sel_idx": np.arange(G),
+             "rate_mean_flies": rng.uniform(0.0, 3.0, (B, G)).astype(np.float32),
+             "rate_max_flies": np.array([[20.0, 20.0, 20.0, 20.0, 0.2, 20.0]] * B, np.float32),   # DNge035/L never fires
+             "group_mean_flies": gm, "tot": tot, "totE": totE, "totI": totI,
+             "watch_rates": wr, "yaw_cmd": rng.normal(0, 0.05, (T, B)).astype(np.float32),
+             "airborne": np.zeros((T, B), bool), "wind_angle": rng.uniform(-1, 1, (T, B)).astype(np.float32),
+             "w__DNa02_L": np.array([-5.0, -5.0, 33.0, 0.6, 0.0, 0.0], np.float32),
+             "w__DNa02_R": np.array([-5.0, -5.0, 0.6, 55.0, 0.0, 0.0], np.float32),
+             "w__leg_L": np.zeros(G, np.float32), "w__leg_R": np.zeros(G, np.float32),
+             "keep__DNa02_L|DNa02_R": keep, "keep__leg_L|leg_R": keep,
+             "series__DNa02_L": series, "series__DNa02_R": series * 0.5,
+             "series__leg_L": series * 0.25, "series__leg_R": series * 0.1,
+             "m__turn_L": turn_l, "m__turn_R": turn_r, "m__leg_L": leg_l, "m__leg_R": leg_r}
+
+        r = object.__new__(m.Run)
+        r.prefix = Path(f"mem:plain_r{seed}")
+        r.z = z
+        r.meta = {"seed": seed, "watch": watch, "device": "cpu"}
+        r.keys = keys
+        r.targets = targets
+        r.B = B
+        r.seed = seed
+        r.flies = None
+        return r
+
+    def test_lr_tables_totals_take_the_skip_and_entries_do_not(self):
+        """The skeptic's protocol item: `--skip` could not reach lr_tables at all, so the audit's totals row included
+        the start-up transient.  It now reaches the per-frame totals; the per-(pre group) entries come from
+        `group_mean_flies`, a whole-rollout mean, and cannot be re-windowed without re-recording."""
+        m = self.m
+        runs = [self._run(s) for s in range(3)]
+        full = m.lr_tables(runs, None, 0.0)
+        skipped = m.lr_tables(runs, None, self.SKIP_S)
+
+        tf = full["DNa02_L|DNa02_R:totals"]; ts = skipped["DNa02_L|DNa02_R:totals"]
+        self.assertAlmostEqual(float(tf.window_skip_s.iloc[0]), 0.0)
+        self.assertAlmostEqual(float(ts.window_skip_s.iloc[0]), self.SKIP_S)
+        self.assertAlmostEqual(float(ts.entries_window_skip_s.iloc[0]), 0.0)     # declared, not silently implied
+        # the transient pulls the unskipped total down by ~1000 * k0 / T = 250 mV/s
+        self.assertLess(tf.I_DNa02_L.mean(), ts.I_DNa02_L.mean() - 200.0)
+        self.assertAlmostEqual(ts.I_DNa02_L.mean(), -300.0, delta=5.0)
+        self.assertAlmostEqual(ts.I_DNa02_R.mean(), -400.0, delta=5.0)
+        # E / I follow the same window, and E + I is the net
+        self.assertTrue(np.allclose(ts.E_DNa02_L + ts.I_neg_DNa02_L, ts.I_DNa02_L, atol=1e-3))
+        # the per-type entries are identical between the two calls (they cannot take a window)
+        for level in ("type", "type_side"):
+            a = full[f"DNa02_L|DNa02_R:{level}"].set_index("pre_group")
+            b = skipped[f"DNa02_L|DNa02_R:{level}"].set_index("pre_group")
+            self.assertTrue(np.allclose(a.LR_mean.sort_index(), b.LR_mean.sort_index()))
+
+    def test_lr_tables_report_the_room_activity_of_each_group(self):
+        m = self.m
+        runs = [self._run(s) for s in range(3)]
+        t = m.lr_tables(runs, None, self.SKIP_S)["DNa02_L|DNa02_R:type"].set_index("pre_group")
+        self.assertEqual(int(t.loc["LLPC1", "n_pre_cells"]), 2)
+        self.assertAlmostEqual(float(t.loc["LLPC1", "w_DNa02_R_mv_per_volley"]), 55.6, places=4)
+        # DNge035/L never exceeds NEVER_FIRING_HZ, DNge035/R does: half the type's cells fire
+        self.assertAlmostEqual(float(t.loc["DNge035", "frac_cells_firing"]), 0.5)
+        self.assertAlmostEqual(float(t.loc["IN12B014", "frac_cells_firing"]), 1.0)
+
+    def test_cancellation_summary_reports_each_pair_s_own_readout(self):
+        """The skeptic's tool bug: cancellation_tables() wrote DNa02's readout SD into the leg pair's summary block,
+        so `summary.cancellation['leg_L|leg_R'].sd_DNa02_LR_hz_mean` was DNa02's number, not the legs'."""
+        m = self.m
+        runs = [self._run(s) for s in range(3)]
+        canc = m.cancellation_tables(runs, self.SKIP_S, n_shuffle=8, seed=0)
+        dna = canc["DNa02_L|DNa02_R"]["summary"]
+        leg = canc["leg_L|leg_R"]["summary"]
+        self.assertEqual(dna["readout_LR"], "DNa02_L-DNa02_R")
+        self.assertEqual(leg["readout_LR"], "leg_L-leg_R")
+        # the two readouts have different temporal SDs, and each block now carries its own
+        self.assertAlmostEqual(dna["sd_readout_LR_hz_mean"], dna["sd_DNa02_LR_hz_mean"], places=9)
+        self.assertNotAlmostEqual(leg["sd_readout_LR_hz_mean"], leg["sd_DNa02_LR_hz_mean"], places=3)
+        per_fly = canc["leg_L|leg_R"]["per_fly"]
+        self.assertAlmostEqual(leg["sd_readout_LR_hz_mean"], float(per_fly.sd_leg_LR_hz.mean()), places=6)
+        self.assertAlmostEqual(dna["sd_readout_LR_hz_mean"], float(canc["DNa02_L|DNa02_R"]["per_fly"].sd_DNa02_LR_hz.mean()), places=6)
+
+    def test_per_fly_readout_corr_is_a_shipped_generator(self):
+        """deficit_turning.md 4.4's corr(LLPC1 L-R, DNa02 L-R) and 5's median corr(DNge035 L-R, leg L-R) had no
+        generator in scripts/; `wind-side --per-fly-corr` now emits both."""
+        m = self.m
+        runs = [self._run(s) for s in range(3)]
+        df, st = m.per_fly_readout_corr(runs, self.SKIP_S)
+        self.assertEqual(len(df), 3 * self.B * 2)                                 # 3 runs x B flies x 2 resolvable pairs
+        st = st.set_index(["pre_LR", "readout_LR"])
+        self.assertGreater(st.loc[("LLPC1_LR", "DNa02_LR"), "median_r_over_runs"], 0.9)
+        self.assertLess(st.loc[("DNge035_LR", "leg_LR"), "median_r_over_runs"], -0.9)
+        self.assertEqual(int(st.loc[("LLPC1_LR", "DNa02_LR"), "n_runs"]), 3)
+        self.assertEqual(len(st.loc[("LLPC1_LR", "DNa02_LR"), "median_r_per_run"]), 3)
+        # HSS / LPT22 are not in this recording's watch list: the generator skips them rather than failing
+        self.assertNotIn(("HSS_LR", "DNa02_LR"), st.index)
+
+
+class ApplyObjectTests(unittest.TestCase):
+    """scripts/interp_apply_object.py on graph(): the `edges` lesion kind's arithmetic, the size geometry, the batch
+    lines, and the trace-path derivation that used to be a fixed path."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_script("interp_apply_object")
+
+    def test_edge_lesion_keeps_the_pattern_and_edits_only_the_block(self):
+        m = self.m
+        c = graph(); W0 = c.W.tocsr().copy()
+        rec = m.apply_edge_lesion(c, "R1-R6", "Mi4", 0.0)
+        self.assertEqual(rec["n_entries"], 1)
+        self.assertEqual(rec["synapses"], 40.0)
+        self.assertEqual(c.W.nnz, W0.nnz)                       # explicit zeros: the sparsity pattern survives
+        self.assertEqual(c.W[1, 0], 0.0)
+        self.assertEqual(c.W[2, 1], W0[2, 1])                   # every other entry untouched
+
+        c = graph()
+        rec = m.apply_edge_lesion(c, "LC4", "DNp01", -1.0)
+        self.assertEqual(rec["n_entries"], 1)
+        self.assertEqual(c.W[3, 2], -W0[3, 2])                  # the counterfactual sign flip
+
+        c = graph()
+        rec = m.apply_edge_lesion(c, "LC4", "DNp01|PEN_a", 2.0)
+        self.assertEqual(rec["n_entries"], 2)
+        self.assertEqual(c.W[3, 2], 2 * W0[3, 2])
+        self.assertEqual(c.W[7, 2], 2 * W0[7, 2])
+
+    def test_edge_selection_and_the_receptor_fast_sign_follow_the_factor(self):
+        from flyverse import brain
+        m = self.m
+        c = graph()
+        sel, _, _ = m.edge_selection(c, "LC4", "DNp01")
+        self.assertEqual(int(sel.sum()), 1)
+        r = brain._receptor(c, brain.LIFParams())
+        self.assertIsNotNone(r)
+        self.assertEqual(r.fast_sign[sel][0], 1.0)
+        fs = np.array(r.fast_sign, copy=True); fs[sel] *= -1
+        self.assertEqual(fs[sel][0], -1.0)
+        self.assertTrue((fs[~sel] == r.fast_sign[~sel]).all())   # a matched entry's table sign must not leak
+
+    def test_size_geometry_and_batch_lines(self):
+        m = self.m
+        g = m.angular_size_from_eye(m.ball_radius_for(11.4))
+        self.assertAlmostEqual(g["angular_diameter_deg_probe"], 11.4, delta=0.05)
+        self.assertAlmostEqual(g["ball_radius_m"], 0.00499, delta=2e-4)
+        for deg in m.SIZES_DEG:
+            gg = m.angular_size_from_eye(m.ball_radius_for(deg))
+            self.assertAlmostEqual(gg["angular_diameter_deg_probe"], deg, delta=0.05)
+        line = m.job_line("t3_off_held", "stim", 2, "out/x")
+        self.assertTrue(line.startswith("mkdir -p out/x && python -c 'import torch; assert torch.cuda.is_available()' && "))
+        self.assertIn("--lesion t3_off_held --arm stim --seed 2", line)
+        lj = m.ladder_job(30.0, "null", 0, "out/y", True, "default")
+        self.assertIn("--null", lj)
+        self.assertIn("--retina", lj)
+        self.assertIn(f"--ball-radius {m.ball_radius_for(30.0)}", lj)
+        for k in ("base", "fb0", "inl1", "outl2", "rect", "t3_off_held", "t3_on_held", "t3_off_flip"):
+            self.assertIn(k, m.LESIONS)
+
+    def test_trace_path_is_derived_from_json_or_trace_dir(self):
+        """The skeptic's tool defect: `analyse` wrote trace_<lesion>.json to a FIXED path regardless of --dir and
+        --json, so a second recording set silently overwrote the first set's per-arm traces."""
+        m = self.m
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            self.assertEqual(m.trace_dir_for(SimpleNamespace(trace_dir=None, json=None)), m.OUT_JSON)
+            self.assertEqual(m.trace_dir_for(SimpleNamespace(trace_dir=None, json=str(d / "a" / "les.json"))), d / "a")
+            self.assertEqual(m.trace_dir_for(SimpleNamespace(trace_dir=str(d / "t"), json=str(d / "a" / "les.json"))), d / "t")
+            # two analyses with their own --json no longer collide
+            one = m.trace_dir_for(SimpleNamespace(trace_dir=None, json=str(d / "one" / "les.json")))
+            two = m.trace_dir_for(SimpleNamespace(trace_dir=None, json=str(d / "two" / "les.json")))
+            self.assertNotEqual(one / "trace_base.json", two / "trace_base.json")
+
+
+class ApplyRotationTests(unittest.TestCase):
+    """scripts/interp_apply_rotation.py's statistics on synthetic data: the sided flip table, the bump / heading
+    metrics across the 16-wedge wrap, and `verify-batch`, the check that catches two clients fetching one directory."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_script("interp_apply_rotation")
+
+    def _fake_c(self):
+        types = np.array(["HSN", "HSN", "GLNO", "GLNO", "PEN", "PEN", "T4", "T4"])
+        n = pd.DataFrame({"type": types, "somaSide": np.array(["L", "R"] * 4), "bodyId": np.arange(8) + 100,
+                          "superclass": ["visual_projection"] * 6 + ["ol_intrinsic"] * 2})
+        return SimpleNamespace(n=8, neurons=n), types, n
+
+    def test_flip_table_finds_a_planted_sided_flip_and_not_its_neighbour(self):
+        m = self.m
+        c, types, n = self._fake_c()
+        rng = np.random.default_rng(0)
+        orig = common.unit_kinds
+        common.unit_kinds = lambda cc, fb=None: np.array(["spiking"] * 6 + ["graded"] * 2, dtype=object)
+        try:
+            def rec(phase, k):
+                x = rng.normal(5.0, 0.3, 8); x[6:] = np.nan
+                dr = np.full(8, np.nan); dr[6:] = rng.normal(0.0, 0.01, 2)
+                if phase == "ccw":
+                    x[0] += 3.0; dr[6] += 0.05
+                if phase == "cw":
+                    x[1] += 3.0; dr[7] += 0.05
+                return common.Recording(np.array([0.0]), np.arange(8), n.bodyId.to_numpy(), types,
+                                        {"rate_hz": x[None].astype(np.float32), "optic_dr": dr[None].astype(np.float32)},
+                                        {}, {"seed": k, "arm": phase})
+            runs = {ph: [rec(ph, k) for k in range(5)] for ph in ("rest", "ccw", "rest2", "cw")}
+            df = m.flip_table(c, runs).set_index("type")
+        finally:
+            common.unit_kinds = orig
+        self.assertEqual(df.loc["HSN", "verdict"], "result")
+        self.assertGreater(df.loc["HSN", "flip_mean"], 5.0)
+        self.assertEqual(df.loc["GLNO", "verdict"], "null")          # the unflipped neighbour stays null
+        self.assertEqual(df.loc["T4", "verdict"], "result")
+        self.assertEqual(df.loc["T4", "unit_kind"], "graded")        # a graded unit is read off optic_dr
+
+    def test_bump_and_heading_metrics_across_the_wrap(self):
+        m = self.m
+        track = []
+        for k in range(1000):
+            cen = (13.0 + 4.0 * k * 0.01) % 16                        # +4 wedges/s through the 16-wedge wrap
+            prof = np.exp(-0.5 * ((np.arange(16) - cen + 8) % 16 - 8) ** 2 / 1.5) * 200
+            cc, vs = m.circ_centre(prof)
+            track.append((cc, vs, prof.max()))
+        b = m.bump_metrics(track, 300)
+        self.assertAlmostEqual(b["drift_wedges_per_s"], 4.0, delta=0.01)
+        self.assertAlmostEqual(b["net_wedges"], 4.0 * 6.99, delta=0.1)
+        self.assertGreater(b["vs"], 0.8)
+        h = m.heading_metrics(np.deg2rad(90.0) * np.arange(1000) * 0.01, 300)
+        self.assertAlmostEqual(h["rate_dps"], 90.0, delta=0.01)
+
+    def test_verify_batch_flags_an_interleaved_fetch(self):
+        """One job writes the `_run.json`, the recording meta, the `_pen` meta and the console, so they must agree;
+        a directory two clients fetched into holds a mix and this is the check that says so (2.1 of the audit)."""
+        m = self.m
+
+        def write(d, stem, drift, heading, drift_rec=None, run_dir="rot-cf0c43"):
+            drift_rec = drift if drift_rec is None else drift_rec
+            phases = {ph: {"bump": {"drift_wedges_per_s": drift}, "heading": {"rate_dps": heading}} for ph, _ in m.PHASES}
+            (d / f"{stem}_run.json").write_text(json.dumps({"device": "cuda", "phases": phases}), encoding="utf-8")
+            txt = [f"run dir <cluster-fs>/neurome/runs/{run_dir}"]
+            for ph, _ in m.PHASES:
+                (d / f"{stem}_{ph}.json").write_text(json.dumps({"meta": {"bump": {"drift_wedges_per_s": drift_rec}}}), encoding="utf-8")
+                (d / f"{stem}_{ph}_pen.json").write_text(json.dumps({"meta": {"bump": {"drift_wedges_per_s": drift_rec}}}), encoding="utf-8")
+                txt.append(f"  {ph} (10.0 s): drift {drift:+.4f} w/s, heading {heading:+.2f} deg/s")
+            (d / f"{stem}.txt").write_text("\n".join(txt) + "\n", encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            write(d, "default_visual_r0", +0.0040, +90.00)
+            write(d, "default_visual_r1", -0.0020, -90.00)
+            df = m.verify_batch(str(d))
+            self.assertEqual(len(df), 2 * len(m.PHASES))
+            self.assertTrue(df.consistent.all())
+            self.assertEqual(sorted(set(df.run_dirs_in_console)), ["rot-cf0c43"])
+
+            # the interleaved case: the recording meta comes from a different job than the run json / console
+            write(d, "default_visual_r2", +0.0040, +90.00, drift_rec=-2.6570, run_dir="rot-7de91e")
+            df = m.verify_batch(str(d))
+            bad = df[~df.consistent]
+            self.assertEqual(len(bad), len(m.PHASES))
+            self.assertEqual(sorted(set(bad.run)), ["default_visual_r2"])
+            self.assertEqual(int(df.consistent.sum()), 2 * len(m.PHASES))
 
 if __name__ == "__main__":
     unittest.main()

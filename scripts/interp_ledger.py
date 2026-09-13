@@ -9,7 +9,7 @@ words, and both say so and stop. `analyse` (the default) is the tool; `validate`
     # everything the project has produced, with the object-sweep nulls as the null arm
     PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py --results "out/interp/*/*.json" out/benchmark_suite.json \
         "out/r3obj/ball_*.json" "out/loom2_*.txt" "out/bitter*.txt" "out/fg*.csv" "out/optic_audit/baseline/stages_s*.json" \
-        --null "out/r3obj/null_*.json" --json out/interp/ledger/all.json
+        --null-runs "out/r3obj/null_*.json" --json out/interp/ledger/all.json
     # only the rows that are not PASS, one arm at a time
     PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py --results out/benchmark_suite.json --status FAIL,KNOWN GAP,MISSING
     # the validation target (docs/INTERP.md 6): benchmark.py's own JSON + the rotation screen
@@ -22,9 +22,10 @@ Sources are paths or globs; the kind is sniffed, not declared (`flyverse.interp.
 `probe_figure_stages.py` JSONs, `r5_attr_taste_cpu.py`'s arm x seed table, loom / bitter console logs, rotation /
 figure-ground CSVs). An unreadable or unrecognised file is reported in the `sources` table, never fatal.
 
-`--null` takes the none-vs-none runs (it is the common `--null` flag with values; `probe_object_sweep.py` JSONs that
-carry `config.null` and the `CB` block of a stage JSON are picked up as nulls on their own). `--replicates` sets the
-scatter rule's minimum (default 3; below it a difference reads `underpowered` whatever the numbers). `--seed` /
+`--null-runs` takes the none-vs-none runs (the one null convention of `common.add_common_args`; `--null` stays as a
+hidden alias, and `probe_object_sweep.py` JSONs that carry `config.null` and the `CB` block of a stage JSON are picked
+up as nulls on their own). `--replicates` sets the scatter rule's minimum (default 3; below it -- and below the run
+count at which the exact rank test can reach alpha at all -- a difference reads `underpowered` whatever the numbers). `--seed` /
 `--device` / `--receptor-*` are accepted for uniformity and recorded in the provenance: the ledger's realised device
 is the CPU that scored, and each scored run's own realised device is in the `sources` table.
 """
@@ -81,9 +82,8 @@ def main(argv=None):
                     help="do not load the cache: skip the population resolution (scoring itself needs no connectome)")
     ap.add_argument("--exit-nonzero", action="store_true", help="exit 1 when summary.ok is false (for CI)")
     common.add_common_args(ap)
-    # the common --null is a flag; for the ledger it names the none-vs-none runs (docs/audits/object_sweep.md 8.4)
-    ap.add_argument("--null", nargs="*", default=[], metavar="PATH_OR_GLOB",
-                    help="none-vs-none runs that form the null arm")
+    # `--null-runs` is the common flag (docs/audits/object_sweep.md 8.4); `--null` stays as a hidden alias of it
+    ap.add_argument("--null", nargs="*", dest="null_runs", default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     args.action = action
     log = (lambda *a, **k: None) if args.quiet else print
@@ -107,13 +107,13 @@ def main(argv=None):
     c = None if args.no_connectome else cn.load(cache_dir=cache_dir, verbose=not args.quiet)
 
     if args.action == "validate":
-        res, side = L.validate(sources or None, table=args.table, c=c, cache_dir=cache_dir, null=args.null, log=log)
+        res, side = L.validate(sources or None, table=args.table, c=c, cache_dir=cache_dir, null=args.null_runs, log=log)
         if not args.quiet:
             common.print_table(side.drop(columns=["sources"]), max_rows=args.max_rows)
     else:
         if not sources:
             ap.error("no sources: pass files or globs with --results (or as positional arguments)")
-        res = L.ledger(sources, table=args.table, tolerance=args.tolerance, strict=args.strict, null=args.null, c=c,
+        res = L.ledger(sources, table=args.table, tolerance=args.tolerance, strict=args.strict, null=args.null_runs, c=c,
                        group_by=None if args.group_by == "none" else "arm", min_replicates=args.replicates,
                        cache_dir=cache_dir, lif=lif, optic=optic,
                        generator="scripts/interp_ledger.py " + " ".join(sys.argv[1:]))

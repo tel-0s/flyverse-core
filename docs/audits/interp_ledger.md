@@ -20,7 +20,10 @@ table, and writes PASS / FAIL / MISSING per (row, arm).
   The table is the *input* to those tools, never a loss.
 * **It is not a second opinion on the battery.** Where a row carries `check_key`, the ledger's status must equal the
   status `scripts/benchmark.py` wrote for the same key on the same JSON. 69 of 70 such rows agree; the one that does
-  not is explained by the stored file's own criterion (section 6), not by a scoring difference.
+  not is explained by the stored file's own criterion (section 6), not by a scoring difference. What that agreement
+  shows is that **the ledger's `evaluate()` reproduces the battery's scoring** -- the `check_key` rows' bounds are
+  copied from `benchmark.REFERENCES`, so it is a check of the operator implementation, not an independent
+  confirmation of the criteria. Nor is it arm-matched: see section 4.
 * **It is not a place to hide a bad bound.** `walk.power_MN.rate_max_hz` carries op `report`: dynamics round 1 showed
   the 50 Hz bound is unfit (it fails under 13 of 16 optic ablations and anti-correlates with room take-offs), so the
   ledger records 79.06 Hz from `out/benchmark_suite.json` as `RECORDED` and never turns it into a verdict.
@@ -93,7 +96,10 @@ table with an `error`, never an exception.
 the receptor model + net rule (`off`, `sign-abs`, `sign-class`, `sign-nonmda`, `full-class`), the hold table when one
 was passed (`holdBrain`, `holdOptic`, `holdBrainGlu`, `holdBrainHis`, `holdKC`, `holdDN1`), the ring gains of a
 compass run (`control`, `gE2/gD15`, `gE2.5/gD25`, `+cx` when a walking program drove the fly) and the optic
-configuration of a stage file (`sign-abs+no_spk_feedback`). `all.json` scores 20 arms.
+configuration of a stage file (`sign-abs+no_spk_feedback`). `all.json` scores 20 arms -- but the labels are **not
+canonical across readers**: `summary.arms` lists `default` and `sign-abs` separately although they are the same
+receptor configuration (`taste_cpu` calls it `default`, `batch_sustain` calls it `sign-abs`), so `--group-by arm`
+splits one configuration in two. The resolver should canonicalise one onto the other.
 
 ---
 
@@ -127,14 +133,23 @@ the model:
   direction separately. That row passes in all three arms measured (off -8.02 +- 0.70 over 3 runs, sign-class
   -4.86, the shipped screen CSV -7.06).
 
-Over the whole corpus (`all.json`): **70 rows mirror a battery check, 69 agree, 0 disagree**, 1 stale criterion.
+Over the whole corpus (`all.json`): **70 rows mirror a battery check, 69 agree, 0 disagree**, 1 stale criterion --
+read as "the ledger's evaluator reproduces the battery's scoring", not "the ledger independently confirms the
+battery". The comparison is also **not arm-matched**: `out/benchmark_suite.json` is the only `benchmark`-kind source
+in the corpus (`all.json` `tables.sources`, 98 rows, 1 benchmark), and `_add_battery` looks its checks up by
+`check_key` alone, so its `off`-arm statuses are compared against every arm. Of the 69 agreements, **only 27 are
+same-arm (`off`, 28 rows); the other 42 are cross-arm coincidences** (`all.csv`, `battery_agrees` by `arm`).
 
 ---
 
 ## 5. What the ledger reads off the finished corpus
 
-`bash`-form of the run that produced `out/interp/ledger/all.json` is in `scripts/interp_ledger.py`'s docstring;
-98 sources, 0 unreadable, devices of the scored runs: NVIDIA B200 / RTX 4090 / `cuda`.
+`out/interp/ledger/all.json`: 98 sources, 0 unreadable, devices of the scored runs: NVIDIA B200 / RTX 4090 / `cuda`.
+**The `bash` form in `scripts/interp_ledger.py`'s docstring does not regenerate it**: its globs match only 65 of the 98 sources in
+`all.json` `tables.sources`. The 33 missing are `out/r5_sustain_*.json` + `out/d1_*.json` (15 `batch_sustain`),
+`out/cxroom/*.json` (12 `compass_room`), `out/screen_rotation.csv` + `out/rot_*.csv` (5 `rotation`) and
+`out/r5_attr_taste_cpu.json` (1 `taste_cpu`) -- i.e. everything sections 5c and 5d rest on. The docstring should
+carry those four globs too.
 
 ```
 status counts: PASS 183, PASS (gap closed) 2, FAIL 23, KNOWN GAP 73, MISSING 7, RECORDED 1, NOT_APPLICABLE 12
@@ -192,13 +207,16 @@ and `out/fg2_abs_s{0,1}.csv`.
 | `fg.TmY21.figure_z` | **-0.706 +- 0.352** | -0.6 | KNOWN GAP |
 | `fg.TmY13.figure_z` | **+2.009 +- 0.610** | +2.2 | KNOWN GAP |
 
-Every type within the +-1.5 the audit itself declares for a per-type figure z. **A new reading the ledger makes:**
-the same rows scored per receptor arm show the carriers are arm-dependent, and the class net rule loses them.
-`fg.Tm1` is +4.56 under `sign-abs`, +4.04 under `off`, **+0.21 +- 0.50 under `sign-class`** and -0.35 under
-`sign-nonmda`; `fg.Mi1` -9.46 / -8.81 / **-1.40** / +2.11; `fg.Tm4` +5.04 / +4.77 / **+2.99** / +0.67; `fg.T4c`
-+3.69 / +2.56 / +2.03 / -0.07. **17 of the 23 FAIL rows in `all.json` are exactly this**: a figure carrier below
-|z| = 3 in a receptor arm other than `sign-abs` (13 of them under `sign-class` / `sign-nonmda`, 4 under `sign` /
-`off` on the two marginal T4 rows). That is a localization question for `trace` / `decompose` -- which edges the
+Every type within the +-1.5 the audit itself declares for a per-type figure z. **A new reading the ledger makes,
+scoped to the adequately replicated arms:** the same rows scored per receptor arm show the carriers are arm-dependent,
+and the class net rule loses them. `fg.Tm1` is +4.56 under `sign-abs`, +4.04 under `off`, **+0.21 +- 0.50 under
+`sign-class`**; `fg.Mi1` -9.46 / -8.81 / **-1.40**; `fg.Tm4` +5.04 / +4.77 / **+2.99**; `fg.T4c` +3.69 / +2.56 /
++2.03. Those three arms carry n = 5 (`all.csv`, `fg.*` rows). The `sign` and `sign-nonmda` arms carry **n = 2**, below
+the shipped `min_replicates = 3`, so their readings (`fg.Tm1` -0.35 `sign-nonmda` / +2.04 `sign`, `fg.Mi1` +2.11,
+`fg.Tm4` +0.67, `fg.T4c` -0.07 / +0.53) are quoted, not called a difference; `sign-nonmda` is not yet a result.
+**17 of the 23 FAIL rows in `all.json` are this pattern**: a figure carrier below |z| = 3 in a receptor arm other than
+`sign-abs`. But **10 of those 17 sit in the n = 2 arms** (7 `sign-nonmda`, 3 `sign`); only 7 are adequately
+replicated (6 `sign-class`, 1 `off`). That is a localization question for `trace` / `decompose` -- which edges the
 class net rule re-signs on the ON/OFF columnar types -- not a bound to relax. The other six FAILs are
 `loom.body.escapes` (0 of 1 demo seed escapes in `out/benchmark_suite.json`), `rotation.HSN.dprime` /
 `rotation.DNp20.dprime` under `sign-class` (-1.998, -1.635 over 2 runs each, against \|d'\| >= 2.0),
@@ -212,15 +230,20 @@ class net rule re-signs on the ON/OFF columnar types -- not a bound to relax. Th
 |---|---|---|---|---|
 | `compass.EPG.bump_survival_s` | **0.033 / 0.033** FAIL | **38.0 / 38.0** PASS | **38.0 / 38.0** PASS | >= 5 s (Seelig 2015) |
 | `compass.EPG.bump_rate_hz` | 34.90 / 34.92 `NOT_APPLICABLE` | **219.49 / 219.08** KNOWN GAP | **259.55 / 260.55** KNOWN GAP | 5-60 Hz |
-| `compass.EPG.bump_width_wedges` | 3.875 `NOT_APPLICABLE` | **3.624 / 3.593** PASS | **3.806 / 3.830** PASS | 2.5-5.0 wedges |
+| `compass.EPG.bump_width_wedges` (new) | 3.875 `NOT_APPLICABLE` | **3.624 / 3.593** PASS | **3.806 / 3.830** PASS | 2.5-5.0 wedges |
 | `compass.EPG.circ_corr_heading` | NaN MISSING | **+0.002 / -0.026** KNOWN GAP | **-0.045 / +0.018** KNOWN GAP | \|r\| >= 0.5 |
 | `compass.PEN_L.rate_hz` | 0.016 `NOT_APPLICABLE` | **56.65 / 56.62** PASS | **75.47 / 76.18** PASS | 5-120 Hz |
-| `compass.Delta7_L.rate_hz` | 0.050 `NOT_APPLICABLE` | **104.08 / 103.44** PASS | **112.52 / 110.83** PASS | 5-200 Hz |
+| `compass.Delta7_L.rate_hz` (new) | 0.050 `NOT_APPLICABLE` | **104.08 / 103.44** PASS | **112.52 / 110.83** PASS | 5-200 Hz |
 | `compass.PFN.rate_hz` | 5e-05 `NOT_APPLICABLE` | **0.600 / 0.611** KNOWN GAP | **0.776 / 0.783** KNOWN GAP | >= 1 Hz |
 | `compass.hDelta.rate_hz` | 3e-05 `NOT_APPLICABLE` | **1.490 / 1.499** KNOWN GAP | **1.826 / 1.815** KNOWN GAP | >= 2 Hz |
 
-This reproduces dynamics round 1's compass result exactly (219-260 Hz, 38 s persistence, \|circ corr\| <= 0.045 here
-against the round's <= 0.11 over 12 runs, PFN 0.60-0.78, hDelta 1.49-1.83), and it is the case that motivated the
+Six of the eight rows reproduce dynamics round 1's compass result exactly (219-260 Hz, 38 s persistence,
+\|circ corr\| <= 0.045 here against the round's <= 0.11 over 12 runs, PEN 55-78, PFN 0.60-0.78, hDelta 1.49-1.83).
+**Two are new reads, not reproductions**: `compass_room.md` 4's table gives bump Hz, PEN L/R, ER/ExR, GLNO, PFN,
+hDelta and survival and does **not** tabulate Delta7_L rates or bump width, so `compass.Delta7_L.rate_hz` 103.4-112.5
+and `compass.EPG.bump_width_wedges` 3.59-3.83 are the ledger's own reads of `out/cxroom/*.json` (verified against
+`cxroom_g2-15_none_s0.json`: `summary.d7_L_post.mean` 101.757, `summary.width_half_post.mean` 3.6245, n 16 flies).
+It is the case that motivated the
 `requires` column. The shipped default has **no bump** (it dies in 0.033 s), yet its `bump_hz_post` reads 34.9 Hz --
 the peak of a wedge that is not an attractor -- which is inside the 5-60 Hz literature window and would have scored a
 **false PASS (gap closed)**. With `requires = compass.EPG.bump_survival_s`, every row that presupposes a bump reads
@@ -232,28 +255,40 @@ string. 12 rows in `all.json` are labelled this way; none of them is a verdict.
 From `out/r5_attr_taste_cpu.json` (arms x seeds 0-2, CPU) and 15 `batch_sustain.py` room rollouts
 (`out/r5_sustain_*_live_*.json`, `out/d1_*.json`; 4,800 fly-s each):
 
-| row | off | default (`sign-abs`) | holdBrain | holdOptic | holdBrainGlu | holdBrainHis | holdKC | holdDN1 |
+| row | off (n=4) | default (`sign-abs`) | holdBrain | holdOptic | holdBrainGlu | holdBrainHis | holdKC | holdDN1 |
 |---|---|---|---|---|---|---|---|---|
-| `taste.MN9.rate_hz` | 2.735 | **3.922** | **2.735** | **3.922** | **3.922** | **2.735** | 3.922 | 3.922 |
-| `smell.KC.n_active` | 894.7 | **480.3** | **894.7** | **480.3** | **894.7** | **480.3** | 898.3 | 499.3 |
+| `taste.MN9.rate_hz` | 3.513 +- 1.950 | **3.922** | **2.735** | **3.922** | **3.922** | **2.735** | 3.922 | 3.922 |
+| `smell.KC.n_active` | 1070.75 +- 484.8 | **480.3** | **894.7** | **480.3** | **894.7** | **480.3** | 898.3 | 499.3 |
 
-`holdBrain` = `off` and `holdOptic` = `default` to every digit on both checks; `holdBrainGlu` mirrors `off` on smell
-and `default` on taste while `holdBrainHis` does the opposite -- the double dissociation of
-`docs/audits/receptor_integration.md` E.4, read straight off the ledger. (`off` in the pooled row above is 3.513 /
-1070.75 because the arm also pools the GPU benchmark draw; the per-source numbers are in the `observations` table.
-The E.4 reference means -- off 2.735 / 894.7, default 3.922 / 480.3, holdKC 898.3, holdDN1 499.3 -- are the CPU
-protocol's three seeds and match `common.VALIDATION['lesion']['reference']` exactly.)
+The equality the ledger's own output supports is
+**`holdBrain` = `holdBrainHis` = 2.735 vs `default` = `holdOptic` = `holdBrainGlu` = 3.922** on taste, and
+`holdBrain` = `holdBrainGlu` = 894.7 vs `default` = `holdOptic` = `holdBrainHis` = 480.3 on smell -- to every digit,
+the double dissociation of `docs/audits/receptor_integration.md` E.4, read straight off the ledger. **`off` is not in
+either chain.** As shipped, `all.csv`'s `off` rows read `taste.MN9.rate_hz` **3.513 (n = 4)** and
+`smell.KC.n_active` **1070.75 (n = 4)**, because that arm pools `out/benchmark_suite.json`'s single GPU value
+(5.8455 / 1599) with the three CPU `out/r5_attr_taste_cpu.json` seeds ([1.5548, 4.3418, 2.3098] and
+[1079, 427, 1178]); the CPU-only means are 2.735 / 894.67 and live in the `observations` table. `off = holdBrain`
+holds for the CPU protocol, not for the ledger's `off` arm. (The E.4 reference means -- off 2.735 / 894.7, default
+3.922 / 480.3, holdKC 898.3, holdDN1 499.3 -- are the CPU protocol's three seeds and match
+`common.VALIDATION['lesion']['reference']` exactly.) The `off` sd quoted above is a **protocol difference, not
+replicate scatter**: see section 7.2.
 
-| row | off (6 runs) | default `sign-abs` (3) | holdBrain (3) | holdOptic (3) |
+| row | off (6 runs) | `sign-abs` (3) | holdBrain (3) | holdOptic (3) |
 |---|---|---|---|---|
 | `hops.body.voluntary_per_1000_fly_s` | **0.000 +- 0.000** PASS (gap closed) | **3.056 +- 0.434** KNOWN GAP | **2.361 +- 0.481** KNOWN GAP | **0.000 +- 0.000** PASS (gap closed) |
 | `hops.body.escape_per_1000_fly_s` | 0.556 +- 0.215 | 2.153 +- 0.434 | 1.250 +- 0.417 | 0.347 +- 0.434 |
 | `hops.DNp01.rate_max_median_hz` | 27.205 +- 0.767 | 32.316 +- 1.001 | 31.976 +- 0.949 | 26.996 +- 0.216 |
 
 Holding the **Brain** half of the receptor signs at NT sign (`holdBrain`, i.e. only the optic half's changes live)
-keeps the whole take-off cost -- 2.36 of the default's 3.06 per 1,000 fly-s, GF median 31.98 of 32.32 -- while
+keeps the whole take-off cost -- 2.36 of the 3.06 +- 0.434 per 1,000 fly-s, GF median 31.98 of 32.32 -- while
 holding the **optic** half (`holdOptic`) removes all of it and returns the `off` numbers to three decimals. That is
 dynamics round 1 result (iii) with three replicates per arm and the scatter quoted.
+
+**Arm labels are not canonical across readers.** `hops.body.voluntary_per_1000_fly_s`'s 3.056 +- 0.434 row carries
+arm `sign-abs` in `all.csv`, while the taste family calls the same receptor configuration `default`; `summary.arms`
+lists both (20 arms, `default` and `sign-abs` among them), so `--group-by arm` splits one configuration in two. The
+arm resolver should canonicalise `default` -> `sign-abs` (or the reverse). Until it does, read the two labels in
+this section as the same arm.
 
 ### 5e. What is MISSING, and why
 
@@ -287,6 +322,15 @@ therefore *only* the rows where both sides used the same criterion and still dif
 scored with op `report` are excluded from both lists by construction (their divergence from the battery is the
 point). Re-running `scripts/benchmark.py` would clear the flag.
 
+**The "0 genuine disagreements" is partly structural, and should be read that way.** `_summary`
+(`flyverse/interp/ledger.py:997-999`) drops a disagreeing row whenever its `row_id` appears in the stale list, and it
+matches on `row_id` across **all** arms rather than per (`row_id`, `arm`). With exactly one stale row that cannot
+bite here -- the corpus's single disagreement and its single stale row are the same (`row_id`, `arm`) -- but the same
+condition that creates the exception is what removes it from the count. `_same_criterion`
+(`flyverse/interp/ledger.py:939-941`) also returns `True` for an empty stored criterion, so a file that records no
+criterion can never be flagged stale. Both want narrowing: the subtraction to (`row_id`, `arm`), and empty-criterion
+rows reported as `unknown` rather than `same`.
+
 ---
 
 ## 7. Reporting debt and open questions
@@ -299,11 +343,14 @@ point). Re-running `scripts/benchmark.py` would clear the flag.
    (`tests/test_interp.py::LesionTests` imports that module first). `LedgerTests.tearDownClass` drops the binding so
    this tool does not add to it, but the fix belongs in `__init__.py`: cache the function
    (`globals()[name] = obj`) after resolving it. `tests/test_control.py` is unaffected (18 tests, pass).
-2. **Pooling across protocols.** An arm pools every run that measured the same (population, stimulus, quantity),
-   even from different protocols -- `taste.MN9.rate_hz` under `off` pools the CPU `r5_attr_taste_cpu` seeds (2.735)
-   with the GPU benchmark draw (5.845), giving 3.513 +- 1.950 over 4 runs. The `source_kinds` column names the kinds
-   that went in and the sd shows the spread, but the ledger has no notion of "the same protocol". If that becomes a
-   problem, the fix is a `protocol` column in the table (or `group_by='arm,kind'`), not a second stimulus id.
+2. **Pooling across protocols mixes incommensurable measurements, and the sd hides it.** An arm pools every run that
+   measured the same (population, stimulus, quantity), even from different protocols. `taste.MN9.rate_hz`'s `off` arm
+   has n = 4 from **two different measurements** -- `benchmark.py`'s GPU taste section (5.845 Hz, one draw) and
+   `r5_attr_taste_cpu`'s CPU probe (1.55-4.34 Hz, three seeds) -- and reports **sd 1.950 as if it were replicate
+   scatter**; it is a protocol difference. `smell.KC.n_active` is the same, 1599 against 427-1178, sd 484.8. The
+   `sources` / `source_kinds` columns keep it traceable, but traceability is not a flag: the arm should be keyed on
+   (receptor arm, `source_kind`), or the row should emit a `mixed_protocol` flag when one arm's runs span more than
+   one source kind. This is what breaks the `off = holdBrain` equality of section 5d.
 3. **`--null` is the common flag with values.** `common.add_common_args` declares `--null` as `store_true`; the
    ledger needs paths, so `scripts/interp_ledger.py` builds its parser with `conflict_handler="resolve"` and re-adds
    `--null` with `nargs="*"`. A bare `--null` is then a no-op rather than an error. This is the only place the CLI
@@ -317,6 +364,26 @@ point). Re-running `scripts/benchmark.py` would clear the flag.
 6. **`walk.power_MN.rate_max_hz` stays op `report`.** If the project ever establishes a fit bound for the wing-power
    maximum, that row (and only that row) changes -- the ledger is where such a decision should be recorded, with the
    file that justified it in `model_reference`.
+7. **The top-level `replicates` block is empty in every ledger JSON**: `{"n": 0, "unit": "runs", "runs": [],
+   "null": null}` in `all.json` and `validate.json`. `ledger()` never sets it -- the `Result` default at
+   `flyverse/interp/common.py:937` survives -- while `atlas` and `decompose` populate theirs (n = 3, null named). On a
+   run that pooled up to 6 runs per arm and read 10 null sources, the declared header says "no replicates, no null".
+   The per-row `n` / `values` / `runs` carry the information, so this is a schema gap, not a data loss: set
+   `replicates.n` to the max (or modal) per-arm n and `replicates.null` to the null source list.
+8. **`provenance.model` is the scorer's, not any scored run's.** `_provenance` calls `common.model_record(lif, optic)`
+   with the ledger's own defaults, so `provenance.model.lif` / `.optic` describe a default `LIFParams` / `OpticParams`
+   for the CPU scorer, and `provenance.model.type_path_gain` is `null` in `all.json`. That is defensible for a pure
+   file reader, but the JSON should say so: a `provenance.stimulus.params.note` that the model block is the scorer's
+   and that the scored runs' configs live in the `sources` table.
+9. **No "measured far from expected" flag.** `dn.DNp09.top_rate_hz` reads measured **152.0** against expected **45**
+   and still PASSes, because the criterion is a `< 250` storm guard and `benchmark.py`'s `dn.DNp09.top` dict lists
+   DNp09's own stimulated rate (152.0) ahead of the top premotor target (IN06B030, 45.0). The ledger mirrors the
+   upstream quirk without surfacing it: a 3.4x reference/measurement gap reads PASS. A ledger is the natural place to
+   catch that -- add a `drift` column (\|measured - expected\| / \|expected\|) reported independently of `status`.
+10. **Omitting `--json` auto-writes a file.** `common.add_common_args` defaults `--json` to `None` and the CLI then
+    falls back to `common.default_json_path` = `out/interp/ledger/<run_id>.json`, so every exploratory invocation
+    silently accumulates `ledger-<ts>-<hash>.json` in the tool's own output directory (the pattern is visible in
+    `out/interp/lesion/`, which holds two such strays). Default to no file unless `--json` is given.
 
 ---
 
@@ -333,8 +400,10 @@ point). Re-running `scripts/benchmark.py` would clear the flag.
 
 Provenance of `all.json`: commit `0d32fd6e7406` (dirty), MaleCNS v1.0 flat-connectome (4 files with SHA-256),
 compiled `W` md5 `ef23cc27bea13be7f6a96f3c04fd3737`, nnz 25,578,600, 167,106 neurons, sum\|W\| 121,460,584,
-`LIFParams` and `OpticParams` fully resolved, body thresholds `gf_hz 33 / takeoff_power_hz 50 / takeoff_hold_s 0.3 /
-mdn_threshold_hz 15`, `execution.device = cpu` (the ledger simulates nothing) with
+**the scorer's own** `LIFParams` and `OpticParams` fully resolved (a default pair, not the resolved parameters of any
+scored run; `provenance.model.type_path_gain` is `null` -- see 7.8), body thresholds
+`gf_hz 33 / takeoff_power_hz 50 / takeoff_hold_s 0.3 / mdn_threshold_hz 15`, an empty top-level `replicates` block
+(7.7), `execution.device = cpu` (the ledger simulates nothing) with
 `execution.scored_devices = [NVIDIA B200, NVIDIA GeForce RTX 4090, cuda]` and every scored run's own device in the
 `sources` table, `replicate_unit = runs`, the units table -- so the Result passes `check()` and
 `scripts/interp_export.py` can serialize it unchanged.

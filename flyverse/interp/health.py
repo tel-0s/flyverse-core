@@ -114,22 +114,14 @@ def resolve_params(params=None, recording: Recording | None = None):
 
 
 def full_counts(c: cn.Connectome) -> tuple[sp.csr_matrix, bool]:
-    """Raw, unsigned, uncapped synapse counts on every stored entry of c.W: |W| where the entry is signed (c.W holds the
-    raw signed counts before the connection cap) and, where it is an explicit zero (sign 0), the count from
-    cache/sign0_counts.npz (connectome.sign0_counts). Returns (counts csr, sign0_counts_available). This is the matrix
-    the NT audit's tables are built from (docs/audits/nt_audit.md: 124,161,873 synapses, 2,701,289 of them sign 0)."""
-    C = c.W.tocsr().copy()
-    C.data = np.abs(C.data).astype(np.float64)               # float64: the 124,161,873-synapse total is exact
-    avail = False
-    try:
-        cnt = cn.sign0_counts(c)
-        if cnt is not None and len(np.asarray(cnt)) == C.nnz:
-            zero = C.data == 0
-            C.data[zero] = np.asarray(cnt, dtype=np.float64)[zero]
-            avail = True
-    except Exception:  # noqa: BLE001 -- the raw weights table is not on every machine
-        pass
-    return C, avail
+    """Raw, unsigned, uncapped synapse counts on every stored entry of c.W -- `common.raw_counts` in float64.
+
+    |W| where the entry is signed (c.W holds the raw signed counts before the connection cap) and, where it is an
+    explicit zero (sign 0), the count from cache/sign0_counts.npz (connectome.sign0_counts). float64 because the
+    whole-model total must be exact: this is the matrix the NT audit's tables are built from (docs/audits/nt_audit.md:
+    124,161,873 synapses, 2,701,289 of them sign 0). The private merge is gone (docs/INTERP.md 11, defect 1, closed).
+    Returns (counts csr, sign0_counts_available)."""
+    return common.raw_counts(c, dtype=np.float64)
 
 
 def presynaptic_indices(c: cn.Connectome, idx, exclude=None) -> np.ndarray:

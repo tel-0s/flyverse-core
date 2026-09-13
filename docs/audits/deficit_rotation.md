@@ -19,7 +19,24 @@ TYPE_NT_OVERRIDE + {GLNO: gaba}, the same compile as `cx_glno.md` 4-5) and two m
 every 10 ms, the world turns around a body that issues no turn -- `cx_shift.md`'s experiment 2) and **efferent** (new:
 the fly turns *itself* -- DNa02 of one side is pulsed at 20 Hz for the phase and `body.Locomotion` integrates the turn
 from the DNa02 L - R and leg-MN asymmetry, position pinned, heading free; the visual world then rotates with the body
-as it would in a walking fly, and PS / LAL / DNa02 are active). Every stochastic number is over **10 independent runs
+as it would in a walking fly).
+
+**What the efferent arm actually excites -- a protocol caveat, not a result.** It does *not* excite the
+efference-copy chain: on the shared cache **DNa02 makes 0 raw synapses onto PS196_b, PS196_a, LAL139, LAL184,
+WED040_a and GLNO** (18 onto PS047_b, 13 onto AN07B037_a; its 14,446 outputs go to IN08A006 899, "Sternal
+anterior rotator MN" 776, IN19A003 629 ...). The arm drives **DNa02 and the VNC**, and so tests **visual
+reafference plus a VNC loop**; PS196_b's 0.03-0.16 Hz under it is therefore partly *structural* -- nothing in the
+stimulus projects to it -- and not only a dynamic failure. This sharpens the answer rather than changing it: the
+question the arm settles is whether a self-generated turn reaches the ring by *any* route the model has, and it
+does not.
+
+**One bump site.** The forming pulse is hard-coded to `PULSE_WEDGES = (0, 1, 2, 3)`, so `centre_start` is
+1.22-1.89 wedges in **158 of the 160 phases** (the two exceptions are jump runs at ~4.0). Round 1 established the
+bump is pinned to 5-7 attractor sites {1.5, 3.9, 8.4, 10.6, 13.2}; "the bump does not follow the rotation" is
+therefore demonstrated at **site ~1.5 only**. The signal-path localisation (PS196_b silent, GLNO L - R fixed) is
+upstream of the ring and unaffected by this.
+
+Every stochastic number is over **10 independent runs
 per (condition, mode)** -- seeds 0-4 in each of two same-code cluster batches (`rot-cf0c43`, `rot-7de91e`; section
 2.1) -- and every difference is referenced to a null of the same shape (the second rest phase against the first);
 the two batches are also analysed separately as a replication (`out/interp/apply_rotation/batch_<id>/`). `selftest`
@@ -78,8 +95,12 @@ of any weight all pass through EPG, LPsP or the ring neurons (ExR4 / ExR6 / ER),
 through a nodulus input. The one nodulus input of PEN, GLNO, is reached by the yaw carriers only at k = 3 and only
 through the LAL / PS premotor cells (H2 / HSS -> PS047_b -> PS196_b -> GLNO; Nod1 -> WED153 / LAL184 / LAL139 ->
 GLNO) -- the efference-copy territory `cx_shift.md` named -- and GLNO -> PEN is sign 0 at the end of every one of
-those walks: the strongest silent link at k = 2 and k = 3 for every source group that reaches PEN is GLNO -> PEN
-(+33.0 mV per PEN per GLNO volley if signed, 16,371 raw synapses). So structurally the candidate block is one link,
+those walks: **GLNO -> PEN is the strongest silent link at k = 3 for all four source groups, and at k = 2 for
+`optic_yaw` and `efference` only** (+33.0 mV per PEN per GLNO volley if signed, 16,371 raw synapses). At k = 2 the
+other two sources have something else or nothing: `jo -> PEN`'s k = 2 silent link is `DNc02 -> b [sign0] +0.1
+mV/volley`, and `descending_yaw -> PEN` has **no** k = 2 silent link at all (`paths_summary.json`, columns
+`k2_silent_link` / `k3_silent_link`) -- because at k = 2 those two sources do not reach PEN through GLNO.
+So structurally the candidate block is one link,
 GLNO -> PEN, and the question the dynamics must answer is whether anything ever arrives at GLNO from the fly's
 rotation (visual or efferent) that the link could carry if it were signed.
 
@@ -138,11 +159,15 @@ per-run values per cell), and the realised body heading rate:
 `bump_drift_vs_rest` (ccw and cw drifts against the twenty rest-phase drifts of the same condition, `summary.json`):
 default visual z +0.50 / +0.96, p 0.25 / 0.015, `null` both; default efferent z +0.33 / +0.78, p 0.35 / 0.010,
 `null`; gaba visual z +0.13 / +0.20, `null`; gaba efferent z +0.26 / +0.17, `null`. In the shipped-cache condition
-all 80 phases (both modes, rest and rotating) lie within -0.006 and +0.010 wedges / s, and the small positive mean of
+all 80 phases (20 runs x 4 phases, both modes, rest and rotating) lie within **-0.008 and +0.010** wedges / s
+(`report_bump.csv`, per-run values; the same interval `cx_shift.md` 3b reports, -0.008..+0.006, which strengthens
+the reproduction), and the small positive mean of
 the cw phases (+0.004) is the same sign as the ccw phases' (+0.002): a drift that does not follow the rotation's
-sign. In the GLNO = gaba condition 74 of 80 phases lie within +-0.017 and the six others are single-run jump events of
-the signed-GLNO ring (`cx_glno.md` 4: the bump leaves its block once) -- two of them in rest phases, and among the
-four rotating ones -0.615 (ccw) and +0.049 (cw) have the wrong sign for a heading-anchored bump, -0.170 (cw, twice)
+sign. In the GLNO = gaba condition **74 of its 80 phases** -- again all four phases of 20 runs, of which only 40
+are rotating -- lie within +-0.017, and the six others are single-run jump events of
+the signed-GLNO ring (`cx_glno.md` 4: the bump leaves its block once): **two in rest phases (visual rest -2.657,
+efferent rest2 -0.596) and four in rotating ones**, and among the four rotating, -0.615 (ccw) and +0.049 (cw) have
+the wrong sign for a heading-anchored bump and -0.170 (cw, twice)
 the right one, so they are not sign-locked either. The realised self-turn in efferent mode is 86-113 deg/s per run
 from DNa02 at 19.8 / 19.3 Hz on the stimulated side (<= 0.1 on the other; `chain_rates.csv`), i.e. the body module
 turns on a DNa02 asymmetry as designed.
@@ -175,13 +200,21 @@ p <= 0.05; in brackets the two per-batch verdicts, `batch_<id>/report_flip.csv`)
 | PEN_a / PEN_b | -0.04 / -0.03, null | -0.03 / -0.04, null | +0.08 / +0.30, null | -0.67 / -1.02, null |
 | EPG / Delta7 / PEG | +0.30 / -0.05 / +0.09, null | +0.45 / -0.14 / +0.10, null | +0.89 / +1.85 / -0.71, null | -0.93 / -4.20 / +1.21 (PEG z +5.0, p 0.023 "result" [n, n]: flip sd 4.0 Hz, a jump-run artefact) |
 
-The per-batch verdicts agree with the pooled ones on 73 of 76 named (arm, type) cells; the three disagreements are the
-sub-Hz WED153 and LAL139 cells (z 2.1 vs 4.4, 7.1 vs 3.9, 4.7 vs 1.1). The `flip_results` sets (198-256 types per
+**Batch-vs-batch agreement, on the whole table rather than the subset above.** Over all **160** named (arm, type)
+cells of `report_flip.csv` the pooled verdict agrees with both batches on **151**; the nine disagreements are HSS
+(default efferent), LNO2 (default efferent), WED153 (default visual and gaba visual), H2, Nod4, PEG and IbSpsP
+(gaba efferent), and LAL139 (gaba visual) -- all sub-2 Hz cells or jump runs. The **40** cells of the key
+populations (PS196_b, GLNO, PEN_a, PEN_b, EPG, DNa02, LAL184, WED040_a, LPsP, Delta7) agree in the pooled analysis
+and in both batches, **40 / 40**: that is the claim that matters here.
+
+The `flip_results` sets (198-256 types per
 pooled arm, `summary.json`) are the optic lobe's motion pathway (T4 / T5 / TmY / LLPC / LPC / LPi / Am1 / LC10 ...),
 the HS / VS / Nod / LPT cells, DNp15 / DNp20, PLP078, and in efferent mode the VNC interneurons and leg motor
-neurons downstream of DNa02. **No central-complex or nodulus type is in any of the four pooled sets** except PEG in
-gaba efferent (above; absent from both per-batch sets, whose only central-complex entries are LNO2 in cf0c43 default
-efferent and IbSpsP in 7de91e gaba efferent, each on one batch only).
+neurons downstream of DNa02. The only central-complex or nodulus types in any of the four pooled sets are **PEG
+(+1.21 Hz, z +4.99) and PFNa (-0.06 Hz, z -5.12)**, both in gaba efferent -- PFNa is exactly the sub-0.1 Hz
+artefact class the process note at the end of section 4 describes. Both are absent from both per-batch sets, whose
+only central-complex entries are LNO2 in cf0c43 default efferent and IbSpsP in 7de91e gaba efferent, each on one
+batch only.
 
 Per-phase rates of the chain cells (`chain_rates.csv`, pooled 10 runs, L / R Hz; max over all cells and runs in
 brackets): **PS196_b 0.03-0.16 / 0.00-0.16 in every phase of every condition [0.57]**; LAL184 0.00-0.01 / 0.09-0.40
@@ -232,7 +265,11 @@ largest inputs exactly one carries the turn, at +1 Hz on a 2-cell type, and PS19
 vs the null rest2, mV/s per post cell, `common.compare` per presynaptic type over 10 runs). GLNO, default (both modes
 within 0.3 %): PEN_a +7,359 to +7,397, PEN_b +4,064 to +4,076, EPG +3,362 to +3,368, ER6 -879 to -880, PEG +417, ExR4
 -199, ExR6 -159; E total +15,215 to +15,264, I -1,293 to -1,314; every PEN / EPG / PEG ccw and cw z between -0.4 and
-+0.5; PS196_b, LAL184, WED040_a, CB2037 absent (0 mV/s). GLNO = gaba: PEN_a +6,277 to +6,381, EPG +3,149 to +3,289,
++0.5. The efference-copy chain is **present but negligible**, not absent: PS196_b contributes
++1.73 / +1.94 / +0.87 mV/s (rest / ccw / cw, default visual) and +0.60 / +1.43 / +1.50 (default efferent), LAL184
++0.66 / +1.14 / +1.60 and +0.79 / +1.41 / +1.43, i.e. **~0.01 % of the +15,215 mV/s drive**; only CB2037 (0.000 in
+visual, +0.02 in efferent rest) and WED011 (0.000) are literally absent, and WED040_a is -0.021.
+GLNO = gaba: PEN_a +6,277 to +6,381, EPG +3,149 to +3,289,
 PEN_b +3,192 to +3,236, ER6 -820 to -829, PEG +406 to +419, GLNO self -187 to -191 (the signed self-loop), ExR4 -179
 to -183; E +13,059 to +13,336, I -1,388 to -1,424; the only ring |z| >= 3 is EPG -3.7 in gaba visual ccw and PEG -3.0
 in gaba efferent cw, the jump runs' phases. PEN_a, default: ExR6 -7,628 to -7,642, ExR4 -4,954 to -4,985, EPG +4,376
@@ -252,9 +289,17 @@ WED153 +0.02 -> +0.18 / +0.08, and in efferent mode the same terms at half the z
 `PEN_by_side`: the R-side ER1_a term -126 -> -138 / -140, the L-side -71 -> -75 / -73, both sides in both directions).
 Each of these is the same for ccw and cw: a "the world is moving" signal, not an angular velocity. Their sum on GLNO
 (-12 mV/s) is 0.09 % of its +13,900 mV/s net drive, ER1_a's rise on PEN_a (-16 mV/s) 0.1 % of its input; the one term
-with a direction is Nod1's 3 synapses onto GLNO (+0.2 -> +0.4 ccw / +1.1 cw mV/s, z +5 / +20; 1e-4 of the net), and
+with a direction is Nod1's 3 synapses onto GLNO (+0.2 -> +0.4 ccw / +1.1 cw mV/s, z +5 / +20; 1e-4 of the net).
+**The percentage is operating-point specific and the direction-blindness is not.** At gE 2 / gD 15 GLNO is driven
+to 146 / 119 Hz almost entirely by the hyperactive ring (PEN_a + PEN_b + EPG = 97.5 % of E), which is what makes
+the LAL139 / PLP078 / LAL158 terms 0.09 %; `cx_glno.md` records GLNO at 9.6 Hz at other operating points, where
+the same absolute terms would be a far larger fraction. The load-bearing half of the argument is that ccw and cw
+give the same value to within a few percent and both ER1_a sides rise together -- that is gain-independent. And
 the flip table confirms the sided reading -- PLP078's own L - R flips by -2.5 to -4.8 Hz (result in 3 of 4 arms)
-while GLNO's L - R stays at +27.7 to +28.0 Hz in every phase (flip -0.17 / -0.26, null) and ExR4's, ExR6's and ER1_a's
+while GLNO's L - R stays at +27.7 to +28.1 Hz in every phase **of the shipped-cache arms** (flip -0.17 / -0.26,
+null; in the GLNO = gaba arms the pooled L - R is **+3.62 to +5.84 Hz** with run sd up to 6.79 in the gaba
+efferent cw phase -- the flip verdict is `null` in all four arms either way, but the +27.7-28.0 number does not
+generalise) and ExR4's, ExR6's and ER1_a's
 flips are null in all four arms. So the visual yaw signal reaches the edge of the ring territory (PLP078 -> ExR4 37 syn /
 CB2037 / GLNO 3 syn; Nod1 -> WED153 -> LAL139 -> GLNO; ER1_a) with its sign, and the cells that receive it there are
 driven 99.9 % by the ring itself (GLNO: PEN_a + PEN_b + EPG = +14,800 of +15,200 mV/s E) or pool both sides
@@ -288,27 +333,35 @@ the chain: the ascending neurons that would carry a turn into PS196_b are themse
 
 **(1) The link whose state blocks the rotation signal, and the population behind it.** The link is **GLNO -> PEN**
 (84 entries, 16,371 raw synapses, 19.4 % of PEN's input, fully contralateral, sign 0 because GLNO's transmitter is
-`unknown`): the strongest silent link at k = 2 and k = 3 for every yaw source that reaches PEN at all (section 1),
+`unknown`): the strongest silent link at k = 3 for every yaw source that reaches PEN at all, and at k = 2 for
+`optic_yaw` and `efference` (section 1),
 while no yaw carrier -- HS / VS / H2 / Nod / LPT, DNp20 / DNp15, Johnston's organ, DNa02 / DNa01 / DNa03, PS196_b,
-LAL139 / LAL184, WED040_a -- makes one synapse onto PEN directly. But the block is two layers deep, and the second
+LAL139 / LAL184, WED040_a -- makes one synapse onto PEN directly. (At k = 2 GLNO -> PEN is the strongest silent
+link for `optic_yaw` and `efference`; `jo` reaches PEN through `DNc02 -> b [sign0] +0.1` and `descending_yaw` has
+no k = 2 silent link. At k = 3 it is GLNO -> PEN for all four.) But the block is two layers deep, and the second
 layer is what the round-1 audits could not see because the fly was teleported: **the population that would bring the
 rotation into GLNO, PS196_b, never fires** (0.03-0.16 Hz, max cell 0.57 Hz, in all 160 phases of the two batches;
 z -0.4 to +0.6, null in 8 / 8 pooled and 16 / 16 per-batch traces), and so do LAL184, WED040_a, CB2037, LPsP and the
-ascending neurons that feed them (AN07B037_a, PS239 ...). The visual consequence of a self-turn gets exactly as far
+ascending neurons that feed them (AN07B037_a, PS239 ...). Part of that silence is structural under this stimulus:
+DNa02, the thing the efferent arm pulses, makes 0 synapses onto PS196_b / LAL / GLNO (section 2), so the arm tests
+visual reafference plus a VNC loop rather than the efference-copy chain directly. The visual consequence of a self-turn gets exactly as far
 as under the teleport: HSN / HSE / Nod1 / LPT26 / LPT50 / DNp20 / DNp15 / VS flip at +-3 to 15 Hz (|z| 3.4-22, `result`
 in 32 of 32 pooled condition x mode x type cells and 64 of 64 per-batch ones), PLP078 flips -2.5 to -4.8 Hz, WED153
 carries +0.5 Hz, PS047_b +1 Hz, LAL139 +0.5 Hz, and GLNO 0 (z -0.4 to +0.5, null in 24 / 24 traces; L - R fixed at
-+27.7 to +28.0 Hz). GLNO's input is 97 % PEN / EPG (+14,800 of +15,200 mV/s E in the default, +12,600 of +13,200 with
++27.7 to +28.1 Hz **in the shipped-cache arms** -- in the GLNO = gaba arms it is +3.6 to +5.8 Hz with run sd up
+to 6.8; the flip verdict is `null` either way, 2.4). GLNO's input is 97 % PEN / EPG (+14,800 of +15,200 mV/s E in the default, +12,600 of +13,200 with
 GLNO = gaba): in this model GLNO is an efference copy of the *bump*, not of the *body*, which is why `cx_glno.md`
 found its sign sets the bump's persistence window and `cx_shift.md` found a signed GLNO gives a one-sided elastic
 lever and no integration -- here, with GLNO = gaba, its -3,740 to -3,820 mV/s onto PEN_a is the largest inhibitory term
 after ExR6 / ExR4 and does not change by more than scatter (z -0.3 to +1.5) when the fly turns. What the eye does
-deliver to the ring's doorstep -- LAL139 / PLP078 / LAL158 onto GLNO, ER1_a onto PEN -- is direction-blind and 0.1 %
-of those cells' drive (2.4). Signing GLNO cannot supply a rotation input on its own; the signed signal the link would
+deliver to the ring's doorstep -- LAL139 / PLP078 / LAL158 onto GLNO, ER1_a onto PEN -- is direction-blind, and at
+the gE 2 / gD 15 operating point 0.1 % of those cells' drive (the percentage is gain-specific, the
+direction-blindness is not; 2.4). Signing GLNO cannot supply a rotation input on its own; the signed signal the link would
 carry is absent one synapse upstream (PS196_b) on the efferent route and arrives unsigned on the visual one. The bump
-moved -0.000 +- 0.005 to +0.005 +- 0.006 wedges / s under a 90 deg/s visual turn and an 86-113 deg/s self-turn in 74 of
-80 rotating phases (six single-run gaba jumps, not sign-locked; every shipped-cache phase within +-0.010) against
-+-4.000 ideal.
+moved -0.000 +- 0.005 to +0.005 +- 0.006 wedges / s under a 90 deg/s visual turn and an 86-113 deg/s self-turn: every
+one of the 80 shipped-cache phases within -0.008..+0.010, and 74 of the 80 gaba phases within +-0.017 (six
+single-run jumps, four of them in rotating phases, not sign-locked) against
++-4.000 ideal -- at the one bump site the protocol forms (~1.5 wedges in 158 of 160 phases; section 2).
 
 **(2) What the connectome data say.** GLNO: MaleCNS `unknown` in every column (consensus / cell-type / per-body
 `unclear`, conf 0.48); T-bar prediction over 3,132 T-bars glutamate 0.505 / ACh 0.373 / 5-HT 0.072; FlyWire Schlegel
@@ -322,7 +375,14 @@ ACh; LAL139 GABA; WED040_a glutamate, `cx_shift.md` 1): their problem is not a s
 are PS099_a 11.6 % / PS048_a 8.0 % / PS099_b 7.4 % / PS047_b 7.4 % / AN07B037_a 6.9 % / PS262 6.3 % (`cx_shift.md` 1;
 2.3 above: 350 / 240 / 224 / 223 / 210 / 190 raw synapses per PS196_b cell) -- posterior-slope premotor and ascending
 cells at 0-2 Hz here, of which only PS047_b carries the turn, at +1 Hz -- and the ascending neurons that reach it
-(AN07B037_a 419 syn, PS239 312) are at 0 Hz: the model's VNC sends the brain no report of the turn it is making. The
+(AN07B037_a 419 syn, PS239 312) are at 0 Hz. **The model's VNC does send a direction-locked report up; that report
+reaches nothing in the PEN chain.** In `default_efferent/flip.csv`, 56 `vnc_intrinsic` and 6 `vnc_motor` types
+reach `result` (IN13B001 flip -16.46 Hz z -38.1, rate 7.2 -> 12.1 Hz; IN14B003 +13.51 z +17.4; IN08A006 +10.73
+z +18.5; "Fe reductor MN" +1.33 z +22.9), and **two ascending types carry a sided flip**: AN07B035 +0.91 Hz
+z +3.5 and AN06A026 +0.46 Hz z +3.0 (AN07B013 +0.89 z +3.7 and AN18B002 +0.43 z +4.2 in the gaba arms). But each
+of those four makes **0 raw synapses onto PS196_b, GLNO and PEN** (checked on the shared cache). So the accurate
+statement is not "no report" but "the report that does ascend reaches nothing in the PEN chain"; the cells that do
+project into the chain (AN07B037_a, PS239) are the silent ones. The
 visual relay that does carry a signed flip, PLP078 (Nod1 430 / LPT26 230 / Nod4 219 syn in; ExR4 37, CB2037 210, GLNO
 3 syn out), is 0.18 % of ExR4's input and 0.03 % of GLNO's in MaleCNS: the connectome offers no visual route into the
 ring of a weight that could move a 200 Hz bump without a gain. In the animal the LAL / PS / WED efference-copy
@@ -340,8 +400,14 @@ missing **afferent / efference report of the turn**: (a) the ascending inputs of
 same tool); (b) what those ascending neurons receive in the VNC in MaleCNS (leg sensory, haltere, VNC intrinsic -- the
 model's `vnc_sensory` superclass is never driven) is a `paths` question on the same cache; (c) drive them from the
 body as a *sensor*, the way wind is fed to JO and sugar to the GRNs (`FlyBrain.wind` / `.taste`: a documented sensor
-path with a physical variable, not a behavioural gain): leg-proprioceptive / haltere afferents fed from
-`body.Locomotion`'s realised yaw and speed. Then repeat this audit's efferent arm (`record --mode efferent`, two
+path with a physical variable, not a behavioural gain) -- **from the leg / haltere state the VNC motor neurons
+actually produce, not from `body.Locomotion`'s yaw scalar.** The distinction is the whole classification of the
+fix: `body.Locomotion` computes yaw *from* a DNa02 L - R readout, so feeding that same scalar back in as
+proprioception closes a loop through a hand-written module -- a documented stop-gap, not a connectome-implied
+mechanism. The stricter data-driven form, and the one step (b) points at, is to drive the afferents from the
+realised leg / haltere state (the model already runs 139 `vnc_motor` and 2,606 `vnc_intrinsic` types, 702 of them
+above 1 Hz in the efferent arm, and section 3(2) shows they already carry a sided signal) and to pick the cells
+from what MaleCNS says those ascending neurons receive. Then repeat this audit's efferent arm (`record --mode efferent`, two
 batches, `verify-batch`, `analyse`): if PS196_b / LAL / WED fire and GLNO's input gains a body-locked *sided* term
 (the `PEN_by_side` / flip tables are the test, not the pooled decompose), the GLNO sign becomes testable on a signal,
 and if the bump still does not move the ring's shape (`cx_wedge.md`: PEN one-step + ring loop; `cx_shift.md`: the
@@ -378,10 +444,10 @@ nodulus link into PEN, GLNO -> PEN, is silent.
 * Defects of the first pass, kept for the record: (i) its first smoke of `record` ran on this desktop's GPU for 27 s
   against the cluster rule (the script set `CUDA_VISIBLE_DEVICES=""` after torch was imported and Windows ignores
   the empty value; fixed to `-1` before the import; no number in this document comes from that smoke); (ii) the
-  double submission (2.1); (iii) `tests/test_interp.py` is not this task's file, so the tool's CPU coverage is
-  `selftest` plus the smoke analyses rather than a test class (a `RotationApplyTests` class with `selftest`'s
-  assertions and a `verify_batch` / `chain_rates` check on synthetic recordings is the addition for whoever owns the
-  test file).
+  double submission (2.1); (iii) the tool had no CPU test class -- `selftest` was never collected by pytest.
+  `tests/test_interp.py` now carries an `ApplyRotationTests` class running `selftest`'s assertions (the planted
+  flip, the graded-unit flip, the wedge-wrap drift and heading arithmetic) plus a `verify_batch` check on synthetic
+  recordings.
 * `trace` needs `min_cells=2` for the yaw cells (HSN / HSE / H2 / LPT / DNp20 are 2-cell types); sub-Hz "results" on
   near-silent cells (DNa02 -0.17 Hz in the draft, IbSpsP -0.29 Hz in one batch here) are what the |z| rule admits
   when the null SD is 0.05-0.1 Hz and are not read as anything; the same goes for decompose's z on numerically-zero

@@ -330,7 +330,6 @@ def main(argv=None):
     a.add_argument("--source", default=PHOTORECEPTORS, help="the sensory population (common.resolve grammar); default the photoreceptors")
     a.add_argument("--stimulus", nargs="+", required=True, help="glob(s) of the stimulus recordings")
     a.add_argument("--control", nargs="+", required=True)
-    a.add_argument("--null-runs", nargs="+", default=None, dest="null_runs", help="glob(s) of the control-again recordings (the null arm)")
     a.add_argument("--stat", default="best_cell", choices=list(tr.STATS))
     a.add_argument("--quantity", default=None, help="the recorded quantity spiking types are scored on (rate_hz | drive_mv | ...); or per unit kind, "
                                                     "e.g. graded=optic_dr_abs,spiking=drive_mv_abs (probe_figure_stages' 'abs' measure under --stat figure_z)")

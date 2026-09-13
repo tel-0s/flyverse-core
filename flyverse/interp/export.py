@@ -489,37 +489,23 @@ def verify(run_dir, *, neurons=None, expect_paired=("LC11", "LC10a"), expect_cou
 
 # ------------------------------------------------------------------------------------------------- adapters
 def raw_counts(c) -> tuple:
-    """Raw synapse counts per stored entry (post x pre, unsigned, uncapped), sign-0 entries included.
+    """Raw synapse counts per stored entry (post x pre, unsigned, uncapped), sign-0 entries included --
+    `common.raw_counts`.
 
-    `common.raw_counts` REPLACES the whole count vector with `connectome.sign0_counts`, which is "non-zero only where
-    W.data == 0" (flyverse/connectome.py:308) -- so every ordinary edge comes out as 0 and only the sign-0 entries
-    carry a count. The export needs the real `synaptic_pair_count` (Neurome joins on it), so it takes |W.data| and
-    fills the explicit zeros from sign0_counts instead. Returns (csr, sign0_available); see the report in
-    docs/audits/interp_export.md."""
-    from .. import connectome as cn
-    C = c.W.tocsr().copy()
-    C.data = np.abs(C.data).astype(np.float32)
-    ok = False
-    try:
-        s0 = cn.sign0_counts(c)
-        if s0 is not None and len(np.asarray(s0)) == C.nnz:
-            C.data = np.maximum(C.data, np.asarray(s0, dtype=np.float32))
-            ok = True
-    except Exception:  # noqa: BLE001 -- the raw weights table is not on every machine
-        pass
-    return C, ok
+    The merge this function used to perform privately (|W.data| with the explicit zeros filled from
+    `connectome.sign0_counts`, because the shared accessor substituted that array for the whole count vector and
+    every ordinary edge came out as 0) is `common.raw_counts`'s own now -- with the same
+    `maximum(|W.data|, sign0_counts)` rule. docs/INTERP.md 11, defect 1, closed. Returns (csr, sign0_available)."""
+    return common.raw_counts(c)
 
 
 def silent_flags(c, pre_idx, frozen_idx=None, rates=None) -> pd.DataFrame:
-    """`common.silent_flags` with `never_firing` left False instead of NaN when no rollout is given.
+    """`common.silent_flags`, whose `never_firing` is False (not evaluated) when no rollout is given.
 
-    `common.links` builds its `silent` string with `bool(flag) is True`, and `bool(float('nan'))` is True, so a
-    structural table built without rates marks every entry 'never_firing'. Here the column is False (not evaluated)
-    unless `rates` are supplied; the table's own `silent_rule` says which."""
-    f = common.silent_flags(c, pre_idx, frozen_idx=frozen_idx, rates=rates)
-    if rates is None:
-        f["never_firing"] = False
-    return f
+    This wrapper used to patch NaN -> False, because `common.links` read `bool(NaN)` as True and marked every
+    structural row 'never_firing'; the shared function returns a boolean column now (docs/INTERP.md 11, defect 2,
+    closed). Kept as the export's named accessor; the table's own `silent_rule` says whether rates were supplied."""
+    return common.silent_flags(c, pre_idx, frozen_idx=frozen_idx, rates=rates)
 
 
 def links_to_contributions(links: pd.DataFrame, *, kind: str = "effective_weight_mV", normalisation: str = "",

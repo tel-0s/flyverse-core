@@ -2,7 +2,7 @@
 
 **Tool.** `flyverse/interp/atlas.py` (`atlas`, `run_once`, `analyse_runs`, `make_populations`, `preset_populations`,
 `readout_groups`, `validate`), CLI `scripts/interp_atlas.py {run|record|analyse}`, tests `AtlasTests` in
-`tests/test_interp.py` (5 tests, CPU, 3.3 s). Contract: `docs/INTERP.md` section 4.5 and the stub in
+`tests/test_interp.py` (6 tests, CPU, 4.0 s). Contract: `docs/INTERP.md` section 4.5 and the stub in
 `flyverse/interp/__init__.py`. Every parameter of the stub is kept; the implementation adds keyword-only parameters
 with defaults (`split`, `n_null`, `min_cells`, `modules`, `include_pn`, `per_body`, `top`, `summary`, `out_dir`,
 `quiet`, `sd_floor`, `per_body_for`).
@@ -75,9 +75,18 @@ shipped defaults, `receptor_model 'sign'`, `w_syn 0.275`, `conn_cap 60`, `same_t
 
 The stimulus arm of a (population, readout) is that population's value **in each independent run** -- 3 draws, the
 replicate unit is the run (`docs/BATCH_SIM.md`). The null arm is every unstimulated row of every run for the same
-readout: 4 rows per chunk x 17 chunks x 3 runs = 321 draws in the 981-population batch, 54 per run in the validation
-batch. Batch rows are independent Poisson draws of the same compiled model, so they are legitimate null draws; they
-are not extra *stimulus* replicates, and the tool never treats them as such.
+readout. The **realised** layout, not the parameter: `n_null = 4` and `per_chunk = batch - n_null = 60`, so the 981
+populations fall into 16 full chunks of 60 populations contributing 4 null rows each plus a last chunk of 21
+populations contributing 43 -- **107 null rows per run** (`out/atlas_cluster.log`: `981 populations x 27 readouts
+107 null rows`) x 3 runs = **321 draws** (`null_n` is 321 on every row of `out/interp/atlas/dn_sensory.json`); the
+validation batch is one chunk of 10, so 54 per run and 162 draws. `replicates.null.rows_per_run` in the Result
+records the `n_null` **parameter** (4), not the realised 107, and `replicates.null.ids` is truncated to the first 64
+ids (`flyverse/interp/atlas.py:762`) -- read the log or `null_n` for the realised count. Batch rows are independent
+Poisson draws of the same compiled model, so they are legitimate null draws; they are not extra *stimulus*
+replicates, and the tool never treats them as such. One caveat the whole tool rests on: the null rows are always the
+**same batch slots** (rows 60-63 of every full chunk, 21-63 of the last), so a hypothetical per-row bias would not
+average out -- the argument is that batch rows are exchangeable with the stimulated ones, not that they were
+randomised.
 
 ---
 
@@ -119,11 +128,18 @@ run's own log line reads `device cuda` (`NVIDIA B200`, torch 2.11.0+cu128, host 
 
 The reference protocol (`scripts/benchmark.py::sec_wind`, `scripts/screen_steering.py`) pins a fly in the room at the
 plume-free spot (0.55, 0.35, 0.75) facing -90 deg and +90 deg in the default 0.3 m/s wind, records 10 s per heading,
-and reports `flip = (L-R)_wind-left - (L-R)_wind-right`. The atlas arm does not build a room: it takes the *exact
-per-cell Johnston's-organ rates* `senses.Wind.rates` would produce for those two poses (`jo_wind_rates`;
-`wind_deflections(-90) = (+0.4243, -0.4243)`, the mirror at +90) and presents them as a stimulated population of 335
-JO-C/JO-E cells, 3 s per arm, plus a **head-on** arm (`wind_deflections(0) = (+0.4243, +0.4243)`, both antennae
-deflected equally) as an internal control the reference protocol does not have.
+and reports `flip = (L-R)_wind-left - (L-R)_wind-right`. The atlas arm does not build a room: it takes the per-cell
+Johnston's-organ rates `senses.Wind.rates` produces for those two poses **at the nominal wind direction**
+(`jo_wind_rates`; `wind_deflections(-90) = (+0.4243, -0.4243)`, the mirror at +90) and presents them as a stimulated
+population of 335 JO-C/JO-E cells, 3 s per arm, plus a **head-on** arm (`wind_deflections(0) = (+0.4243, +0.4243)`,
+both antennae deflected equally) as an internal control the reference protocol does not have.
+
+"Nominal" is the one real protocol difference, and it is not cosmetic: the room's `Air` meanders the wind direction
+by **+-20 deg with an 8 s period** (`flyverse/air.py` `WindParams.meander_deg 20`, `meander_period_s 8`;
+`Air.direction` adds it and `Air.vector` uses it), and `benchmark.py::sec_wind` averages 10 s of that. Over that
+window the reference's deflection on the stimulated antenna wanders **+0.254 .. +0.544** (mean **+0.393**, JO drive
+`2 + 50 * d` = **21.65 Hz**) against the atlas arm's fixed **+0.4243** (**23.21 Hz**) -- about **7 % more drive in
+the atlas**. `atlas.wind_deflections` reproduces `Air.deflections` only at `t = 0`, where the meander term is zero.
 
 | type | reference (L-R flip, Hz) | source | atlas flip, Hz (mean of 3 runs) | per-run values | run sd | head-on (L-R) |
 |---|---|---|---|---|---|---|
@@ -141,6 +157,15 @@ reproduce the reference sign and magnitude within a few Hz on a protocol that sh
 `senses.Wind.rates` itself: no room, no ray tracer, no `Air`, no 10 s rollout, 3 s of direct JO drive instead.
 With `--summary half` (the second half of the 3 s window, `out/interp/atlas/validation_half.json`) DNp18 is +48.87
 (sd 1.88) and DNp33 -48.85 (sd 1.62), so the numbers are a steady state and not an onset transient.
+
+**The DNp18 overshoot is the meander.** DNp18 is the one type that runs high: +50.98 (`out/interp/atlas/validation.json`)
+and +50.59 in an independent three-seed repeat (`out/skeptic_atlas/val_analyse.txt` `wind.DNp18_flip_hz` 50.5937)
+against the reference +45.2, i.e. **+12 %** -- the sign of the extra 7 % of JO drive above. Presenting the same JO
+drive at eight phases of one meander cycle and averaging the flips closes it: DNp18 **+47.49** (phases +42.6 .. +52.2)
+against the fixed-direction **+51.27** in the same batch, DNp33 **-48.59** (fixed -49.24), WED080 **-42.78** (fixed
+-45.98), DNge016 **+31.64** (fixed +33.83) -- every one within ~2 Hz of its reference
+(`out/skeptic_atlas/meander_s10.txt`; generator `scripts/skeptic_atlas_wind_meander.py`). The flips need no room, but
+they do need the room's wind statistics.
 
 The per-arm table (`out/interp/atlas/validation_analyse.txt`) shows the mechanism, which the flip statistic hides:
 
@@ -160,12 +185,19 @@ The per-arm table (`out/interp/atlas/validation_analyse.txt`) shows the mechanis
 **New: the wind DNs carry a fixed left-right offset under symmetric drive.** Head-on wind deflects both antennae by
 the same +0.424 and therefore drives the two JO fields symmetrically, yet DNp18 sits at L-R **+13.45 Hz**, DNp73 at
 **+19.51**, WED080 at **-17.07**, DNge016 at **+9.89**, DNp19 at **+9.75**, DNp33 at **-10.68**, DNg05_a at **+1.66**
-(all `result`, run sd 0.4-2.0 Hz). Half of DNp73's apparent flip (+16.6) is this offset, which is why it is the one
-type whose flip sits below its NOTES value while its raw asymmetry is the largest of the set. This is the same kind
-of fixed anatomical gradient that dynamics round 1 found in PFL3 (a 2-3 Hz L-R offset of bump position,
-`docs/audits/compass_room.md`) -- a per-type asymmetry of the wiring, not a signal. The **difference of differences**
-that `benchmark.py` and `screen_steering.py` use removes it exactly; any readout built on a single-condition L-R would
-inherit it. No change to `body.py` follows from this: it is a measurement of what is already there.
+(all `result`, run sd 0.4-2.0 Hz). **None** of DNp73's flip is this offset. The flip is a difference of differences,
+so a fixed head-on offset enters both arms and cancels exactly: `out/interp/atlas/validation.json` puts DNp73's L-R
+at **+26.51** under wind-left and **+9.89** under wind-right (head-on +19.51), and 26.51 - 9.89 = **+16.62** whatever
+the offset is. The defensible statement is the opposite one -- DNp73's L-R **never changes sign**, so a
+*single-condition* L-R readout would be dominated by the +19.5 Hz fixed gradient while the flip statistic is immune
+to it. This is the same kind of fixed anatomical gradient that dynamics round 1 found in PFL3 (a 2-3 Hz L-R offset of
+bump position, `docs/audits/compass_room.md`) -- a per-type asymmetry of the wiring, not a signal, and a measurement
+rather than an artefact. The **difference of differences** that `benchmark.py` and `screen_steering.py` use cancels
+any term common to the two arms exactly; the head-on value is **not** that common term for half the set --
+`((L-R)_left + (L-R)_right)/2` minus head-on is +17.01 (DNp33), +8.64 (DNg99), +7.32 (WED080), -6.21 (DNp18) Hz,
+against -4.57 / -1.89 / -1.31 / -0.17 for DNp19 / DNge016 / DNp73 / DNg05_a
+(`out/interp/atlas/validation.json`), so the head-on arm bounds the offset rather than measuring it. No change to
+`body.py` follows from this: it is a measurement of what is already there.
 
 ### 3.2 DNa02 -> leg motor neurons
 
@@ -208,9 +240,12 @@ With `--summary half` PFL3_L -> DNa02_R is 27.22 Hz (26.21 / 26.56 / 28.90), i.e
 
 `--preset dn+sensory` builds, from `cn.load()`:
 
-* **953 descending-neuron populations** -- all 480 types with `superclass == descending_neuron` (1,310 cells), split
-  per type and, where both sides exist, per soma side (`DNa02_L`, `DNa02_R`, ...; a type present on one side only keeps
-  its bare name; the four untyped DN cells become `(untyped)_L` / `(untyped)_R` with an explicit `body:` spec).
+* **953 descending-neuron populations** -- all 480 distinct types with `superclass == descending_neuron` *plus* the
+  four untyped DN bodies, **1,314 cells in all** (1,310 typed + 4 untyped; counted from `populations` in
+  `out/interp/atlas/dn_sensory.json`), split per type and, where both sides exist, per soma side (`DNa02_L`,
+  `DNa02_R`, ...; a type present on one side only keeps its bare name; the four untyped DN cells become
+  `(untyped)_L`, 3 cells, `body:11851|13539|55579`, and `(untyped)_R`, 1 cell, `body:13964`). So both "all 480 DN
+  types" and "every DN cell" hold here -- the untyped bodies are populations 952 and 953, not a gap.
 * **13 sensory-class populations** -- every value of the `class` column among cells whose superclass contains
   `sensory` (`chemosensory` 58, `gustatory` 1428, `hygrosensory` 66, `mechanosensory` 1733,
   `mechanosensory_proprioceptive` 1454, `mechanosensory_tactile` 2558, `mechanosensory_tbc` 11, `olfactory` 2639,
@@ -225,9 +260,18 @@ With `--summary half` PFL3_L -> DNa02_R is 27.22 Hz (26.21 / 26.56 / 28.90), i.e
 Every recorded `spec` round-trips: `common.resolve(c, spec)` returns exactly the population's cells for all 976
 grammar-expressible populations (the five channel populations record the constructor that made them instead).
 
-Protocol: 150 Hz for 400 ms after 200 ms of settle, batch 64 with 4 null rows per chunk, no sensory context, three
-runs. 3,212 (population, readout) pairs out of 26,487 reach verdict `result`; 578 of the 981 populations move at
-least one motor readout; **347 move nothing at all**.
+Protocol: 150 Hz for 400 ms after 200 ms of settle, batch 64 with 4 null rows per chunk (107 realised per run,
+section 1.2), no sensory context, three runs. 3,212 (population, readout) pairs out of 26,487 reach verdict `result`
+-- **with its floor attached**: in this round every null arm is exactly 0.000 Hz with SD exactly 0, so the verdict is
+set entirely by the declared `SD_FLOOR_HZ = 0.05` Hz. The smallest `result` is `|diff| = 0.15000086` Hz = 3 x 0.05
+exactly, 846 of the 3,212 (26 %) sit below 0.5 Hz and 1,461 (45 %) below 1 Hz
+(`out/interp/atlas/dn_sensory.json`). "Reaches verdict `result`" therefore means "moved a silent readout by
+>= 0.15 Hz", not "moved it meaningfully"; the floor is declared-not-fitted (section 7.3), and any downstream use --
+the ledger, the export -- should carry the `diff`, not the verdict count.
+
+578 of the 981 populations move at least one motor readout to `result`, **347 move nothing at all** (`max |diff|`
+exactly 0 across all 27 readouts) -- and the remaining **56** move something by a non-zero amount that never reaches
+`result`. The two categories are not exhaustive.
 
 ---
 
@@ -801,9 +845,13 @@ and every DN inside them appears at rank 1 of its own readout for a trivial reas
 Four readings worth keeping:
 
 1. **Nothing reaches the giant fibre by stimulation.** Only three populations of 981 move `gf` at all: DNp01 itself
-   (both sides, self-drive) and **DNp70_R at +1.63 Hz**. DNp70 is one of the five types `LIFParams.type_path_gain`
-   damps onto DNp01 (`^(SAD073|GNG300|DNp70|CL367|PVLP010)$ -> ^DNp01$`, x0.3), so the one population that can
-   reach the GF from outside is a type the defaults already single out. Neither LC4 nor LPLC2 appears -- they are
+   (both sides, self-drive) and **DNp70_R at +1.63 Hz**, and that +1.63 is at DNp70's **full** weight onto DNp01.
+   The round-3 GF damping (`^(SAD073|GNG300|DNp70|CL367|PVLP010)$ -> ^DNp01$`, x0.3) was **retired in round 5**
+   (`docs/audits/anti_runaway.md`) and is not in force here: this round's own provenance records
+   `type_path_gain = [["^(LC4|LPLC2)$", "^DNp01$", 3.0]]` and nothing else
+   (`provenance.model.lif.type_path_gain`, identical in all three of `out/interp/atlas/*.json`). So the one
+   population that can reach the GF from outside is a type the *previous* defaults singled out, undamped in this
+   model. Neither LC4 nor LPLC2 appears -- they are
    visual projection neurons, not in this population list; the atlas over DNs and sensory classes says only that no
    *descending* or *sensory* population drives the GF. DNp01 does drive the escape motor neurons it should:
    `ttm` rank 1 is DNp01_R +34.44 with DNp06 beside it.
@@ -854,7 +902,10 @@ ranks a sensory class against a DN.
 
 `summary.n_populations_that_moved_nothing = 347` (the list is in `summary.populations_that_moved_nothing`, first 200):
 DNb02, DNb04, DNb07, DNb09, DNbe004, DNbe005, DNc01, DNc02, DNd02, DNd03, DNd04, DNde001, DNde006, DNde007, DNg01_a,
-... -- and the visual populations of 6.2. A DN that fires at 150 Hz for 400 ms and leaves all 21 motor groups exactly
+... -- and the visual populations of 6.2. "Moves nothing" is the strict reading, `max |diff|` **exactly 0** across all
+27 readouts; recomputed from `out/interp/atlas/dn_sensory.json`, exactly 347 populations qualify. It is not the
+complement of the 578 that reach a `result`: a further **56** populations move a readout by a non-zero amount that
+never reaches verdict `result` (578 + 347 + 56 = 981). A DN that fires at 150 Hz for 400 ms and leaves all 21 motor groups exactly
 at their null value either projects to VNC interneurons the readout does not pool, or its targets do not reach
 threshold at this dose. The atlas' answer here is a *fact about the readouts*, not about the neurons: `flyverse/motor.py`
 pools 532 cells out of 167,106, and a DN that drives its own premotor set without moving those 532 reads null. The
@@ -881,7 +932,8 @@ provenance block and the Neurome `readout_per_body` table.
    returns the module instead of the function. Any test or caller that does `from flyverse.interp import atlas as A`
    (as every implementer's test class does) breaks `StubTests.test_stubs_import_and_signatures` for that tool if
    `StubTests` runs afterwards. Under `pytest` the classes run in definition order, `StubTests` comes first and the
-   whole file passes (63 tests); under `python -m unittest` the classes run alphabetically and `StubTests` fails --
+   whole file passes (a whole-file count is not quoted here: `tests/test_interp.py` is shared and moves under other
+   owners; `AtlasTests` alone is `6 passed` in 4.0 s); under `python -m unittest` the classes run alphabetically and `StubTests` fails --
    with `HealthTests` alone, before this task's class existed. One line in `_implementation` fixes it:
    `globals()[name] = obj` before the `return`, so the package attribute holds the function, not the module. I did not
    apply it: `__init__.py` is the design task's file (`docs/INTERP.md` section 8).
@@ -903,8 +955,22 @@ provenance block and the Neurome `readout_per_body` table.
 6. The `context` argument is implemented (`CONTEXTS`: `wind_left`, `wind_right`, `wind_head_on`, `wind_off`, `sugar`;
    a `{sense: args}` dict; or a callable driving the FlyBrain each frame) but **this round ran every population with
    `context=None`**, the `screen_dns.py` protocol. `docs/INTERP.md` section 9 asks "whether `stimulate` of JO-C/E
-   alone (no room) gives the same DNp18 / DNp33 flips": section 3.1 answers **yes** -- +50.98 / -49.31 against the
-   room's +45.2 / -49.6 -- so the wind arm does not need a room, and the JO drive is the whole of that signal.
+   alone (no room) gives the same DNp18 / DNp33 flips": section 3.1 answers **yes, once the wind's meander is
+   carried across** -- +50.98 / -49.31 with the direction pinned at its nominal value, +47.49 / -48.59 when the JO
+   drive is swept over the room's own +-20 deg / 8 s meander, against the room's +45.2 / -49.6. The JO drive is the
+   whole of that signal; the residual DNp18 overshoot is the meander (7 % more drive), not the room.
+7. **`docs/INTERP.md` section 7's atlas example passes `--by-side`.** When this record was first written the CLI
+   implemented only `--no-by-side` and that documented line died with `unrecognized arguments: --by-side`. It now
+   parses: `scripts/interp_atlas.py:142` adds `--by-side` as a **no-op alias** -- by-side is already the default and
+   only `--no-by-side` changes anything (`by_side=not args.no_by_side`, lines 44 / 49 / 63). The example runs today
+   and does what it says; the flag is decorative, not a switch.
+8. **The null rows' averaging window is not matched to the stimulus row's.** In `run_once` the stimulus row uses that
+   population's own pulse length (`trace[:w, row]`, `w = round(ps.ms / frame_ms)`, `flyverse/interp/atlas.py:562-566`)
+   but the null rows use `w = n_pulse`, the **longest** pulse in the chunk (`:571-576`). In the validation batch that
+   is 300 frames of null (the 3 s JO arms) against 40 frames of DNa02 / PFL3 stimulus. It changes nothing in this
+   round -- every null is identically zero, and the dn+sensory batch pulses every population for the same 400 ms --
+   but it would bite the moment the tool is run with a sensory `--context` (`wind_left`, `sugar`), where the null rows
+   are not silent and the two windows would no longer be comparable.
 
 ---
 
@@ -920,7 +986,7 @@ compiled W       md5 ef23cc27bea13be7f6a96f3c04fd3737   nnz 25,578,600   n 167,1
 model.lif        w_syn 0.275, conn_cap 60, same_type_gain 0.1, adapt_jump 1.5, input_norm alpha 1 / ref 5000,
                  t_ref 2.2 ms, v_th -45 / v_rest -52 mV, receptor_model 'sign', receptor_net_rule 'abs',
                  prune_frozen True, path_gain [(descending_neuron -> vnc_, 3.0), (visual_projection -> descending_neuron, 2.0)],
-                 type_path_gain [((LC4|LPLC2) -> DNp01, 3.0), ((SAD073|GNG300|DNp70|CL367|PVLP010) -> DNp01, 0.3)]
+                 type_path_gain [((LC4|LPLC2) -> DNp01, 3.0)]   <- the only entry; the round-5 default, GF damping retired
 model.body       gf_hz 33, takeoff_power_hz 50, takeoff_hold_s 0.3, mdn_threshold_hz 15, k_opto 0
 execution        device cuda (NVIDIA B200), devices ['cuda','cuda','cuda'], host <cluster-node>, torch 2.11.0+cu128,
                  dt lif 0.5 / optic 1 / frame 10 ms, batch 64, seeds brain [0,1,2], replicate_unit 'runs'
@@ -951,10 +1017,12 @@ python scripts/interp_atlas.py run --populations "~^LC1[01]" --populations "supe
 python scripts/interp_atlas.py run --preset validation --context wind_left --seed 0 --out out/atlas/ctx_r0
 
 # the CPU test
-PYTHONIOENCODING=utf-8 python -m pytest tests/test_interp.py::AtlasTests -q      # 5 tests, 3.3 s
+PYTHONIOENCODING=utf-8 python -m pytest tests/test_interp.py::AtlasTests -q      # 6 passed, 4.0 s
 ```
 
-`AtlasTests` exercises the whole path on a 6-neuron subset of `graph()` (the photoreceptor and the optic rate unit are
+`AtlasTests` is six methods -- `test_population_list_and_specs`, `test_readout_groups_and_derived`,
+`test_wind_deflections_and_contexts`, `test_run_roundtrip_and_null_comparison`, `test_atlas_end_to_end`,
+`test_per_body_rows_and_validation` -- exercising the whole path on a 6-neuron subset of `graph()` (the photoreceptor and the optic rate unit are
 dropped so `FlyBrain` builds no retina -- the synthetic graph has no hex coordinates): the stimulation grammar and its
 spec round trip, the readout groups and their left-right derivations, `wind_deflections` / `CONTEXTS` against
 `flyverse/air.py`'s convention, a real three-run `FlyBrain` sweep with its null rows, the `AtlasRun` npz/json round

@@ -4,7 +4,7 @@
     python scripts/interp_decompose.py record --target DNp01 --protocol walk --arm holdBrain --seed 0 --out out/dec/holdBrain_r0
     # CPU: the dynamic decomposition over arms of runs (label=glob), compared with a null arm
     PYTHONIOENCODING=utf-8 python scripts/interp_decompose.py analyse --target DNp01 --recordings "default=out/dec/default_r*.npz" \
-        --recordings "holdBrain=out/dec/holdBrain_r*.npz" --null "off=out/dec/off_r*.npz" --by type --window 0.5,1.5 --json out/interp/decompose/gf_walk.json
+        --recordings "holdBrain=out/dec/holdBrain_r*.npz" --null-runs "off=out/dec/off_r*.npz" --by type --window 0.5,1.5 --json out/interp/decompose/gf_walk.json
     # CPU: the static decomposition under one arm, and the structural contrast of two arms
     PYTHONIOENCODING=utf-8 python scripts/interp_decompose.py analyse --static --target "OA-AL2i3|TmY14|DNge138|DNge149|DNge150" --arm holdBrainHis
     PYTHONIOENCODING=utf-8 python scripts/interp_decompose.py contrast --target "OA-AL2i3|TmY14|DNge138|DNge149|DNge150" --arms default,holdBrainHis
@@ -219,7 +219,7 @@ def cmd_analyse(args) -> int:
         arms = _arms_from_items(args.recordings)
         if not arms:
             raise SystemExit("analyse needs --recordings label=glob (or --static)")
-        null = _arms_from_items([args.null]) if args.null else None
+        null = _arms_from_items(args.null_runs) if args.null_runs else None
         res = dec.decompose(c, args.target, recording=arms, null_recording=null, params=lif, optic_params=op, by=by, tiers=not args.no_tiers,
                             window=_window(args.window), top=args.top)
     res.files["generator"] = "scripts/interp_decompose.py " + " ".join(sys.argv[1:])
@@ -477,7 +477,6 @@ def main() -> int:
     a.add_argument("--target", required=True); a.add_argument("--static", action="store_true")
     a.add_argument("--arm", default="as-given", help="static: the arm whose weights to decompose")
     a.add_argument("--recordings", action="append", default=[], metavar="LABEL=GLOB", help="an arm of runs (repeatable)")
-    a.add_argument("--null-arm", dest="null", default=None, metavar="LABEL=GLOB", help="the matched control arm")
     a.add_argument("--by", default="type", help="comma-separated subset of " + ",".join(dec.GROUPINGS))
     a.add_argument("--no-tiers", action="store_true"); a.add_argument("--window", default=None, help="start_s,end_s")
     a.add_argument("--top", type=int, default=40)
@@ -492,8 +491,6 @@ def main() -> int:
     for p in (r, a, k, v):
         common.add_common_args(p)
     args = ap.parse_args()
-    if args.null is not None and args.cmd == "analyse" and isinstance(args.null, bool):
-        args.null = None
     return {"record": cmd_record, "analyse": cmd_analyse, "contrast": cmd_contrast, "validate": cmd_validate}[args.cmd](args)
 
 

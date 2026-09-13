@@ -11,8 +11,10 @@ The toolkit reads the model; it never changes it. This module holds the five thi
 3. **Recording** -- `Recorder` (reusing screen.TypeRecorder for the population pooling) captures per-frame
    quantities of a cell set from a FlyBrain / Sim / BatchSim into a `Recording` (npz + json) that the CPU half of
    every tool analyses; `record_frames` is the loop.
-4. **Null / replicate helpers** -- `arm`, `compare`: the object-sweep statistic (z against a none-vs-none null,
-   Welch, exact Mann-Whitney) and the scatter rule (no 'result' below three independent runs per arm).
+4. **Null / replicate helpers** -- `ArmStats`, `compare`, `p_floor`: the object-sweep statistic (z against a
+   none-vs-none null, Welch, exact Mann-Whitney) and the scatter rule -- no 'result' below three independent runs per
+   arm, and none below the run count at which the exact rank test can reach alpha at all (`p_floor`; 4 per arm, 5 for
+   a small effect). A deterministic null (SD 0) is 'undetermined', never a z of NaN or 1e41.
 5. **The result schema** -- `Result` + `provenance`: one JSON for all tools, carrying everything the Neurome
    export (docs/NEUROME_INTERFACE.md) needs, so export is a serializer.
 
@@ -50,7 +52,9 @@ DATASET_RELEASE = "v1.0 flat-connectome"
 UNIT_KINDS = ("spiking", "graded", "photoreceptor")
 CONTRIBUTION_KINDS = ("anatomical_count", "effective_weight_mV", "current", "voltage", "activity")
 FRAME_MS, OPTIC_DT_MS = 10.0, 1.0
-MIN_REPLICATES = 3          # the scatter rule: a difference is a result only over >= 3 independent runs per arm
+MIN_REPLICATES = 3          # the scatter rule: a difference is quoted only over >= 3 independent runs per arm
+#: A difference is CALLED only where the exact rank test can reach alpha: `compare` reports `p_floor` and says
+#: 'underpowered' while it exceeds alpha, so 3 v 3 buys the scatter and 4 v 4 (5 v 5 for a small effect) buys a result.
 Z_RESULT = 3.0              # the object-sweep criterion (docs/audits/object_sweep.md 8.5)
 NEVER_FIRING_HZ = 0.5       # a cell whose max rate over a rollout stays below this is 'never_firing'
 
@@ -114,8 +118,13 @@ VALIDATION = {
     "health": {
         "name": "the 200 Hz refractory-limited bump and the sign-0 / silent populations of the NT audit",
         "reference": {"bump_hz": [180, 260], "t_ref_ms": 2.2, "PEN_hz": [40, 65], "Delta7_hz": [90, 112],
-                      "sign0_presynaptic_bodies": 3407, "sign0_synapse_share": 0.022,
-                      "mushroom_body_input_share_silenced": 0.098, "visual_centrifugal_output_silenced": 0.176},
+                      "sign0_presynaptic_bodies": 3312, "sign0_synapse_share": 0.022,
+                      "mushroom_body_input_share_silenced": 0.098, "visual_centrifugal_output_silenced": 0.176,
+                      "note": "3,312 is the SHIPPED cache's sign-0 body count (docs/audits/nt_audit.md; 2,683 of them "
+                              "presynaptic, 2,701,289 of 124,161,873 synapses). The 3,407 this entry carried until "
+                              "this revision is the pre-TYPE_NT_OVERRIDE cache's count (receptor_verification.md, "
+                              "sum|W| 121,427,136) and is not this model's; docs/NEUROME_INTERFACE.md line 73 still "
+                              "quotes it. The tool reports the count of the cache it loaded, with its fingerprint."},
         "source": "docs/audits/cx_wedge.md section 7 / cx_glno.md section 5; docs/audits/nt_audit.md"},
     "ledger": {
         "name": "the existing T4/T5 DS, loom, optomotor and sugar/bitter numbers",
@@ -316,27 +325,54 @@ def effective_weights(c: cn.Connectome, params=None, receptor=None) -> Effective
     return EffectiveWeights(A, scale, tot, p, _md5_csr(A), shaped_md5)
 
 
-def raw_counts(c: cn.Connectome, with_sign0: bool = True) -> tuple[sp.csr_matrix, bool]:
-    """Unsigned, uncapped synapse counts per stored entry (post x pre), including the sign-0 entries' raw counts when
-    cache/sign0_counts.npz is available (connectome.sign0_counts); returns (counts, sign0_available)."""
-    C = abs(c.W).tocsr()
-    if with_sign0:
-        try:
-            cnt = cn.sign0_counts(c)
-            if cnt is not None and len(np.asarray(cnt)) == c.W.nnz:
-                C = c.W.tocsr().copy(); C.data = np.asarray(cnt, dtype=np.float32)
-                return C, True
-        except Exception:  # noqa: BLE001 -- the raw weights table is not on every machine
-            pass
-    return C, False
+def raw_counts(c: cn.Connectome, with_sign0: bool = True, *, dtype=np.float32, build: bool = True) -> tuple[sp.csr_matrix, bool]:
+    """The true raw synapse count of every stored entry of c.W (post x pre), unsigned and uncapped.
+
+    The compiled cache holds the signed raw count of every signed entry in `W.data` and an explicit **zero** for every
+    entry whose presynaptic transmitter carries no sign; those entries' counts live in `cache/sign0_counts.npz`
+    (`connectome.sign0_counts`), an array aligned with `W.data` that is non-zero ONLY on them. The two are therefore
+    **merged, never substituted**:
+
+        C.data = maximum(|W.data| (already in count units), sign0_counts)
+
+    (Substituting -- the pre-revision behaviour -- reported 0 synapses for every signed edge and wrote
+    `synaptic_pair_count 0` into the mandatory Neurome column; `docs/INTERP.md` section 11, defect 1.)
+
+    `with_sign0` says whether the **sign-0 entries are included**: True (the default) fills them from
+    `sign0_counts`, so the matrix carries every synapse the connectome has; False leaves them at their stored 0, i.e.
+    the count of the entries the LIF can actually carry. Signed entries are the same either way.
+
+    `build` is passed to `connectome.sign0_counts` (build the npz from the raw weights table when it is absent);
+    `dtype` is float32 by default and float64 where an exact whole-model total is wanted (the NT audit's
+    124,161,873 synapses do not fit a float32 mantissa). Returns (counts, sign0_available); `sign0_available` is
+    False when the npz is not on this machine, and the sign-0 entries then read 0 (a lower bound).
+    """
+    W = c.W.tocsr()
+    C = W.copy()                                             # keep the structure, explicit zeros included
+    C.data = np.abs(W.data).astype(dtype)
+    if not with_sign0:
+        return C, False
+    try:
+        cnt = cn.sign0_counts(c, W=W, build=build)
+    except Exception:  # noqa: BLE001 -- the raw weights table is not on every machine
+        cnt = None
+    if cnt is None or len(np.asarray(cnt)) != W.nnz:
+        return C, False
+    C.data = np.maximum(C.data, np.asarray(cnt, dtype=dtype))
+    return C, True
 
 
 def silent_flags(c: cn.Connectome, pre_idx, frozen_idx=None, prune_frozen: bool = True, rates=None,
                  min_hz: float = NEVER_FIRING_HZ) -> pd.DataFrame:
     """Per presynaptic cell: sign0 (its transmitter carries no sign -> every output entry is an explicit zero),
     frozen (a rate unit of the optic lobe: never spikes in the LIF), pruned (frozen and dropped from the LIF matrix),
-    never_firing (max recorded rate below `min_hz`; NaN when no rates are given). `rates`: (T, N) or (N,) Hz over
-    the model indices, or a dict {index: max_hz}."""
+    never_firing (max recorded rate below `min_hz`).
+
+    Every column is a **boolean**: with no `rates` the never_firing question was not asked, and the answer is False
+    (not NaN, which `links` and every other `bool(flag)` reader turned into 'every cell never fires' --
+    docs/INTERP.md section 11, defect 2). A structural table therefore carries no never_firing flag; say so with the
+    table's own silent_rule when it matters. `rates`: (T, N) or (N,) Hz over the model indices, or a dict
+    {index: max_hz}."""
     pre_idx = np.asarray(pre_idx)
     sign = c.neurons["sign"].to_numpy() if "sign" in c.neurons else np.ones(c.n)
     out = pd.DataFrame({"index": pre_idx, "sign0": (sign[pre_idx] == 0)})
@@ -346,7 +382,7 @@ def silent_flags(c: cn.Connectome, pre_idx, frozen_idx=None, prune_frozen: bool 
     out["frozen"] = frozen[pre_idx]
     out["pruned"] = out.frozen & bool(prune_frozen)
     if rates is None:
-        out["never_firing"] = np.nan
+        out["never_firing"] = np.zeros(len(pre_idx), bool)      # not evaluated: no rollout was given
     else:
         if isinstance(rates, dict):
             mx = np.array([rates.get(int(i), np.nan) for i in pre_idx])
@@ -397,7 +433,10 @@ def links(c: cn.Connectome, ew: EffectiveWeights, pre, post, receptor=None, coun
     f = flags.set_index("index")
     cols_f = ["sign0", "frozen", "pruned", "never_firing"]
     ff = f.reindex(cols).reset_index(drop=True)
-    df["silent"] = ["|".join(k for k in cols_f if bool(ff[k].iloc[i]) is True) for i in range(len(df))]
+    # a flag that was not evaluated (no rates) or whose cell is absent from `flags` reads False, never True:
+    # bool(NaN) is True, which is what marked every structural row 'never_firing' (docs/INTERP.md 11, defect 2).
+    fb = {k: ff[k].fillna(False).to_numpy().astype(bool) for k in cols_f}
+    df["silent"] = ["|".join(k for k in cols_f if fb[k][i]) for i in range(len(df))]
     if nonzero_only:
         df = df[df.effective_mv != 0]
     return df.sort_values(["post_index", "pre_index"]).reset_index(drop=True)
@@ -619,11 +658,40 @@ class ArmStats:
         return dataclasses.asdict(self)
 
 
+def p_floor(n_a: int, n_b: int) -> float:
+    """The smallest two-sided exact Mann-Whitney p that two arms of `n_a` and `n_b` runs can reach -- every draw of one
+    arm above every draw of the other: 2 / C(n_a + n_b, n_a).
+
+    3 v 3 runs floor at 0.10, 4 v 4 at 0.029, 5 v 5 at 0.0079 (docs/audits/object_sweep.md 8.4). Three runs per arm is
+    therefore simultaneously the floor for not being 'underpowered' (MIN_REPLICATES) and a guaranteed 'null' at
+    alpha 0.05, whatever the separation: `compare` reports this number and calls that case underpowered."""
+    from math import comb
+    n_a, n_b = int(n_a), int(n_b)
+    if n_a < 1 or n_b < 1:
+        return float("nan")
+    return 2.0 / comb(n_a + n_b, n_a)
+
+
 def compare(stim, null, z_min: float = Z_RESULT, min_n: int = MIN_REPLICATES, alpha: float = 0.05) -> dict:
     """The object-sweep comparison of two replicate arms (docs/audits/object_sweep.md 8.4): z = (mean stim - mean null) /
     SD(null); Welch = the difference over the standard error of the two means; exact Mann-Whitney U and p when scipy
-    can; verdict 'underpowered' (fewer than `min_n` runs in an arm), 'result' (|z| >= z_min and p <= alpha when a p
-    exists), else 'null'. Every value the verdict rests on is returned."""
+    can. Every value the verdict rests on is returned, `p_floor` (the exact-U floor at these two n) included.
+
+    The verdict, in this order:
+
+    * `'underpowered'` -- fewer than `min_n` runs in an arm (the scatter rule), **or** `p_floor > alpha`: at this many
+      runs the rank test cannot reach alpha however large the effect, so no z can make the difference a result
+      (3 v 3 floors at p 0.10). `MIN_REPLICATES` stays 3 -- three runs still buy the scatter -- but four per arm is
+      the smallest that can be called (five when the effect is small): docs/INTERP.md 10.2.
+    * `'undetermined'` -- the null arm is deterministic (SD 0, up to float noise: bit-identical draws, an all-silent
+      readout, a `gain_fb=0` lobe), the arms differ, and the rank test does not settle it as null (p <= alpha, or no
+      p at all). z is the criterion and z is not defined there, so neither a huge z nor a NaN one is a verdict: read
+      `diff` (the magnitude) and `p`, plus the tool's own effect-size column (atlas `z_floor`) where it has one.
+      This replaces the three private answers of the build round (docs/INTERP.md 11, defect 4). A deterministic null
+      that the rank test DOES settle (p > alpha) is a plain 'null'.
+    * `'result'` -- |z| >= `z_min` and p <= `alpha` (when a p exists).
+    * `'null'` -- otherwise, the deterministic null with no difference at all included.
+    """
     from scipy import stats
     a, b = ArmStats.of(stim), ArmStats.of(null)
     diff = a.mean - b.mean
@@ -637,14 +705,21 @@ def compare(stim, null, z_min: float = Z_RESULT, min_n: int = MIN_REPLICATES, al
             U, p = float(r.statistic), float(r.pvalue)
         except ValueError:
             pass
-    if min(a.n, b.n) < min_n:
+    floor = p_floor(a.n, b.n) if (a.n >= 1 and b.n >= 1) else float("nan")
+    # 'deterministic' is SD exactly 0 or below float noise on the arm's own scale -- the case that sent z to 1e41 on
+    # near-zero groups as surely as the exactly-zero one sent it to NaN.
+    det_null = bool(b.n >= 2 and np.isfinite(b.sd) and b.sd <= 1e-12 * max(1.0, abs(b.mean)))
+    if min(a.n, b.n) < min_n or (np.isfinite(floor) and floor > alpha):
         verdict = "underpowered"
+    elif det_null and diff != 0 and not (np.isfinite(p) and p > alpha):
+        verdict = "undetermined"
     elif np.isfinite(z) and abs(z) >= z_min and (not np.isfinite(p) or p <= alpha):
         verdict = "result"
     else:
         verdict = "null"
     return {"stim": a.record(), "null": b.record(), "diff": float(diff), "z": float(z), "welch": float(welch),
-            "U": U, "p": p, "verdict": verdict, "z_min": z_min, "min_n": min_n}
+            "U": U, "p": p, "verdict": verdict, "z_min": z_min, "min_n": min_n, "alpha": alpha,
+            "p_floor": float(floor), "null_sd_zero": det_null}
 
 
 def replicate_seeds(n: int, seed0: int = 0) -> list[int]:
@@ -691,6 +766,28 @@ def git_state() -> dict:
     status = _git("status", "--porcelain")
     files = [ln[3:] for ln in status.splitlines() if ln.strip()]
     return {"commit": head, "dirty": bool(files), "modified_files": files[:200]}
+
+
+def source_fingerprint(git: dict | None = None, force: bool = False) -> dict:
+    """The content identity of the code behind a Result when git cannot name it.
+
+    A cluster job runs from an rsynced copy with no `.git`, so `git_state()` there says `commit 'unknown'` and the
+    JSON names no code at all (docs/INTERP.md 11, defect 8: every GPU Result but the export's). This calls
+    `export.source_fingerprint(include_loaded=True)` -- SHA-256 of every simulation / probe source under ROOT plus
+    the modules the process really imported -- so `export.match_sources` can pin the run to a checkout by content.
+    Computed when the commit is unresolved (or `force`); otherwise the block records that git answered, so a Result
+    always carries the key and never pays for the hashing twice."""
+    git = git_state() if git is None else git
+    if not force and git.get("commit") not in (None, "", "unknown"):
+        return {"computed": False, "reason": "git_state() resolved the commit", "commit": git.get("commit")}
+    try:
+        from . import export as _export
+        fp = _export.source_fingerprint(include_loaded=True)
+    except Exception as e:  # noqa: BLE001 -- never let provenance fail a run
+        return {"computed": False, "reason": f"unavailable: {e!r}", "commit": git.get("commit", "unknown")}
+    fp["computed"] = True
+    fp["reason"] = "git_state() could not resolve the commit: identify this code by these hashes (export.match_sources)"
+    return fp
 
 
 def dataset_release() -> dict:
@@ -800,8 +897,13 @@ def execution_record(fb=None, device=None, seeds=None, env_seeds=None, batch=Non
 def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, seeds=None, env_seeds=None, batch=None,
                backend=None, stimulus=None, retina=None, cache_dir=None, replicate_unit="runs") -> dict:
     """The mandatory provenance block of every Result (docs/INTERP.md section 3): git, dataset release, compiled
-    connectome fingerprint, resolved model parameters, realised execution, stimulus spec, retina record, units."""
-    return {"flyverse_commit": git_state(), "dataset_release": dataset_release(),
+    connectome fingerprint, resolved model parameters, realised execution, stimulus spec, retina record, units.
+
+    `source_fingerprint` is the fallback identity of the code: when `git_state()` cannot resolve the commit (a cluster
+    copy with no `.git`), the SHA-256 of every source file the run loaded goes in, so 'commit unknown' is the last
+    resort and not the only answer."""
+    git = git_state()
+    return {"flyverse_commit": git, "source_fingerprint": source_fingerprint(git), "dataset_release": dataset_release(),
             "compiled_connectome": connectome_fingerprint(c, cache_dir), "model": model_record(lif, optic),
             "execution": execution_record(fb, device, seeds, env_seeds, batch, backend, replicate_unit),
             "stimulus": to_jsonable(stimulus) if stimulus is not None else {"protocol": None, "params": {}, "control": None},
@@ -928,11 +1030,20 @@ def parse_kv(items) -> dict:
 
 
 def add_common_args(ap) -> None:
-    """The flags every scripts/interp_<tool>.py accepts (docs/INTERP.md section 5)."""
+    """The flags every scripts/interp_<tool>.py accepts (docs/INTERP.md section 2.6).
+
+    The null arm has ONE convention: `--null-runs GLOB [GLOB ...]` on an `analyse` subcommand names the finished
+    control-vs-control runs (the wrappers that label arms accept `LABEL=GLOB`), and a `record` / `run` subcommand
+    that has to GENERATE that arm declares its own bare `--null` switch. `--null-arm` / `--null-recordings` stay as
+    hidden aliases of `--null-runs` so the round's command lines keep working (docs/INTERP.md 11, defect 5)."""
+    import argparse
     ap.add_argument("--json", default=None, help="write the Result JSON here (default out/interp/<tool>/<run_id>.json)")
-    ap.add_argument("--replicates", type=int, default=MIN_REPLICATES, help=f"independent runs per arm (default {MIN_REPLICATES})")
+    ap.add_argument("--replicates", type=int, default=MIN_REPLICATES,
+                    help=f"independent runs per arm (default {MIN_REPLICATES}; >= 4 to reach a 'result', 5 for a small effect)")
     ap.add_argument("--seed", type=int, default=0, help="first brain seed; replicates take consecutive seeds")
-    ap.add_argument("--null", action="store_true", help="also run the matched control-vs-control arm")
+    ap.add_argument("--null-runs", nargs="*", default=[], metavar="GLOB",
+                    help="the matched control-vs-control arm: glob(s) of its finished runs (LABEL=GLOB where arms are named)")
+    ap.add_argument("--null-arm", "--null-recordings", nargs="*", dest="null_runs", default=None, help=argparse.SUPPRESS)
     ap.add_argument("--device", default=None, help="torch device request; the JSON records the realised one")
     ap.add_argument("--cache-dir", default=None, help="connectome cache directory (default cache/)")
     ap.add_argument("--receptor-model", default="default", choices=["default", "off", "sign", "sign+gain", "full"])

@@ -32,14 +32,32 @@ Tm6 -0.2, T2a -0.1, Tm12 -0.3, TmY18 +0.0, Li15 -0.2; LC10a <- Tm5Y +0.9, TmY21 
 chain (depth 3) and the **Tm5Y / TmY21 stage** on the LC10a chain (depth 2); LC11 (+0.1) and LC10a (+0.0) then have
 nothing to pool (section 1).
 
+**"At the null" at the small-field stage is a threshold call, not a measured absence.** The same quantity on the
+same model and stimulus, measured in four independent batches, reads **Tm5Y z +0.86** (`trace_obj.json`, 5 v 5),
+**+2.19** (`lesions.json` base arm, 4 v 4), **+2.65** (`ladder.json` d114, 5 v 5) and **+3.65**
+(`skeptic_lesions.json` base arm, 4 v 4: 0.0470 +- 0.0031 vs its own null 0.0290 +- 0.0049, U 16/16, p 0.0286,
+verdict `result`); **T3** reads +0.20, +1.39, +2.15 (d114, U 25/25, p 0.0079 -- complete rank separation of ball
+over null) and +0.34. The small-field stage carries an **attenuated but non-zero** figure that crosses the tool's
+`|z| >= 3` rule from batch to batch. LC11 and LC10a are at or below their nulls in all four, so only the
+small-field half of "lost" is a threshold call.
+
 **Which kind of fact** -- the four candidates the task named, decided by the eight lesion arms of section 4 (each
 recorded under the identical protocol with its own none-vs-none null, 4 independent runs per arm), the per-run
 scatter of section 4.4 and the deterministic projection of section 4.5:
 
-1. **Wiring -- yes, at T3.** T3 sums ON (Mi1 22.5 %, Tm3 8.2 %) and OFF (Tm1 16.0 %, Tm4 6.7 %) carriers through
-   excitatory, exact-tier synapses, and the sweeping ball's figure in the two channels has opposite sign at T3: in the
-   deterministic lobe the carrier terms cancel to **3.6 % of their sum** (cancellation 0.964, `perrun` on the fb0
-   arm; 0.92 in the pooled shipped-model trace, 0.84 +- 0.20 per run). Silencing either channel restores T3
+1. **Wiring -- yes, at T3.** T3 sums **carriers whose measured figures have opposite sign** through excitatory,
+   exact-tier synapses: Mi1 22.5 %, Tm3 8.2 % and Tm2 1.8 % raise, Tm1 16.0 % and Tm4 6.7 % lower. The split is
+   *not* strictly ON vs OFF -- `stage.json`'s own `carriers_raising` is `[Mi1, Tm3, Tm2]` against
+   `carriers_lowering` `[Tm1, Tm4]`, i.e. `pathways_raising` `[OFF, ON]`: Tm2, an OFF type, raises with the ON
+   carriers. "ON / OFF convergence" is shorthand for the two hold arms, which held Tm1|Tm4 and Mi1|Tm3.
+   In the deterministic lobe the carrier terms cancel to **3.6 % of their sum** (cancellation 0.964, `perrun` on
+   the fb0 arm; 0.92 in the pooled shipped-model trace, 0.84 +- 0.20 per run). **The cancellation fraction is a
+   descriptive ratio of the two opposing sums in the type-mean linear decomposition; it does not predict the
+   target's measured figure in sign or size** -- on the deterministic fb0 arm `perrun`'s own
+   `cancellation_summary` gives T3 `linear_estimate` +4.20e-6 against `own_signed_figure` -2.25e-4 (54x too small
+   and the wrong sign), T2 -1.91e-5 vs +1.26e-3, Tm5Y +6.28e-6 vs +9.52e-4, TmY21 -3.04e-6 vs -1.88e-4, LC10a
+   +1.57e-6 vs +6.28e-3. The wiring conclusion rests on the lesion arms below, not on this arithmetic.
+   Silencing either channel restores T3
    (`t3_off_held` 0.062 vs its null 0.026 +- 0.010, z +3.5; `t3_on_held` 0.072 vs 0.025 +- 0.010, z +4.8; both U 16/16,
    p 0.029 = the 4 v 4 floor) and makes T3's figure a direct response instead of a residual (per-run cancellation
    0.20 / 0.24) whose run-to-run scatter collapses to the medulla's (T3 0.062 +- 0.002 and 0.072 +- 0.002 across 4
@@ -68,17 +86,26 @@ scatter of section 4.4 and the deterministic projection of section 4.5:
    inputs). Tm5Y, TmY21 and LC11 are fallback-tier on 100 % of their input (unprofiled); no sign arm was run on them.
    Their deterministic figures exist (point 2) and vanish under the feedback exactly as T3's does, so their loss in
    the shipped model is the same dynamics fact on top of a smaller cancellation (0.68 / 0.81 deterministic).
-5. **LC11 / LC10a -- pooling, in every arm.** Nothing restores the LC cells: T3 restored 2.6-3.9x reaches LC11 at z
-   +0.7 / -0.8 / +1.2 (T3 is 21 % of LC11's input and an LC11 cell pools 94 retinal columns under `out_norm l1`), and
-   the deterministic LC figures themselves (LC11 0.046 mV, LC10a 0.080 mV) lie inside the shipped model's null (0.057
-   +- 0.027 / 0.083 +- 0.037, 5 draws). This is the wiring (94 / 32 columns per cell) times the output normalisation,
-   as optic_measures.md 6 read it; it is upstream-independent.
+5. **LC11 / LC10a -- pooling; the structural half is measured, the experimental half is an underpowered
+   non-detection.** The structural statement is sound: T3 is 21 % of LC11's input, an LC11 cell pools 94 retinal
+   columns under `out_norm l1`, LC10a 32. The experimental statement is **"not detectable at 4 v 4 with this
+   null"**, not "lost in every arm": LC11's null mean ranges 0.045-0.082 mV with SD **0.020-0.045** across arms, so
+   point estimates that did move are invisible -- `t3_off_flip` LC11 0.0765 vs the base's 0.0451 (**+70 %**), and
+   in the replicate batch `t3_on_held` 0.0722 vs base 0.0532 (**+36 %**) and `t3_nc_held` 0.0682 (**+28 %**), all
+   `null`, all `not moved`, only because the pooled scatter is 0.03-0.05 mV. The deterministic LC figures
+   themselves (LC11 0.046 mV, LC10a 0.080 mV) likewise lie inside the shipped model's null (0.057
+   +- 0.027 / 0.083 +- 0.037, 5 draws). The mechanism -- wiring (94 / 32 columns per cell) times the output
+   normalisation, as optic_measures.md 6 read it -- is upstream-independent; the assay cannot yet resolve a 30-70 %
+   change at the LC cells.
 6. **All of it is a small-object fact.** The Neurome size ladder (section 5): at 4.5 / 11.4 / 20 deg the two LC types
    and their small-field inputs sit at the null; at 30 deg T2 / T3 / Tm5Y / TmY21 / TmY13 / TmY5a and LC11 (+4.8) /
-   LC10a (+8.6) all reach 'result' in 5 v 5 runs, behind the loom chain (LPLC2 / LC16 / LC4 from 20 deg). The model's
+   LC10a (+8.6) all reach 'result' in 5 v 5 runs, behind the loom chain, whose threshold lies **below** 20 deg
+   (LPLC2 / LC16 / LC4 reach `result` at 20 deg here, and LPLC2's verdict at 11.4 deg **flips between batches** --
+   z +2.05 / +1.51 / +2.60 / +2.82 over four batches of the same stimulus, so this file's own 11.4 deg point does
+   not reproduce object_sweep.md 8.7's +5.4; section 5). The model's
    size ordering is the opposite of the animal's (LC11 ~5-10 deg objects; LPLC2 expansion).
 
-So: **the object is lost by the ON / OFF convergence at the small-field stage (a wiring fact under a linear sum),
+So: **the object is lost by the convergence of opposite-figure carriers at the small-field stage (a wiring fact under a linear sum),
 whose residual the stochastic spiking feedback then destroys (a dynamics fact), and what survives is pooled away at
 the LC cells (a wiring x output-normalisation fact); it is not a normalisation / rectification / gain artefact and
 not a sign fact.** Nothing was tuned; the edge arms are diagnoses of the linear reading, not proposals.
@@ -98,8 +125,13 @@ job `device cuda` NVIDIA B200, cache md5 `ef23cc27bea13be7f6a96f3c04fd3737`, eff
 spiking type on its firing rate (`trace_obj_rate.json`) for the central-brain inputs of LC10a, which receive no
 optic drive. Re-run on the fixed trace tool (section 7.2): every statistic identical to the first run.
 
-Validation (`validation.status`): **reproduced** -- Mi4 / Mi1 / Tm3 'result' (z +6.6 / +17.2 / +10.5), T2 / T3 /
-Tm5Y / TmY21 / LC11 / LC10a 'null', the object-stage target of docs/INTERP.md section 6.
+Validation (`validation.status`): **reproduced, and that word is verdict-level only.** `trace.py:786-801` checks
+only that Mi4 / Mi1 / Tm3 read `result` and the six named types do not; the **z bands** of docs/INTERP.md section 6
+(Mi4 +22.3 / +28.6, Mi1 +7.8 / +27.9, Tm3 +7.8 / +15.6) are **not tested and do not reproduce here** -- Mi4's
+measured z is **+6.6**, 3.4x below its band, because this batch's 5-draw null SD is ~3x the reference's. What
+reproduces is the carrier / at-null grouping (Mi4 / Mi1 / Tm3 `result` at +6.6 / +17.2 / +10.5, T2 / T3 / Tm5Y /
+TmY21 / LC11 / LC10a `null`) and the stimulus-arm levels; the z magnitudes do not, and under the contract's own
+default statistic (`figure_z`) the target reads `not reproduced`.
 
 | type | depth | stage | kind | n | quantity | stim mean | null mean +- SD | z | U | p | verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -191,7 +223,10 @@ denominator 52.2; all inputs exact-tier, 0 entries changed vs NT_SIGN):
 | Tm2 | OFF | 0.018 | + | 1 | 8 | exact | result (+11.0) | +1.0e-4 | +1.8e-6 |
 
 Carriers raising T3 {Mi1, Tm3, Tm2} +5.1e-5 vs lowering {Tm1, Tm4} -4.3e-5: **cancellation fraction 0.92 through
-excitatory synapses only** (excitatory carrier share 0.55 of 0.56). The Pm / Li inhibition (42 % of the input) is
+excitatory synapses only** (excitatory carrier share 0.55 of 0.56). Note the split is by measured figure, not by
+pathway: `stage.json` records `pathways_raising ['OFF', 'ON']` because Tm2 (OFF) raises alongside Mi1 / Tm3, so the
+accurate statement at T3 is "carriers whose measured figures have opposite sign converge through same-sign
+(excitatory, exact-tier) synapses" -- which is exactly what the two hold arms of section 4 test. The Pm / Li inhibition (42 % of the input) is
 not a carrier (Pm5 z +0.6, Pm1 +1.5, Mi2 -0.0) -- not tuned to the object in this model, as optic_measures.md 5.3
 read by hand. **T2** (z -0.2; E 0.52 / I 0.48; carriers 0.39): Tm2 0.113 + / L5 0.083 + / Tm3 0.070 + / Mi1 0.034 +
 raising (+2.0e-5) vs C3 0.024 - lowering (-1.9e-5), cancellation 0.99, exact-tier throughout; the OFF carrier Tm2 and
@@ -236,8 +271,18 @@ same arithmetic on the mean-over-runs figure):
 
 The single-run values are biased low (a noisy term never cancels exactly) and scatter by +-0.2-0.4, so the pooled
 0.92 / 0.99 / 0.96 are not what one run shows; the clean number is the deterministic arm's: **T3 0.96, T2 0.68, Tm5Y
-0.78, TmY21 0.81** -- the small-field figure is the 4-32 % residual of its carriers' opposing terms, at every one of
-the four types.
+0.78, TmY21 0.81**.
+
+**What the fraction is and is not.** It is a *descriptive* ratio of the two opposing sums in the type-mean linear
+decomposition -- how much of the raising sum the lowering sum removes. It is **not** a prediction of the target's
+measured figure, in sign or in size, and the generating table says so: on the deterministic fb0 arm
+(`perrun.json`, table `cancellation_summary`) the residual `linear_estimate` and the measured
+`own_signed_figure` are T3 **+4.20e-6 vs -2.25e-4** (54x too small, opposite sign), T2 -1.91e-5 vs +1.26e-3, Tm5Y
++6.28e-6 vs +9.52e-4, TmY21 -3.04e-6 vs -1.88e-4, LC10a +1.57e-6 vs +6.28e-3. So read the fraction as a statement
+about the *input decomposition* -- the carriers' terms very nearly annihilate at all four types -- and read the
+claim that the small-field figure is a residual off the **lesion arms** of section 4 (where holding either class
+raises T3 2.6-3.9x and collapses its run scatter), not off this arithmetic. Wherever the "4-32 % residual" phrase
+appears below it is that qualitative statement.
 
 ## 3. Reading of sections 1-2 before the counterfactuals
 
@@ -322,8 +367,8 @@ stimulus runs against its own four none-vs-none draws (z on the null SD, exact U
 
 The **fb0 and inl1 arms are deterministic**: their four runs are identical to four digits and their none-vs-none
 null is exactly 0.0000 in every type, so the tool's z is nan / 1e7-1e9 and its verdict 'result' on p 0.029 is
-degenerate (`note null_sd_zero`; the 42 fb0 / inl1 rows in the JSON's `restores` list are that degeneracy, not
-restorations -- a trace-tool defect noted in 7.3). Those two columns are read as magnitudes; against the base arm's
+degenerate (`note null_sd_zero`). The JSON's `restores` list holds **48 rows, of which 41 are that degeneracy**
+(fb0 21, inl1 20) and **7 are not** (T3 x3, L5 x2, LPLC2 x2) -- a trace-tool defect noted in 7.4. Those two columns are read as magnitudes; against the base arm's
 own 4-draw null the fb0 magnitudes sit at z **T3 +4.5, T2 +5.5, Tm5Y +4.7, TmY21 +5.2, Mi1 +22.9, LC11 -0.8, LC10a
 -0.4** (`z_vs_base_null` in `matrix`).
 
@@ -349,6 +394,15 @@ interp_lesion.md in another guise: with 4 v 4 draws a 'result' whose stim value 
 scatter. **Loses** (10 rows): `outl2` Mi1 / Mi4 / T4c / T4d / Tm20 (their nulls double under the l2 output stage's
 larger feedback), `t3_off_held` Tm1 / Tm2 and `t3_on_held` Tm1 / Tm2 / T5a (z 1.8-2.9 with stim values unchanged)
 -- scatter again.
+
+**State this as a general rule of the assay, not as a footnote to two rows: a per-arm verdict of `result` is not
+by itself a restoration.** A size-matched control run in a replicate batch shows the mechanism cleanly:
+`t3_nc_held` (the non-carrier hold) reaches T3 `result` at **z +3.56, U 16/16, p 0.0286** purely because its own
+null floor fell to 0.0193 +- 0.0031 from the base arm's 0.0233 +- 0.0052, while its stimulus value did not move
+(0.0303 vs 0.0250, `delta_vs_base` +0.005, `moved_vs_base` `not moved`;
+`out/interp/apply_object/skeptic_lesions.json`). **Read `delta_vs_base` and `z_vs_base_null`, never the per-arm
+verdict alone.** By that rule the three T3 edge arms stand (delta +0.038 / +0.049, `moved`) and the L5 / LPLC2
+rows do not.
 
 ### 4.3 What the edge arms say
 
@@ -497,11 +551,18 @@ and T2 / T3 / Tm5Y / TmY21 / TmY13 / TmY5a all switch on at the same size, with 
 behind them: the loss of sections 1-4 is a loss of *small* objects specifically, and what passes at 30 deg is a
 silhouette that darkens ~20 columns at once, the regime in which cancellation between neighbouring ON / OFF
 carriers no longer removes the mean and a residual survives the feedback. (3) The loom chain (LPLC2, LC16, LC4)
-rises from 20 deg with z 5-100 and LPLC2's best cell fires (+3.3 Hz at 30 deg): the size ordering of the model is
+reaches `result` at 20 deg with z 5-100 -- its threshold is below 20 deg, not at it (point 5) -- and LPLC2's best
+cell fires (+3.3 Hz at 30 deg): the size ordering of the model is
 loom detectors < LC10a < LC11 in threshold and the opposite of the animal's (LC11 prefers ~5-10 deg objects, LPLC2
 expansion). (4) The 20 deg point is where LC10a (+2.8, U 21) and T2 (U 24, p 0.016) begin to separate from their
 nulls without reaching the |z| >= 3 rule; at 4 sizes x 5 runs the threshold lies between 20 and 30 deg for both LC
-types. This is the diagnostic Neurome asked for, with the per-body tables and the retinal sampling in the run
+types. (5) **The loom chain's threshold lies *below* 20 deg, and this ladder's own 11.4 deg point does not
+reproduce object_sweep.md 8.7.** There LPLC2 at the 11.4 deg ball is stim +0.351 +- 0.038 vs null +0.139 +- 0.040,
+z **+5.4**, "the one type at z > 3" (8.7, `sign-abs` row). The stimulus value reproduces here and in every
+batch -- 0.301 (`trace_obj`), 0.344 (`lesions` base), 0.363 (ladder d114), 0.349 (`skeptic_lesions` base) -- but
+the nulls are 0.165 +- 0.066, 0.178 +- 0.110, 0.176 +- 0.072 and 0.165 +- 0.065, so z reads **+2.05 / +1.51 /
++2.60 / +2.82, all `null`**. LPLC2's verdict at 11.4 deg is a **null-draw difference**, not a size threshold, and
+flips between batches; quote the difference over the null, not the z. This is the diagnostic Neurome asked for, with the per-body tables and the retinal sampling in the run
 directories above; it is not a pass criterion and nothing was tuned.
 
 ## 6. What follows (diagnoses, not proposals)
@@ -531,9 +592,14 @@ lines, the per-run cancellation and the projection on the synthetic graph of tes
 `out/interp/apply_object/`: `trace_obj.json` (+ `_rate.json`, `_console.txt`), `stage.json`, `trace_<arm>.json` (8
 arms), `lesions.json` (+ console), `perrun.json` (+ console), `ladder.json`, `ladder_<size>.json`;
 `out/apply_object/les/{batch.sh,manifest.resolved.json}` + 96 x 5 recording files, `out/apply_object/ladder/` + 40
-runs, `out/apply_object/smoke/`; cluster logs `out/apobj-smoke_cluster.log`, `out/apobj-les_cluster.log`,
-`out/apobj-lad_cluster.log`. Every JSON carries the resolved LIFParams / OpticParams, `type_path_gain`, the realised
-device (`cuda`, NVIDIA B200) and the cache fingerprint (`ef23cc27bea13be7f6a96f3c04fd3737`).
+runs, `out/apply_object/smoke/`; cluster logs **`out/apobj-smoke2_cluster.log`** (the 3-job `apobj-smoke-84bc5f`
+run), `out/apobj-les_cluster.log`, `out/apobj-lad_cluster.log`. `out/apobj-smoke_cluster.log` is **not** that run:
+it is a 3-line ssh failure (`Could not resolve hostname <cluster-host>`) for an earlier run id,
+`apobj-smoke-15b44e`; it is kept as evidence of the retry, not cited. Every JSON carries the resolved LIFParams / OpticParams, `type_path_gain`, the realised
+device and the cache fingerprint (`ef23cc27bea13be7f6a96f3c04fd3737`). **Where the device evidence lives:** the
+`apobj-les` and `apobj-smoke2` consoles print a device line per job; the `apobj-lad` console does not, so "every
+job `device cuda` (NVIDIA B200)" for the ladder batch is read from each recording's own
+`provenance.execution.device` / `device_name` (which do say `cuda` / NVIDIA B200 in all 40), not from the log.
 
 Exports (`scripts/interp_export.py analyse --result ... --out out/export`; every one `problems: none`):
 
@@ -564,10 +630,26 @@ The cancellation ratios the skeptic named as single-draw-set numbers are now quo
 T3 0.92 pooled / 0.73 +- 0.25 and 0.84 +- 0.20 per run / 0.964 deterministic; T2 0.99 / 0.52 +- 0.23 / 0.86 +- 0.07 /
 0.683; Tm5Y 0.96 / 0.20 +- 0.12 / 0.47 +- 0.41 / 0.784; TmY21 0.45 / 0.29 +- 0.30 / 0.29 +- 0.15 / 0.808.
 
-### 7.3 Defects found in the tools used (for their owners; not edited here)
+### 7.3 Defects in this script, fixed in this revision
+
+* **`analyse` wrote its per-arm traces to a fixed path.** `cmd_analyse` built
+  `OUT_JSON / f"trace_{lid}.json"` regardless of `--dir` and `--json`, so analysing a second recording set with
+  its own `--json` silently overwrote the first set's per-arm traces (a replicate batch overwrote
+  `trace_base.json` / `trace_t3_off_held.json` / `trace_t3_on_held.json`; they were restored by re-running
+  `analyse --dir out/apply_object/les --lesions base,t3_off_held,t3_on_held`, which reproduced them to every digit
+  -- T3 0.0240 z +1.39, 0.0623 z +3.51, 0.0718 z +4.81, only `run_id` and `created_utc` differing -- and the
+  replicate's own traces are kept as `skeptic_trace_*.json`). The path is now `trace_dir_for(args)`: `--trace-dir`
+  if given, else `--json`'s directory, else the tool's output directory. `perrun` reads the same location through
+  a matching `--arm-traces`.
+* **No CPU test covered this script.** `selftest` pinned the edge-lesion arithmetic, the size geometry and the
+  projection but was never collected by pytest. `tests/test_interp.py` now carries an `ApplyObjectTests` class
+  that runs those assertions on the 8-neuron synthetic graph plus the new trace-path derivation.
+
+### 7.4 Defects found in the tools used (for their owners; not edited here)
 
 * **trace**: with a degenerate null (SD exactly 0: the fb0 / inl1 arms) `compare` returns z nan / ~1e8 and verdict
-  'result' on p 0.029 (`note null_sd_zero`); the lesion matrix's `restores` list therefore carries 42 spurious rows.
+  'result' on p 0.029 (`note null_sd_zero`); the lesion matrix's `restores` list therefore carries **41** spurious
+  rows of its 48 (fb0 21, inl1 20), leaving 7 real ones (T3 x3, L5 x2, LPLC2 x2).
   A null of SD 0 should yield verdict 'undetermined' (magnitude only), not 'result'.
 * **decompose / trace composition**: the dynamic decomposition at the lost stage produced no table on these
   recordings (`decompose.arm_params` reads `meta['arm']` = 'stim' / 'ctrl' as a receptor arm name); the static tables
@@ -576,7 +658,7 @@ T3 0.92 pooled / 0.73 +- 0.25 and 0.84 +- 0.20 per run / 0.964 deterministic; T2
   the `edges` kind added in this script); worth promoting into `flyverse/interp/lesion.py` with its receptor-sign
   wrapper.
 
-### 7.4 Provenance
+### 7.5 Provenance
 
 Shipped model throughout (receptor `sign` / `abs`, `type_nt_override` TmY14 glutamate / Mi19 serotonin / aMe8
 acetylcholine, OpticParams as listed in section 1); dataset MaleCNS v1.0 flat connectome (body annotations sha256
