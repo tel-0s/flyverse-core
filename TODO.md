@@ -6,7 +6,7 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
 
 ## A. Release blockers (days)
 
-- [ ] **LICENSE** (code) and a data-licence note: MaleCNS v1.0 (Janelia FlyEM; cite the release paper and its
+- [x] **LICENSE** (code: MIT, 2026-09-13) and a data-licence note: MaleCNS v1.0 (Janelia FlyEM; cite the release paper and its
       licence), the external expression tables (`scripts/fetch_data.py`; not redistributed — `data/external/` is
       git-ignored), FlyWire NT predictions where used. `CITATION.cff` for flyverse itself.
 - [ ] **Infrastructure scrub** — done at the tip (2026-09-13: cluster host / IP / filesystem paths replaced by
