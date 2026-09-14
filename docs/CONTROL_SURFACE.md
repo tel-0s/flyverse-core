@@ -97,6 +97,44 @@ returns `(B, N)`; use `.any(axis=0)` to keep cells active in any fly. Graded opt
 cells remain selected because they have no spike frequency. Removing cells based on activity
 changes the model and does not preserve full-brain trajectories.
 
+## Hooks, modules, graph extension
+
+Everything in this section is **opt-in and off by default**, and a controller with nothing attached
+follows the numerical path documented above, byte for byte (`tests/test_bit_identity.py`).
+[Optional extensions](EXTENSIBILITY.md) is the reference; this is the shape of the surface.
+
+```python
+fb.add_hook(lambda f, t_ms: f.brain.set_poisson(f.c.select(type="DNa02"), 30.), when="pre", name="bias")
+fb.attach(FunctionModule({"src": {"type": "LC4"}}, {"dst": {"type": "DNp01"}}, fn, name="relay"))
+c2 = fb.c.extend(nodes, edges, cache_dir="out/aux-cache")     # a new Connectome; build a new FlyBrain from it
+```
+
+| surface | what it is |
+|---|---|
+| `add_hook(fn, when="pre"/"post", name=...)`, `remove_hook(name)` | A named callable run once per `step()` call, before or after the advance. It receives the controller and `t_ms` and may only use the existing `set_drive` / `set_poisson` / `stimulate` primitives. An exception aborts the call and names the hook. |
+| `attach(module)`, `detach(name)`, `attached_modules` | A named object that reads selected cells and writes a neural channel between frames. `FunctionModule`, `TorchModule`, `SNNModule` (an independent synthetic `Brain`) and `ReadoutModule` (reads only, sampled through the [NT source interface](NT_READOUT.md)) ship in `flyverse.modules`. |
+| `Connectome.extend(nodes, edges, cache_dir=...)` | Synthetic cells with **negative int64** bodyIds and their edges, in a scratch cache. Biological IDs and biological-to-biological weights never change, and `prune` inverts it exactly. Construct a new `FlyBrain` from the result. |
+| `LIFParams(surrogate_grad=True)` | Functional Torch LIF and optic updates that backpropagate through a short window. Torch only: native CUDA/Metal kernels, CUDA graphs and explicit `event_driven` all raise. |
+
+Selections use the `interp.common.resolve` grammar, so a module names cell types or body IDs, never
+row indices of a particular subset. Writes are validated at attach: two modules may not write the
+same channel on the same cell. Drive writes are additive and may be negative; Poisson writes combine
+with the senses and with `stimulate` **by maximum**, and a negative rate clamps to zero. Weights are
+never rewritten by a module — an extension is an external input, not a new synapse.
+
+Frame timing is the part that bites. A module that **writes** (or a vision encoder that feeds the
+optic frame) splits `step(ms)` into frames of at most 10 ms, because its output is the next frame's
+input; a module that only reads — a `ReadoutModule`, any `kind="analysis"` observer — does not, and
+`step(50)` stays bit-identical to the same call with nothing attached. Observation does not perturb
+the model. Modules see the **previous** frame's state, and all inputs are gathered before any module
+runs, so attachment order cannot create a zero-delay loop.
+
+`fb.hooks`, `fb.module_records()` and `provenance(..., fb=fb)["model"]` record what was attached;
+checkpoints carry hook identifiers, module descriptions and module state, but never code — reattach
+matching code before `load_state_dict`. Every attached thing declares a `kind`
+(`stop-gap` / `mechanism` / `sensor` / `decoder` / `analysis`), so a result says which of its numbers
+came from the connectome and which from hand-written code.
+
 ## Execution options
 
 ```python

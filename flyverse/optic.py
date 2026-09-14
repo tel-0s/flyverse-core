@@ -168,7 +168,8 @@ def _mv(M, x: torch.Tensor) -> torch.Tensor:
 class OpticLobe:
     def __init__(self, c: Connectome, retina: Retina, params: OpticParams | None = None, device=None, batch: int = 1,
                  metal_kernels: bool | None = None, cuda_kernels: bool | None = None, cuda_sparse: str = "torch",
-                 receptor: ReceptorSigns | None = None, receptor_gain: dict | None = None, slow=None):
+                 receptor: ReceptorSigns | None = None, receptor_gain: dict | None = None, slow=None,
+                 surrogate_grad: bool = False):
         """metal_kernels: custom Metal kernels for the sparse products and the substep (flyverse/metal.py);
         None = automatically on MPS when available.
         receptor: an optional connectome.receptor_signs(c, ...) (LIFParams.receptor_model): every optic-lobe edge
@@ -190,12 +191,22 @@ class OpticLobe:
         rest-to-threshold gap; 'threshold' shifts the output nonlinearity, r = clip(v + b + min(g_slow, 0.9 (1 - b)), 0, 1).
         Spiking targets of rate-unit monoamine cells (Mi19 serotonin -> central brain) are outside both models (the LIF
         prunes frozen presynaptic cells). The native CUDA / Metal optic kernels do not carry the tone: an active slow
-        term runs the Torch substep (a warning if kernels were requested)."""
+        term runs the Torch substep (a warning if kernels were requested).
+        surrogate_grad (LIFParams.surrogate_grad): run the frame functionally so autograd can reach it. Torch only --
+        native kernels and cuda_sparse='warp' raise. The substep is the SAME model: it goes through _recurrent() /
+        _output() like inference, so the per-stream hooks above act on it identically, and with the hooks off the two
+        paths evaluate identical expressions (bit-identical; tests/test_surrogate.py). Only the storage differs (state
+        tensors are rebuilt rather than written in place)."""
         self.c, self.r, self.p = c, retina, params or OpticParams()
         self.receptor = receptor
         self.slow = slow if (slow is not None and receptor is not None and slow.gain) else None
         self.B = int(batch)
         self.device = resolve(device)
+        self.surrogate_grad = surrogate_grad
+        if surrogate_grad:
+            if cuda_kernels or metal_kernels or cuda_sparse != "torch":
+                raise ValueError("surrogate_grad requires Torch optic operations, not native CUDA/Metal kernels")
+            cuda_kernels = metal_kernels = False
         # the per-stream hooks (OpticParams.stream_rectify / stream_adapt / spatial_suppress): Torch substep only
         self._hooks = bool(self.p.stream_rectify or self.p.stream_adapt or self.p.spatial_suppress)
         torch_only = self.slow is not None or self._hooks
@@ -448,10 +459,15 @@ class OpticLobe:
             m = s["mode"]
             x = y if m is None else (y.clamp(min=0.0) if m == "pos" else ((-y).clamp(min=0.0) if m == "neg" else y.abs()))
             xs.append(x)
-        if update:
-            for k in range(len(self._a_stream)):
-                Ak = self.stream_adapt_state[k]
-                torch.add(u, (Ak - u) * self._a_stream[k], out=Ak)
+        if update and self._a_stream:
+            if self.surrogate_grad:
+                # functional update: the differentiable path must not write in place into a tensor autograd holds
+                self.stream_adapt_state = torch.stack([u + (self.stream_adapt_state[k] - u) * a
+                                                       for k, a in enumerate(self._a_stream)])
+            else:
+                for k in range(len(self._a_stream)):
+                    Ak = self.stream_adapt_state[k]
+                    torch.add(u, (Ak - u) * self._a_stream[k], out=Ak)
         return xs
 
     def _recurrent(self, dr: torch.Tensor, update: bool = False) -> torch.Tensor:
@@ -477,13 +493,13 @@ class OpticLobe:
 
     # ------------------------------------------------------------------ photoreceptors
     @torch.no_grad()
-    def photoreceptor_activity(self, col_radiance: torch.Tensor, dt_ms: float) -> torch.Tensor:
+    def photoreceptor_activity(self, col_radiance: torch.Tensor, dt_ms: float, *, intensity=None) -> torch.Tensor:
         """col_radiance (B, n_col, 4) -> photoreceptor contrast activity (B, n_pr)."""
         p = self.p
         rad = col_radiance.to(self.device, torch.float32)
         if rad.dim() == 2:
             rad = rad[None]
-        I_pr = (rad[:, self.pr_column_t, :] * self.sens[None]).sum(-1)                     # (B, n_pr)
+        I_pr = (rad[:, self.pr_column_t, :] * self.sens[None]).sum(-1) if intensity is None else intensity
         I = _mv(self.avg, I_pr)                                                               # (B, n_col*5)
         fresh = self._fresh[:, None]
         torch.where(fresh, I, self.I_lp, out=self.I_lp)
@@ -538,13 +554,18 @@ class OpticLobe:
         self.v.zero_()
         self.r0 = self.b_vec[None].clone()
 
+    def step_frame(self, col_radiance: torch.Tensor, spk_rate_hz: torch.Tensor, frame_ms: float, *, intensity=None) -> torch.Tensor:
+        if self.surrogate_grad:
+            return self._step_frame_grad(col_radiance, spk_rate_hz, frame_ms, intensity=intensity)
+        return self._step_frame_inference(col_radiance, spk_rate_hz, frame_ms, intensity=intensity)
+
     @torch.no_grad()
-    def step_frame(self, col_radiance: torch.Tensor, spk_rate_hz: torch.Tensor, frame_ms: float) -> torch.Tensor:
+    def _step_frame_inference(self, col_radiance, spk_rate_hz, frame_ms, *, intensity=None):
         """Advance the optic lobe by one frame; returns the drive (B, N) in mV for the spiking brain.
         spk_rate_hz: the brain's rate tensor, (B, N) (or (N,))."""
         if self.r0 is None:
             self.relax()
-        a_pr = self.photoreceptor_activity(col_radiance, frame_ms)
+        a_pr = self.photoreceptor_activity(col_radiance, frame_ms, intensity=intensity)
         if spk_rate_hz.dim() == 1:
             spk_rate_hz = spk_rate_hz[None]
         s = (spk_rate_hz[:, self.spk_idx_t] / 100.0).clamp(0, 3)
@@ -581,7 +602,86 @@ class OpticLobe:
         self.last["dr"] = dr
         return drive
 
+    def _step_frame_grad(self, col_radiance, spk_rate_hz, frame_ms, *, intensity=None):
+        """Functional Torch optics for a short differentiable simulation window.
+
+        The substep is the same model as `_step_frame_inference`: the recurrent input goes through
+        `self._recurrent(dr, update=True)` and the output through `self._output(...)`, so the opt-in per-stream
+        hooks (OpticParams.stream_rectify / stream_adapt / spatial_suppress) act here exactly as they do in
+        inference, and with the hooks off the two paths evaluate the identical expressions (bit-identical;
+        tests/test_surrogate.py::test_grad_and_inference_optic_agree_bitwise). Only the *storage* differs:
+        every state tensor is rebuilt functionally instead of being written in place."""
+        p = self.p
+        if self.r0 is None:
+            self.relax()
+        rad = col_radiance.to(self.device, torch.float32)
+        if rad.ndim == 2:
+            rad = rad[None]
+        I_pr = (rad[:, self.pr_column_t, :] * self.sens[None]).sum(-1) if intensity is None else intensity
+        I = _mv(self.avg, I_pr)
+        lp = torch.where(self._fresh[:, None], I, self.I_lp)
+        mean = torch.where(self._fresh[:, None], I, self.I_mean)
+        self._fresh = torch.zeros_like(self._fresh)
+        a_lp = float(np.exp(-frame_ms / p.tau_lp_ms)); a_ad = float(np.exp(-frame_ms / p.tau_adapt_ms))
+        self.I_lp = a_lp * lp + (1. - a_lp) * I
+        self.I_mean = a_ad * mean + (1. - a_ad) * self.I_lp
+        contrast = ((self.I_lp - self.I_mean) / (self.I_mean + p.eps)).clamp(-1., p.contrast_clip)
+        self.contrast = torch.where(self.has_t[None], contrast, 0.)
+        a_pr = self.contrast[:, self.pr_cell_t]
+        if spk_rate_hz.ndim == 1:
+            spk_rate_hz = spk_rate_hz[None]
+        s = (spk_rate_hz[:, self.spk_idx_t] / 100.).clamp(0, 3)
+        total = self._pending_ms + frame_ms
+        steps = int(np.floor((total + 1e-9) / p.dt_ms))
+        self._pending_ms = max(0., total - steps * p.dt_ms)
+        if steps:
+            pr_input = p.gain_in * _mv(self.W_rp, a_pr)
+            spk_input = p.gain_fb * _mv(self.W_rs, s)
+            if self.slow is not None:
+                self._slow_in_s = torch.stack([p.gain_fb * _mv(W, s) if W is not None else torch.zeros_like(self.v)
+                                              for W in self.W_slow_rs])
+            for _ in range(steps):
+                dr = self.rates() - self.b_vec[None]
+                if self.slow is None:
+                    # Keep the addition order of _substep: combining the held inputs would change rounding.
+                    inp = self._recurrent(dr, update=True) + pr_input - p.adapt_gain * self.adapt
+                    inp = inp + spk_input
+                else:
+                    slow = []
+                    for k, W in enumerate(self.W_slow_rr):
+                        target = self._slow_in_s[k]
+                        if W is not None:
+                            target = target + p.gain_rr * _mv(W, dr)
+                        target = target * self._slow_scale[k]
+                        slow.append(target + (self.g_slow_cls[k] - target) * self._a_slow[k])
+                    self.g_slow_cls = torch.stack(slow)
+                    self.g_slow = self.g_slow_cls.sum(0)
+                    syn = self._recurrent(dr, update=True) + pr_input + spk_input
+                    if self.slow.mode == "additive":
+                        inp = syn - p.adapt_gain * self.adapt + self.g_slow
+                    elif self.slow.mode == "gain":
+                        factor = (1. + self.g_slow / self._slow_norm).clamp(*self.slow.clip)
+                        inp = syn * factor - p.adapt_gain * self.adapt
+                    else:
+                        inp = syn - p.adapt_gain * self.adapt
+                self.v = inp + (self.v - inp) * self._a[None]
+                self.adapt = dr + (self.adapt - dr) * self._a_ad
+        self.delta_rate = self.rates() - self.r0
+        drive = torch.zeros(self.B, self.c.n, device=self.device)
+        drive[:, self.spk_idx_t] = (p.gain_out_mv * self._output(self.delta_rate)).clamp(-p.drive_clip_mv, p.drive_clip_mv)
+        self.last["dr"] = self.delta_rate
+        if self.diagnostics:
+            self.last["contrast"] = self.contrast.detach().view(self.B, -1, 5).cpu().numpy()
+        return drive
+
+    def detach_state(self):
+        for name in ("v", "adapt", "I_lp", "I_mean", "_fresh", "contrast", "delta_rate", "g_slow", "g_slow_cls",
+                     "_slow_in_s", "stream_adapt_state"):
+            setattr(self, name, getattr(self, name).detach().clone())
+
     def reset(self, rows=None) -> None:
+        if self.surrogate_grad:
+            self.detach_state()
         if rows is None:
             self._fresh[:] = True; self.v.zero_(); self.adapt.zero_()
             self.g_slow_cls.zero_(); self.g_slow.zero_(); self._slow_in_s.zero_(); self.stream_adapt_state.zero_()

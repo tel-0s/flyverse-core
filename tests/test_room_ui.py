@@ -59,6 +59,24 @@ class DisplaySim:
 
 
 class ConsoleTests(unittest.TestCase):
+    def test_extension_readout_is_sampled_only_when_visible_and_advanced(self):
+        from flyverse.nt_readout import NTChannel, NTSnapshot
+        from flyverse.room_ui import RoomUI
+        channel = NTChannel("health", "score", 0, 1)
+        module = SimpleNamespace(channels=(channel,), readout=Mock(return_value=NTSnapshot(0, np.array([1]), (channel,), np.array([[.5]]))))
+        sim = DisplaySim()
+        ui = RoomUI()
+        ui._module_readout(sim,module,False)
+        module.readout.assert_not_called()
+        self.assertEqual(ui._module_readout(sim,module,True), [("health","0.5 score")])
+        ui._module_readout(sim,module,True)
+        self.assertEqual(module.readout.call_count,1)
+        sim.brain.t = 100
+        ui._module_readout(sim,module,False)
+        self.assertEqual(module.readout.call_count,1)
+        ui._module_readout(sim,module,True)
+        self.assertEqual(module.readout.call_count,2)
+
     def setUp(self):
         self.environment = patch.dict(os.environ,{"SDL_VIDEODRIVER":"dummy","SDL_AUDIODRIVER":"dummy"})
         self.environment.start()

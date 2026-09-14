@@ -587,6 +587,8 @@ class Recorder:
         self._motor = {}
         self._t = []
         self._optic_pos = None
+        self._extension_frames = {}
+        self._extension_model = None
 
     def _optic_positions(self, optic):
         if self._optic_pos is None:
@@ -598,6 +600,14 @@ class Recorder:
         brain = getattr(fb, "brain", fb)
         B = int(getattr(brain, "B", 1))
         self._t.append(float(brain.t if t_ms is None else t_ms))
+        extension_inputs = fb.module_inputs() if hasattr(fb, "module_inputs") else {}
+        shape = (B, len(self.idx)) if B > 1 else (len(self.idx),)
+        for key in set(extension_inputs) | set(self._extension_frames):
+            frames = self._extension_frames.setdefault(key, [np.zeros(shape, np.float32) for _ in self._t[:-1]])
+            value = _np(extension_inputs[key])[..., self.idx] if key in extension_inputs else np.zeros(shape, np.float32)
+            frames.append(np.asarray(value, np.float32).reshape(shape).copy())
+        if extension_inputs or getattr(fb, "attached_modules", {}) or getattr(fb, "hooks", []):
+            self._extension_model = {"hooks": fb.hooks, "modules": fb.module_records()}
         for q in self.quantities:
             if q == "rate_hz":
                 x = np.asarray(brain.rate_np())[self.idx] if B == 1 and hasattr(brain, "rate_np") else _np(brain.rate)[..., self.idx]
@@ -627,9 +637,23 @@ class Recorder:
 
     def finish(self, meta: dict | None = None) -> Recording:
         q = {k: np.stack(v) if v else np.zeros((0, len(self.idx)), np.float32) for k, v in self._frames.items()}
+        q.update({k: np.stack(v) for k, v in self._extension_frames.items()})
         mo = {k: np.stack(v) for k, v in self._motor.items()}
         m = dict(meta or {}); m.setdefault("sides", self.sides.tolist()); m.setdefault("quantities", list(self.quantities))
+        if self._extension_model is not None:
+            m["extensions"] = self._extension_model
+            m["input_classes"] = list(self._extension_frames)
         return Recording(np.asarray(self._t, dtype=np.float64), self.idx.copy(), self.body_ids.copy(), self.types.copy(), q, mo, m)
+
+
+def module_input_table(records):
+    """External input identities, kept distinct from synaptic edges in trace/decompose."""
+    rows = []
+    for m in records:
+        for label, ids in m.get("writes", {}).items():
+            rows.extend({"input_class": "module:" + m["name"], "channel": m["channel_out"],
+                         "body_post": str(i), "label": label, "module_kind": m["kind"]} for i in ids)
+    return pd.DataFrame(rows)
 
 
 def record_frames(step, rec: Recorder, frames: int, fb=None, motor=None, every: int = 1) -> Recorder:
@@ -831,20 +855,28 @@ def connectome_fingerprint(c: cn.Connectome, cache_dir=None) -> dict:
     nnz, n_neurons, the NT overrides in force and, for a subset, its size. Memoised per object."""
     ref = c.reference
     key = id(ref)
+    # Object IDs can be reused after a scratch graph is collected. Keep a weak
+    # identity check so an unrelated graph never inherits its fingerprint.
+    import weakref
+    if key in _FP_CACHE and _FP_CACHE[key][0]() is not ref:
+        del _FP_CACHE[key]
     if key not in _FP_CACHE:
         W = ref.W.tocsr()
         if not W.has_sorted_indices:
             W = W.copy(); W.sort_indices()
-        _FP_CACHE[key] = {"md5_data": hashlib.md5(W.data.tobytes()).hexdigest(),
+        fingerprint = {"md5_data": hashlib.md5(W.data.tobytes()).hexdigest(),
                           "md5_indices": hashlib.md5(W.indices.tobytes()).hexdigest(),
                           "md5_indptr": hashlib.md5(W.indptr.tobytes()).hexdigest(),
                           "md5": _md5_csr(W), "sum_abs_W": float(np.abs(W.data).sum()), "nnz": int(W.nnz), "n_neurons": int(ref.n),
                           "nt_counts": {str(k): int(v) for k, v in ref.neurons["nt"].value_counts().items()} if "nt" in ref.neurons else {}}
-    fp = dict(_FP_CACHE[key])
-    fp["cache_dir"] = str(cache_dir or os.environ.get("FLYVERSE_CACHE") or cn.CACHE_DIR)
+        _FP_CACHE[key] = (weakref.ref(ref, lambda unused, k=key: _FP_CACHE.pop(k, None)), fingerprint)
+    fp = dict(_FP_CACHE[key][1])
+    fp["cache_dir"] = str(cache_dir or getattr(c, "cache_dir", None) or os.environ.get("FLYVERSE_CACHE") or cn.CACHE_DIR)
     fp["type_nt_override"] = dict(cn.TYPE_NT_OVERRIDE) if cn.TYPE_NT_OVERRIDE_DEFAULT else {}
     fp["unknown_nt_override_regex"] = dict(cn.UNKNOWN_NT_OVERRIDE_REGEX)
     fp["subset"] = None if ref is c else {"n": int(c.n), "of": int(ref.n)}
+    if c._extension is not None:
+        fp["extension"] = to_jsonable(c._extension)
     return fp
 
 
@@ -937,8 +969,16 @@ def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, see
     copy with no `.git`), the SHA-256 of every source file the run loaded goes in, so 'commit unknown' is the last
     resort and not the only answer."""
     git = git_state()
+    if fb is not None:
+        candidate_lif = getattr(getattr(fb, "brain", None), "p", None)
+        candidate_optic = getattr(getattr(fb, "optic", None), "p", None)
+        lif = lif or (candidate_lif if dataclasses.is_dataclass(candidate_lif) else None)
+        optic = optic or (candidate_optic if dataclasses.is_dataclass(candidate_optic) else None)
+    model = model_record(lif, optic)
+    model["hooks"] = getattr(fb, "hooks", [])
+    model["modules"] = fb.module_records() if hasattr(fb, "module_records") else []
     return {"flyverse_commit": git, "source_fingerprint": source_fingerprint(git), "dataset_release": dataset_release(),
-            "compiled_connectome": connectome_fingerprint(c, cache_dir), "model": model_record(lif, optic),
+            "compiled_connectome": connectome_fingerprint(c, cache_dir), "model": model,
             "execution": execution_record(fb, device, seeds, env_seeds, batch, backend, replicate_unit),
             "stimulus": to_jsonable(stimulus) if stimulus is not None else {"protocol": None, "params": {}, "control": None},
             "retina": to_jsonable(retina) if retina is not None else {"file": None, "n_columns": None, "column_to_bodies": None},
