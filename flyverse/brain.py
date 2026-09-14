@@ -146,6 +146,7 @@ class LIFParams:
     slow_tau_by_class: dict | None = None
     slow_mode: str = "additive"               # "additive" | "gain" | "threshold" (see above)
     slow_gain_clip: tuple = (0.0, 4.0)        # bounds of the multiplicative factor in "gain" mode
+    surrogate_grad: bool = False            # experimental Torch-only gradients through short windows
 
 
 # Gain-class factors of the receptor model ("sign+gain" / "full"): the table's classes are per-source expression
@@ -328,6 +329,18 @@ def _slow_weights(c: Connectome, p: LIFParams, receptor: ReceptorSigns, spec: Sl
     return out
 
 
+class _SurrogateSpike(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, voltage):
+        ctx.save_for_backward(voltage)
+        return (voltage >= 0).to(voltage.dtype)
+
+    @staticmethod
+    def backward(ctx, grad):
+        (voltage,) = ctx.saved_tensors
+        return grad / (1. + 25. * voltage.abs()).square()
+
+
 class Brain:
     def __init__(self, c: Connectome, params: LIFParams | None = None, device: str | None = None,
                  seed: int = 0, batch: int = 1, metal_kernels: bool | None = None,
@@ -343,6 +356,13 @@ class Brain:
         self.n = c.n
         self.B = int(batch)
         p = self.p
+
+        if p.surrogate_grad:
+            if cuda_kernels or metal_kernels or cuda_sparse != "torch":
+                raise ValueError("surrogate_grad requires the Torch path; native CUDA/Metal kernels cannot backpropagate")
+            if p.event_driven:
+                raise ValueError("surrogate_grad requires sparse matmul; event selection discards subthreshold gradients")
+            cuda_kernels = metal_kernels = False
 
         if self.B < 1 or not math.isfinite(p.dt) or p.dt <= 0:
             raise ValueError("batch must be positive and dt must be positive and finite")
@@ -379,7 +399,7 @@ class Brain:
             S = {k: Sk.copy() for k, Sk in S.items()}
             for k, Sk in S.items():
                 Sk.data = Sk.data * np.float32(p.w_syn * self.slow.gain[k])
-        self.event_driven = (self.device.type != "cuda") if p.event_driven is None else bool(p.event_driven)
+        self.event_driven = False if p.surrogate_grad else ((self.device.type != "cuda") if p.event_driven is None else bool(p.event_driven))
         adapt_map_early = DEFAULT_ADAPT_BY_TYPE if p.adapt_by_type is None else p.adapt_by_type
         if adapt_map_early and cuda_kernels:
             import warnings
@@ -644,17 +664,24 @@ class Brain:
 
     # ------------------------------------------------------------------ input helpers
     def _idx(self, idx) -> torch.Tensor:
-        return torch.as_tensor(np.asarray(idx), device=self.device, dtype=torch.long)
+        return torch.as_tensor(idx, device=self.device, dtype=torch.long)
 
     def set_drive(self, idx, mv) -> None:
         """Injected current (mV) of neurons `idx`: scalar, (len(idx),) or (B, len(idx))."""
-        self.drive[:, self._idx(idx)] = torch.as_tensor(np.asarray(mv, dtype=np.float32), device=self.device)
+        if getattr(self, "_input_target", None) is not None:
+            return self._input_target("drive_mv", idx, mv)
+        value = torch.as_tensor(mv, dtype=torch.float32, device=self.device)
+        if self.p.surrogate_grad:
+            self.drive = self.drive.clone()
+        self.drive[:, self._idx(idx)] = value
 
     def set_poisson(self, idx, rate_hz) -> None:
         """Force Poisson spikes at rate_hz on neurons `idx`: scalar, (len(idx),) or (B, len(idx))."""
-        r = torch.as_tensor(np.asarray(rate_hz, dtype=np.float32), device=self.device)
+        if getattr(self, "_input_target", None) is not None:
+            return self._input_target("poisson_hz", idx, rate_hz)
+        r = torch.as_tensor(rate_hz, dtype=torch.float32, device=self.device)
         self.poisson_p[:, self._idx(idx)] = r * (self.p.dt / 1000.0)
-        self._poisson_on = bool(np.any(np.asarray(rate_hz) > 0)) or bool(self.poisson_p.count_nonzero() > 0)
+        self._poisson_on = bool((r > 0).any()) or bool(self.poisson_p.count_nonzero() > 0)
 
     def freeze(self, idx) -> None:
         """Neurons `idx` never spike in the LIF (they are simulated as rate units in optic.py)."""
@@ -662,6 +689,8 @@ class Brain:
 
     def reset(self, rows=None) -> None:
         """Reset the state of brains `rows` (all if None) to rest."""
+        if self.p.surrogate_grad:
+            self.detach_state()
         sel = slice(None) if rows is None else torch.as_tensor(np.asarray(rows), device=self.device, dtype=torch.long)
         self.v[sel] = self.p.v_rest
         for t in (self.g, self.g_slow, self.refrac, self.drive, self.poisson_p, self.rate, self.spikes, self.adapt,
@@ -675,8 +704,90 @@ class Brain:
         self._rate_np_key = None
 
     # ------------------------------------------------------------------ dynamics
-    @torch.no_grad()
     def step(self, n_steps: int = 1) -> None:
+        if self.p.surrogate_grad:
+            if self.cuda or self.metal:
+                raise ValueError("surrogate_grad cannot use native kernels")
+            return self._step_surrogate(n_steps)
+        return self._step_inference(n_steps)
+
+    def detach_state(self):
+        """End a truncated backpropagation window without resetting simulated state."""
+        for name in ("v", "g", "g_slow", "g_slow_cls", "refrac", "drive", "poisson_p", "rate", "spikes",
+                     "adapt", "res", "spike_buf", "spike_counts"):
+            setattr(self, name, getattr(self, name).detach().clone())
+        self._acc = {k: v.detach().clone() for k, v in self._acc.items()}
+
+    def _step_surrogate(self, n_steps):
+        """Functional counterpart of the Torch LIF update, including clocks and slow tone."""
+        p = self.p
+        for _ in range(n_steps):
+            phase = self._phase[self.step_count % self.K] if self._kvec is not None else None
+            a_s = phase["a_s"] if phase else self._a_s
+            a_m = phase["a_m"] if phase else self._a_m
+            a_r = phase["a_r"] if phase else self._a_r
+            a_ad = phase["a_ad"] if phase else self._a_ad
+            a_std = phase["a_std"] if phase else self._a_std
+            dt = phase["dt"] if phase else p.dt
+            x = self.spike_buf[self.buf_pos]
+            self.g = self.g * a_s
+            slow = [self.g_slow_cls[k] * (phase["a_slow"][k] if phase else self._a_slow[k])
+                    for k in range(len(self.slow_classes))]
+            weights = self._W_k if phase else {1: self.W}
+            for kk, W in weights.items():
+                if kk == 1:
+                    incoming = x
+                else:
+                    self._acc[kk] = self._acc[kk] + x
+                    if self.step_count % kk:
+                        continue
+                    incoming = self._acc[kk]
+                    self._acc[kk] = torch.zeros_like(incoming)
+                self.g = self.g + (W @ incoming.T.contiguous()).T
+                if self._slow_active:
+                    matrices = self._W_slow_k[kk] if phase else self.W_slow
+                    slow = [value + (Wk @ incoming.T.contiguous()).T for value, Wk in zip(slow, matrices)]
+            if self._slow_active:
+                self.g_slow_cls = torch.stack(slow)
+                self.g_slow = self.g_slow_cls.sum(0)
+            target = self._membrane_target()
+            voltage = target + (self.v - target) * a_m
+            voltage = torch.where(self.refrac > 0, p.v_reset, voltage)
+            self.refrac = (self.refrac - dt).clamp_min(0)
+            threshold = p.v_th
+            if self._slow_active and self.slow.mode == "threshold":
+                threshold = p.v_th - self.g_slow.clamp(max=SLOW_THRESHOLD_MAX_FRAC * self.slow.norm_mv)
+            spikes = _SurrogateSpike.apply(voltage - threshold) * self.active
+            if phase:
+                spikes = spikes * phase["u"]
+            if self._poisson_on:
+                probability = self.poisson_p * phase["pois"] if phase else self.poisson_p
+                forced = (torch.rand(voltage.shape, generator=self.gen, device=self.device) < probability).float()
+                spikes = torch.maximum(spikes, forced)
+            # Hard reset decisions have no derivative; the spike signal carries the surrogate.
+            fired = spikes.detach() > 0
+            self.v = torch.where(fired, p.v_reset, voltage)
+            self.refrac = torch.where(fired, p.t_ref, self.refrac)
+            self.spikes = spikes
+            if self.adapt_jump_vec is not None or p.adapt_jump > 0:
+                jump = self.adapt_jump_vec if self.adapt_jump_vec is not None else p.adapt_jump
+                self.adapt = self.adapt * a_ad + spikes * jump
+            transmitted = spikes * self.res if self._std_on else spikes
+            if self._std_on:
+                self.res = 1. - (1. - torch.where(fired, self.res * (1. - self.std_u_vec), self.res)) * a_std
+            buffers = list(self.spike_buf.unbind(0))
+            buffers[self.buf_pos] = transmitted
+            self.spike_buf = torch.stack(buffers)
+            self.buf_pos = (self.buf_pos + 1) % self.n_delay
+            if self.record_activity:
+                self.spike_counts = self.spike_counts + spikes
+            rate_gain = phase["rate_gain"] if phase else (1. - self._a_r) * 1000. / p.dt
+            self.rate = self.rate * a_r + spikes * rate_gain
+            self.t += p.dt
+            self.step_count += 1
+
+    @torch.no_grad()
+    def _step_inference(self, n_steps: int = 1) -> None:
         if self._kvec is not None:
             self._step_clocked(n_steps)
             return
@@ -825,7 +936,7 @@ class Brain:
         device->host copy is a sync; the demo makes ~30 readouts per frame)."""
         key = (self.step_count, self.t)
         if self._rate_np_key != key:
-            self._rate_np = self.rate[0].cpu().numpy()
+            self._rate_np = self.rate[0].detach().cpu().numpy()
             self._rate_np_key = key
         return self._rate_np
 
@@ -833,7 +944,7 @@ class Brain:
         """(len(idx),) for B = 1, else (B, len(idx))."""
         if self.B == 1:
             return self.rate_np()[np.asarray(idx)]
-        return self.rate[:, self._idx(idx)].cpu().numpy()
+        return self.rate[:, self._idx(idx)].detach().cpu().numpy()
 
     def mean_rate(self, idx):
         """float for B = 1, else (B,) array."""
@@ -841,7 +952,7 @@ class Brain:
             return 0.0 if self.B == 1 else np.zeros(self.B)
         if self.B == 1:
             return float(self.rate_np()[np.asarray(idx)].mean())
-        return self.rate[:, self._idx(idx)].mean(dim=1).cpu().numpy()
+        return self.rate[:, self._idx(idx)].mean(dim=1).detach().cpu().numpy()
 
     def total_spikes(self):
         cached = getattr(self, "_cuda_spike_total", None)
