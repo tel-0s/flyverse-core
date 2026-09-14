@@ -103,6 +103,23 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(ValueError): Proprioception(graph(), "all", mn_ref_hz=0)
         with self.assertRaises(ValueError): Proprioception(graph(), "all", haltere_k=-1)
 
+    def test_round3_tokens_leg_cycle_and_haltere_sided(self):
+        P = Proprioception
+        self.assertEqual(P.parse_flags("all"), (P.CHANNELS, {"haltere_coriolis": False, "leg_cycle": False, "haltere_sided": False}))
+        self.assertEqual(P.parse_flags("all+leg_cycle+haltere_sided+haltere_coriolis")[1], {"haltere_coriolis": True, "leg_cycle": True, "haltere_sided": True})
+        self.assertEqual(P.parse_spec("all+leg_cycle"), (P.CHANNELS, False))                 # the round-2 view is unchanged
+        with self.assertRaises(ValueError): P.parse_flags("haltere+leg_cycle")               # leg_cycle needs a leg channel
+        with self.assertRaises(ValueError): P.parse_flags("chordotonal+haltere_sided")       # haltere_sided needs the haltere channel
+        s = Proprioception(graph(), "chordotonal,campaniform+leg_cycle")
+        self.assertEqual(s.spec, "chordotonal,campaniform+leg_cycle"); self.assertTrue(s.leg_cycle); self.assertFalse(s.haltere_sided)
+        self.assertIsNone(s.haltere_sides(None))
+        base = Proprioception(graph(), "all")
+        self.assertFalse(base.leg_cycle); self.assertFalse(base.haltere_sided); self.assertEqual(base.spec, "all")
+        self.assertNotIn("segments", base.counts()["chordotonal"])                           # the round-2 counts dict is untouched
+        c = s.counts()["chordotonal"]
+        self.assertEqual(c["segments"], {"T1": 1, "T2": 2, "T3": 1, "none": 0}); self.assertEqual(c["legs"], {"L1": 1, "R1": 0, "L2": 1, "R2": 1, "L3": 0, "R3": 0})
+        np.testing.assert_allclose(s.leg_weights["chordotonal"], [[0, 0, 1, 0, 0, 0], [0, 0, 0, 1, 0, 0], [0, 0, 0, 0, .5, .5], [1, 0, 0, 0, 0, 0]])
+
 
 class RateLawTests(unittest.TestCase):
     def rates(self, s, **kw):
@@ -145,6 +162,35 @@ class RateLawTests(unittest.TestCase):
         self.assertTrue(arm.haltere_coriolis)
         np.testing.assert_allclose(self.rates(arm, haltere=100., yaw_rate=-0.5)["haltere"], [[150] * 3])
         np.testing.assert_allclose(self.rates(arm, haltere=100., yaw_rate=10.)["haltere"], [[250] * 3])   # clamped
+
+    def test_per_leg_per_phase_laws_under_leg_cycle(self):
+        """Cells: chordotonal 9 (L2) 10 (R2) 11 (unsided T3) 20 (L1); hair plate 12 (L2) 13 (R2); campaniform 14 (L1) 15 (R1)."""
+        s = Proprioception(graph(), "all+leg_cycle+haltere_sided")
+        legs = dict(phase=np.array([[0.0, 0.5, 0.8, 0.3, 0.9, 0.7]]), stance=np.array([[1, 1, 0, 1, 0, 0]], bool),
+                    amp=np.array([[1.0, 1.0, 0.5, 1.0, 1.0, 1.0]]), beta=np.array([0.6]))
+        r = {ch: hz[0] for ch, _, hz in s.rates(0., 0., 0., False, 0., 1, legs=legs, haltere_L=20., haltere_R=40.)}
+        # L2 in swing (movement burst, amp 0.5): 10 + 140 * 0.5; R2 in stance at protraction 0.5 (mid-joint: claw units silent);
+        # unsided T3 = mean of L3 / R3, both in swing at amp 1; L1 at touchdown (protraction 1, an extreme): amp 1
+        np.testing.assert_allclose(r["chordotonal"], [80., 10., 150., 150.])
+        np.testing.assert_allclose(r["hair_plate"], [5 + 95 * 0.5 * 0.5, 5 + 95 * 0.5])            # L2: swing protraction 0.5 x amp 0.5; R2: stance protraction 0.5
+        np.testing.assert_allclose(r["campaniform"], [50., 50.])                                   # three legs down: 50 Hz per stance leg
+        np.testing.assert_allclose(r["haltere"], [20., 40., 40.])                                  # L cell reads haltere_L, the two R cells haltere_R
+        six = dict(legs, stance=np.ones((1, 6), bool), phase=np.zeros((1, 6)), amp=np.zeros((1, 6)), beta=np.array([1.0]))
+        r = {ch: hz[0] for ch, _, hz in s.rates(0., 0., 0., False, 0., 1, legs=six, haltere_L=0., haltere_R=0.)}
+        np.testing.assert_allclose(r["campaniform"], [25., 25.]); np.testing.assert_allclose(r["chordotonal"], 10.); np.testing.assert_allclose(r["hair_plate"], 5.)
+        r = {ch: hz[0] for ch, _, hz in s.rates(0., 0., 0., True, 0., 1, legs=legs, haltere_L=20., haltere_R=40.)}      # airborne
+        np.testing.assert_allclose(r["campaniform"], 0.); np.testing.assert_allclose(r["chordotonal"], 10.); np.testing.assert_allclose(r["haltere"], [20., 40., 40.])
+        big = dict(legs, amp=np.full((1, 6), 1e6))
+        r = {ch: hz[0] for ch, _, hz in s.rates(0., 0., 0., False, 0., 1, legs=big, haltere_L=1e6, haltere_R=0.)}
+        np.testing.assert_allclose(r["chordotonal"][[0, 2, 3]], 150.); np.testing.assert_allclose(r["haltere"], [250., 0., 0.])   # ceilings hold
+        # the MN rates are not read by the leg channels under the cycle; the held state from take_body is consumed once
+        base = s.take_body(dict(leg_L=30., leg_R=0., haltere=7., airborne=False, yaw_rate=0., legs=legs, haltere_L=20., haltere_R=40.))
+        self.assertEqual(sorted(base), ["airborne", "haltere", "leg_L", "leg_R", "yaw_rate"])
+        r = {ch: hz[0] for ch, _, hz in s.rates(**base, batch=1)}
+        np.testing.assert_allclose(r["chordotonal"], [80., 10., 150., 150.]); np.testing.assert_allclose(r["haltere"], [20., 40., 40.])
+        with self.assertRaises(ValueError): s.rates(**base, batch=1)                                # consumed: the token now has no state
+        with self.assertRaises(ValueError): s.rates(0., 0., 0., False, 0., 1, legs=legs)            # haltere_sided without sides
+        with self.assertRaises(ValueError): s.rates(0., 0., 0., False, 0., 1, legs=dict(legs, phase=np.zeros((1, 5))), haltere_L=0., haltere_R=0.)
 
 
 class ShippedPathTests(unittest.TestCase):

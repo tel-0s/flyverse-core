@@ -206,7 +206,11 @@ class BatchSim:
         if "smell" in available: self.fb.smell(*self.smell_values)
         if "wind" in available: self.fb.wind(*self.air.deflections(f,left))
         if "taste" in available: self.fb.taste(self.tasting)
-        if "proprioception" in available: self.fb.proprioception(**self.body.proprio_state(self.motor))
+        if "proprioception" in available:
+            # the sided extras (leg-cycle state, side-split haltere MN rates) ride on the sense, since FlyBrain.proprioception's
+            # signature is the round-2 one; take_body returns the five base arguments and holds the rest for rates()
+            sense = self.fb.proprioception_sense
+            self.fb.proprioception(**sense.take_body(self.body.proprio_state(self.motor,haltere_sides=sense.haltere_sides(self.brain))))
         self.fb.step(self.FRAME_MS)
         self.motor = self.fb.motor()
         self.commands,self.wcommands = self.body.readout(self.motor,dt)

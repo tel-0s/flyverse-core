@@ -22,7 +22,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy"); os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-from flyverse import brain, connectome, world  # noqa: E402
+from flyverse import body, brain, connectome, world  # noqa: E402
 from flyverse.batch_sim import BatchSim  # noqa: E402
 
 ARMS = {
@@ -62,7 +62,12 @@ def main():
     ap.add_argument("--cuda-sparse", default="torch")
     ap.add_argument("--proprioception", default=None, metavar="SPEC",
                     help="opt-in senses.Proprioception ('all', a comma list of channels, 'all+haltere_coriolis' for the labelled "
-                         "stop-gap control arm); default off = the shipped path (docs/audits/proprioception_transducer.md)")
+                         "stop-gap control arm; round 3: '+leg_cycle' reads the body's stance / swing cycle per leg, '+haltere_sided' "
+                         "the side-split haltere MN readout -- docs/audits/body_sided_state.md); default off = the shipped path "
+                         "(docs/audits/proprioception_transducer.md)")
+    ap.add_argument("--leg-cycle", action="store_true",
+                    help="attach body.LegCycle to the batch body (a readout of the realised speed / yaw; the walk itself is untouched). "
+                         "Attached automatically when --proprioception names leg_cycle.")
     args = ap.parse_args()
     import torch
     assert torch.cuda.is_available(), "no CUDA device (run this on the cluster)"
@@ -74,8 +79,12 @@ def main():
                    cuda_graphs=True, cuda_kernels=True, event_driven=True, cuda_sparse=args.cuda_sparse,
                    proprioception=args.proprioception)
     lp = sim.fb.brain.p
+    sense = getattr(sim.fb, "proprioception_sense", None)
+    if args.leg_cycle or (sense is not None and sense.leg_cycle):
+        sim.body.leg_cycle = body.LegCycle()
     print(f"arm {args.arm}: receptor_model {lp.receptor_model} ({lp.receptor_net_rule}), type_path_gain {lp.type_path_gain}, "
-          f"cache {args.cache_dir or 'default'}, sum|W| {float(abs(sim.fb.c.W).sum()):,.0f}, device {sim.fb.brain.device}, B {args.batch}")
+          f"cache {args.cache_dir or 'default'}, sum|W| {float(abs(sim.fb.c.W).sum()):,.0f}, device {sim.fb.brain.device}, B {args.batch}, "
+          f"proprioception {sense.spec if sense is not None else 'off'}, leg cycle {'on' if sim.body.leg_cycle is not None else 'off'}")
     info = world.make_room(0, "all")[1]; top_z = float(info["table_top_z"]); ext = info["table_extent"]
     fruit = np.array([s.center for s in sim.fb_world_spheres()]) if hasattr(sim, "fb_world_spheres") else None
     B = args.batch; n = int(args.seconds * 100)
@@ -118,7 +127,7 @@ def main():
     summary = {k: agg(k) for k in ("yaw_sd_deg_s", "yaw_mean_abs_deg_s", "straightness", "path_m", "left_table_s", "frac_on_table", "min_fruit_cm", "frames_within_2cm", "hops", "dna02_abs_mean", "leg_abs_mean")}
     summary["n_left_table"] = int(sum(r["left_table_s"] is not None for r in rows))
     out = {"arm": args.arm, "seed": args.seed, "seconds": args.seconds, "program": args.program, "fence": args.fence, "cache_dir": args.cache_dir,
-           "proprioception": sim.proprioception,
+           "proprioception": sim.proprioception, "leg_cycle": None if sim.body.leg_cycle is None else {k: v for k, v in vars(sim.body.leg_cycle).items()},
            "lif": {"receptor_model": lp.receptor_model, "receptor_net_rule": lp.receptor_net_rule, "type_path_gain": lp.type_path_gain},
            "sum_abs_W": float(abs(sim.fb.c.W).sum()), "wall_s": time.time() - t0, "summary": summary, "rows": rows,
            "cmd_keys": sorted(sim.commands[0].keys()) if sim.commands and isinstance(sim.commands[0], dict) else None,

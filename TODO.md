@@ -31,7 +31,14 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       that the GPU rollout is not seed-reproducible (round-1 finding) and that runs are the replicate unit,
       and that a bit-identity claim about the shipped output is a CPU claim only: two identical runs of one
       tree at one seed on a B200 diverge from frame 500 of 6,000 (`out/proprio_bitid/compare.txt`).
-- [~] **Owed bookkeeping before the numbers are quoted publicly** (all four edits made 2026-09-13, in the
+      **The round-3 commit is the reproducibility anchor**: commit the whole round-3 working tree in one commit
+      (so every batch's uncommitted cross-task dependencies have a history) and quote that tree's identity with
+      the numbers -- `provenance.source_fingerprint` **44 files** (not 43), compiled-W md5
+      **ef23cc27bea13be7f6a96f3c04fd3737**, receptor-table md5 **0381a446107e6050e75cc87b16d7f830**
+      (`scratchpad/r3_results/critique.json`, owner notes 0(d)). Every number in
+      `docs/NOTES.md` "Session 11" is quoted against that tree; **nothing was adopted in round 3 and no default
+      moved**, so the shipped model the statement describes is unchanged.
+- [x] **Owed bookkeeping before the numbers are quoted publicly** (all four edits made 2026-09-13, in the
       working tree): de-score `walk.power_max` — **decided from the data** (`docs/audits/anti_runaway.md`
       round 6; 12/12 draws at 48.48, margin inside the worst single-arm scatter, non-monotone, Spearman
       −0.600 against the room take-off rate) and **DONE**: `scripts/benchmark.py:85` now carries the
@@ -40,7 +47,11 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       gain re-labelled a drive gain and the "x4" comment fixed in `optic.py` — **DONE**; record the
       `drive_clip_mv` decision — **RECORDED: 7 draws, 10 PASS / 0 FAIL ×6, `walk.power_max` 49.2480,
       `walk.GF_max` 4.63 → 13.26, `motion.min_dsi` 0.0040 below the lowest shipped draw on record; NOT
-      adopted — the adopt-alone rule's 29-check suite × ≥ 3 and the room take-off protocol were not run.**
+      adoptable -- the adopt-alone suites were RUN (round 7, `guard_suites_r3.md`): suite 27/0/2 x3, room
+      voluntary take-offs 3.96 vs 1.94 per 1,000 fly-s (`result` at 4 v 4 on the B200); the clip binds on the
+      wing-power route. LPi x1 also run in the room: 34.6 per 1,000 fly-s, 48/48 flies above the escape
+      threshold -- NOT adoptable.** Both are closed as NOT adoptable in `anti_runaway.md`; the next submission
+      on that thread is only for a candidate REPLACEMENT mechanism.
 - [ ] **Neurome acknowledgement** and the interchange note (`docs/NEUROME_INTERFACE.md`): agree with Astra what
       is public (their reports are in their repo).
 
@@ -63,15 +74,66 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
         full 29-check suite × ≥ 3 with the sense on through `BatchSim`, and a measured Drosophila rate per
         channel. **Next mechanisms, both body-side:** a leg cycle in `body.py` (makes the leg channels sided
         during a turn) and a side-split haltere MN readout in `motor.py`.
-  - [ ] **neuromodulator signs**: 3,312 presynaptic bodies (2.7 M synapses: dopamine, octopamine, serotonin,
+        **Round 3: leg cycle + side-split haltere built and measured** (`body_sided_state.md`): DNa02 fires
+        (0.54/0.38 Hz), yaw SD 7.9, a fixed left drift, no frame > 100 deg/s, the report gone at GLNO; a LEVEL
+        effect (23 -> 88 Hz) not separated from the phase structure. Owed: the level-matched control (`all`,
+        `mn_ref_hz` ~3.5), `lit.walk.*` ledger rows, hops + room at >= 6 runs/arm, `half_width_m` measured,
+        `MotorRates.haltere_L/_R` (owner -- **deferred**, session 11). Both mechanisms ship opt-in, default OFF;
+        nothing adopted and no default changed.
+    - [ ] **the level-matched control** (next-round item 1; house, ONE submission, ~20 jobs, blocks
+          `fam_r<seed>`): shipped / `all` at `mn_ref_hz` ~3.5 so the window-mean chordotonal rate is 88 Hz (a
+          LABELLED control) / `all+leg_cycle` / `all+leg_cycle+haltere_sided`, 5 seeds x 16 flies x 60 s plus the
+          same 4 arms on the efferent compass at 4 seeds. Decides whether the per-leg / per-phase structure
+          contributes anything beyond the afferent level. First, on CPU: add the `lit.walk.*` rows and fix the
+          `sided_frames` lag and the DNa02 frame mask.
+    - [ ] **the adoption-licensing run for the module** (next-round item 2; ONE submission, one block `fam_lic`):
+          shipped vs `all+leg_cycle+haltere_sided` on `--sections hops` x 6 draws and the `batch_sustain` room
+          take-off protocol x 6 batches at seed-matched seeds, plus the 29-check suite x 3 for the record (28 of
+          29 checks cannot carry the sense) and the room ledger rows under the sided spec. Run it **only** if the
+          level-matched control shows the phase structure matters; otherwise the module stays a module.
+  - [~] **neuromodulator signs**: 3,312 presynaptic bodies (2.7 M synapses: dopamine, octopamine, serotonin,
         unknown) are silenced (sign 0). Receptor-expression tiers for DA / OA / 5-HT receptors per postsynaptic
         type (same sources as `receptors_by_type.csv`; `docs/NT_INTEGRATION.md`) would un-silence the arousal /
         locomotor-state system the animal's spontaneous walking depends on. Largest single missing input.
-  - [ ] **the compass at the defaults**: the ring is silent unless EPG/PEN/Δ7 gains are raised (experiment
+        **Round 3: the monoamine slow class measured** (`monoamine_slow_term.md`) -- inert at 0.02 (and FAIL on
+        `taste.MN9_hz` on CPU), runaway at 0.2/1.0 additive, MBONs zeroed in gain mode; VNC targets have 0
+        receptor rows. Nothing adopted; the parked module stays parked and `sign` stays the default. Next: split
+        the class per transmitter (code, thread B/C), a KC>MBON plasticity module, VNC receptor rows.
+    - [ ] **the monoamine class split** (next-round item 4; code first, then ONE submission): `receptor_signs`
+          slow_class per presynaptic transmitter (DA / OA / 5-HT) and `LIFParams.slow_gain_by_class` /
+          `slow_tau_by_class` with three keys, default None, CPU bit-identity test, separate E/I accumulators in
+          gain mode; then 5 runs per arm -- off / DA 0 + OA gain 1-3 / 5-HT additive 0.02-0.2 -- with health, the
+          plain-fly room, the suite on the GPU **and** the same sections on the CPU, and the compass rows under
+          the OA arm. New source of signs for the same set: FAFB per-cell probabilities and BANC verified
+          transmitters (`flywire_banc_survey.md` 4, `docs/NT_INTEGRATION.md` item 11) -- about 400 MaleCNS
+          `unknown` cells carry a classical-transmitter prediction in BANC.
+  - [~] **the compass at the defaults**: the ring is silent unless EPG/PEN/Δ7 gains are raised (experiment
         overrides); with them the bump persists but is pinned, heading-blind and steering-inert. Data question:
         the per-transmitter unitary strength (mV per synapse) and the CX receptor tiers; a bump in darkness
         (Seelig & Jayaraman 2015) is the ledger target. Rotation input needs the transducer above (GLNO's
         inputs are efference / proprioceptive territory; the visual route is direction-blind).
+        **Round 3: the per-transmitter unitary is answered NO** (0/48 bumps at shipped gains under ACh x0.5-1.0,
+        I/E 0.25-0.75; `unitary_strength.md`): a transmitter scale multiplies the tuned Delta7 inhibition and the
+        untuned ring feedback by the same factor and cannot set the Delta7 : ring ratio. `LIFParams.w_syn_by_nt`
+        is **kept as an opt-in instrument** (owner decision, session 11) and no bracket of it is adoptable.
+        Owed: a type-level ring mechanism the data imply, and 4 seeds per compass arm so the rows are callable.
+    - [ ] **the ACh-only unitary family** (next-round item 3; ONE submission, `--arm-block-map` so the family is
+          ONE block): `w_syn_by_nt` acetylcholine x0.8 and x0.5 with inhibition x1, through the suite x 4 draws,
+          the wedge compass x 4 seeds and the room x 4 runs with the transducer OFF **and** ON; `taste.MN9_hz`
+          re-read as the re-calibration it is, not re-passed. Before submission, on CPU: pin Kazama & Wilson
+          2008's primary EPSP (5 vs 7 mV), add the Periplaneta unitary I/E 0.28 as a ledger row, cite or relabel
+          `unitary.IoverE.chloride_driving_force`, and fix `probe_unitary`'s rounding-before-compare.
+    - [ ] **a type-level ring mechanism, or none** (next-round item 5): before any compass batch, a CPU structure
+          pass (`interp_paths` / `structure.json`) naming what data-implied fact could change the Delta7 : ring
+          ratio (receptor tiers on ER / ExR -> EPG, the GLNO transmitter, a conductance-based synapse). If none
+          exists, park the compass at "no attractor at shipped gains" and run the free-walking compass room under
+          the transducer at the experiment gains once (4 seeds, one block, bump metrics + `circ_corr_heading`) to
+          close `body_sided_state.md` 8 item 5 -- expected negative: the report is gone by GLNO.
+  - [ ] **saccade generator / signed steering command**: named missing by round 3
+        (`round3_integration.md` 9): nothing in the wired graph produces a clean frame above 100 deg/s or a
+        DNa02 sided rate that leads the yaw. Round 3's largest yaw numbers (12.8-13.4 deg/s under transducer +
+        unitary-high) rest on 12-17 % of the window with every fly off the table and are a fixed one-sign bias
+        in 80/80 fly-runs -- not steering.
   - [ ] **intrinsic / spontaneous activity**: the model's only noise is sensory Poisson; per-type baseline
         rates (DNs in walking flies — Aymanns 2022; ANs — Chen 2018; CX) as ledger rows and as a documented
         Poisson-background mechanism per type if the data support it.
@@ -105,6 +167,24 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
       (`out/interp/objr2c/spec_transitions.json`) — both transitions survive in every arm
       (no window below 0.56× base's), what rectification moves is the ON/OFF asymmetry, and almost
       every 0.3 s window sits at its own blank/blank floor (`object_compare_r2.md` 6.1).
+      **Object round 3 closed all four owed items and changed no answer** (`object_samedevice_r3.md`,
+      `object_rectangles_r3.md`, `object_localizer_r3.md`, `object_export_r3.md`; six batches, 0 failed, every
+      original H200 and every fresh-seed replication B200, one host per batch): (a) the **localizer** ran and
+      **neither LC population localizes under a static 4.5-deg probe on either lobe in either batch** -- LC11
+      zero fits at the fixed z = 5 throughout, the B200 `fb0` blank-selected z* = 4 giving 4/143 against 1/143
+      blank and still failing coverage and enrichment, with the Mi1 positive control on `optic_dr` and not on
+      the `drive_mv` quantity the negative is measured in; (b) the **same-device re-run** is done on two GPU
+      models -- H200 `REPRODUCES`, B200 **`PARTIAL`** (rectify T2 at 4.5 deg z +2.66825 under the z >= 3 gate,
+      separation complete) -- and it also showed that the large-rung companion effect is a three-batch effect
+      and that the **base arm itself crosses the gate on the B200 and not the H200**; (c) the **rectangle
+      ladders** ran in two batches, **40/40 primary verdicts `null`**, no animal-shape call, with retinal
+      contrast matched only at width >= 8.8 deg and the upstream size-monotonicity call a two-directional
+      knife-edge; (d) the **compare arms are exported** (41 of 95 directories in
+      `out/export/objr3_index.json`; 1,712 tables, 0 problems, four native B200 replication Results linked
+      under `replication_evidence`). **Nothing adopted, no default changed.** Still open, and both are protocol
+      decisions rather than owed work: a **separately declared moving-probe RF assay** with blank controls and a
+      smaller, level-matched probe, and **more LC10a runs under a new declaration** to settle the width-15 row
+      the two batches sign-reverse on. `docs/NEUROME_INTERFACE.md` 3d.
       Data: receptor tiers for Tm5Y / TmY21 / TmY13 / LC11 (Neurome); per-body LC11/LC10a
       recordings at the six matched sizes; the Keleş 2020 Rdl constraint in quantitative form so
       it can be a **scored** ledger row rather than the magnitude rule this round used.
@@ -128,7 +208,10 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
 Most useful experimental data, ranked by leverage: (1) receptor / conductance profiles for the unprofiled
 types and for DA / OA / 5-HT receptors; (2) per-type baseline firing in behaving flies (DN / AN / CX imaging);
 (3) unitary synaptic strengths by transmitter (mV per synapse; the global scale is the one number every
-attractor depends on); (4) proprioceptor firing ranges (Mamiya 2018; Agrawal 2020); (5) behavioural
+attractor depends on) (round 3: one insect unitary I/E on record, 0.28, Periplaneta -- J Neurosci 34:13039; none
+for Drosophila, and no Drosophila central fast IPSP at all); (4) proprioceptor firing ranges (Mamiya 2018;
+Agrawal 2020) (round 3 needs a walking-mean FeCO rate; the 10-150 Hz bracket lets the level move 4x, and the
+level is what the round could not separate from the phase structure); (5) behavioural
 kinematics ground truth for the ledger (DeAngelis 2019 walking; Katsov 2017 turning statistics; Álvarez-Salvado
 2018 plume navigation; von Reyn 2014 escape latency); (6) **[now actionable]** per-body LC11 / LC10a recordings at
 matched sizes — object round 2 built and exported the matched geometry, so this is no longer hypothetical: the six
@@ -168,6 +251,14 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
       the atlas, one validation semantics, CPU tests for the apply scripts, graded units' drive in mV in exports.
 - [ ] `cluster_run.py`: refuse the bare `--fetch out/`; verify-batch built in; the console log's failure line
       surfaced; a per-run `provenance.json`.
+- [ ] **Cluster tooling the round-3 process debts name** (next-round item 7; no GPU, `docs/INTERP.md` 10.4 items
+      13, 15, 19, 21): a `cluster_run.py --attach <run>` mode so a new client can resume the wait / fetch of an existing
+      run (four of six behaviour batches lost their client); the scheduler's own completion receipt fetched as a
+      file into `out/<dir>/` instead of trusting the client console; a guard that refuses (or reddens and
+      requires `--confirm`) an `--arm-block` that yields more blocks than jobs/2 or any block of size 1, plus a
+      family token that is the same string on every arm; `fetch_run.py` per-file **sha256 receipts** (hash
+      computed on the box before transfer, compared locally) so an audit may write "verified"; and a
+      verdict-agreement script that diffs two analysis CSVs and prints the count and the flipped keys verbatim.
 - [ ] Batch-sustain / probe JSON headers: done for `batch_sustain.py`; do the same for every probe still
       writing `options.device = None`.
 - [ ] Observatory UI: NT readout of the `health` tool; a "why did it do that" panel that runs `decompose` on
@@ -180,3 +271,27 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
 - [ ] A 5-minute "run the fly" notebook (CPU subset: antennal lobe + MB + central + DN, smell → turn).
 - [ ] Contributing guide: the project rule in one paragraph; how to propose a default change (audit +
       skeptic + suite run); how to add a ledger row.
+
+## F. Cross-connectome: FlyWire FAFB v783 and BANC v888 (female brain; female brain + VNC)
+
+Survey: `docs/audits/flywire_banc_survey.md` (2026-09-14); implementation spec: `docs/CONNECTOME_BACKENDS_SPEC.md`
+(handed to Astra, 2026-09-14: items 1-3 below and, time allowing, the BANC walking replicate). Both releases are public; type names overlap MaleCNS
+exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` already bridges the rest.
+
+- [ ] `scripts/cross_connectome.py`: every anatomical claim of rounds 1-3 (DNa02's inhibitory budget, PS049 /
+      PS059 / VES051 / AOTU019, AN04B003 and LT51 excitation, IN12B014's symmetric contralateral pair, the
+      PS196a -> PS059 loop, the haltere-afferent route, LC11 / LC10a inputs) printed MaleCNS / FAFB / BANC side by
+      side with a per-release synapse scale (counts run ~1 : 0.6 : 0.3). CPU, a day. The README's "not a
+      reconstruction artefact" table.
+- [ ] `Connectome.load(dataset="fafb" | "banc")`: `root_id` -> `bodyId` (int64 fits), alias-normalised types,
+      vocabulary maps for superclass / NT / side / neuropil; the receptor table and ledger transfer by type name.
+      BANC = the female CNS as a whole-animal replicate of the walking result (either outcome is a finding);
+      FAFB = the complete female optic lobe. ~2 days; the biggest scientific payoff and the best release story.
+- [ ] NT sources 4 and 5 for `docs/NT_INTEGRATION.md`: FAFB per-cell probabilities, BANC verified transmitters
+      (65,369 cells). Conflict rows to add: PFL3 (ACh in MaleCNS / FAFB, TYR predicted in BANC; PFL2 verified
+      tyramine), Delta7 (`glutamate,serotonin` verified), LAL074; ~400 MaleCNS `unknown` (silenced) cells carry a
+      classical-transmitter prediction in BANC; MaleCNS `serotonin` splits SER / DA / tyramine across sources.
+- [ ] FAFB `column_assignment` (45,528 cells, 31 types, hex coordinates) as ground truth for
+      `trace.column_of_cells` and the LC anatomical windows; LC11 / LC10a themselves are not column-assigned there.
+- [ ] Do not: mix counts across releases unscaled; treat BANC's optic lobes as complete (T2 853 vs 1,466);
+      prefer BANC predicted monoamine labels to its verified column; assume `fru` / `dsx` circuits are sex-shared.

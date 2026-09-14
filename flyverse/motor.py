@@ -91,6 +91,35 @@ def wing_groups(c: Connectome) -> WingGroups:
     )
 
 
+def haltere_side_groups(c: Connectome) -> dict:
+    """The haltere motor-neuron group (WingGroups.haltere: superclass vnc_motor, subclass hm) split by somaSide, for the
+    opt-in side-split readout `read_haltere_sides`. On the shipped cache 16 cells = 8 L / 8 R (hi2 MN x2 per side,
+    MNhm42, MNhm03, hDVM MN, MNhm43, hi1 MN, hiii2 MN x1 per side); every instance carries an _L / _R suffix and
+    somaSide agrees. Cells without a side are in neither group (reported as `unsided`)."""
+    h = c.select(superclass="vnc_motor", subclass="hm")
+    side = c.neurons.somaSide.fillna("").to_numpy()[h]
+    return {"L": h[side == "L"], "R": h[side == "R"], "unsided": h[(side != "L") & (side != "R")]}
+
+
+def read_haltere_sides(brain, groups: dict):
+    """Opt-in side-split haltere MN readout: (haltere_L, haltere_R), each the mean `rate` of the side's cells -- scalars
+    for B = 1, (B,) arrays otherwise -- read from the brain's current rate tensor, i.e. the same quantity
+    `read_motor`'s `MotorRates.haltere` averages over both sides. It lives beside `MotorRates` rather than on it:
+    `MotorRates` is hashed field-by-field by tests/test_bit_identity.py's golden, so a new field there would move the
+    recorded digest of the shipped path (an owner decision); this function touches nothing unless called."""
+    import torch
+    out = []
+    for s in ("L", "R"):
+        idx = np.asarray(groups[s])
+        if not len(idx):
+            v = torch.zeros(brain.B, dtype=brain.rate.dtype, device=brain.rate.device)
+        else:
+            v = brain.rate[:, brain._idx(idx)].mean(dim=1)
+        v = v.detach().cpu().numpy()
+        out.append(float(v[0]) if brain.B == 1 else v.copy())
+    return tuple(out)
+
+
 @dataclass(frozen=True)
 class MotorRates:
     """Independent CPU snapshot: scalars for B=1, arrays (B,) otherwise. Missing groups read zero."""

@@ -406,6 +406,125 @@ prefer the 2026-09-14 directory.
    LC11 receptive fields are known per cell type at a comparable resolution, that would let us
    replace 143 anatomical boxes with measured regions.
 
+## 3d. Round 3 (2026-09-14) -- the arm/device confound closed, the rectangle ladders run, the localizer answered
+
+**Export location** (schema `flyverse.neurome.export/2`, revision 2; **95 run directories, 1,712 tables,
+`problems` empty in every one and in every source-Result round trip**). Start at the combined index
+`out/export/objr3_index.json`; it names its four component indices and, separately, the replication evidence:
+
+| index | contents |
+|---|---|
+| `out/export/objr3_r2compare_index.json` | 41 directories -- the round-2 fixed-anatomy comparison arms (section 3c's "run, not exported" item, now exported), with the ON/OFF transition and specificity/benchmark sidecars |
+| `out/export/objr3_samedevice_index.json` | 16 directories -- the same-device sphere batch (base / rectify / suppress on one GPU model) |
+| `out/export/objr3_rectangles_index.json` | 36 directories -- the height and width rectangle ladders, with the per-rung effective-contrast and window-coverage tables |
+| `out/export/objr3_rfmap_index.json` | 2 directories -- the stimulus-driven RF maps, both lobes |
+| `out/export/objr3_house_results/index.json` | **linked from `objr3_index.json` under `replication_evidence`** (sha256 `466c4fb2...`, `n_results` 4): the four **native fresh-seed B200 replication Results** -- house same-device, house rectangles, and the two house RF maps -- kept as native Results rather than folded into the 95 original directories |
+
+`objr3_tables.json` lists every one of the 1,712 tables; `objr3_skeptic.json` records the independent delivery
+checks. Every one of the 91 sphere / rectangle rungs carries **all 418 LC bodies at all 1,200 frames** with run
+means and sample SDs. Per-section reference devices are explicit fields (round-2 sphere base B200; specificity and
+benchmark base H200), and the literal verdict text `null` survives the CSV round trip -- it is a scientific
+verdict, not a missing value.
+
+**The device caveat, restated.** "Same-device" in round 3 means **one GPU model per batch** -- NVIDIA H200 for the
+original batches, NVIDIA B200 for the replications -- with the reference arm and its treatments in the same
+submission and the same block on the same physical host. It does not mean the two batches ran on the same GPU
+model as each other, and no causal GPU-model attribution is claimed: the two round-3 sphere batches have
+**identical source fingerprints** (all 44 fingerprinted files match) and differ in GPU model, box, seeds and
+execution history together.
+
+**Round-2 question 1 (a same-device `base` re-run, to de-confound arm from GPU model) -- answered, and the answer
+is PARTIAL on the second box.** Rectify exceeds base at every small T3 / T2 maximum in both batches (H200 ratios
+T3 6.281 / 9.528 / 13.063 and T2 2.356 / 3.369 / 3.068 at 4.5 / 8.8 / 11 deg, Holm p .023810 on all six rows;
+B200 T3 6.131 / 9.028 / 12.598, T2 3.522 / 3.421 / 3.225). The predeclared reproduction rule requires T3 **and**
+T2 at all three small rungs: H200 `REPRODUCES`; B200 is **`PARTIAL`**, because rectify T2 at 4.5 deg reads
+z **+2.66825** against its own blank/blank null and is therefore `null` under `common.compare`'s z >= 3 gate even
+at Holm p .023810. The separation at that rung is complete (all five rectify runs above all five null runs,
+U 25/25, p at the exact 5 v 5 floor .0079365); the gate is missed because a single null run inflates the null SD
+to .005302 against the H200 null's .001147. Three corrections you should carry with that verdict:
+
+* The **large-rung companion effect is a three-batch effect, not a device-specific one**. Rectify's per-body
+  RF-windowed T3 companion exceeds base at 20 deg (.006050 +/- .000709 vs .004445 +/- .000414, z +3.88) and 30 deg
+  (.007377 +/- .000775 vs .004259 +/- .000400, z +7.80), and its T2 companion at 30 deg (z +3.56), all
+  Holm .039683, on **H200 as well as B200** -- and round 2 already carried the T3-at-30 row (z +9.795, ratio
+  1.827). `companion_all_null_all_rungs` is false in both round-3 Results. The round-2 statement that the
+  rectification figure lives entirely in the extremum holds **only at the three small rungs**.
+* **The reference arm is not identical across the two batches.** `base`'s own T2 maximum versus its own
+  blank/blank null crosses the effect gate on the **B200** (z +6.12652 at 8.8 deg, +9.29988 at 11 deg, both
+  Holm .023810, `result`) and not on the **H200** (z +0.35 / +1.02 / +1.96, `null` at every small rung). The
+  shipped model's own small-object figure separates from blank on one GPU model and not the other.
+* **Suppress reproduces as a null**, and there is no LC11 rescue in either batch (`both_null` on T3, T2 and LC11;
+  `lc11_follows` false in every arm of both batches). Nothing is adopted and no default moved; rectify and
+  suppress remain hand-set, opt-in control arms.
+
+**Round-2 question 2 (the contrast-matched rectangle ladders, height and width separately, as Keles & Frye did) --
+run in both batches; 40 of 40 primary verdicts `null`, and the contrast is matched only at width >= 8.8 deg.**
+Each batch is 216 object runs (9 shapes x 2 contrasts x 6 seeds x 2 lobes) plus 108 blank/blank null runs
+(9 shapes x 6 seeds x 2 lobes) = 324 paired runs. Nulls are blank/blank and carry no contrast, so a shape's six
+nulls serve **both** its dark and its bright family -- those two families are not independent of each other,
+which matters if you re-test across them. **No LC11 or LC10a animal-shape preference is called in either batch.**
+Three things to read beside the nulls:
+
+* **Object contrast is fixed at Weber +/- .995; effective retinal contrast is not.** Fractional coverage of the
+  4.5-deg column acceptance caps the per-column change wherever a rectangle is narrower than a column: peak
+  per-column effective contrast reaches +/- .995 **only at width >= 8.8 deg -- three of the nine rectangles, all
+  of them in the width ladder.** The whole height ladder runs at width 4.4 and is capped at max coverage .88530 /
+  extreme -.65262, so its 8.8 / 15 / 30 rungs are matched to each other but not to the width ladder, and its 2.2
+  and 4.4 rungs (.42649 / -.22826 and .65590 / -.53849) are matched to nothing. At the smallest rungs the stimulus
+  is also intermittent: 40 % of frames at 4.4 x 2.2 and 25 % at 2.2 x 8.8 change no column by more than 5 %.
+* **The one sub-.05 row points both ways.** B200 dark LC10a at width 15 deg reads diff **+.055055 mV**,
+  z **+2.17788**, Holm p .021645 -- `null` under the z >= 3 gate -- and the H200 batch has the **opposite sign**
+  at the same type, ladder, contrast and rung (-.015022 mV, z -.45490, Holm 1). We report it as open in both
+  directions, not as weak positive evidence.
+* **The upstream size-monotonicity call is a two-directional knife-edge, so no conclusion leaves the round.** Of
+  the 16 declared (ladder x contrast x type) joint tests, exactly **one passes in each batch and it is a different
+  one** (B200 `hlad:dark:T2`, H200 `hlad:bright:Tm5Y`); the two batches agree in **sign** on both statistics, and
+  both calls flip under a different permutation seed (H200 median p .049248 -> .053047; B200 `hlad:bright:T2`
+  .050797 -> .047048). "Does not replicate" would be the wrong word for a threshold crossing.
+
+**Round-2 question 3 (a stimulus-driven LC11 / LC10a localizer, after 0 of 143 fits at `z_min` 5) -- run, and
+neither LC population localizes under this probe, on either lobe, in either batch.** LC11 has **zero fits at the
+fixed z = 5** on both lobes in both batches. In the B200 `fb0` map the blank-selected threshold is z* = 4, giving
+4 of 143 LC11 fits against 1 of 143 blank fits, which still **fails both the population-coverage and the
+spatial-enrichment criteria**; shipped B200 LC10a shows free-peak enrichment above 2x chance but insufficient
+fitted coverage. Four limits define what this negative is:
+
+* **The positive control is on a different quantity.** Mi1 pooled coverage is ~53 % in both batches, but Mi1, T2,
+  T3, Tm5Y and TmY21 are all optic-lobe rate units fitted on **`optic_dr`**, while the only `drive_mv` rows in the
+  map are the 418 LC bodies that produced the negative. The control shows the grid, dwell, pooling and fitter work
+  on rates; it does not show that a `drive_mv` receptive field of the same strength would have been detected.
+* **The probe was 4.5 deg and static**, not the 2-4 deg we asked for and not the moving square Keles & Frye used
+  for their RF measurement; the presented grid was 1,466 of 1,787 reachable nodes (82 % of the eye), with the
+  per-cell box restriction applied at fit time only.
+* **This is not a statement about firing.** The fitted quantity is received drive; the LC populations emit
+  essentially no spikes in this protocol (137 of 143 LC11 bodies emit exactly zero over the 1,466.5 s recording).
+  Please do not read the result as "these cells cannot be localized by any stimulus".
+* **The round's ladder windows were not retrofitted.** All 143 LC11 windows remain the anatomical fallback, and
+  using any new RF map in inference would need a separately stamped analysis.
+
+**What we ask Neurome for next, in order of leverage** (items 1 and 3 of section 3c stand unchanged; these are the
+round-3 additions):
+
+1. **Receptor tiers for LC11, T2 and T3** (with Tm5Y / TmY21 / TmY13 from section 3c). This is now the top of the
+   list rather than one item on it: T3 and T2 are LC11's two largest inputs (69,205 and 36,917 predicted pairs)
+   and all of them still run on the presynaptic-sign fallback for 100 % of their input. Round 3 tested the
+   physiological alternatives that do not need data -- per-stream rectification, adaptation, spatial suppression,
+   a per-transmitter unitary scale -- and none of them passes; the remaining lever on this pathway is the receptor
+   tier, not another hand-set mechanism.
+2. **The contrast at which LC11 should be probed.** Keles & Frye's Figure 3B shows that **maximum contrast is not
+   LC11's optimum**: reducing OFF-object Weber contrast from 100 % to 30 % "nearly doubled the amplitude of the
+   calcium response". Both round-3 ladders ran at |Weber| .995, i.e. at the contrast the animal responds to
+   *least* strongly. If you can give the response-versus-contrast curve in quantitative form, the next ladder
+   runs at the animal's optimum instead of at ours, and the caveat stops travelling with every null.
+3. **Whether you need localizer frame chronology.** The long RF recording retained only node / role-window means,
+   so the delivery carries **node response tables, explicitly labelled as such** -- we did not reconstruct a
+   per-cell frame series from means. Per-cell 10 ms traces over the RF grid are obtainable, but only from a **new
+   recording**; tell us if the analysis needs them before we cost another long run.
+4. **The moving-probe RF assay, if you want the localizer negative closed.** We will declare it separately, with
+   blank controls and a smaller, level-matched probe, before making any absence claim under other stimuli. Whether
+   that is worth the runs, and whether more LC10a runs under a new declaration are worth them, are the two open
+   protocol decisions on our side.
+
 ## 4. Neurome evidence bundles
 
 Accepted initially as **read-only observations**: predicted anatomical counts, source annotations, reconstruction
@@ -438,7 +557,12 @@ suite before adoption.
   **stimulus-driven LC11 localizer** (0 of 143 bodies fit at `z_min` 5); then the **transfer test** with fixed
   parameters and held-out stimuli. LC10a state gating is deferred. **Done since the round closed:** the **ON/OFF
   transition split**, re-derived on CPU from the stored specificity recordings
-  (`out/interp/objr2c/spec_transitions.json`; section 3c).
+  (`out/interp/objr2c/spec_transitions.json`; section 3c). **All four closed in round 3 (section 3d):** (a) both
+  rectangle ladders ran in two batches, 40/40 primary verdicts `null`, with the effective-contrast limit measured
+  (matched only at width >= 8.8 deg); (b) the compare arms are exported (41 of the 95 directories); (c) the
+  same-device re-run is done on two GPU models -- H200 `REPRODUCES`, B200 `PARTIAL`; (d) the stimulus-driven
+  localizer ran and neither LC population localizes under a static 4.5-deg probe. The **transfer test** with fixed
+  parameters and held-out stimuli is still open, and there is nothing to transfer until a mechanism passes.
 - Open for Neurome: per-body LC11 / LC10a physiology at matched geometry when it exists (the matched sizes now exist
   and are exported, section 3c); the receptor tiers of the unprofiled types (Tm5Y, TmY21, TmY13, LC11 -- 100 %
   fallback-tier input); and the **quantitative form of the Keles 2020 Rdl constraint** (the effect size on the
@@ -449,6 +573,17 @@ suite before adoption.
   `spikes_median` preference rows (all `role = primary`) with `spearman_p_perm = 5.0e-05` against an undefined rho.
   Fixed and re-emitted 2026-09-14 (`objr2-ladder-20260914T024906Z-035363c0`); the 2026-09-13 directories stay on disk
   as the superseded delivery.
+- **Coming: a cross-connectome anatomy table.** `docs/audits/flywire_banc_survey.md` (2026-09-14) surveys the two
+  public Princeton / FlyWire female releases against the MaleCNS v1.0 graph we ship on -- FAFB v783 (brain with both
+  optic lobes, 139,255 cells) and BANC v888 (brain **and** VNC, 158,262 cells, a *verified* transmitter for 65,369
+  of them). Exact type-name overlap covers 59 % (FAFB) and 72 % (BANC) of MaleCNS cells and `type_aliases.csv`
+  already bridges the rest, so the next deliverable on this side is a **side-by-side MaleCNS / FAFB / BANC table for
+  every anatomical claim we have made** (`scripts/cross_connectome.py`; spec in `docs/CONNECTOME_BACKENDS_SPEC.md`),
+  with a per-release synapse scale -- raw counts run ~1 : 0.6 : 0.3 and are not comparable unscaled, and BANC's
+  optic lobes are under-proofread (T2 853 vs FAFB 1,466 vs MaleCNS 1,630). It is read-only and changes no model.
+  Relevant to this interchange: FAFB's `column_assignment` (45,528 cells, 31 types, hex coordinates) is an
+  independent column map for `trace.column_of_cells` and the LC anatomical windows -- though LC11 and LC10a
+  themselves have no column assignment there, which is the same gap the round-3 localizer hit.
 - Whether `bodyId` alone is stable across MaleCNS releases; we key on it and record the release.
 - Cluster paths: agreed -- Neurome's namespace is `$NEUROME_NS/{runs,evidence,exports}/`;
   flyverse keeps `$CLUSTER_FLYVERSE/` and `$CLUSTER_RUNS/`.

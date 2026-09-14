@@ -23,6 +23,8 @@ import numpy as np
 
 from .motor import MotorGroups, WingGroups, MotorRates, motor_groups, wing_groups, read_motor, LH_ODOUR_TYPES
 
+TRIPOD_OFFSET = (0.0, 0.5, 0.5, 0.0, 0.0, 0.5)   # leg phases at rest, order L1 R1 L2 R2 L3 R3: L1 R2 L3 at 0, R1 L2 R3 at 1/2
+
 
 @dataclass
 class FlyState:
@@ -57,6 +59,16 @@ class FlyState:
     _edge_left: float = 0.0   # metres of travel left in the blend
     edge_len: float = 0.020   # 20 mm: at walking speed the sensed rotation over an edge is ~90 deg/s; at 4-10 mm (450-180 deg/s)
                               # the sweep still fired the giant fibre at 27-49 Hz even with LPi inhibition (NOTES, session 9)
+    # Leg cycle (opt-in, `LegCycle`; static defaults when no cycle is attached): per-leg phase in [0, 1) with 0 =
+    # touchdown, stance flag, stance-path amplitude relative to LegCycle.step_ref_m, and the share of body weight on
+    # each side's stance legs. Order LegCycle.LEGS = L1 R1 L2 R2 L3 R3. A readout of the body's own kinematics;
+    # nothing in the walk reads these back.
+    leg_phase: np.ndarray = field(default_factory=lambda: np.array(TRIPOD_OFFSET))
+    leg_stance: np.ndarray = field(default_factory=lambda: np.ones(6, dtype=bool))
+    leg_amp: np.ndarray = field(default_factory=lambda: np.zeros(6))
+    stance_frac: float = 1.0  # the cycle's stance fraction beta this frame (1 = standing)
+    stance_load_L: float = 0.5
+    stance_load_R: float = 0.5
 
     @property
     def pos(self) -> np.ndarray:
@@ -151,6 +163,8 @@ class FlyState:
         if isinstance(self.face, dict):                              # loaded from a saved state: re-resolved on the next step
             self.face = None
         self.fwd = np.asarray(self.fwd, float); self.normal = np.asarray(self.normal, float)
+        self.leg_phase = np.asarray(self.leg_phase, float); self.leg_amp = np.asarray(self.leg_amp, float)
+        self.leg_stance = np.asarray(self.leg_stance, bool)
 
 
 _flystate_init = FlyState.__init__
@@ -207,6 +221,105 @@ class Metabolism:
 
 
 @dataclass
+class LegCycle:
+    """Opt-in stance / swing leg cycle: a kinematic model of the six legs driven by the REALISED walking speed and yaw
+    rate of the body (`FlyState.speed`, `FlyState.yaw_rate` after `Locomotion.step`'s smoothing). Nothing here feeds
+    back into the walk -- the trajectory of a fly with and without the cycle is identical -- so the cycle is a body-
+    state readout the opt-in proprioception transducer (senses.Proprioception, spec token 'leg_cycle') can read per
+    leg and per phase, in place of the leg motor-neuron rate it read in round 2. OFF unless attached
+    (`Locomotion.cycle = LegCycle()`; `BatchBody.leg_cycle = LegCycle()`).
+
+    Gait (tripod, the coordination Drosophila uses at every walking speed -- Strauss & Heisenberg 1990, J Comp
+    Physiol A 167:403; Mendes et al. 2013, eLife 2:e00231 Fig 4; DeAngelis et al. 2019, eLife 8:e46409 Fig 2):
+    legs L1 R2 L3 share one phase, R1 L2 R3 the phase + 1/2. Per frame, phase += f dt (mod 1), stance = phase < beta.
+
+    Timing laws (literature, see docs/audits/body_sided_state.md 2 for the brackets and what is uncertain):
+      stance duration  tau_st(v) = stance_coef_s * (v / v_unit) ** stance_exp
+                       -- DeAngelis et al. 2019 Fig 1E fit: tau_stance = 932.8 ms * (v / 1 mm/s) ** -1.025 (R^2 0.59)
+      swing duration   tau_sw = swing_s, constant with speed (Mendes 2013 Fig 2B: "swing phase duration remains mostly
+                       constant while stance phase duration is inversely proportional to speed"; DeAngelis 2019 Fig 1E:
+                       "roughly constant"); 30 ms is Mendes 2013's plateau reading (step period ~60 ms at >= 30 mm/s
+                       with swing ~ stance at the fastest speeds), and the bracket is 30-50 ms (their Fig 2B).
+      step frequency   f = 1 / (tau_st + tau_sw); stance fraction beta = tau_st / (tau_st + tau_sw), floored at
+                       stance_min (three legs always on the ground: the tripod never becomes an aerial gait).
+      standing         v < v_min (0.5 mm/s, DeAngelis 2019's walking threshold): f = 0, every leg in stance, amp 0.
+    Turn asymmetry (the animal's own rigid-body kinematics -- the outer legs' tarsi move faster over the ground than
+    the inner legs' by yaw_rate * half_width, so with one shared step frequency the outer legs take LONGER steps and
+    the inner legs shorter ones: Strauss & Heisenberg 1990; DeAngelis 2019 Fig 6C "outside limbs: step length
+    increased with yaw rate; inside mid/hind: decreased"): per-leg ground speed v_i = |v| + s_i * yaw * half_width
+    (s_i = -1 for the left legs, +1 for the right; positive yaw = a left turn, so the left legs are inside), clipped
+    at 0; stance-path length = v_i * tau_st(v); amp_i = that / step_ref_m (~1 in straight walking, since v * tau_st is
+    ~0.93 mm at every speed under the fitted exponent -1.025). THE YAW RATE MODULATES THE CYCLE: it is
+    body.Locomotion's own realised yaw scalar, read here as the body's kinematics (which leg travels how far), not
+    as a sense. DeAngelis 2019's per-leg swing-duration modulation in turns (up to ~25 % net frequency change) is not
+    modelled: one frequency for all six legs. half_width_m is NOT a measured number (see the audit): it scales the
+    turn asymmetry linearly and is a reported constant, never tuned.
+    Loads: body weight shared equally by the legs in stance; stance_load_L/R = the share on each side's stance legs
+    (2/3 vs 1/3 alternating within the tripod; 1/2 each standing; 0 airborne)."""
+    swing_s: float = 0.030
+    stance_coef_s: float = 0.9328
+    stance_exp: float = -1.025
+    v_unit: float = 0.001          # m/s: the fit's speed unit (1 mm/s)
+    step_ref_m: float = 0.00093    # the stance path v * tau_st(v) the fit implies (0.93 mm at 1 mm/s, 0.86 mm at 30 mm/s)
+    half_width_m: float = 0.0010   # lateral distance of the stance tarsi from the yaw axis: APPROXIMATE, not measured
+    v_min: float = 0.0005
+    stance_min: float = 0.5
+    LEGS = ("L1", "R1", "L2", "R2", "L3", "R3")
+    SIDE = (1, -1, 1, -1, 1, -1)              # +1 left, -1 right (the senses' convention)
+    SEGMENT = (1, 1, 2, 2, 3, 3)
+    TRIPOD_OFFSET = TRIPOD_OFFSET                     # L1 R2 L3 at phase 0; R1 L2 R3 at + 1/2 (FlyState's default leg_phase)
+
+    def timing(self, speed):
+        """|speed| (B,) m/s -> (stance duration s, step frequency Hz, stance fraction), zeros / 1 when standing."""
+        v = np.abs(np.asarray(speed, float))
+        walking = v >= self.v_min
+        vv = np.maximum(v, self.v_min) / self.v_unit
+        tau_st = self.stance_coef_s * vv ** self.stance_exp
+        period = tau_st + self.swing_s
+        beta = np.maximum(tau_st / period, self.stance_min)
+        f = np.where(walking, 1.0 / period, 0.0)
+        return np.where(walking, tau_st, np.inf), f, np.where(walking, beta, 1.0)
+
+    def advance(self, phase, speed, yaw_rate, airborne, dt_s):
+        """One frame. phase (B, 6) -> dict(phase, stance, amp (B, 6); freq, beta, load_L, load_R, n_stance (B,)).
+        Airborne rows: the cycle is suspended (phase held, no stance, no load, amp 0)."""
+        phase = np.asarray(phase, float); v = np.abs(np.asarray(speed, float)); yaw = np.asarray(yaw_rate, float)
+        air = np.asarray(airborne, bool)
+        tau_st, f, beta = self.timing(v)
+        f = np.where(air, 0.0, f)
+        new = (phase + f[:, None] * dt_s) % 1.0
+        stance = (new < beta[:, None]) & ~air[:, None]
+        side = np.asarray(self.SIDE, float)
+        # left legs (side +1) travel v - yaw * b, right legs v + yaw * b: yaw > 0 is a left turn, left legs inside
+        v_leg = np.maximum(v[:, None] - side[None] * yaw[:, None] * self.half_width_m, 0.0)
+        tau_fin = np.where(np.isfinite(tau_st), tau_st, 0.0)
+        amp = np.where(air[:, None], 0.0, v_leg * tau_fin[:, None] / self.step_ref_m)
+        n_st = stance.sum(1)
+        nL = (stance & (side > 0)[None]).sum(1); nR = (stance & (side < 0)[None]).sum(1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            load_L = np.where(n_st > 0, nL / np.maximum(n_st, 1), 0.0); load_R = np.where(n_st > 0, nR / np.maximum(n_st, 1), 0.0)
+        return dict(phase=new, stance=stance, amp=amp, freq=f, beta=beta, load_L=load_L, load_R=load_R, n_stance=n_st)
+
+    def initial_phase(self, batch=1):
+        return np.tile(np.asarray(self.TRIPOD_OFFSET, float), (batch, 1))
+
+    def apply(self, fly: FlyState, dt_s: float) -> dict:
+        """Scalar path: advance one fly from its own realised speed / yaw / airborne flag and write the FlyState fields."""
+        k = self.advance(fly.leg_phase[None], [fly.speed], [fly.yaw_rate], [fly.airborne], dt_s)
+        fly.leg_phase = k["phase"][0]; fly.leg_stance = k["stance"][0]; fly.leg_amp = k["amp"][0]; fly.stance_frac = float(k["beta"][0])
+        fly.stance_load_L = float(k["load_L"][0]); fly.stance_load_R = float(k["load_R"][0])
+        return k
+
+    @staticmethod
+    def state(flies) -> dict:
+        """The per-leg state the transducer reads, batched over flies: phase / stance / amp (B, 6), beta / load_L /
+        load_R (B,)."""
+        return dict(phase=np.stack([np.asarray(f.leg_phase, float) for f in flies]), stance=np.stack([np.asarray(f.leg_stance, bool) for f in flies]),
+                    amp=np.stack([np.asarray(f.leg_amp, float) for f in flies]), beta=np.array([float(f.stance_frac) for f in flies]),
+                    load_L=np.array([float(f.stance_load_L) for f in flies]), load_R=np.array([float(f.stance_load_R) for f in flies]))
+
+
+@dataclass
 class Locomotion:
     """Walking: a physical readout of the motor signals in `MotorRates`. No behaviour lives here -- the
     odour-gated steering, casting, hunger and search programs are in `programs.py` and are off by
@@ -232,6 +345,25 @@ class Locomotion:
     tau_ms: float = 80.0           # motor smoothing
     baseline_speed: float = 0.008  # m/s intrinsic walking drive (flies walk spontaneously; keeps optic flow alive)
     mdn_threshold: float = 15.0    # Hz
+    # opt-in leg cycle (LegCycle; None = off, the shipped path): advanced at the end of step() from the realised
+    # speed / yaw rate; read by nothing in this class
+    cycle: object = None
+
+    def proprio_state(self, fly: FlyState, motor, haltere_sides=None) -> dict:
+        """The scalar body state the opt-in proprioception transducer reads (the batched twin is
+        batch_body.BatchBody.proprio_state): the previous frame's leg MN rates per side and haltere MN rate (zeros
+        when `motor` is None), the airborne flag, the realised yaw rate (the labelled stop-gap term only), the leg-cycle
+        state when a cycle is attached, and the side-split haltere MN rates when the caller supplies them
+        (motor.read_haltere_sides; None otherwise)."""
+        def m(name): return 0.0 if motor is None else float(getattr(motor, name))
+        out = dict(leg_L=m("leg_L"), leg_R=m("leg_R"), haltere=m("haltere"), airborne=bool(fly.airborne), yaw_rate=float(fly.yaw_rate))
+        if self.cycle is not None:
+            out["legs"] = LegCycle.state([fly])
+        if haltere_sides is not None:
+            hL, hR = haltere_sides
+            out["haltere_L"] = 0.0 if motor is None else float(np.asarray(hL).reshape(-1)[0])
+            out["haltere_R"] = 0.0 if motor is None else float(np.asarray(hR).reshape(-1)[0])
+        return out
 
     def readout(self, motor, g: MotorGroups | None = None, dt_s: float = 0.01) -> dict:
         # Legacy (Brain, MotorGroups) probes use the same raw-rate adapter.
@@ -262,6 +394,8 @@ class Locomotion:
         fly.speed = a * fly.speed + (1 - a) * cmd["speed"]
         fly.yaw_rate = a * fly.yaw_rate + (1 - a) * cmd["yaw"]
         fly.proboscis = cmd["proboscis"]
+        if self.cycle is not None:                                   # opt-in: the legs follow the realised speed / yaw
+            self.cycle.apply(fly, dt_s)
         if hasattr(bounds, "walk"):
             n_before = fly.normal.copy()
             p, f, n, face = bounds.walk(fly.pos, fly.fwd, fly.normal, fly.face, fly.speed * dt_s, fly.yaw_rate * dt_s)

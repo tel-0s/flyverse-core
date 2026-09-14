@@ -892,6 +892,120 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
     console-vs-JSON device cross-check of item 4 unavailable for 70 runs. A tool's `verify` must count consoles
     against runs and raise a problem when they do not match.
 
+13. **A verdict-agreement statement is produced by a script, not by eye.** `docs/audits/body_sided_state.md`
+    section 4 said the five-run and four-run tables "differ in NO verdict (0 rows ... checked by diffing the
+    verdict columns)". Diffing `out/vncd3/analysis` against `analysis_4runs` gives **15 of 765 pairwise and 7 of
+    548 room-table verdict cells** (reproduced independently). No headline row flips, so no conclusion moves --
+    but the five-run tables span two submissions (seed 2 from `vncd3-f3bb50`, seeds 0/1/3/4 from `vncd3b`) while
+    the four-run table is the single-submission one this document asks for. **RULE: a verdict-agreement statement
+    is produced by a script that diffs the two CSVs and prints the count and the flipped keys, pasted verbatim
+    into the audit (this extends item 7); and when a family spans two submissions, the single-submission table is
+    the headline and the pooled one is the supplement.**
+14. **A suite claim is device-scoped, and the CPU path is the reference.** `add_low`'s "suite 12/0/0 in 5/5" holds
+    on H200 and on B200 -- the seed-locked values are bit-identical across the two GPUs (`taste.MN9_hz`
+    10.93417739868164 / 2.4795215129852295 on all nine runs) -- and **FAILS on the CPU**: 1.9669914 against a
+    criterion of `> 2` (with the term off, CPU 5.0909, PASS). A shipped value under an opt-in mode therefore fails
+    a scored check on the path the project's bit-identity rule uses. **RULE: any suite claim about a candidate
+    default (or about a shipped value under an opt-in mode) is reported on the CPU path as well as the GPU;
+    "seed-locked" sections are named with the device they are locked on; and a 2x CPU-vs-CUDA difference on a
+    scored check (MN9 5.09 vs 10.93 -- a residual of +-1.7 V/s inputs) is itself a defect of the check and is
+    recorded as one.**
+15. **`--arm-block` must block the family, and a one-job block is a bug.** In unitary batch 1 `--arm-block fam`
+    resolved to **one block per FILE**: 16 one-job blocks, dealt round-robin over two H200s. It happened to be
+    balanced (seeds 0/2 -> box b, 1/3 -> box a for every arm) and the skeptic reproduced the family in one block
+    on a B200, so nothing is confounded -- but as executed it was a departure from item 9's rule, and the ANSWER's
+    "one submission, both boxes H200, balanced per arm" did not say so. **RULE: `cluster_run.py` refuses (or at
+    minimum prints a red line and requires `--confirm`) when `--arm-block` yields more blocks than jobs/2, or any
+    block of size 1 in a batch larger than the target count; job commands carry a family token that is the SAME
+    string on every arm (`fam_<family>`), with `--arm-block-map` as the fallback; and the audit prints the
+    block-to-box table verbatim.**
+16. **"Bit for bit" is never said of a GPU number** (item 2, restated because this round broke it three times).
+    The walk triple 48.48052978515625 / 20.109053071339925 / 4.629162311553955 was called "bit for bit rounds
+    4/5/6/7" in `guard_suites_r3.md`, `anti_runaway.md` round 7 and `round3_integration.md` section 1, while
+    (a) the attribution of the candidate triples to rounds 4/5 is partly wrong (round 4's `lpi_x1` `walk.GF_max`
+    was 9.7681, not 9.7951), (b) the same walk section is **not** seed-locked under the unitary-high arm on the
+    eager path (90.47 vs 44.70 between two draws on one box), and (c) the CPU reads **57.38 / 26.66 / 9.76** for
+    the shipped default. **RULE: "bit-identical" is a CPU claim; a GPU value that repeats is "reproduced the
+    recorded value exactly in n draws on backend X", and the CPU value is quoted beside it whenever the number is
+    used as a reference.**
+17. **The adopt-alone rate-half is a two-sample exact Poisson, stated in one direction.** The guards audit
+    attributed "inside the baseline's exact Poisson 95 % CI" to rounds 4-6; round 5 read it one-sided ("not worse
+    in either route") and no round stated CI containment. Containment of the candidate's point estimate in the
+    baseline's CI ignores the candidate's own sampling error -- **14.9-15.6 % false failure for an identical true
+    rate at 3-6 batches per arm, and it does not improve with n** -- and it was applied asymmetrically: the
+    transducer arm, also outside the CI but *below* it, was passed. **RULE: the rate-half is a two-sample exact
+    Poisson (conditional binomial) at equal exposure, quoted beside the run-level `common.compare`; the direction
+    is stated once for every arm; and the prescribed replication is derived from a power calculation on the
+    observed contrast (here >= 6 runs per arm: power 0.85 at n 6, 0.50 at n 4 for 15.0 vs 24.3 hops per run), not
+    a fixed ">= 4".**
+18. **Compare on unrounded values; round only at print time.** `scripts/probe_unitary.py` `_stats()` rounds to
+    4 dp **before** `common.compare` (compass `mid` `rest_mean_post` z 4.50 rounded against 7.12 unrounded; `low`
+    -3.50 against -7.29), and the integration's pairwise table prints z to the nearest integer, so "z-3 p 0.032
+    null" appears beside a `|z| >= 3` criterion and reads as a contradiction (the actual values are -2.88 and
+    -2.77). **RULE: compare on unrounded values, round only at print time, and print z to one decimal in any table
+    whose criterion is `|z| >= 3`.**
+19. **"Verified" needs a receipt, or the word is "size-verified".** "md5-verified against the box" (unitary batch
+    1) rests on a size compare (`FETCHED.txt`) -- **no tool in `cluster_run.py` or `fetch_run.py` computes a
+    digest** -- and the box has since been destroyed, so it cannot be re-checked; "the 155 raw job files ... with
+    their md5" (monoamines) is 40 files. **RULE: `fetch_run.py` writes a per-file sha256 receipt (the remote hash
+    computed on the box before transfer, compared locally), and an audit says "md5/sha256-verified" only with the
+    receipt path; otherwise it says "size-verified".**
+20. **A shared dependency is committed before the batch is submitted.** Every batch of this round shipped
+    uncommitted cross-task files (item 10.1(7b) violated by all five threads), and the guards batch ran an
+    **intermediate `body.py`** (md5 46e3c10a, neither HEAD nor the present tree), so its "transducer on" arms are
+    the previous round's sense and the audit had to read the tree back over ssh. The never-edit list was breached
+    once -- `flyverse/brain.py`, thread unitary, through the "a new `LIFParams` field is unavoidable" carve-out
+    (default `None` plus a CPU bit-identity test, so the letter was kept). **RULE: a shared dependency is
+    committed (on a branch if need be) before the batch is submitted, or the batch is explicitly a working-tree
+    batch and the audit header carries `submit_tree.txt` plus the md5 of every `flyverse/` file that differs from
+    HEAD; and the never-edit list names the carve-out's two conditions AND requires a line in the hand-off.**
+21. **The scheduler's receipt is the record of "n jobs, 0 failed", not the client's console.** Every predecessor
+    agent died at a session limit; the rented boxes were stopped ~5 h for funds; four of six batches lost their
+    `cluster_run.py` client and were pulled by hand (`scripts/box_status.py` and `scripts/fetch_run.py` were
+    written for it); unitary batch 1's log ends in "connection refused" with no summary line. **RULE: the
+    scheduler's own completion receipt (job counts and exit codes) is the record of "<n> job(s), <m> failed",
+    fetched as a file into `out/<dir>/`, never the client console; `cluster_run.py` gets an `--attach <run>` mode
+    so a new client can resume the wait / fetch of an existing run; and rented-box batches are kept inside the
+    session budget.**
+22. **One table, one frame mask.** Inherited from `probe_vnc_drive`'s reducer: `DNa02_L` / `DNa02_R` include
+    airborne frames while `DNa02 L-R` is the non-airborne window, so the AC row reads 2.014 / 0.940 beside an
+    L-R of +1.124 (the okf-masked pair, 2.061 / 0.937, does subtract). Separately, `sided_frames()` aligns the
+    recorded samples one body frame early (`scripts/probe_vnc_drive.py` ~1126), understating the AN04B003
+    sidedness by ~13 %. **RULE: a reducer declares the frame mask per key in the CSV header, rows that are
+    arithmetically related share one mask, and a lag scan is part of the validation of any cross-signal
+    correlation.**
+23. **When arms differ in clean fraction, quote the window-matched statistic and call the verdict on it.** Under
+    the unitary-high arms the clean frames are 12-17 % of the window (every fly off the table in 7.7-11 s)
+    against 94 % under the transducer alone, so every AC-vs-A row is selection-confounded; window-matched
+    re-scoring shrinks AC v A yaw SD from +5.09 to **+4.55** (5-16 s) and **+3.78** (5-10 s) -- the ordering
+    holds, the magnitude is inflated by 15-26 %. **RULE: when arms differ in clean fraction by more than ~2x, the
+    window-matched statistic is quoted beside the full-window one and the verdict is called on the matched one.**
+24. **"Underpowered by rule" is not a verdict to plan for.** Both the body-state and the integration batch ran
+    **3 seeds per compass arm** (3 v 6 per phase, 3 v 3 for the flip rows), so every compass row was
+    `underpowered` by item 1 before the first job was submitted, and the audits quoted per-seed lists instead.
+    **RULE: no arm is planned below 4 runs unless the audit predeclares that its rows are magnitudes only.**
+25. **Every bracket edge names its source, or is labelled "headroom".** This round: Strauss & Heisenberg 1990
+    read as "tripod at every walking speed" (the paper says at the fastest walking); a "stance amplitude ...
+    largely kept constant" quotation not found in DeAngelis 2019 (the number is self-derived and sound);
+    `lit.HS.oa_response_gain`'s upper edge 2.3 with no source; `unitary.IoverE.chloride_driving_force` citing no
+    E_Cl source at all (larval / embryonic values give an I/E of 0.0-0.15, below the row's own bracket); Kazama &
+    Wilson 2008's primary EPSP possibly 7 mV rather than the 5 mV gloss; and the one insect unitary I/E on record
+    (0.28, Periplaneta, J Neurosci 34:13039) missed entirely. **RULE: every bracket edge of a `lit.*` / `unitary.*`
+    row names its source verbatim or is labelled "headroom" (as the 250 Hz haltere ceiling is), and quotations are
+    checked against the full text before they are typed as quotations.**
+26. **The REPORT / ANSWER block is generated from the audit's tables, never retyped.** The header text drifted
+    from the body three times in one round: the integration's "undetermined/structural" against the body's "null
+    with a zero-SD null"; guards' "21 wrapper runs" against 18 and "wrong in direction" against "not what
+    happened"; monoamines' "zero scatter in the abort time" when frame 51 is the guard's earliest possible abort.
+    **RULE: the REPORT / ANSWER block is generated from the audit's tables, or the audit's section 0 IS the ANSWER
+    verbatim -- it is never retyped by hand.**
+27. **A round with two workflows names one owner per file and one closing critic.** Round 3 ran a behaviour
+    workflow and an object workflow over the same house cluster and the same working tree, and an external agent
+    (Astra) took the object tasks mid-round after API 529s; the object half's skeptic passes were the author's own
+    separately implemented checks, not a second agent, and it had no NOTES entry until the owner wrote one.
+    **RULE: one hand-off file per round names every file's owner (done: `docs/HANDOFF_ROUND3_ASTRA.md`,
+    git-ignored), and the closing critic covers both workflows or says plainly which one it does not.**
+
 ### 10.3 The minimal command sequence (an odour-to-DN question, as an example)
 
 ```bash

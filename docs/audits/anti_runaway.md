@@ -1005,3 +1005,97 @@ round-2 corrections above: `out/sk_les_holds_all/{baseline,holdBrain,holdOptic,o
 `holdOptic` scatter), `out/pm_bound/*/*.json` (the `motion.min_dsi` and `loom.GF_peak` per-draw values),
 `out/r5_adopt_default_{1,2}.json` (the 0.24595 `min_dsi` draws), `scripts/pm_bound_report.py:133` (the
 tie-uncorrected rank), `scripts/benchmark.py:132` (what `notnone` does).
+
+## Round 7 (2026-09-14): the adopt-alone suites the round-6 record called for -- both candidates fail on the room
+
+**Decision record: nothing is adopted; neither candidate is adoptable by this document's rule.** Round 6 left two
+retirement candidates with a clean pinned record and no room measurement -- `OpticParams.drive_clip_mv` 35 (the
++-35 mV clip on the optic -> spiking injected current) and `optic.DEFAULT_PAIR_GAIN`'s LPi34/43 -> LPLC2 x4 -- and
+said the adopt-alone rule (round 4, executed in round 5) requires each candidate's own full 29-check suite x >= 3
+**and** the room take-off protocol against the shipped default before the default changes. Both were run this round,
+in one submission on this round's boxes (H200, `scripts/guard_suites.sh`, run dir `guard7-97ce35`, 27 jobs, 0
+failed; the full record is **docs/audits/guard_suites_r3.md**, tables `out/guard_r3/guard_report.md`). The
+status-half of the rule is met by both candidates (27 PASS / 0 FAIL / 2 KNOWN GAP in 3/3 draws each, no check worse
+in status than the baseline's 27/0/2 x3 -- an insensitive criterion: the worst margins to bound shrink, `walk.GF_max`
+33.37 -> 24.74 (noclip) / 28.20 (lpi1), `walk.power_sustained` 29.89 -> 24.73, `motion.min_dsi` 0.1411 -> 0.1371,
+`walk_gf.p99` 12.62 -> 9.13; `walk.power_max_hz` is reported, not scored, since round 6 -- `benchmark.py:85`
+`notnone`; under the old `< 50` scoring LPi x1 would be 26/1/2 x3 at 51.5078 Hz, **reproducing the value recorded in
+rounds 4 and 6 exactly in 3 draws on the native CUDA backend** -- "bit for bit" is a CPU claim, and the CPU reads
+57.3838 / 26.6636 / 9.7632 for the shipped default's triple).
+
+**The rate-half, stated once and in one direction.** Rounds 4-6 asked for each candidate's own 29-check suite x >= 3
+*and* the room take-off protocol, and round 5 read the room half ONE-SIDED, as "the take-off rates are not worse in
+either route", with one-sided p's (:551-553); **no round stated a CI-containment rate-half**. The CI-containment form
+was new in round 7 and was applied asymmetrically (both candidates failed by containment while the transducer arm, also
+outside the CI but below it, was passed under round 5's reading). It is also not a 5 % test: for a candidate with the
+default's true rate, its point estimate falls outside the baseline's exact Poisson CI 14.9 % of the time at 3 batches
+per arm, 15.3 % at 4 and 15.6 % at 6, and the error does not fall with n. **This round therefore states the rate-half
+as a two-sample exact Poisson (conditional binomial) at equal exposure, two-sided, quoted beside the run-level
+`common.compare`, and applies it to every arm including the transducer** (which then also departs from the default, in
+the direction of fewer take-offs: all routes p 0.0225, voluntary p 5.1e-04). Which form the rule takes -- round 5's
+one-sided "not worse" or this two-sided restatement -- is an owner decision (see the owner-decision line below); the
+transducer arm and both retirement candidates are to be re-read under the chosen form in the next guard round, and no
+number changes either way. The rate-half fails for both candidates under both readings:
+
+| arm (3 batches x 16 flies x 300 s, brain seeds 0-2, live escape route) | hops = escape + voluntary | all per 1,000 fly-s (exact Poisson 95 % CI) | escape | voluntary | walking-GF median (flies >= 33 Hz) | verdict |
+|---|---|---|---|---|---|---|
+| shipped default (this round's reference) | 45 = 17 + 28 | **3.125 (2.279-4.181)** | 1.181 (0.688-1.890) | 1.944 (1.292-2.810) | 31.27 Hz (15/48) | -- |
+| `no_drive_clip` | 73 = 16 + 57 | 5.069 (3.974-6.374) | 1.111 | **3.958** (2.998-5.128) | 31.16 Hz (15/48) | **not adoptable**: two-sample exact Poisson vs the default p 0.0126 all routes, **p 0.0022 voluntary**, escape p 1.00 |
+| `pair_gain_lpi_x1` | 498 = 451 + 47 | 34.583 (31.612-37.758) | **31.319** (28.495-34.348) | 3.264 | **38.12 Hz (48/48)** | **not adoptable**: 11x (p 1.1e-97), the escape route fires from walking (p 1.4e-110) |
+| transducer 'all' (round-2 sense; a guard, not a candidate) | 25 = 18 + 7 | 1.736 (1.124-2.563) | 1.250 | **0.486** (0.195-1.002) | 31.29 Hz (13/48) | no check worse; FEWER take-offs, and under the same two-sided test it also departs from the default (all routes p 0.0225, voluntary p 5.1e-04); `underpowered` at 3 v 3 |
+
+* **The drive clip** costs nothing on the pinned suite (the round-6 record, reproduced: 49.2480 / 25.2732 / 13.2599 in
+  3/3, `motion.min_dsi` 0.2371 below every default draw) and **doubles the voluntary take-off rate in the room**
+  (57 vs 28 hops in 14,400 fly-s; per seed-matched batch 27 / 10 / 20 vs 13 / 9 / 6; fly-level Mann-Whitney p 0.012,
+  descriptive; two-sample exact Poisson p 0.0022). The escape route and the walking-GF tail are unchanged (1.11 vs
+  1.18, p 1.00; 31.16 vs 31.27 Hz, 15/48 both), so **round 6's prediction that the clip's removal raises the room
+  walking-GF tail is NOT CONFIRMED -- the clip does not move that tail at all** (diff +0.15 Hz, `compare` verdict
+  `null`, 25/64 vs 26/64 on the skeptic's B200 rerun) -- rather than "wrong in direction": **it binds on the wing-power
+  route instead**, in line with the pinned `walk.power_sustained` 20.11 -> 25.27 Hz (the voluntary criterion is 50 Hz
+  held 0.3 s). The clip's removal is now callable at the run level, from the skeptic's fresh-seed B200 replication
+  (`guardsk-70c2f8`, house cluster, 8 jobs 0 failed, 4 runs per arm, one submission, one block; default 72 = 36 + 36 =
+  3.750 per 1,000 fly-s, noclip 105 = 27 + 78 = 5.469): `hops_voluntary_total` diff +10.5, z 3.57, U 16.0, **p 0.0286
+  `result`**, higher in 4 of 4 seed-matched batches, with escape / walking-GF median / rows>=33 all `null`. What the
+  clip stands in for (section 1) is therefore a bound on the optic drive that the wing-power MNs see; its replacement
+  has to bound that without the hand-set +-35 mV, and be re-run through **both halves** -- its own 29-check suite x >= 3
+  *and* this room protocol with **>= 6 runs per arm** (power 0.85 at n 6, 0.50 at n 4 for this contrast; the 4 v 4
+  rerun landed exactly on the exact-U floor).
+* **The LPi x4 factor** is, in the room, the difference between 17 and 451 escapes per 14,400 fly-s: at x1 every one of
+  48 flies walks with a giant-fibre maximum above the 33 Hz escape threshold (per-fly minimum 34.7 Hz, median 38.1;
+  0.4-1.6 % of the time airborne, per-batch medians 0.86-0.98 %). Round 4's reading -- "the mechanism is real and the *size* of the hand-set factor buys
+  nothing that is scored" -- was correct about the pinned checks (`walk.GF_max` 9.80, `walk_gf.p99` 26.6-28.9 against
+  38) and is refuted by the room; and G.4's finding that the pinned GF numbers do not predict the room has its
+  sharpest instance here (pinned 4.63 -> 9.80 Hz, room median 31.3 -> 38.1 Hz across the threshold). The round-3
+  replacement statement stands: not "delete the gain" but a sign-correct LPi -> LPLC2 strength from data, and any
+  such candidate is scored in the room before the pinned suite is taken as evidence.
+* **The rule's own limits, on record.** With 3 batches per arm the run-level `compare` is `underpowered` by
+  construction (exact-U floor p 0.10; lpi1 hops z 50, noclip hops z 3.1); at the skeptic's 4 v 4 it is callable. The
+  rate-half is decided on the two-sample exact Poisson on pooled counts (above), not on CI containment; the fly-level
+  p's are quoted for continuity, not as the replicate unit. The default's rate reproduces round 5's on a different
+  device inside both CIs (3.125 here vs 3.89 on B200; 2.94-5.05 there), and the fixed-seed cross-device scatter that
+  statement rests on is itself on record: round 5 (B200) and round 7 (H200) ran the IDENTICAL seeds and got 19 / 21 /
+  16 against 18 / 15 / 12 flies at threshold per batch (diff -1 / -6 / -4), while the skeptic's fresh-seed B200 default
+  is 3.750 (2.934-4.723) with walking-GF medians 30.79-33.76 against this batch's 30.24-31.95 -- roughly a third of the
+  `no_drive_clip` contrast. The `hops` section (2,400 fly-s, 3 draws) gives the same reference (3.33 per 1,000
+  fly-s, CI 2.14-4.96) and shows that its voluntary gap row (`< 1.0`) passes in 1 of 3 default draws.
+* **The proprioceptive transducer** was run as a regression guard on the shipped default (round-2 `senses.Proprioception('all')`,
+  the version on the boxes; the round-3 sided version in the working tree was not shipped): no check worse in status in
+  the `hops` section (3/0/0 x3 vs the default's 2/0/1 in 2 of 3 draws), fewer take-offs in every draw and batch
+  (hops section 3 / 4 / 1 vs 5 / 9 / 10; room 4 / 11 / 10 vs 18 / 15 / 12), all of it on the voluntary route (room 7 vs 28, 1 / 3 / 3 vs 13 / 9 / 6; escape 18 vs 17; walking-GF median 31.29 vs 31.27 Hz), the room rate 1.74 per 1,000 fly-s below the default's CI 2.28-4.18 -- `underpowered` at 3 v 3 (room voluntary z -2.0, exact U 0, p 0.10 = the floor). It stays opt-in; the question
+  belongs to the body-state thread (docs/audits/body_sided_state.md), and a callable design is >= 6 runs per arm in
+  one submission. **No section of the 29-check suite can carry the sense**: only `sec_hops` builds a `BatchSim` at all,
+  and `hops` is not in `--sections all` (`benchmark.py:785` `OPTIONAL = ['hops']`), while the demo sections'
+  `room_demo.Sim` never attaches one. So no "transducer on" 29-check suite was run -- it would be the default suite.
+
+**Owner decision recorded (2026-09-14): the adopt-alone rate-half is restated as a two-sample exact Poisson comparison
+(two-sided) of the candidate's and the baseline's pooled take-off counts at equal exposure, replacing "the candidate's
+point estimate inside the baseline's exact Poisson 95 % CI".** The transducer arm and both retirement candidates are to
+be re-read under that form in the next guard round; no number of this round changes now.
+
+Extent of this edit: this section is appended after the round-6 section's file list; nothing above it was changed, and
+the corrections of the round-3 skeptic pass (the wrapper-run count 18, the walk-triple round attributions, the airborne
+bracket, "not confirmed" in place of "wrong in direction", the two-sample exact Poisson, >= 6 runs per arm, the CPU walk
+triple, the B200 replication) were applied to this section and to `docs/audits/guard_suites_r3.md` before the commit.
+Files: `scripts/guard_suites.sh`, `docs/audits/guard_suites_r3.md`, `out/guard_r3/` (27 run artefacts,
+`guard_report.md`, `guard_summary.json`, `submit_tree.txt`, `guard_wrap.py`), `out/guard_r3_cluster.log`; the skeptic
+pass's own artefacts `out/guard_sk/fam_room2/` (`guardsk-70c2f8`) and `out/guard_sk_cpu/walk_cpu.json`.
