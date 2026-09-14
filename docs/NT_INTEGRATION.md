@@ -185,6 +185,30 @@ sign-0 and disagreement tables as its target lists.
   note it and move on.
 - Alias ambiguity across platforms (the 2026 note): every join row keeps its source name so a
   disagreement can be traced.
+- **Re-examine the SILENCING rule's premise on photoreceptor -> medulla edges** (opened by dynamics round 2,
+  2026-09-13; `docs/audits/receptor_integration.md` G.6.5-G.6.7). The rule at issue is the *silencing* rule --
+  "a silencing (`fast_sign` 0) needs every source profiling the type to agree and at least two of them", i.e.
+  that absent `HisCl1` / `ort` in a medulla type's transcriptomes its photoreceptor synapses transmit nothing
+  -- and **not** the contested-flip rule (R3.1). The 45 histamine rows that carry the room's take-off cost are
+  `fast_net_abs = none`, `fast_sign_abs = 0`, `fast_selection primary` and `flip_contested` empty on 45/45 with
+  unanimous sources, while the class the flip rule *did* police (the T1 / Dm9 / Lai glutamate flips) carries
+  nothing in the room, so re-examining `contest_flip` would touch the wrong class. Two sub-items, in order:
+  1. **First, and it is not a table question.** These are the R7 / R8 (and R1-R6) -> Mi / Dm / C / L / Tm
+     synapses -- 15,509 entries, 80,432 |W|, 90 % of the class's entries and 97 % of its |W| -- whose
+     postsynaptic types are among the best-profiled cells in every optic-lobe atlas, so the `none` calls are
+     the data's **strongest**, not their weakest. If they are right, the room cost is a **model** consequence
+     of a *correct* silencing, and the question moves to `optic.py`'s use of the receptor factor on
+     photoreceptor -> rate edges (`optic.py:165-225`: every optic-lobe edge, photoreceptor -> rate included,
+     takes |count| x the row's fast sign) -- a **swappable-module** question, not a table question. Under the
+     shipped default these direct photoreceptor inputs are zero in the medulla rate model.
+  2. **Second, and only from expression data.** If the integration wants a **bound** rather than a silencing
+     for this class (a tier-`silenced` prior kept at the presynaptic sign with a small gain), it must be
+     justified from the expression levels (the `fast_neg_val` of these rows, all 0 under the group rule) --
+     **never from the room take-off rate**. Deciding it on behaviour is hand-tuning toward behaviour.
+  QC caveat the item carries: tier is `exact` on 34/45, `fuzzy` on 9 (Dm3a/b/c, LC14a-1, LC14a-2, LC14b, Pm1,
+  Pm2a/b) and `alias` on 2 (LPi34, l-LNv); QC `pass` on 44/45 (l-LNv `suboptimal_only`). Immaterial by weight
+  -- tier-`exact` rows carry 17,049 of 17,256 entries (98.8 %) and QC-`pass` rows 17,189 (99.6 %) -- but the
+  earlier "all 45 tier exact, QC pass" was wrong and must not be re-quoted.
 
 ## 7. Round 1 (session 10): what was built, what it found, what was wrong
 
@@ -401,9 +425,22 @@ default. Where each item now stands:
    has no signed rotation input in MaleCNS (GLNO is silent, fully contralateral and efference-fed; LNO / SpsP
    make 0-13 synapses onto PEN), and relabelling GLNO GABA gives an **elastic** +0.30 against +0.04 wedge L-only
    deflection (6/6 seeds, p 0.031). Visual rotation at 90 deg/s moves the bump 0.00 +- 0.01 w/s against a 4.0 w/s
-   ideal. Next: the efferent rotation route (R2-1), which the rig never tested. `out/cxroom_orig/`, `out/cxvfy/`,
+   ideal. `out/cxroom_orig/`, `out/cxvfy/`,
    `out/verify_cx_shift_shift.md`, `out/vcx_*_s345.json`; `docs/audits/compass_room.md`, `cx_shift.md` (both
    still stubs; R2-0 fills them from data that already landed).
+   **[Dynamics round 2] The efferent route is run, and the chain is live and unsigned.** With the
+   proprioceptive / haltere transducer on, PS196_b goes 0.193/0.519 -> 1.437/1.505 Hz and GLNO 0.034/0.038 ->
+   0.664/0.657 Hz in the 60 s room (5 runs/arm, `result` p 0.0079) -- the first time PEN's nodulus input
+   carries anything in the plain fly -- and the bump still does not move: drift -0.0047..+0.0036 wedges/s on
+   the phase means of all three arms against 4.0 ideal, every one of 36 arm-phase-runs inside
+   -0.0097..+0.0060, GLNO L-R +26.93..+28.07 Hz in every phase. Under the labelled Coriolis stop-gap the
+   chain is driven 13x harder (PS196_b 11.05/7.52 Hz in the turn) and **its L-R moves the same way in both
+   turn directions** (+3.52 ccw, +3.95 cw), so the failure is a **sign**, not a magnitude. Structural
+   reason: the only afferent class two steps from PS196_b is the haltere SApp, and `MotorRates.haltere` is
+   one bilateral number; the sided leg channels reach it only at k = 3. **Signing GLNO remains moot** -- 12
+   mV/s of symmetric PS196_b against a ring at 25-145 Hz. The compass item is now a **body-model** item
+   (a side-split haltere MN readout in `motor.py`; a leg cycle in `body.py`), not a receptor or
+   transmitter item. `docs/audits/vnc_drive.md` 6; `out/vncd/analysis/compass_*.csv`.
 2. **Object -- the stage is named.** The figure is lost by ON/OFF cancellation at T2 / T3 / Tm5Y / TmY21 and then
    by l1 pooling at LC10 / LC11 (LC11 +0.046 mV, LC10a +0.080 against LPLC2's +0.54 and a 7 mV criterion). No
    hand-crafted optic measure sits on those edges and none of 16 ablations moves it; the LPLC2 object null under
@@ -421,21 +458,44 @@ default. Where each item now stands:
    downwind only, no concentration-change rule, 81 % of flies ending upwind of the apple, closest approach
    2.3-7.2 cm against a 3.8 cm capture radius). `body.py` was untouched and stays so. `out/feedh_*.json`,
    `out/skfeed_*.json`; `docs/audits/feeding_horizon.md`.
-4. **`walk.power_max` -- STILL OWED**, and now blocking three verdicts (LPi x4, the drive clip, the AL LN
-   override). It fails under 13 of 16 optic ablations (51.5-198.8 Hz), is non-monotone in `gain_out`
-   (80 / 100 / 120 = 63.8 / 48.5 / 51.7) and **anti-correlates** with the room take-off rate across the four hold
-   arms, so it is not a take-off predictor and nothing may be tuned to it. `scripts/retire_measures.py:245`
-   references `brain` without importing it, so handover item 4's own first command cannot run until its owner
-   adds the import. `out/optic_audit/`; `docs/audits/optic_measures.md`, `anti_runaway.md`.
+4. **`walk.power_max` -- DECIDED (dynamics round 2, `docs/audits/anti_runaway.md` round 6): de-score it.**
+   48.4805 Hz in 12 of 12 shipped-default GPU draws, margin 1.5195 Hz -- **inside the worst single-arm
+   scatter on record** (11.86 Hz on `holdOptic`; the `off` suite arm alone spans 1.56 Hz). Non-monotone in
+   the LPi scan (51.51 / 48.00 / 48.48) while `walk.GF_max` is monotone; the two path gains move it in
+   opposite directions (32.41 at DN -> VNC x1, 34.24 with both off); **Spearman -0.600** against the room
+   take-off rate over the four hold arms, the two FAILing arms being the two quietest rooms. The 50 is
+   `body.Flight.takeoff_power_hz` (50 Hz held 0.3 s) applied to a per-frame maximum; the sustained form
+   `walk.power_sustained_hz` keeps that referent and stays scored. **Done:** `scripts/benchmark.py:85` now
+   carries `Ref(22, "notnone", 0, "4", note="REPORTED, NOT SCORED since session 10 ...")`, the form
+   `loom.escape_cm` uses. Note `benchmark.py:135` makes `notnone` pass whenever the value is not None, so the
+   row stays in the pass tally as a report -- "de-scored", not "unscored". **Not** to be re-derived from a
+   gain scan. The `retire_measures.py` import defect that blocked this item's first command is fixed.
+   De-scoring does **not** license retiring LPi x4, `drive_clip_mv` or the AL LN override.
+   `out/pm_bound/`; `docs/audits/anti_runaway.md` round 6.
 5. **Take-off -- optic-side.** Over 4 matched batches (19,200 fly-s per arm) the optic side of the receptor signs
    (44,463 medulla entries) carries **most** of the cost -- 75 % of the hop excess, 83 % voluntary, 95 % of the
    GF-median shift, having read 92-106 % on three batches -- and the Brain side (3,832 entries) **none** of it.
    The two halves do not cancel in the room as they do in `walk.GF_max`, so the pinned walk section is not a
    proxy; off with the damping retired is the same denominator as off with it (0.486 vs 0.625 per 1,000 fly-s;
    0 voluntary take-offs in 52,800 fly-s over 11 batches); and 0 of the 48,295 changed entries land on the
-   take-off pathway. Unresolved: the escape route alone (p 0.09 over 4 batches) and dose. Next: `holdOpticHis` /
-   `holdOpticGlu` with a dose control, all arms in one submission (R2-3). `out/d1_*.json`, `out/sk_d1_*_4.json`;
-   `docs/audits/receptor_integration.md` G.5.
+   take-off pathway.
+   **[Dynamics round 2] Split and replicated: the histamine silencings carry it, the glutamate flips carry
+   none.** Five arms in one submission x 4 runs, plus a fresh-seed replication at brain seeds 4/5/6
+   (7 runs/arm pooled, 33,600 fly-s each). `holdOpticHis` (17,256 entries, 83,191 |W|, 90 % of entries
+   photoreceptor -> medulla) is `compare`-**null** against the shipped default on hops, escape, voluntary and
+   the GF median (pooled hops 0.840x [0.669, 1.054]) and `result` against off on all four (z +9.4 / +3.4 /
+   +29.2 / +4.0). `holdOpticGlu` (27,207 entries, 87,920 |W| -- the **larger** perturbation) reproduces off
+   on all four, with 0 voluntary take-offs in 19,200 fly-s. A 3,832-entry random draw from the carrying
+   class, matched to the Brain side's entry dose and |W|, also reproduces off, so **dose in entries or |W|
+   does not order the arms**. Two limits: the **escape** channel stays unattributable (the reported batch's
+   103.6 % does not replicate -- fresh seeds 0.633x [0.353, 1.116]; at 7 v 7 even `off` vs shipped is
+   `compare`-null on escape, |z| 1.92 < 3), and **dose in postsynaptic cells touched is not excluded and is
+   structurally unclosable by this design** (off 0 / Glu 2,091 / Random 2,505 / His 10,411 / shipped 14,161
+   orders monotonically with the outcome; an entry-matched subset can never match its class's cell count).
+   Off's voluntary rate is 1 in 86,400 fly-s over 18 batches, not 0. Next split: per-row within the
+   histamine class (Dm2 / Mi15 / Mi4 / Mi1 / L4 / C3 alone and their complement), same exposure.
+   `out/d2_hold/`, `out/sk_d2_hold/`; `docs/audits/receptor_integration.md` G.6. `out/d1_*.json`,
+   `out/sk_d1_*_4.json`; `docs/audits/receptor_integration.md` G.5.
 6. **Optic stop-gaps -- one re-labelled, one candidate for retirement.** `DEFAULT_PAIR_GAIN[1]`
    (Tm4 / Tm9 / CT1 / TmY15 -> T5 x5) is data-contradicted: 78,877 of its 101,619 edges are Tm4 / Tm9 -> T5
    **acetylcholine** against 22,742 GABA, so it is a drive gain on T5's main excitation, not delayed inhibition.
@@ -443,5 +503,28 @@ default. Where each item now stands:
    stop-gap**. `OpticParams.drive_clip_mv = 35` is a retirement candidate (11/11 checks without it) pending 3
    independent draws, and `DEFAULT_PAIR_GAIN[4]` is a literal no-op that can go now. `out/optic_audit/`;
    `docs/audits/optic_measures.md`.
+7. **Proprioceptive / haltere transducer -- built, measured, adopted as a MODULE, not a default** (dynamics
+   round 2; `docs/audits/proprioception_transducer.md`, `vnc_drive.md`). `senses.Proprioception` drives the
+   941 wired-but-never-driven `vnc_sensory` / `sensory_ascending` proprioceptors from the body state the VNC
+   motor neurons produce -- a `Wind` -> JO-shaped transducer, six literature-bracket ledger rows all
+   `op report`, no number chosen against behaviour, default **OFF** and the shipped path bit-identical **on
+   CPU** with it absent, attached-but-unfed, or `BatchSim(proprioception=None)`. It drives the wiring as the
+   connectome said it would (AN04B003 0.589/0.314 -> 3.713/3.690 Hz; PS196_b -> 1.44/1.51; GLNO -> 0.66/0.66)
+   and closes neither deficit (DNa02 moves a fifth of the way to threshold; PS196_b is symmetric).
+   **What blocks a default, and what an adoption would need, in order:** (a) `rest.spikes_per_step` reads
+   **6.0 against `< 5`, FAIL**, because the check is defined as "no input" and 740 tonic afferents are input
+   -- a redefinition needs a ledger row for what a resting VNC reads, and no measured Drosophila FeCO /
+   hair-plate / campaniform rate exists in any of the six rows; (b) four bench measures move 37-81 % while
+   passing loose bounds (`taste.MN9_hz` -62 %, `smell.PN_hz` -64 %, `smell.KC_active` -37 %,
+   `walk.GF_max_hz` +81 %) -- a cross-modal effect, unmeasured as to cause, on a body-less `brain.Brain`
+   harness, with **one effective replicate per arm**; (c) the full 29-check suite x >= 3 draws with the sense
+   on through `BatchSim`, plus `--sections hops` and the 4-batch room take-off protocol; (d) the loop gain
+   per channel at the operating point (haltere: d(MN)/d(afferent Hz) = **0.163** on the ground, ~0.26 in a
+   turn); (e) the two documented mismatches (35 SNpp19 prosternal/neck hair plates driven by the leg law;
+   the leg variable is the MN rate, not a joint angle). **Closed:** the opt-in checkpoint/partial-reset gap
+   (`BatchSim.state_dict` carries the motor snapshot; `CheckpointAndResetTests`). **Never a default:** the
+   haltere Coriolis term -- a loop through `body.Locomotion`'s hand-written yaw scalar. If a minimal default
+   is ever costed, cost **arm C** (the three leg channels), which reproduces the whole measured effect while
+   the haltere channel alone reproduces none of it.
 
 Do not start a round 6 of receptor work.

@@ -137,6 +137,20 @@ operating point) with a data-driven next measurement and an explicit list of the
 (`docs/audits/deficit_{turning,object,rotation}.md`). The procedure to run when a behaviour fails is
 [`docs/INTERP.md` section 10](docs/INTERP.md); the tools it uses never edit the model.
 
+**What the body does not send back, and the module that tests it.** Every `vnc_sensory` and
+`sensory_ascending` proprioceptor in MaleCNS is wired into this model and, in the plain fly, sits at 0 Hz:
+the walking VNC runs open-loop. `senses.Proprioception` (opt-in, **off by default**) closes that loop the
+way `Wind` feeds Johnston's organ -- leg chordotonal / hair-plate / campaniform afferents from the leg
+motor-neuron rates and ground contact, haltere afferents from the haltere motor-neuron rate, every rate law
+inside a published range recorded as an unscored ledger row. Turning it on makes the wiring carry: the
+ascending cells fire, the efference-copy chain into the compass fires for the first time, and a sided
+excitatory term appears on the steering neuron DNa02. It does not make the fly turn (DNa02 moves a fifth of
+the way to threshold, and the term is symmetric because the body model has no leg cycle) and it does not
+make the compass follow a self-turn (the report arrives without a sign, because the haltere motor readout is
+a single bilateral number). It is shipped as a **module, not a default**: with it on, the suite's `rest`
+check fails by construction -- a fly standing still has firing proprioceptors, and that check is defined as
+"no input". `docs/audits/proprioception_transducer.md`, `docs/audits/vnc_drive.md`.
+
 ## Food-finding, and what is the brain's and what is not
 
 The default model is the connectome plus a **plain body**: rates in, motion out (forward DNs ->

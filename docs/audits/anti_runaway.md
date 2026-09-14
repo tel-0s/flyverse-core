@@ -754,3 +754,254 @@ uncertainty, and "not worse" is the robust statement. (3) Three room replicates 
   be re-scanned under the shipped default before "x2 is the only passing point" is quoted again.
 * `retire_measures.py`: `baseline` and `no_gf_damping` are now the same weights; the new `gf_damped` configuration
   restores the damping for future ablations.
+
+## Round 6 (2026-09-13): the `walk.power_max` bound, decided from the data (handover item 4)
+
+**Decision.** `walk.power_max_hz` should be **de-scored** -- kept in the table as a reported number, not as a pass / fail
+check -- and its referent should **not** be re-derived from a gain scan. The measured facts behind that: (a) under the
+shipped defaults it is 48.4805 Hz in 12 of 12 independent GPU draws (this batch's 6 plus 6 on file), **1.5195 Hz**
+under the 50 Hz bound, with zero scatter in the default itself but **more scatter on record for the very arms
+section (c) uses than that margin**: `out/sk_les_holds_all/holdOptic_r{0..3}.json` span 11.86 Hz on this check and
+this document's own `off` suite arm spans 1.56 Hz, so **the margin is inside the worst single-arm scatter on record**
+(not "about two excursions wide", as an earlier form of this sentence said -- see the bit-stability paragraph below);
+(b) it is
+**non-monotone** in the one three-point scan available (LPi -> LPLC2 x1 / x2 / x4 = 51.51 / 48.00 / 48.48, 6 draws
+each, under the shipped gains) while the quantity that gain was added for, `walk.GF_max`, is monotone (9.80 / 9.03 /
+4.63); (c) across the four take-off hold arms its rank correlation with the room take-off rate is **negative**
+(**Spearman -0.60**, which is the statistic to quote: it stays exactly -0.600 under every substitution tested --
+report value, pooled 9 draws, eager mean 63.51, worst draw 56.17 -- while the Pearson moves -0.787 -> -0.664 and its
+p 0.213 -> 0.336; n = 4, exact permutation p 0.42 against a floor of 0.083 -- descriptive only, but
+the ordering is the opposite of what a spurious-take-off bound should produce); (d) its note's referent ("22 Hz with
+DN -> VNC x3") measures 48.48 at that operating point under the shipped model, and the 50 it is scored against is the
+body's voluntary-take-off threshold (`Flight.takeoff_power_hz`, 50 Hz **held 0.3 s**) applied to a **per-frame maximum**
+-- the sustained form of that criterion is the separate check `walk.power_sustained_hz`, which keeps its referent and
+stays scored. The exact line is named in (d) below; **it is not changed here** (the benchmark's owner does).
+The drive-clip retirement candidate (`OpticParams.drive_clip_mv` 35) is 10 PASS / 0 FAIL in 6 of 6 draws at a
+`walk.power_max` of 49.2480 (0.75 Hz under the bound) with `walk.GF_max` 4.63 -> 13.26; **nothing is adopted** -- the
+adopt-alone rule needs its own 29-check suite run and the room take-off protocol, and those were not run.
+
+### The batch (`scripts/pm_bound_batch.sh`; run dir `pmb-f59cd3` on four rented boxes; console `out/pm_bound_cluster.log`)
+
+One `cluster_run.py` call, **36 jobs, 0 failed, 6.3 min wall**: six configurations x brain seeds 0, 1, 2 x two
+independent draws, each job its own directory `out/pm_bound/<cfg>_s<seed>_d<k>/<cfg>.json` (+ `<cfg>.log`, the job's
+`.txt`), each job
+
+    mkdir -p out/pm_bound && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && \
+      PYTHONIOENCODING=utf-8 python scripts/retire_measures.py --configs <cfg> --seeds <s> --sections walk,a,b --timeout 40 --out out/pm_bound/<cfg>_s<s>_d<k>
+
+(`walk` = the legacy walking / loom / rotate section that carries the three `walk.*` checks, `a` = motion, `b` =
+`loom_escape` at that one seed; receptor model `default` = LIFParams' own `sign` / `abs`, native backend). The boxes:
+vast-a / vast-b (NVIDIA B200, 20 jobs), vast-c / vast-d (NVIDIA H200, 16 jobs); every JSON's `config.device` reads a
+GPU, none `cpu`. `scripts/retire_measures.py` was edited for this batch (its owner's import fix was already in):
+a `no_drive_clip` configuration (`optic: {"drive_clip_mv": 1e9}`, the same ablation as `scripts/audit_optic.py`'s)
+and a `provenance` block in every JSON (`flyverse.interp.common.provenance`: the resolved LIFParams / OpticParams,
+the compiled-connectome fingerprint, source fingerprint, execution record). Identity of the runs: compiled `W`
+md5 `ef23cc27...` (sum|W| 121,460,584, 25,578,600 nnz, the shipped cache), `type_path_gain`
+`[LC4|LPLC2 -> DNp01 x3]`, `path_gain` `[DN -> vnc_ x3, VP -> DN x2]`, `flyverse_commit` `unknown` in the run copy
+(no `.git`; the 43-file source fingerprint is in each JSON), local commit `653179b4` with a dirty tree -- the
+working-tree diff `cluster_run.py` ships (26 files) is the concurrent tasks' opt-in work (`senses.Proprioception`,
+the optic stream hooks, `batch_sim`'s `proprioception=None` argument), every field defaulting to off; the check that
+none of it touched these sections is that the baseline reproduces round 5's shipped-default **walk** values
+**bit for bit** -- `walk.power_max` 48.48052978515625, `power_sustained` 20.109053071339925, `GF_max`
+4.629162311553955, all three in 6/6 draws. **"Bit for bit" is the three walk values and no more**: `motion.min_dsi`
+is bit-identical nowhere (the six baseline draws take **five distinct values**, 0.2410964184151673 ..
+0.24109659755256557, and the round-5 files themselves split 0.24109651 / 0.24109660 / 0.24109660 against
+0.24595012 / 0.24595003 in `out/r5_adopt_default_1.json` / `_2.json`), and `loom.GF_peak` spans
+**43.5929-47.2241** across the six baseline draws. Those two reproduce to 4 dp / within scatter, not bit for bit.
+Tables: `out/pm_bound/replicates.md`
+/ `.json` (`retire_measures.py --report-replicates out/pm_bound`) and `out/pm_bound/pm_bound_report.md` /
+`pm_bound_summary.json` (`scripts/pm_bound_report.py`, CPU; sections 1-7 there carry every number below).
+
+### The walk section, every configuration x 6 draws (`out/pm_bound/pm_bound_report.md` section 1 / 7)
+
+| config | walk.power_max (< 50) | walk.power_sustained (< 50) | walk.GF_max (< 38) | loom.GF_peak (>= 20) | rotate.DNp20_flip (< -2) | motion.min_dsi (>= 0.1) | loom_escape.GF_peak (>= 33) / escapes | tally x6 |
+|---|---|---|---|---|---|---|---|---|
+| baseline (shipped) | **48.4805 x6** | 20.1091 x6 | 4.6292 x6 | 43.59-47.22 | -43.9 to -26.9 | 0.24109642-0.24109660 (5 distinct values, not bit-identical) | 44.1-50.3 / 1 x6 | 10/0/0 x6 |
+| no_dn_vnc_gain (DN -> VNC x1, VP -> DN x2 kept) | **32.4141 x6** | 10.7886 x6 | 9.9266 x6 | 53.9267 x6 | -37.5 to -29.9 | 0.2531-0.2532 | 44.5-48.4 / 1 x6 | 10/0/0 x6 |
+| no_path_gain (both gains off) | **34.2405 x6** | 11.8857 / 15.9133 x3 / 15.8312 x2 | 0.0000 x6 | 40.72-46.79 | -23.2 to -20.1 | 0.2510-0.2531 | 37.8-47.8 / 1 x6 | 10/0/0 x6 |
+| no_drive_clip (clip 35 -> 1e9 mV) | **49.2480 x6** | 25.2732 x6 | 13.2599 x6 | 42.68-46.62 | -47.1 to -36.3 | 0.23701883-0.23713313 (all 6 **below** every default draw) | 40.7-53.3 / 1 x6 | 10/0/0 x6 |
+| pair_gain_lpi_x1 | **51.5078 FAIL x6** | 20.2129 x6 | 9.7951 x6 | 56.24-61.93 | -42.3 to -25.8 | 0.2377-0.2490 | 50.5-62.4 / 1 x6 | 9/1/0 x6 |
+| pair_gain_lpi_x2 | **48.1205 x5, 47.4015 x1** | 27.9224 x5, 28.7598 x1 | 9.0295 x6 | 51.40-52.75 | -35.9 to -28.2 | 0.2445 x6 | 48.4-58.3 / 1 x6 | 10/0/0 x6 |
+
+`--report-replicates`: no check differs in status between the six baseline draws; `breaks_in_all` is empty for
+every configuration but `pair_gain_lpi_x1` (`walk.power_max_hz`, 6/6); `fixes_in_all` empty everywhere (the baseline
+fails nothing in these sections). The x1 / x2 walk values are bit-for-bit round 4's 51.5078 / 48.1205 and the
+optic-audit's (`out/optic_audit/pair_gain_lpi_{x1,x2}/`), and `no_drive_clip`'s 49.2480 / 25.2732 / 13.2599 are
+bit-for-bit the optic audit's one draw (`out/optic_audit/no_drive_clip/no_drive_clip.json`).
+
+**On "walk.* is bit-stable".** It is bit-stable in the default (12/12) and in four of the five ablations (6/6 each,
+across both GPU types: `no_dn_vnc_gain`, `no_drive_clip`, `pair_gain_lpi_x1` ran on B200 and H200 and agree to the
+last digit), but **not in every configuration**: `pair_gain_lpi_x2_s2_d1` (H200) gives 47.4015 / 28.7598 / leg MN
+2.20 Hz against 48.1205 / 27.9224 / 2.99 Hz in its five siblings (three of them on the same box), and
+`no_path_gain`'s `power_sustained` takes three values (11.8857, 15.9133, 15.8312) while its `power_max` 34.2405 does
+not move. Within this batch the draw-to-draw excursion on `power_max`, when it happens, is 0.6-0.7 Hz (0.63 Hz in the
+round-4 corrections, 0.72 Hz here) and up to 4 Hz on `power_sustained`; "zero scatter" is the default's own record,
+not a property of the section.
+
+**The scatter on record is much larger than this batch shows, on the arm section (c) leans on** (dynamics round 2
+verification -- and it argues harder for de-scoring, not less). `out/sk_les_holds_all/holdOptic_r{0,1,2,3}.json`
+(`lesion.id` `holdOptic`, `kind` `hold_table`, note `scripts/build_hold_tables.py group Optic` -- the **same arm**
+section (c) uses) give `walk.power_max` **64.9147 / 56.1737 / 68.0376 / 64.9147**: an **11.86 Hz spread over four
+replicates**. And this document's own `off` suite arm spans **1.5598 Hz** (95.54158-97.10139), already wider than the
+**1.5195 Hz** margin it is defending. In fairness that lesion set is a different harness (tool `lesion`, sections
+rest / taste / smell / walk / bitter, `provenance.execution.backend` showing `cuda_kernels` / `cuda_graphs` /
+`event_driven` all false), so it is not a like-for-like replicate -- but its `baseline` (48.4805 x4), `holdBrain`
+(47.0012 x4) and `off` (95.5416 x3) agree **bit for bit** with the native suite, so the divergence is specific to
+`holdOptic` and is not obviously a backend artefact. The honest statement is that **the margin is inside the worst
+single-arm scatter on record**, not that it is two excursions wide.
+
+### (a) Inside or outside 50 across draws
+
+Inside, 12 of 12: 48.4805 in this batch's six draws and in `out/r5_adopt_default_{1,2,3}.json`,
+`out/r5_skeptic_default_4.json`, `out/r5_attr_default_1.json`, `out/optic_audit/baseline/baseline.json` (all B200;
+`out/sk/sk_attr_default.json` makes 13). Margin **1.5195 Hz**, which is *inside the worst single-arm scatter on
+record* for this check (11.86 Hz on `holdOptic`, 1.56 Hz on the `off` suite arm -- see the bit-stability paragraph),
+not merely two excursions wide.
+There is no distribution to speak of in the default -- the answer is a point 1.5 Hz under a hand-set line,
+and the line's 3 % margin is smaller than the scatter the same check shows on other arms.
+
+### (b) Monotone in any scanned measure?
+
+* **LPi34/43 -> LPLC2 factor: no.** 51.5078 (x1) / 48.0007 mean, 47.40-48.12 (x2) / 48.4805 (x4): down then up,
+  crossing the bound once between x1 and x2 -- the round-4 shape, now under the shipped gains and with six draws per
+  point (round 4 had x3 at 60.42 under the damped gains; x3 was not re-run). `walk.GF_max` is monotone (9.7951 / 9.0295
+  / 4.6292) and `walk_gf.p99` was not (round-4 corrections); the gain suppresses the walking giant-fibre drive as
+  designed and every point is far under that check's 38 Hz bound.
+* **DN -> VNC gain: two points only, 32.4141 (x1) -> 48.4805 (x3), +16.07 Hz;** the x6 point (the note's 50 Hz) was
+  not measured -- no `dn_vnc_gain_x6` configuration exists and the task's list did not include one.
+* **Both path gains off: 34.2405**, i.e. removing VP -> DN x2 on top of DN -> VNC x1 *raises* `power_max` by 1.83 Hz
+  while taking `walk.GF_max` from 9.93 to 0.00 and `loom.GF_peak` from 53.9 to 40.7-46.8: the two gains do not act
+  on this check in the same direction, so a one-dimensional "gain -> power" referent does not exist even in the
+  measure the note names.
+* **Drive clip: 48.4805 -> 49.2480 (+0.77 Hz)**, with `walk.GF_max` 4.63 -> 13.26 and `power_sustained` 20.11 -> 25.27.
+
+`common.compare` on every one of these contrasts returns `undetermined` (null SD 0: the baseline's six draws are
+bit-identical, so z is undefined and the exact U at 6 v 6 sits on its floor 0.0022); the differences are read as
+magnitudes, which is what a deterministic section allows.
+
+### (c) Correlation with the room take-off rate over the four hold arms (`pm_bound_report.md` section 4)
+
+| arm | walk.power_max (suite draws) | room hops per 1,000 fly-s (4 matched batches, 19,200 fly-s) | escape / voluntary | walking-GF median per batch |
+|---|---|---|---|---|
+| shipped default | 48.4805 x5 | 3.906 (75 = 27 + 48; 19 / 21 / 16 / 19) | 1.406 / 2.500 | 31.15 / 33.32 / 31.22 / 31.56 |
+| holdBrain (optic side only) | 47.0012 x5 | 3.073 (59 = 19 + 40; 14 / 22 / 16 / 7) | 0.990 / 2.083 | 31.15 / 33.01 / 31.77 / 30.29 |
+| holdOptic (Brain side only) | 64.9147 x5 FAIL | 0.417 (8 = 8 + 0; 1 / 4 / 0 / 3) | 0.417 / 0.000 | 27.10 / 27.14 / 26.75 / 25.95 |
+| off | 97.1014 / 95.5416 / 96.4573 FAIL (**3 draws**) | 0.573 (11 = 11 + 0; 3 / 3 / 1 / 4) | 0.573 / 0.000 | 26.82 / 28.20 / 26.18 / 27.76 |
+
+Suite files `out/r5_attr_*.json`, `out/r5_attr_dup/`, `out/sk/sk_attr_*.json`, `out/r5_adopt_default_*.json`; room
+files `out/r5_adopt_sustain_live_{1,2,3}.json` + `out/sk_d1_shipped_4.json`, `out/d1_{holdBrain,holdOptic,off}_{1,2,3}.json`
++ `out/sk_d1_{holdBrain,holdOptic,off}_4.json` (the receptor_integration.md G.5 pooling). Spearman rho(`walk.power_max`,
+hops rate) = **-0.60** (exact permutation p 0.417), Pearson r = -0.79 (p 0.21); escape route rho -0.60. At n = 4 arms
+the smallest exact two-sided p a rank correlation can reach is 0.083, so in `compare`'s
+vocabulary this is `underpowered` and the reading is the ordering: by `walk.power_max` holdBrain < default < holdOptic
+< off, by room take-offs holdOptic < off < holdBrain < default. The two arms that FAIL the check are the two quietest
+rooms; the two that PASS are the two that take off 5-9x more. A bound meant to guard against spurious take-offs
+cannot be that bound.
+
+Three limits on this table, all from the dynamics round-2 verification, none of which changes the ordering:
+
+* **Quote the rank correlation, not the Pearson magnitude.** Spearman stays exactly **-0.600** under every
+  substitution tried -- the table's value, the pooled 9 `holdOptic` draws, the eager mean 63.51, the worst draw
+  56.17 -- so the ordering finding is robust; the Pearson moves -0.787 -> -0.664 and its p 0.213 -> 0.336 under the
+  same substitutions. Section 4 of `pm_bound_report.md` also presents `holdOptic` as five bit-identical draws
+  (64.9147 x5) while the four-replicate record of that arm at 56.17-68.04 sits unmentioned on file
+  (`out/sk_les_holds_all/holdOptic_r{0..3}.json`; see the bit-stability paragraph).
+* **`spearman_voluntary` -0.80 is a tie-breaking artefact and is withdrawn.** `scripts/pm_bound_report.py:133` ranks
+  with `np.argsort(np.argsort(x)) + 1`, which has **no tie correction**, and the voluntary rates contain a tie
+  (0.000 for both `holdOptic` and `off`). Tie-corrected the value is **-0.7379**, and because of that tie
+  |rho| = 1 is unreachable on the voluntary row, so **the quoted 0.083 floor does not apply to it**. The headline
+  rows (`all` and `escape`) have no ties and are exact.
+* **The `off` arm rests on 3 suite draws**, below `docs/INTERP.md` 10.2's ">= 4 runs per arm" (the table above says
+  so: 3 suite / 4 room). It is also the only arm whose `walk.power_max` has scatter, and its 3-draw mean 96.3668 is
+  what the Pearson consumes. It does not change the FAIL status (every draw 95.5-97.1, far above 50) or its rank, so
+  the ordering is unaffected.
+
+### (d) The referent, and which line
+
+`scripts/benchmark.py` line 85:
+
+    "walk.power_max_hz": Ref(22, "<", 50, "4", note="per-frame max of the wing-power MN mean (22 Hz with DN->VNC x3, 50 at x6)"),
+
+The note's two anchors are session-4 numbers from a model without the receptor lookup, the LPi gain, the GF damping
+or its retirement; at the same operating point (DN -> VNC x3) the shipped model measures 48.48, at x1 32.41, and the
+x6 point was not re-measured. The 50 is not an animal number: it is `body.Flight.takeoff_power_hz`, the wing-power
+level the body must hold for 0.3 s to launch, and `walk.power_sustained_hz` (line 86, `Ref(22, "<", 50, ...)`, the
+0.3 s running mean) is the check that carries that referent -- the shipped default measures 20.11 on it, no clip
+25.27, LPi x2 27.9-28.8, and receptor_integration.md G.4 records that off sits at 49.2-50.6 on it while making 0
+voluntary take-offs in 52,800 fly-s, so even the sustained form is a weak predictor of the room. The per-frame
+maximum has no referent of its own. **Recommendation: de-score it** -- keep the number in the table and the JSON,
+stop scoring it: on line 85 change the op / bound to the form the suite already uses for an unscored, reported value
+(`loom.escape_cm` on line 88: `Ref(3.5, "notnone", 0, ...)`), i.e. `Ref(48.5, "notnone", 0, "4, r6", note="reported,
+not scored (docs/audits/anti_runaway.md round 6): per-frame max of the wing-power MN mean; the scored take-off
+criterion is walk.power_sustained_hz")`, with the reference value updated to the shipped model's 48.48 so the table's
+"reference" column stops printing 22. **Precision on what that form does:** it does **not** remove the row from the
+tally. `scripts/benchmark.py:132` makes `notnone` pass iff the value is not `None`, so the check stays **in the pass
+count** as a row that can only fail when the measurement is missing -- exactly what `loom.escape_cm` does today (it
+prints PASS in every table, including for `out_norm_l2` at 50.0 cm). "De-scored, kept as report" is accurate in
+effect; "unscored" is not literally true, and a tally of 10/0/0 with this form still counts `walk.power_max_hz` as a
+PASS. **Not recommended: re-deriving the referent from x3 / x6.** The x6 point is
+unmeasured under the shipped gains, the two path gains move the check in opposite directions (b), the LPi scan is
+non-monotone at three points, and any number read off a gain scan is a hand-set bound on a hand-set gain -- the
+project rule's "labelled control arm", not a referent. The line is **not changed here**; the benchmark's owner
+changes it, and until then every verdict below is stated both ways.
+
+### What this frees, and what it does not
+
+* **LPi34/43 -> LPLC2 x4 (`optic.DEFAULT_PAIR_GAIN`).** With `walk.power_max` scored, x1 is 9/1/0 in 6/6 and x4
+  cannot be retired (the round-4 / optic-audit verdict, reproduced bit for bit). With it de-scored, x1 is 10/10 in
+  6/6 on these sections and the only remaining measured cost of x1 is the one the gain was added for -- the walking
+  giant-fibre drive, `walk.GF_max` 4.63 -> 9.80 (bound 38) -- plus `loom.GF_peak` 56-62 and `loom_escape.GF_peak`
+  50-62 *higher* than the baseline's 44-50. Whether x4 can then be retired is a full-suite question (29 checks, and
+  the room walking-GF tail that fires the 33 Hz escape, which the pinned section does not measure -- G.4), not one
+  these ten checks settle; it is not retired here.
+* **`OpticParams.drive_clip_mv` 35 (the +-35 mV clip on the optic -> spiking injected current).** Seven draws now
+  (six here + the optic audit's one): 10 PASS / 0 FAIL x6 on walk / a / b (11/11 with `walk_gf` in the audit), no
+  check worse in status than the baseline, `walk.power_max` 49.2480 (PASS by 0.75 Hz -- one excursion wide, on the
+  check this section de-scores), `power_sustained` 25.27 (margin 24.7), `walk.GF_max` 13.26 (margin 24.7; the clip
+  binds on the walking GF's peak frames), `motion.min_dsi` 0.2411 -> 0.2371 (`compare` calls this `result` at 6 v 6
+  within the batch, |diff| 0.004; **an earlier form of this sentence set that verdict aside as "inside the shipped
+  default's 0.241-0.246 cross-batch band", which is wrong -- 0.2371 is BELOW 0.241, not inside the band.** All six
+  `no_drive_clip` draws (0.23701883-0.23713313) lie below **every** shipped-default draw on file: this batch's
+  0.24109642-0.24109660 and the round-5 files' 0.24109651-0.24595012. The cross-batch band therefore does not
+  neutralise the `result`. The correct statement is that 0.2371 is **0.0040 below the lowest shipped-default draw on
+  record**, small against the check's 0.1 bound, and irrelevant to this section's decision because **nothing is
+  adopted**), `loom.GF_peak` 42.7-46.6 vs 43.6-47.2 and `loom_escape.GF_peak` 40.7-53.3 vs 44.1-50.3 (`null`),
+  `rotate.DNp20_flip` -47 to -36 vs -44 to -27 (`null`, p 0.09). By this document's rule the ablation passes with a
+  status margin on every check but the one under question. **Adopt nothing:** the adopt-alone rule (round 4, executed
+  in round 5) requires the ablation's own full 29-check suite x >= 3 and the room take-off protocol (3-4 batches x 16
+  flies x 300 s) against the shipped default before the default changes, and neither was run in this batch. The
+  numbers above are the record for that run; the prediction it should test is that the clip's removal raises the
+  room walking-GF tail (pinned GF max 4.6 -> 13.3 Hz is the same sign as the holdBrain / holdOptic 12.5 / 13.3 that
+  G.4 showed does NOT predict the room, so the prediction is weak).
+* **Unknown-NT AL LN -> GABA override.** Not in this batch. Its round-4 verdict rested on 26/1/2 with `walk.power_max`
+  60.88 under the damped gains; with the check de-scored the deciding numbers are the olfactory ones (KC active 816
+  -> 1805, LH apple clean 4.3-4.5 -> 5.2-5.5 against 6 -- a 0.5 Hz margin), and the verdict "cannot be retired,
+  replacement = a transmitter prediction for the 27 cells" stands on those, unchanged.
+
+### Caveats
+
+(1) Ten checks per draw (sections walk, a, b), not the 29-check suite; the tallies above are section tallies.
+(2) Six draws per configuration on two GPU types; the walk values agree across the types wherever both ran, but the
+one 0.72 Hz excursion (`pair_gain_lpi_x2_s2_d1`) is a single draw on an H200 and is not attributed to the device.
+(3) The x6 DN -> VNC point and the LPi x3 point were not re-measured under the shipped gains; (b)'s DN -> VNC
+statement is two points. (4) The room correlation is over four arms and `underpowered` by construction; it is
+reported because the ordering, not the p, is the finding. (5) The batch ran with the concurrent tasks' opt-in modules
+in the working tree; the bit-identity of the baseline's **three walk values** to the round-5 record is the evidence
+they were inert in these
+sections. (6) `retire_measures.py`'s new `provenance.execution.device` field reads `null` (the realised device is in
+`config.device` and `provenance.execution.device_requested`) -- a bookkeeping defect of this edit, to be fixed by
+whoever next touches the script; `flyverse_commit.commit` is `unknown` in every cluster JSON as in every other cluster
+Result (INTERP.md 10.2), and the identity is the cache md5 + source fingerprint.
+(7) Extent of the round-6 edit: this section begins at line 758 and **runs to the end of the file** (it closed round 6
+at line 947, +191 / -0, append-only; the dynamics round-2 verification corrections above extend it further). Nothing
+in rounds 1-5 was edited by either pass.
+
+Files: `scripts/pm_bound_batch.sh` (the batch), `scripts/pm_bound_report.py` (every table and statistic above ->
+`out/pm_bound/pm_bound_report.md`, `pm_bound_summary.json`, console `pm_bound_report_console.txt`),
+`scripts/retire_measures.py` (the `no_drive_clip` configuration and the provenance block), `out/pm_bound_cluster.log`
+(`36 job(s), 0 failed  (6.3 min)`), `out/pm_bound/<cfg>_s<s>_d<k>/` (36 run directories), `out/pm_bound/replicates.md`
+/ `.json`, `out/pm_bound/structure_check.txt` (`--check` of the six configurations, CPU). Files behind the dynamics
+round-2 corrections above: `out/sk_les_holds_all/{baseline,holdBrain,holdOptic,off}_r*.json` (the 11.86 Hz
+`holdOptic` scatter), `out/pm_bound/*/*.json` (the `motion.min_dsi` and `loom.GF_peak` per-draw values),
+`out/r5_adopt_default_{1,2}.json` (the 0.24595 `min_dsi` draws), `scripts/pm_bound_report.py:133` (the
+tie-uncorrected rank), `scripts/benchmark.py:132` (what `notnone` does).

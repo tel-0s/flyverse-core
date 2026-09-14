@@ -257,6 +257,10 @@ CONFIGS = {
                          "note": "LPi34 / LPi43 -> LPLC2 at x2 instead of x4; every other pair gain kept"},
     "pair_gain_lpi_x3": {"measure": "optic pair gains", "kind": "replacement", "optic": pair_gain_lpi(3.0),
                          "note": "LPi34 / LPi43 -> LPLC2 at x3 instead of x4; every other pair gain kept"},
+    # the +-35 mV clip on the optic -> spiking injected current (optic.OpticParams.drive_clip_mv; the same ablation as
+    # scripts/audit_optic.py's `no_drive_clip`, added here so the retirement candidate can be replicated by this script)
+    "no_drive_clip": {"measure": "optic drive clip", "kind": "ablation", "optic": {"drive_clip_mv": 1e9},
+                      "note": "OpticParams.drive_clip_mv 35 -> 1e9: the +-35 mV clip on the injected current removed"},
     # the unknown-NT antennal-lobe local-neuron relabelling (connectome.UNKNOWN_NT_OVERRIDE_REGEX)
     "no_al_ln_override": {"measure": "AL LN NT override", "kind": "ablation", "connectome": no_al_ln_override_connectome,
                           "note": "UNKNOWN_NT_OVERRIDE_REGEX emptied: unknown-NT AL local neurons keep sign 0 instead of GABA"},
@@ -404,9 +408,23 @@ def run_one(name, sections, fast, out_dir, seeds, receptor_model="off", receptor
     n_gap = sum(c["status"] == "KNOWN GAP" for c in ctx.checks); n_miss = sum(c["status"] == "MISSING" for c in ctx.checks)
     print(f"\n{name}: {n_pass} pass, {n_fail} fail, {n_gap} known gap, {n_miss} missing; runtime {total / 60:.1f} min")
     os.makedirs(out_dir, exist_ok=True)
+    # the mandatory provenance block (docs/INTERP.md 2.5: git / source fingerprint, cache fingerprint, the resolved
+    # LIFParams / OpticParams, the realised device); never lets a finished run go unwritten
+    try:
+        import torch
+        from flyverse.interp import common as _common
+        # the REALISED device, as a torch device string: passing the GPU's product name left
+        # provenance.execution.device null (it is not a device) while config.device held it; common.execution_record
+        # records this as the realised device and fills device_name from it.
+        provenance = _common.provenance(ctx.c, lif=ctx.lif(), optic=ctx.optic_params(),
+                                        device="cuda" if torch.cuda.is_available() else "cpu",
+                                        seeds=ctx.seeds, backend={"native": not eager, "description": config["backend"]})
+    except Exception as e:      # noqa: BLE001
+        provenance = {"error": repr(e)}
     with open(os.path.join(out_dir, f"{name}.json"), "w") as f:
         json.dump({"config": config, "sections": ctx.results, "checks": ctx.checks, "runtime_s": ctx.runtime, "total_runtime_s": total,
-                   "date": time.strftime("%Y-%m-%d %H:%M")}, f, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o))
+                   "date": time.strftime("%Y-%m-%d %H:%M"), "provenance": provenance},
+                  f, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o))
 
 
 # ---- the comparison table ------------------------------------------------------------------------------------

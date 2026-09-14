@@ -395,6 +395,7 @@ def _verdict_from(cmp: dict, *, z_min: float, min_n: int, alpha: float) -> str:
     itself on untied data, where the tie-aware p IS the exact p and the two must agree row for row."""
     na, nb = int(cmp["stim"]["n"]), int(cmp["null"]["n"])
     floor, z, p, diff = cmp["p_floor"], cmp["z"], cmp["p"], cmp["diff"]
+    min_n = max(int(min_n), common.CALL_REPLICATES)          # the call rule: >= 4 runs per arm, whatever the other arm has
     if min(na, nb) < min_n or (np.isfinite(floor) and floor > alpha):
         return "underpowered"
     if cmp.get("null_sd_zero") and diff != 0 and not (np.isfinite(p) and p > alpha):
@@ -404,7 +405,7 @@ def _verdict_from(cmp: dict, *, z_min: float, min_n: int, alpha: float) -> str:
     return "null"
 
 
-def compare_tie_aware(stim, null, *, z_min: float = common.Z_RESULT, min_n: int = common.MIN_REPLICATES,
+def compare_tie_aware(stim, null, *, z_min: float = common.Z_RESULT, min_n: int = common.CALL_REPLICATES,
                       alpha: float = 0.05) -> dict:
     """`common.compare` with the rank test taken by `mann_whitney` -- exact only on untied data -- and the verdict
     re-derived from the p that resulted. Adds `p_method` and `n_tied_values`; every other field is `compare`'s own."""
@@ -1209,7 +1210,7 @@ def result_from_object_sweep(stim_jsons, null_jsons=(), *, cells=(), null_cells=
             pooled = pooled.merge(nd, on=["type", "bodyId", "quantity"], how="left")
             with np.errstate(invalid="ignore", divide="ignore"):
                 pooled["z_vs_null"] = (pooled.stimulus_minus_control - pooled.null_mean) / pooled.null_sd
-            pooled["verdict"] = np.where(pooled.n_trials < common.MIN_REPLICATES, "underpowered",
+            pooled["verdict"] = np.where(pooled.n_trials < common.CALL_REPLICATES, "underpowered",
                                          np.where(np.abs(pooled.z_vs_null) >= common.Z_RESULT, "result", "null"))
         pooled["paired_control_ids"] = paired_ids
         pooled["null_reference_ids"] = null_ids

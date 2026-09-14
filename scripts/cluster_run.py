@@ -40,6 +40,10 @@ through an ssh local port-forward this script opens and closes itself; "api" is 
                  "root": "/root/flyverse", "runs": "/root/runs", "gpus": 1, "vram_gb": 20, "slots": 4}},
      "default": ["house"]}
 
+A job line that ends with `; tail ...` or `; cat ...` after a redirect is WARNED about (stderr and the console log,
+never rewritten): `;` makes the job's exit status tail's, not python's, so a run that died mid-write still exits 0 and
+`'<n> job(s), 0 failed'` proves nothing. Write `&& tail -4 <file>` or `st=$?; tail -4 <file>; exit $st`.
+
 Options: --targets a,b,c / --target x, --minutes (estimate, default 30), --no-wait, --priority, --node, --tags,
 --poll seconds, --sync-only, --allow-bare-fetch. Run directories are kept on each target (results and logs stay
 there under the printed paths). See docs/CLUSTER.md section 14.
@@ -51,6 +55,7 @@ import atexit
 import io
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -350,6 +355,43 @@ BARE_FETCH_WHY = (
 )
 
 
+_EXIT_MASK_RE = re.compile(r";\s*(tail|cat)\b[^;|&]*$")
+
+EXIT_MASK_WHY = (
+    "WARNING {name}: this job line ends with '{suffix}' after a redirect, so the job's exit status is "
+    "{tool}'s, not python's -- a job whose python died mid-write still exits 0 and '<n> job(s), 0 failed' "
+    "proves nothing. Write '&& tail -N <file>' (the tail runs only on success and the failure survives) or "
+    "'st=$?; tail -N <file>; exit $st'. The command is submitted unchanged."
+)
+
+
+def exit_masking_suffix(command: str) -> str | None:
+    """The trailing `; tail ...` / `; cat ...` of a job line that replaces python's exit status, or None.
+
+    Only after a redirect: `... > log 2>&1; tail -4 log` is the shape the round used to read a job's last lines, and
+    `;` makes the LAST command's status the job's. `&& tail` and `st=$?; tail ...; exit $st` are not flagged (the
+    first keeps the failure, the second restores it), nor is a bare pipeline with no redirect."""
+    s = command.strip().rstrip(";").strip()
+    m = _EXIT_MASK_RE.search(s)
+    if m is None or ">" not in s[:m.start()]:
+        return None
+    return s[m.start():].lstrip(";").strip()
+
+
+def warn_exit_masking(commands: list[str]) -> list[str]:
+    """Print the warning (console log AND stderr) for every job line whose exit status is tail's / cat's."""
+    bad = []
+    for i, command in enumerate(commands):
+        suffix = exit_masking_suffix(command)
+        if suffix is None:
+            continue
+        bad.append(command)
+        msg = EXIT_MASK_WHY.format(name=f"command {i}", suffix=suffix, tool=suffix.split()[0])
+        print(msg)
+        print(msg, file=sys.stderr)
+    return bad
+
+
 def make_tarball(files: list[str]) -> bytes:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tf:
@@ -473,6 +515,7 @@ def main() -> int:
     bare = bare_fetch_paths(args.fetch)
     if bare and not args.allow_bare_fetch:
         sys.exit(BARE_FETCH_WHY.format(paths=" ".join(bare)))
+    warn_exit_masking(args.commands)
 
     targets, default = load_config()
     want = [n.strip() for n in (args.targets or args.target or "").split(",") if n.strip()] or None

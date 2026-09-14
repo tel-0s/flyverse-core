@@ -7,12 +7,13 @@ RNG stream. Changing batch size changes its random draw layout, as in FlyRoomEnv
 from __future__ import annotations
 
 import copy
+from dataclasses import fields, replace
 from pathlib import Path
 
 import numpy as np
 import torch
 
-from . import air, body, brain, optic, programs, surfaces, world
+from . import air, body, brain, optic, programs, senses, surfaces, world
 from .fly import FlyBrain
 from .batch_air import BatchAir
 from .batch_body import BatchBody, frames
@@ -45,6 +46,26 @@ def _load_program(program, state):
     vars(program).clear(); vars(program).update(values)
 
 
+def _motor_rows_cleared(motor, rows, batch):
+    """A copy of a MotorRates snapshot with the selected rows' rates zeroed: what a reset row must read next frame.
+
+    The snapshot is the opt-in proprioception transducer's only cross-frame input (``BatchBody.proprio_state``), and a
+    reset row has no previous frame, so it must read zeros -- the same state a full reset produces by dropping the
+    snapshot. ``time_ms`` (the shared clock) and ``pn_glom_cells`` (per-glomerulus cell counts) are not rates and are
+    left alone; at ``batch == 1`` the fields are scalars, so the only row there is zeroed outright.
+    """
+    if motor is None: return None
+    def zero(value):
+        if isinstance(value,np.ndarray): value = value.copy(); value[rows] = 0; return value
+        return 0. if batch == 1 else value                              # a B=1 snapshot is scalars; its one row is `rows`
+    changed = {}
+    for f in fields(motor):
+        if f.name in ("time_ms","pn_glom_cells"): continue
+        value = getattr(motor,f.name)
+        changed[f.name] = {k:zero(v) for k,v in value.items()} if isinstance(value,dict) else zero(value)
+    return replace(motor,**changed)                                     # MotorRates is frozen
+
+
 class _RowStimulus:
     """Coalesce same-frame program pulses before touching the batched controller."""
     def __init__(self, owner, row): self.owner,self.row = owner,row
@@ -70,7 +91,7 @@ class BatchSim:
                  event_driven=None, cuda_sparse="torch", cuda_compact=True, weight_dtype="float32",
                  sensory_cuda_graphs=None, dt_by_module=None, prune_frozen=True, modules=None,
                  wind_speed=.3, wind_dir=180., fruit_set="all", fence=False,
-                 program="none", escape_gating=False):
+                 program="none", escape_gating=False, proprioception=None):
         if not isinstance(batch,(int,np.integer)) or batch<1:
             raise ValueError("batch must be a positive integer")
         self.B = int(batch)
@@ -89,6 +110,12 @@ class BatchSim:
                                                       dt_by_module=dt_by_module,prune_frozen=prune_frozen),
                            optic_params=optic.OpticParams(dt_ms=optic_dt))
         self.c,self.r,self.optic,self.brain = self.fb.c,self.fb.retina,self.fb.optic,self.fb.brain
+        # Opt-in proprioception (senses.Proprioception; default None = the shipped path, no sense attached). The
+        # transducer reads the previous frame's motor readout and the body state in step().
+        self.proprioception = None if proprioception in (None,False,"","off","none") else str(proprioception)
+        self.motor = None
+        if self.proprioception is not None:
+            self.fb.proprioception_sense = senses.Proprioception(self.c,self.proprioception)
         if self.optic is not None: self.optic.diagnostics = False
         self.sensory_cuda_graphs = cuda_graphs if sensory_cuda_graphs is None else sensory_cuda_graphs
         pairs = [world.make_room(s,fruit_set) for s in self.seeds]
@@ -179,6 +206,7 @@ class BatchSim:
         if "smell" in available: self.fb.smell(*self.smell_values)
         if "wind" in available: self.fb.wind(*self.air.deflections(f,left))
         if "taste" in available: self.fb.taste(self.tasting)
+        if "proprioception" in available: self.fb.proprioception(**self.body.proprio_state(self.motor))
         self.fb.step(self.FRAME_MS)
         self.motor = self.fb.motor()
         self.commands,self.wcommands = self.body.readout(self.motor,dt)
@@ -251,14 +279,17 @@ class BatchSim:
         self.episode_frames[selected] = 0; self.loom_t[selected] = -1.
         self.world.move_sphere(self.loom_idx,(9,9,9),(.03,)*3,rows=selected)
         self._program_pulses.clear()
+        # The proprioception transducer (if attached) must start a reset row from zero MN rates again: drop the whole
+        # snapshot on a full reset, zero only the selected rows on a partial one.
+        self.motor = None if rows is None else _motor_rows_cleared(self.motor,selected,self.B)
 
     def state_dict(self):
         """Owned CPU snapshot, including every program RNG and independent environment."""
         names = ("flies","locos","flights","metabolisms","tasting","smell_values","commands","wcommands",
-                 "episode_frames","loom_t","loom_speed","loom_final","loom_start")
+                 "episode_frames","loom_t","loom_speed","loom_final","loom_start","motor")
         state = {k:copy.deepcopy(getattr(self,k)) for k in names}
         state.update(version=1,batch=self.B,seeds=self.seeds,program_names=self.program_names.copy(),fence=self.fence,
-                     fruit_set=self.fruit_set,escape_gating=self.escape_gating,
+                     fruit_set=self.fruit_set,escape_gating=self.escape_gating,proprioception=self.proprioception,
                      controller=self.fb.state_dict(),feeding=self.feeding.copy(),
                      airs=[copy.deepcopy(a.__dict__) for a in self.airs],
                      programs=[_program_state(p) for p in self.programs],gatings=[_program_state(g) for g in self.gatings],
@@ -266,13 +297,16 @@ class BatchSim:
         return state
 
     def load_state_dict(self, state):
-        if (state["version"],state["batch"],tuple(state["seeds"]),state["program_names"],state["fence"],state["fruit_set"],state["escape_gating"]) != (1,self.B,self.seeds,self.program_names,self.fence,self.fruit_set,self.escape_gating):
+        if (state["version"],state["batch"],tuple(state["seeds"]),state["program_names"],state["fence"],state["fruit_set"],state["escape_gating"],state.get("proprioception")) != (1,self.B,self.seeds,self.program_names,self.fence,self.fruit_set,self.escape_gating,self.proprioception):
             raise ValueError("BatchSim checkpoint configuration does not match")
         self.fb.load_state_dict(state["controller"])
         for k in ("flies","locos","flights","metabolisms"):
             getattr(self,k)[:] = copy.deepcopy(state[k])
         for k in ("tasting","smell_values","commands","wcommands","episode_frames","loom_t","loom_speed","loom_final","loom_start"):
             setattr(self,k,copy.deepcopy(state[k]))
+        # The previous frame's MotorRates: the opt-in proprioception transducer's only cross-frame input, so a resumed
+        # run with the sense on must feed the same snapshot. Absent in checkpoints written before it was saved -> None.
+        self.motor = copy.deepcopy(state.get("motor"))
         self.body.feeding[:] = state["feeding"]
         for i in range(self.B):
             self.airs[i].__dict__.clear(); self.airs[i].__dict__.update(copy.deepcopy(state["airs"][i]))

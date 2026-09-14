@@ -2163,3 +2163,394 @@ partition check), `out/d1_walk_gfmax_recount.log` (G.4). The closing skeptic's 4
 re-derivations (G.5): `scripts/sk_d1_hold_verify.sh`, `scripts/sk_d1_hold_{structure,weights,stats,pool}.py`,
 `out/sk_d1_hold_cluster.log`, `out/sk_d1_{shipped,holdBrain,holdOptic,off}_4.{json,txt}`,
 `out/sk_d1_hold_{structure,weights,stats,pool}.log`.
+
+### G.6 The take-off class split with a dose control (dynamics round 2; `scripts/d2_hold_batch.sh`, run dir `d2-hold-62b6e8`)
+
+G.5 left two things open by name: which *class* of the optic-side sign changes carries the room take-off cost -- the
+17,256 two-source histamine silencings (-1 -> 0) or the 27,207 glutamate -> iGluR flips (-1 -> +1) on T1 / Dm9 -- and
+whether "the optic side" was an answer at all or just "the larger perturbation" (item 5: 92 % of the changed entries,
+95 % of the changed |W|; dose uncontrolled). This section runs the split with the dose control G.5 asked for, all five
+arms in ONE submission, four runs per arm.
+
+**Result: the histamine silencings carry the whole take-off cost and the glutamate flips carry none of it, and dose
+measured in ENTRIES or |W| is not the explanation: the glutamate class is the LARGER perturbation (27,207 entries /
+87,920 |W| against 17,256 / 83,191) and reproduces off on every measure, while a 3,832-entry random subset of the
+histamine class (the Brain side's dose) also reproduces off. The cost belongs to a class, and it needs more of that
+class than 3,832 entries.** Two limits on that headline, both established by the round-2 skeptic's fresh-seed
+replication and folded in below (G.6.7): (i) **dose measured in POSTSYNAPTIC CELLS TOUCHED is not excluded** and
+cannot be excluded by this design -- cells touched orders every arm monotonically with the outcome while entries and
+|W| do not (G.6.4 item 2); (ii) the **escape channel remains the weakly attributed one**, as in G.5: the reported
+batch's escape attribution (39 vs 38, 103.6 % of the excess) does not replicate, and pooled over 7 runs per arm both
+`off vs shipped` and `holdOpticGlu vs shipped` come back `compare`-null on escape. The hop and voluntary channels and
+the GF median replicate.
+The contested-flip rule is not the rule that produced this class (G.6.5): the silencings come from the silencing rule
+("no fast histamine receptor in any of >= 2 sources"), and it is that rule, not the flip rule, that the finding
+puts in question for `docs/NT_INTEGRATION.md`. Nothing in the table or the model was changed here.
+
+#### G.6.0 The three tables (`scripts/build_hold_tables.py --groups OpticHis,OpticGlu,OpticRandom --verify`; local `out/d2_hold/d2_hold_tables_local.log`, in-job `out/d2_hold/provenance.txt`)
+
+These are **alone** tables, not hold tables in the round-5 sense: the named class of optic-side rows is the only set
+that keeps its receptor-derived sign, and every other row that differs from `NT_SIGN` -- the rest of the optic side
+*and the whole Brain side* -- is held at the prior. The files are still `receptors_hold<G>.csv` and the arms
+`hold<G>` (the builder has one naming path), so `hold` reads "hold everything but" for these three; the builder's
+docstring says so. Against `sign(W.data)` on the shipped cache (25,578,600 entries, sum |W| 121,460,584), the
+partition of G.0's 44,463 optic-side entries:
+
+| arm | rows kept | entries changed | changed \|W\| | kind | postsynaptic types (entries) | presynaptic types (entries / \|W\|; `out/d2_hold/d2_hold_presyn.log`) | md5 |
+|---|---|---|---|---|---|---|---|
+| `holdOpticHis` = histamine silencings alone | 45 optic histamine rows | **17,256** | 83,191 | all -1 -> 0 | Dm2 2,643, Mi15 2,507, Mi9 1,841, Mi4 1,818, L4 1,707, Mi1 1,601, C3 1,239, L5 695, Tm29 495, Dm4 492, T2 389, Tm3 343, ... (33 rows own entries, 15 own none) | **photoreceptors 15,509 / 80,432** (R8y 3,389 / 25,537, R8_unclear 2,930 / 20,157, R8p 2,337 / 18,772, R1-R6 2,131 / 3,097, R7y 1,586, R7_unclear 1,217, R7p 1,079, R7d 395, R8d 360), T1 1,722 / 2,692, HBeyelet 26 | `bbe5a5e26cb37825a56520be1faa379b` |
+| `holdOpticGlu` = glutamate flips alone | 3 optic glutamate rows | **27,207** | 87,920 | all -1 -> +1 | T1 21,157, Dm9 5,981, Lai 69 | Dm19 6,742 / 18,035, Dm6 5,519 / 25,617, Dm17 2,182, Dm14 2,172, Dm9 1,936, Dm8b 1,725 / 10,332, Dm8a 1,507 / 8,135, Dm20 1,118, Mi14 643, L1 545 (26,984 `ol_intrinsic`, 211 `visual_centrifugal`) | `cfd2ef641ce74a9570f6f7103a618b17` |
+| `holdOpticRandom` = the dose control | 11 optic rows, seeded draw | **3,832** | 9,034 | all -1 -> 0 | Mi9 1,841, L5 695, Dm4 492, Lawf1 336, TmY5a 142, Lawf2 128, Dm3b 71, TmY3 59, Dm3c 38, TmY4 25, Pm4 5 | photoreceptors 3,349 / 8,232 (R8_unclear 743, R8y 675, R8p 583, R7y 542, R7_unclear 265, R1-R6 218, R7p 188), T1 480 / 797 | `38b4b76cd1176896240e6a44a27cf94a` |
+
+17,256 + 27,207 = 44,463 with 0 entries in both and 0 outside the optic side (`--verify`: `EXPECTED ... -> OK` on all
+three, locally and in job 0 on the run box; the remaining changes are entirely `ol_intrinsic`; the held set is the
+other class plus the 3,720 / 65 / 29 / 18 Brain-side entries of G.0; the in-job md5s equal the local ones). The dose
+control matches the Brain side's **entry** count exactly (3,832 = 3,832) and its |W| closely (9,034 vs 8,833) but
+**not** its postsynaptic cell count (2,505 vs 1,659; see G.6.4 item 2): the
+draw is uniform, with `numpy.random.default_rng(0)`, over the 69,818 subsets of the **33 entry-owning optic rows of
+the 48 optic-side rows that differ from the prior** (the 15 entry-free rows cannot carry a dose, so the draw is over
+33, not 48 and not "the optic side" -- `build_hold_tables.py:166`, the CSV header and the builder docstring all say 33)
+whose entry counts sum to exactly 3,832 (subset-sum count + backward sampling; the CSV header lists the drawn rows
+and the cache it counted on). Two limits by construction, stated before the numbers: the receptor table is per
+(postsynaptic type, presynaptic transmitter), so a random subset is **row-granular**, not entry-granular; and no
+exact-dose subset can contain T1 (21,157) or Dm9 (5,981), so the control samples the histamine-silencing class (it
+could carry Lai's 69 glutamate entries; the seed-0 draw does not). It controls the *dose* of a small optic
+perturbation, not the class; the class is what `holdOpticHis` / `holdOpticGlu` decide.
+
+Where the histamine class sits in the model: 90 % of its entries and 97 % of its |W| are **photoreceptor ->
+medulla synapses** (R7 / R8 / R1-R6 onto Mi1, Mi4, Mi9, Mi15, Dm2, L4, C3, L5, Tm29, Dm4, T2, Tm3 ...), touching
+10,411 postsynaptic cells from 4,910 presynaptic ones. Postsynaptic cells touched, all five arms, recomputed on the
+shipped cache: `holdOpticHis` **10,411**, `holdOpticRandom` **2,505**, `holdOpticGlu` **2,091**, the Brain-side arm
+**1,659** (the optic side's two classes have disjoint post-cell sets: 10,411 + 2,091 = 12,502 = the whole optic side;
+the default touches 14,161). That ordering is the confound G.6.4 item 2 now names. Both the LIF (`brain._shaped_weights`) and the optic-lobe
+rate model (`optic.py:165-225`: every optic-lobe edge, photoreceptor -> rate included, takes |count| x the row's fast
+sign) apply the receptor factor, so under the shipped default these direct photoreceptor inputs are zero in the
+medulla rate model, and `holdOpticGlu` / `holdOpticRandom` restore all / 78 % of them. The LIF fan-in route (E.3) is
+not involved: the optic-side silencings move `input_scale` on 0 cells (`out/r5_fanin.log` line 12).
+
+#### G.6.1 The batch
+
+One submission, 21 jobs, **0 failed**, 95.4 min wall (`out/d2_hold_cluster.log`, copied to
+`out/d2_hold/d2_hold_cluster.log`; run dir `/root/runs/d2-hold-62b6e8` on four rented boxes: vast-a 6 jobs, vast-b 6,
+vast-c 6, vast-d 3; the house cluster is disabled tonight). Job 0 is provenance (`out/d2_hold/provenance.txt`); jobs
+1-20 are
+
+    mkdir -p out/d2_hold && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' &&
+    [python scripts/build_hold_tables.py --groups OpticHis,OpticGlu,OpticRandom --out-dir out/d2_hold &&]
+    python scripts/batch_sustain.py --batch 16 --minutes 5 --energy 0.9 --program cx --fruit apple --fence \
+        --cuda-graphs --cuda-kernels --event-driven --cuda-sparse torch \
+        [--receptor-model default | --receptor-model off | --receptor-model sign --receptor-net-rule abs --receptor-table out/d2_hold/receptors_hold{OpticHis,OpticGlu,OpticRandom}.csv] \
+        --seed k --seeds 16k..16k+15 --json out/d2_hold/<arm>_k.json
+
+for k = 0 / 1 / 2 / 3 -- the G.5 protocol and its four matched brain-seed / environment blocks, with the shipped
+default and off re-run **inside the same submission** (no arm is taken from the record). Every job: exit 0,
+`device=cuda` (20/20 in the `.txt`, `"device": "cuda"` in 20/20 JSON headers -- `batch_sustain.py` now records the
+realised device and the full `LIFParams` dump, and the dump is identical across the 20 runs apart from
+`receptor_model` / `receptor_net_rule` / `receptor_table`), `gf_hz` 33, 30,000 frames, `fast_sign_changed_entries`
+48,295 / 0 / 17,256 / 27,207 / 3,832 as expected, env seeds as listed, `hops = escape + voluntary` in 20/20, fetched
+JSON md5s equal to the run-directory copies 20/20 (`out/d2_hold/remote_md5.txt`). Wall 3,965-5,595 s per job,
+0.86-1.21 aggregate fly-s per wall-s (vast-a and vast-b are two instances on one host: same address, same GPU memory
+reading, so 12 jobs shared one B200; vast-c is an H200).
+
+Provenance (`out/d2_hold/provenance.txt`): `flyverse/brain.py` md5 `9caf67b228a211434f8524d8685eed3b` -- the same
+file as run dirs `d1-hold-8ed117` / `r5-adopt-fb3608`, i.e. the shipped gains. That equality is **not** evidenced by
+those run dirs' own logs (they record no md5s); the evidence is this document's `receptor_integration.md:1650` and
+`:1974`, which record the same md5 for the two earlier run dirs, plus the empty `git diff` on `flyverse/brain.py`
+in this checkout -- cite those, not the run-dir logs. `DEFAULT_TYPE_PATH_GAIN` =
+`[LC4|LPLC2 -> DNp01 x3]` printed in-job; `flyverse/data/receptors_by_type.csv` `0381a446107e6050e75cc87b16d7f830`
+(= G.1); `scripts/batch_sustain.py` `c36c8fbfca0036dbf5a92f89bb145277`, `scripts/build_hold_tables.py`
+`d7e9beade862a226d0199f0ce69e5b4b`, `batch_body.py` `e0e8c833...`, `batch_sim.py` `892d351d...`, `fly.py`
+`d2ac5abb...`, `optic.py` `748e7821...`, `senses.py` `88e7e8bb...`; torch 2.11.0+cu128. The checkout was commit
+`653179b4` **dirty** (37 modified / untracked files from the concurrent threads, shipped to the run box by
+`cluster_run.py`; the one that touches this protocol is the opt-in proprioception transducer, `BatchSim(...,
+proprioception=None)` by default, which every job here left off), so this batch is one code tree and its arms
+compare within it; against the G.5 record it is a different tree and different draws. The cross-batch check is
+consistent with that: the shipped default made 96 hops here against G.5's pooled 75 over the same 19,200 fly-s
+(1.28x, Jeffreys 95 % [0.95, 1.73], binomial p 0.13; voluntary 58 vs 48, escape 38 vs 27) and off 10 against 11.
+`out/d2_hold/d2_hold_result.json` (`common.Result`, tool `lesion`, `check()` empty) carries the resolved
+`LIFParams` / `OpticParams` / `type_path_gain`, the compiled-W md5 `ef23cc27bea13be7f6a96f3c04fd3737`, the git state
+and the realised device.
+
+#### G.6.2 The five arms in the room (`out/d2_hold/d2_hold_report.py` -> `out/d2_hold/d2_hold_report.log`, `d2_hold_summary.md`)
+
+Per batch (brain seed 0 / 1 / 2 / 3), hops = escape + voluntary, then the batch's walking-GF median and rows at 33 Hz:
+
+* shipped: 23 (10+13), 30 (9+21), 20 (8+12), 23 (11+12) | 32.95 / 32.81 / 32.31 / 33.31 Hz | 8, 7, 6, 9 of 16
+* `holdOpticHis` (histamine silencings alone): 28 (11+17), 19 (9+10), 19 (11+8), 21 (8+13) | 31.53 / 32.58 / 33.39 / 30.17 | 6, 7, 9, 5
+* `holdOpticGlu` (glutamate flips alone): 2 (2+0), 2 (2+0), 4 (4+0), 5 (5+0) | 26.22 / 27.23 / 27.64 / 28.08 | 2, 2, 4, 5
+* `holdOpticRandom` (3,832 random optic entries alone): 1 (1+0), 4 (4+0), 2 (2+0), 6 (6+0) | 26.82 / 27.67 / 28.84 / 28.21 | 1, 4, 2, 4
+* off: 1 (1+0), 4 (4+0), 3 (3+0), 2 (2+0) | 26.59 / 29.22 / 26.48 / 25.72 | 1, 3, 2, 2
+
+Kruskal-Wallis on hops across the four batches of an arm is n.s. everywhere (p 0.28 / 0.51 / 0.46 / 0.39 / 0.75), so
+the four runs of each arm behave as replicates of one rate. Pooled (4 x 16 x 300 s = 19,200 fly-s per arm; exact
+Poisson 95 % intervals on the rates per 1,000 fly-s):
+
+| arm | hops | escape | voluntary | hops / 1,000 fly-s | escape | voluntary | walking-GF median | rows >= 33 Hz | rows with an escape hop |
+|---|---|---|---|---|---|---|---|---|---|
+| shipped default | 96 | 38 | 58 | 5.000 [4.050, 6.106] | 1.979 [1.401, 2.717] | 3.021 [2.294, 3.905] | 32.82 | 30/64 | 28 (agree 62/64) |
+| `holdOpticHis` | 87 | 39 | 48 | 4.531 [3.629, 5.589] | 2.031 [1.444, 2.777] | 2.500 [1.843, 3.315] | 31.97 | 27/64 | 27 (64/64) |
+| `holdOpticGlu` | 13 | 13 | 0 | 0.677 [0.361, 1.158] | 0.677 [0.361, 1.158] | 0.000 [0.000, 0.192] | 26.80 | 13/64 | 13 (64/64) |
+| `holdOpticRandom` | 13 | 13 | 0 | 0.677 [0.361, 1.158] | 0.677 [0.361, 1.158] | 0.000 [0.000, 0.192] | 27.80 | 11/64 | 11 (64/64) |
+| off | 10 | 10 | 0 | 0.521 [0.250, 0.958] | 0.521 [0.250, 0.958] | 0.000 [0.000, 0.192] | 26.80 | 8/64 | 8 (64/64) |
+
+The escape-priority caveat of G.5 item 2 holds here too: `rows >= 33 Hz` is the set of rows with at least one escape
+hop in 318 of 320 rows (the two disagreements are shipped rows at or above 33 Hz with no escape hop counted; why is
+not recorded in the JSON), so the GF tail and the escape count are one channel and voluntary is the other.
+
+#### G.6.3 Ratios, shares, and the verdicts over runs
+
+Count ratios at equal exposure (Jeffreys 95 %), the exact conditional binomial p, and each arm's share of the shipped
+default's excess over off:
+
+| arm | measure | count | vs shipped | vs off | share of the excess |
+|---|---|---|---|---|---|
+| `holdOpticHis` | hops | 87 | 0.906x [0.678, 1.211], p 0.55 | 8.70x [4.71, 17.4], p 1.8e-16 | **89.5 %** |
+| | escape | 39 | 1.026x [0.656, 1.605], p 1.0 | 3.90x [2.01, 8.09], p 3.9e-05 | 103.6 % |
+| | voluntary | 48 | 0.828x [0.563, 1.211], p 0.38 | 48 vs 0, [18.7, inf), p 7.1e-15 | 82.8 % |
+| | GF median | 31.97 | | | 85.9 % of the 26.80 -> 32.82 shift |
+| `holdOpticGlu` | hops | 13 | **0.135x [0.074, 0.234]**, p 8.3e-17 | 1.30x [0.575, 3.00], p 0.68 | 3.5 % |
+| | escape | 13 | 0.342x [0.178, 0.628], p 6.2e-04 | 1.30x [0.575, 3.00], p 0.68 | 10.7 % |
+| | voluntary | 0 | **0.000x [0.000, 0.044]**, p 6.9e-18 | 0 vs 0 | 0.0 % |
+| | GF median | 26.80 | | | 0.0 % |
+| `holdOpticRandom` | hops | 13 | 0.135x [0.074, 0.234], p 8.3e-17 | 1.30x [0.575, 3.00], p 0.68 | 3.5 % |
+| | escape | 13 | 0.342x [0.178, 0.628], p 6.2e-04 | 1.30x, p 0.68 | 10.7 % |
+| | voluntary | 0 | 0.000x [0.000, 0.044] | 0 vs 0 | 0.0 % |
+| | GF median | 27.80 | | | 16.7 % |
+| off | hops / escape / voluntary | 10 / 10 / 0 | 0.104x [0.052, 0.192] / 0.263x [0.127, 0.511] / 0.000x [0.000, 0.044] | -- | 0 |
+
+Additivity of the two classes' excesses over off, **this batch**: hops (77 + 3) / 86, escape (29 + 3) / 28,
+voluntary (48 + 0) / 58 -- uneven (93 / 114 / 83 %), and the escape line over-sums (32 vs 28). **Pooled over 7 runs per arm
+(G.6.7) it is a consistent ~82 % on all three routes:** hops (118 + 0) / 144, escape (40 + 1) / 50,
+voluntary (78 - 1) / 94. "No cancellation and no synergy" survives; "the two classes' excesses sum to the default's
+within the count scatter" is better stated as **"sum to ~0.82 of it"**, and the pooled `holdOpticHis` / shipped hops
+ratio **0.840x [0.669, 1.054]** makes a ~16 % remainder the point estimate rather than this batch's ~10 %. This
+batch's uneven split in both directions (114 % on escape, 83 % on voluntary) is that scatter.
+
+Two-sided Mann-Whitney over the 64 rows per arm (asymptotic; counts are tied):
+
+| pair | hops | escape | voluntary | walking-GF max |
+|---|---|---|---|---|
+| `holdOpticHis` vs shipped | U 1798, p **0.22** | U 2029.5, p **0.92** | U 1763, p **0.15** | U 1926, p **0.56** |
+| `holdOpticHis` vs off | U 3328, p 8.0e-12 | U 2668, p 1.6e-04 | U 3072, p 1.2e-10 | U 3376, p 2.5e-10 |
+| `holdOpticGlu` vs shipped | U 509, p 3.4e-15 | U 1509.5, p 1.7e-03 | U 640, p 1.2e-15 | U 742, p 4.9e-10 |
+| `holdOpticGlu` vs off | U 2195, p **0.28** | U 2195, p **0.28** | U 2048, p **1.0** | U 2193, p **0.49** |
+| `holdOpticRandom` vs shipped | U 512, p 3.2e-15 | U 1472.5, p 6.9e-04 | U 640, p 1.2e-15 | U 846, p 1.0e-08 |
+| `holdOpticRandom` vs off | U 2138, p **0.49** | U 2138, p **0.49** | U 2048, p **1.0** | U 2465, p 0.047 |
+| `holdOpticGlu` vs `holdOpticHis` | U 829.5, p 1.6e-10 | U 1541.5, p 3.0e-03 | U 1024, p 1.2e-10 | U 776, p 1.4e-09 |
+| `holdOpticHis` vs `holdOpticRandom` | U 3277, p 8.5e-11 | U 2593, p 1.2e-03 | U 3072, p 1.2e-10 | U 3141, p 1.9e-07 |
+| off vs shipped | U 469, p 3.3e-16 | U 1399, p 8.8e-05 | U 640, p 1.2e-15 | U 636, p 1.7e-11 |
+
+And the toolkit's verdicts, `flyverse.interp.common.compare` over the **4 runs per arm** (the replicate unit; per-run
+rate per 1,000 fly-s, per-run GF median, per-run rows >= 33; z = (mean a - mean b) / SD(b), exact U, p floor 0.029
+at 4 v 4, so `result` is reachable and `null` is a finding):
+
+| pair | hops | escape | voluntary | GF median | rows >= 33 |
+|---|---|---|---|---|---|
+| `holdOpticHis` vs shipped | **null** (z -0.53, p 0.34) | null (z +0.19, p 0.89) | null (z -0.57, p 0.69) | null (z -2.23, p 0.49) | null (z -0.58, p 0.69) |
+| `holdOpticHis` vs off | **result** (z +14.9, p 0.029) | result (z +5.6, p 0.029) | undetermined (off SD 0; U 16, p 0.029, Welch +6.1) | result (z +3.2, p 0.029) | result (z +5.8, p 0.029) |
+| `holdOpticGlu` vs shipped | **result** (z -4.9, p 0.029) | result (z -4.8) | result (z -3.3) | result (z -13.4) | result (z -3.3) |
+| `holdOpticGlu` vs off | **null** (z +0.58, p 0.69) | null (z +0.58) | null (0 vs 0) | null (z +0.19, p 0.69) | null (z +1.5, p 0.34) |
+| `holdOpticRandom` vs shipped | **result** (z -4.9, p 0.029) | result (z -4.8) | result (z -3.3) | result (z -11.9) | result (z -3.7) |
+| `holdOpticRandom` vs off | **null** (z +0.58, p 0.89) | null | null (0 vs 0) | null (z +0.58, p 0.34) | null (z +0.92, p 0.69) |
+| `holdOpticGlu` vs `holdOpticHis` | result (z -4.3, p 0.029) | result (z -4.3) | result (z -3.1) | result (z -3.3) | null (z -2.05, p 0.057) |
+| `holdOpticHis` vs `holdOpticRandom` | result (z +8.3, p 0.029) | null (z +2.9 < 3, p 0.029) | undetermined (random SD 0; U 16, p 0.029) | result (z +4.7) | null (z +2.7, p 0.029) |
+| off vs shipped | result (z -5.1, p 0.029) | result (z -5.4) | result (z -3.3) | result (z -14.1) | result (z -4.3) |
+
+Per-run draws behind the headline pairs (hops per 1,000 fly-s): shipped 4.79 / 6.25 / 4.17 / 4.79, `holdOpticHis`
+5.83 / 3.96 / 3.96 / 4.38, `holdOpticGlu` 0.42 / 0.42 / 0.83 / 1.04, `holdOpticRandom` 0.21 / 0.83 / 0.42 / 1.25, off
+0.21 / 0.83 / 0.62 / 0.42; GF medians shipped 32.95 / 32.81 / 32.31 / 33.31, `holdOpticHis` 31.53 / 32.58 / 33.39 /
+30.17, `holdOpticGlu` 26.22 / 27.23 / 27.64 / 28.08, `holdOpticRandom` 26.82 / 27.67 / 28.84 / 28.21, off 26.59 /
+29.22 / 26.48 / 25.72.
+
+**Correction (dynamics round 2 verification).** An earlier form of this paragraph said "every `holdOpticGlu` and every
+`holdOpticRandom` run lies inside off's range on every measure; every `holdOpticHis` run lies inside the shipped
+default's range on hops and GF". **Both halves are false**, and the runs that fall outside are these:
+
+* off's hop rates are [0.21, 0.83, 0.62, 0.42], but `holdOpticGlu`'s 4th run is **1.04** and `holdOpticRandom`'s is
+  **1.25**, both above off's maximum 0.83; off's rows >= 33 are [1, 3, 2, 2], but `holdOpticGlu` gives **4** and **5**
+  and `holdOpticRandom` gives **4** twice, all above off's maximum 3.
+* two `holdOpticHis` runs sit at **3.96** against the shipped minimum 4.17 (this paragraph already conceded that one),
+  and **three of the four** `holdOpticHis` GF medians lie outside shipped's [32.31, 33.31]: 30.17 and 31.53 below,
+  33.39 above.
+
+The `compare` verdicts these sentences were glossing are unaffected -- the range statements were the gloss, not the
+test. Read the table above and G.6.7's pooled verdicts, not the ranges.
+
+#### G.6.4 Answer
+
+1. **Which class carries it: the histamine silencings, all of it.** The 17,256 -1 -> 0 entries alone (photoreceptor ->
+   medulla, 83,191 |W|) reproduce the shipped default on every measure -- hops 0.906x [0.678, 1.211], escape 1.026x
+   [0.656, 1.605], voluntary 0.828x [0.563, 1.211], GF median 31.97 vs 32.82 Hz; `compare` **null** on all five
+   run-level measures (p 0.34-0.89), row-level p 0.15-0.92 -- and reproduce 90 % (hops), 104 % (escape), 83 %
+   (voluntary) and 86 % (GF shift) of the default's excess over off, at 8.70x off on hops [4.71, 17.4]. The
+   glutamate flips alone (27,207 entries, 87,920 |W|, T1 / Dm9 / Lai) reproduce off: hops 0.135x the default
+   [0.074, 0.234], 1.30x off [0.575, 3.00] (p 0.68), **0 voluntary take-offs in 19,200 fly-s** (0.000x [0.000, 0.044]),
+   GF median 26.80 -- equal to off's 26.80 **to two decimals only**: the pooled 64-row medians are `holdOpticGlu`
+   26.803645 and off 26.802207 Hz, not an identity; `compare` **result** against the default on all five
+   measures (z -3.3 to -13.4) and **null** against off on all five. The glutamate class's hop and voluntary rates are
+   therefore bounded at <= 0.23x and <= 0.044x **of the default's** (those are ratios to the default, **not** shares of
+   the excess over off, which are 3.5 % and 0.0 % -- see the table above; the two quantities are not the same);
+   the histamine class's share is 0.68-1.21x on hops -- indistinguishable from all of it, and the lower bound (0.68)
+   is a bound on how well 87 vs 96 counts can be measured, not evidence of a remainder. On the escape channel this
+   item does **not** replicate: see item 3.
+2. **The dose control decides against "the larger perturbation" -- when perturbation is measured in ENTRIES or |W|,
+   and only then.** Two independent facts: (a) the null class is the
+   larger one -- 27,207 entries and 87,920 |W| carry nothing while 17,256 entries and 83,191 |W| carry everything --
+   so perturbation size does not order the arms; (b) a 3,832-entry random draw from the carrying class, matched to
+   the Brain side's entry dose (and to its |W|, 9,034 vs 8,833), carries nothing either: 13 = 13 + 0 hops, GF median
+   27.80, `compare` null against off on all five measures (hops z +0.58, p 0.89), the only row-level p below 0.05
+   being the GF tail (U 2465, p 0.047; 11/64 vs 8/64 rows at 33 Hz), which at the run level is z +0.58 / p 0.34.
+   So G.5's "the Brain side carries nothing" was not a statement about size: a same-sized perturbation of the class
+   that does carry the cost also carries nothing at that size. The cost needs a **large fraction of the histamine
+   class** -- somewhere between the 22 % of its entries (11 % of its |W|) the random draw kept and the whole; which
+   rows (Dm2 / Mi15 / Mi4 / Mi1 / L4 / C3 are the big ones the draw could not include) is the next split, not this
+   one.
+
+   **The confound this section does not close: POSTSYNAPTIC CELLS TOUCHED** (dynamics round 2 verification). Counted
+   on the shipped cache (G.6.0): `holdOpticHis` 10,411, `holdOpticRandom` 2,505, `holdOpticGlu` 2,091, the Brain-side
+   arm 1,659 (off touches 0, the shipped default 14,161). **Cells touched orders this section's five arms
+   monotonically with the outcome** -- off 0 / 10 hops, `holdOpticGlu` 2,091 / 13, `holdOpticRandom` 2,505 / 13,
+   `holdOpticHis` 10,411 / 87, shipped 14,161 / 96 -- while entries
+   (27,207 null > 17,256 carries > 3,832 null) and |W| (87,920 null > 83,191 carries) do not. (Adding G.5's
+   Brain-side arm, 1,659 / 8, leaves one 2-count inversion against off's 10 -- inside the count scatter.) So a
+   *breadth-in-cells* account of these same five arms -- "the arm that reaches the most medulla cells carries the
+   most" -- is **not excluded** by this design, and the two accounts are not distinguishable here. Worse, the
+   confound is **structural, not merely an un-run control**: an entry-matched subset of a class can never match that
+   class's cell count (3,832 entries touch at most 3,832 cells, against 10,411), so no dose control built from this
+   per-(type, transmitter) table can equalise cells touched. G.6.6(c) names the row-granularity limit; this is the
+   other one. The claim that survives unqualified is the narrow one: **size in entries or |W| does not order the
+   arms.**
+3. **The hop and voluntary routes and the GF tail attribute the same way; the ESCAPE route does not -- it stays the
+   weakly attributed one, as in G.5.** *This item as first written said the opposite* ("unlike G.5, here the histamine
+   class carries the escape excess too (39 vs off 10, 3.90x [2.01, 8.09], p 3.9e-05; `compare` result z +5.6) and the
+   glutamate class none of it (13 vs 10, p 0.68)"), and the escape half of it **does not replicate** (G.6.7). At fresh
+   brain seeds 4-6 the histamine class made escape 19 against shipped 30 = **0.633x [0.353, 1.116], p 0.152** (and
+   2.375x off's 8, p 0.052) -- i.e. G.5's unattributable escape route, not an attributed one. Pooled over 7 runs per
+   arm (33,600 fly-s each, p_floor 0.00058): **escape 58 vs shipped 68 = 0.853x [0.600, 1.210]**, the escape share of
+   the default's excess over off is **80.0 %, not 103.6 %**, and both `off vs shipped` (z -1.92) and
+   `holdOpticGlu vs shipped` (z -1.88) come back **`compare`-null on escape**. The 103.6 % was a one-batch high draw.
+   What replicates: hops (`holdOpticHis` vs shipped null, vs off result z +9.4), voluntary (vs off result z +29.2)
+   and the GF median (vs off result z +4.0). The default's escape excess over off is itself larger in this batch
+   (3.8x, 38 vs 10) than on the record (2.45x) or pooled (68 vs 18, 3.8x over 7 runs); the escape counts are the
+   noisiest channel at this exposure and the attribution rests on hops, voluntary and the GF median.
+4. **What the class is, mechanically.** The silenced entries are the direct photoreceptor synapses (R7 / R8 mostly,
+   some R1-R6) onto Mi1 / Mi4 / Mi9 / Mi15 / Dm2 / L4 / C3 / L5 / Tm29 / Dm4 / T2 / Tm3 -- the medulla cells whose
+   scRNA profiles show neither `HisCl1` nor `ort` in any source (G.6.5). Under the shipped default these inputs are
+   zero in both the LIF and the optic-lobe rate model; with them restored (`holdOpticGlu`, `holdOpticRandom` 78 %
+   of them) the room is off's room. Which of the two model stages transmits the effect to DNp01 / the wing-power
+   command, and through which of those types, is not measured here; E.3's fan-in route is excluded (0 cells).
+
+#### G.6.5 Does the contested-flip rule need re-examination? No -- a different rule does
+
+The histamine silencings are **not products of the contested-flip rule** (R3.1, `contest_flip`): that rule acts on a
+FLIP, a selected profile whose fast net has the sign opposite to the prior (glutamate +1), and falls back to the
+prior when another source contradicts it. The 45 histamine rows are `fast_net_abs = none`, `fast_sign_abs = 0`:
+the **silencing rule** of the table header -- "a silencing (fast_sign 0) needs every source profiling the type to
+agree and at least two of them" -- with the sources agreeing unanimously: Mi1, L4, L5, C3, Tm1, Lawf1 5 of 5 sources
+`fast=none` (Davis 2020, Özel 2021, Kurmangaliyev 2020, FCA 2022, Davie 2018), Mi4 / Mi9 / Mi15 / Tm29 / Tm3 / Tm4 /
+T2 4 of 4, Dm4 3 of 3, Dm2 2 of 2 (Özel 2021 + Kurmangaliyev 2020), `fast_selection`
+`primary` on 45/45, no `flip_contested` entry on 45/45, and no `alt_sources` entry reporting a non-`none` abs call on
+any of the 45 (`flyverse/data/receptors_by_type.csv`; the rows are listed in `out/d2_hold/d2_hold_his_rows.log`).
+**Tier and QC are not uniform across the 45, contrary to an earlier "all tier `exact`, QC pass"** (dynamics round 2
+verification, recomputed from `receptors_by_type.csv`): tier is `exact` on **34/45**, `fuzzy` on **9** (Dm3a, Dm3b,
+Dm3c, LC14a-1, LC14a-2, LC14b, Pm1, Pm2a, Pm2b) and `alias` on **2** (LPi34, l-LNv); QC is `pass` on **44/45**, the
+exception being **l-LNv (`suboptimal_only`)**. It is immaterial by weight -- the tier-`exact` rows carry 17,049 of the
+class's 17,256 entries (**98.8 %**) and the QC-`pass` rows 17,189 (**99.6 %**); the 11 non-`exact` rows carry 207
+entries between them, of which l-LNv carries 67 -- and the enumerated big types above, where the unanimity argument
+actually runs, *are* tier `exact` and QC `pass`. By contrast the class the flip rule *did* police -- the
+glutamate flips on T1 / Dm9 / Lai (+1 rows that survived the shipped `--flip-rule any`, i.e. uncontested by any
+source) -- carries nothing in the room. So re-examining
+`contest_flip` would touch the wrong class. What the finding puts to `docs/NT_INTEGRATION.md` is the **silencing
+rule's premise**: that absent `HisCl1` / `ort` in the transcriptomes of a medulla type means its photoreceptor
+synapses transmit nothing. Two things a data-integration pass should weigh, reported here and not acted on: (i)
+these are the R7 / R8 (and R1-R6) -> Mi / Dm / C / L / Tm synapses -- 15,509 entries, 80,432 |W| -- whose
+postsynaptic types are among the best-profiled cells in every optic-lobe atlas, so the 'none' calls are the data's
+strongest, not their weakest; if the calls are right, the cost is a *model* consequence of a correct silencing
+(an optic-lobe rate model that also loses these inputs, G.6.0) rather than a wrong sign, and the question moves to
+`optic.py`'s use of the receptor factor on photoreceptor -> rate edges, which is a swappable-module question, not a
+table question; (ii) if the integration wants a bound instead of a silencing for this class (a tier-'silenced'
+prior kept at the presynaptic sign with a small gain, say), that is a new rule for `docs/NT_INTEGRATION.md` to
+justify from the expression levels (`fast_neg_val` of these rows, all 0 under the group rule), not from the room
+behaviour -- deciding it on the take-off rate would be hand-tuning toward behaviour (project rule). Nothing in the
+table changed here.
+
+#### G.6.6 What this settles and what it leaves open
+
+Settled (and replicated at fresh seeds, G.6.7): the class (histamine silencings, photoreceptor -> medulla), with a
+run-level `result` against off on hops, voluntary and the GF median and `null` against the
+default on all five; the dose confound **in entries and |W|** (the larger class carries nothing; a Brain-dose sample
+of the carrying class carries nothing); the additivity (**~82 %** of the default's excess pooled, G.6.3).
+Not settled, contrary to earlier wording here: the **escape** channel (G.6.4 item 3) and **dose measured in
+postsynaptic cells touched** (G.6.4 item 2, structurally unclosable by this design).
+Open: (a) which rows of the histamine class -- the dose control excluded the six rows above 1,600 entries by
+construction; a per-type split (Dm2, Mi15, Mi4, Mi1, L4, C3 alone and their complement) is the next hold, at the same
+exposure; (b) which model stage carries it to the take-off routes (the LIF's medulla cells or the optic-lobe rate
+model's, both of which apply the factor to these edges), answerable on the CPU with `interp_decompose.py --static`
+on Mi1 / Mi4 / Mi9 under the two tables before any GPU job; (c) the row-granularity of the dose control -- an
+entry-granular random subset would need an entry-level override the receptor path does not have; (d) as in G.5,
+correctness is not measured: there is no animal reference for the spontaneous take-off rate in this arena, the
+flies are at energy 0 for the last ~2 min of every rollout (median minimum energy 0.0 in all 20 batches), and
+whether off's voluntary rate or the
+default's 3.0 per 1,000 fly-s is nearer the animal is a question for a reference, not for a hold.
+
+**Off's voluntary rate is not exactly zero, and the statements that leaned on the exact zero were batch-specific**
+(dynamics round 2 verification). "0 in 72,000 fly-s over 15 batches" was exactly true of the record when written --
+all 15 were enumerated -- and it broke in the very next batch: `out/sk_d2_hold/off_5.json` (brain seed 5, env seed
+85) records 4 hops = 3 escape + **1 voluntary** (that row's `power_max` 103.1 Hz, `gf_max_walk` 27.69 Hz, i.e. the
+wing-power route, and `hops = escape + voluntary` still holds). The record with the replication is **1 voluntary
+take-off in 86,400 fly-s over 18 batches**. Two consequences, applied above: off's SD on voluntary is no longer 0,
+so at **7 runs per arm the voluntary comparison against off is a plain `compare` RESULT (z +29.2, U 49, p 0.00058)**,
+not `undetermined`; and the Jeffreys interval `inf` upper limits quoted from a zero denominator (`[18.713,
+98262.742]` for the histamine class, `0.000x [0.000, 0.044]` for the glutamate class) are properties of that batch's
+zero, not of the arm.
+
+#### G.6.7 Fresh-seed replication (dynamics round 2 verification, `verify:takeoff-split`)
+
+The round's Opus skeptic re-ran **all five arms in one submission at brain seeds 4 / 5 / 6** (environment blocks
+64-79 / 80-95 / 96-111 -- used by no batch above), same protocol, same 13 code md5s, and the three ALONE tables
+rebuilt in-job to the same three md5s: 16 jobs, 0 failed, 86.7 min, run dir `sk-d2hold-39c9a1`, console
+`out/sk_d2_hold_cluster.log`, integrity 0 problems in 15 runs, report `out/sk_d2_hold/sk_d2_hold_replicate.log`.
+Fresh seeds alone (3 runs x 16 flies x 300 s = 14,400 fly-s per arm), then pooled with the reported batch (7 runs,
+33,600 fly-s per arm, `compare` p_floor 0.00058 at 7 v 7):
+
+| arm | fresh 3 runs: hops = esc + vol \| GF med \| >= 33 | pooled 7 runs: hops = esc + vol \| GF med \| >= 33 | pooled vs shipped (hops) |
+|---|---|---|---|
+| shipped default | 67 = 30 + 37 \| 32.03 \| 21/48 | 163 = 68 + 95 \| 32.58 \| 51/112 | -- |
+| `holdOpticHis` | 50 = 19 + 31 \| 31.36 \| 16/48 | 137 = 58 + 79 \| 31.76 \| 43/112 | **0.840x [0.669, 1.054]**, p 0.149 |
+| `holdOpticGlu` | 6 = 6 + 0 \| 27.14 \| 6/48 | 19 = 19 + 0 \| 27.06 \| 19/112 | 0.117x [0.071, 0.183] |
+| `holdOpticRandom` | 8 = 8 + 0 \| 26.67 \| 8/48 | 21 = 21 + 0 \| 27.57 \| 19/112 | 0.129x |
+| off | 9 = 8 + **1** \| 27.17 \| 7/48 | 19 = 18 + **1** \| 26.99 \| 15/112 | 0.117x [0.071, 0.183] |
+
+Pooled `compare` at 7 v 7: `holdOpticHis` vs shipped **null** on all four (hops z -0.86, escape z -0.38, voluntary
+z -0.68, GF median z -0.82); `holdOpticHis` vs off **result** on all four (z +9.4 / +3.4 / +29.2 / +4.0, pooled hops
+7.211x [4.557, 11.900]); `holdOpticGlu` and `holdOpticRandom` vs off **null** on all four (1.000x [0.529, 1.891] and
+1.105x [0.595, 2.063] on hops). **The two escape verdicts that flip:** `holdOpticGlu` vs shipped is **null** on
+escape (z -1.88) and so is `off` vs shipped (z -1.92), while both stay `result` on hops, voluntary and the GF median
+-- i.e. at 7 runs per arm the escape channel no longer separates *off itself* from the default, which is why it
+cannot attribute anything. (`holdOpticRandom` vs shipped was not computed at 7 v 7; the pooled log carries
+`holdOpticRandom` vs off only.)
+
+What the replication changes above: G.6.4 item 3 (the escape attribution, refuted as stated), G.6.3's additivity
+(93 / 114 / 83 % -> a consistent ~82 %) and its closing range statements, G.6.6's off-voluntary statements, and the
+`compare`-`undetermined` verdicts that rested on off's zero SD. What it leaves standing: the class, the hop and
+voluntary attribution, the GF median, and the entries/|W| dose control.
+
+**Process note for the next launcher.** `scripts/build_hold_tables.py`'s `--groups` default is `",".join(GROUPS)` and
+`GROUPS` now includes the three ALONE groups, so a bare `python scripts/build_hold_tables.py` writes three extra
+tables **and loads the connectome cache** (`OpticRandom` -> `alone_table` -> `optic_row_entries` ->
+`connectome.load`), which the script never needed before. The shipped model defaults are untouched and `out/` is
+git-ignored, but the script's default invocation and its dependency footprint both changed; the three new groups
+would sit better behind an explicit `--groups` opt-in. **Not changed here** (the script's owner decides).
+
+Files: `scripts/d2_hold_batch.sh` (launcher), `scripts/build_hold_tables.py` (`--groups OpticHis,OpticGlu,OpticRandom`,
+the `ALONE_GROUPS` family, `RANDOM_SEED` 0, `RANDOM_ENTRIES` 3,832), `out/d2_hold_cluster.log` =
+`out/d2_hold/d2_hold_cluster.log` (console; `21 job(s), 0 failed (95.4 min)`), `out/d2_hold/provenance.txt` (job 0),
+`out/d2_hold/receptors_hold{OpticHis,OpticGlu,OpticRandom}.csv` (the tables, md5s above),
+`out/d2_hold/d2_hold_tables_local.log` (the local `--verify`), `out/d2_hold/{shipped,off,holdOpticHis,holdOpticGlu,holdOpticRandom}_{0,1,2,3}.{json,txt}`
+(results), `out/d2_hold/remote_md5.txt` (the run-directory md5s), `out/d2_hold/d2_hold_report.py` ->
+`d2_hold_report.log` / `d2_hold_summary.md` / `d2_hold_result.json` (every number above; the generator is in
+`out/d2_hold/` because this task's file list allows only the launcher under `scripts/`), `out/d2_hold/d2_hold_presyn.log`
+(the presynaptic composition of G.6.0), `out/d2_hold/d2_hold_his_rows.log` (the 45 histamine rows with tier / QC /
+sources, G.6.5). Replication (G.6.7): `out/sk_d2_hold_cluster.log`,
+`out/sk_d2_hold/{shipped,off,holdOpticHis,holdOpticGlu,holdOpticRandom}_{4,5,6}.{json,txt}`,
+`out/sk_d2_hold/sk_d2_hold_replicate.log`, `out/sk_d2_hold/provenance.txt`.
