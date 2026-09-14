@@ -364,8 +364,68 @@ def _optic_matches(rec: dict, arm: str) -> list[str]:
     return probs
 
 
+# ---------------------------------------------------------------- the arm/box confound (docs/INTERP.md 10.4 item 9)
+REFERENCE_ARM = "base"
+
+
+def arm_device_sets(rows, arm_key: str = "arm", device_key: str = "device_name") -> dict:
+    """{arm: sorted realised device_name(s) of its runs}; blanks and nulls are dropped, so an arm with no recorded
+    device reads as an empty list (unknown), never as agreeing with the reference."""
+    devs: dict = {}
+    for r in rows:
+        a = r.get(arm_key)
+        if a is None:
+            continue
+        s = devs.setdefault(str(a), set())
+        d = r.get(device_key)
+        if d is not None and str(d) not in ("", "None", "nan") and not (isinstance(d, float) and np.isnan(d)):
+            s.add(str(d))
+    return {a: sorted(s) for a, s in devs.items()}
+
+
+def device_problems(devs: dict, section: str, reference: str = REFERENCE_ARM) -> list:
+    """One problem per arm whose realised device set differs from the reference arm's.
+
+    `cluster_run.py` places one job per command on the least-loaded target, so one job per arm makes ARM collinear with
+    BOX -- and the fleet mixes GPU models: object round 2 ran `base` on a B200 and `rectify` / `suppress` on H200s, so
+    the decisive arm-vs-base question compared arm-on-box-X with base-on-box-Y. Block the family
+    (`cluster_run.py --arm-block`) or replicate the reference arm on every box that hosted a treatment arm; a `result`
+    on a cross-device comparison is device-crossed until a same-device pair confirms it (docs/INTERP.md 10.4 item 9)."""
+    if not devs:
+        return []
+    ref = devs.get(reference)
+    if not ref:
+        return [f"{section}: no realised device_name for the {reference} arm; the arm/box confound cannot be checked"]
+    probs = []
+    if len(ref) > 1:
+        probs.append(f"{section}/{reference}: the reference arm itself ran on {ref} (arm/box confound within the reference)")
+    for arm in sorted(a for a in devs if a != reference):
+        d = devs[arm]
+        if not d:
+            probs.append(f"{section}/{arm}: no realised device_name recorded; the arm/box confound cannot be checked")
+        elif d != ref:
+            probs.append(f"{section}/{arm}: realised device {d} differs from {reference} {ref} (arm confounded with box)")
+    return probs
+
+
+def same_device_as_reference(devs: dict, arm, reference: str = REFERENCE_ARM) -> bool:
+    """True only when the arm's realised device set is known, the reference's is known, and the two are equal."""
+    a, r = devs.get(str(arm)) or [], devs.get(reference) or []
+    return bool(a and r and a == r)
+
+
+def stamp_same_device(comps: list, devs: dict, reference: str = REFERENCE_ARM) -> list:
+    """Every arm-vs-reference comparison row carries `same_device_as_reference`, so the caveat survives into the
+    Result and the export. An unknown device on either side reads False: device-crossed until a pair confirms it."""
+    for c in comps:
+        if c.get("against") == reference:
+            c["same_device_as_reference"] = same_device_as_reference(devs, c.get("arm"), reference)
+    return comps
+
+
 def verify_all(out: str, log: str | None) -> dict:
-    rep = {"problems": [], "log": None, "sphere": None, "spec": None, "bench": None, "expected_missing": [], "hook_liveness": {}}
+    rep = {"problems": [], "log": None, "sphere": None, "spec": None, "bench": None, "expected_missing": [], "hook_liveness": {},
+           "devices_by_arm": {}}
     if log and Path(log).exists():
         lines = [l for l in Path(log).read_text(encoding="utf-8", errors="replace").splitlines() if "job(s)" in l and "failed" in l]
         rep["log"] = lines[-1] if lines else None
@@ -384,8 +444,10 @@ def verify_all(out: str, log: str | None) -> dict:
     if sph:
         df, probs = pom.verify_runs(sph)
         rep["problems"] += probs
+        dev_rows = []
         for p in sph:
             d = json.load(open(p, encoding="utf-8")); nm = parse_sphere_name(Path(p).stem)
+            dev_rows.append({"arm": nm["arm"], "device_name": d["provenance"]["execution"].get("device_name")})
             rep["problems"] += [f"{p}: {x}" for x in _optic_matches(d["provenance"]["model"]["optic"], nm["arm"])]
             if bool(d["summary"]["null"]) != nm["null"]:
                 rep["problems"].append(f"{p}: null flag {d['summary']['null']} vs name")
@@ -402,18 +464,24 @@ def verify_all(out: str, log: str | None) -> dict:
                 rep["problems"].append(f"{p}: hook arm without the Torch-substep warning in its console (hook not live?)")
             if nm["arm"] not in HOOK_ARMS and live:
                 rep["problems"].append(f"{p}: plain arm shows the Torch-substep warning")
+        rep["devices_by_arm"]["sphere"] = arm_device_sets(dev_rows)
+        rep["problems"] += device_problems(rep["devices_by_arm"]["sphere"], "sphere")
         rep["sphere"] = {"n_runs": int(len(df)), "el_band_spread_deg": df.attrs.get("el_band_spread_deg"), "el_band_verdict": df.attrs.get("el_band_verdict"),
-                         "devices": sorted(set(df.device_name.dropna().astype(str))), "runs": df.to_dict("records")}
+                         "devices": sorted(set(df.device_name.dropna().astype(str))), "devices_by_arm": rep["devices_by_arm"]["sphere"], "runs": df.to_dict("records")}
     d_spec = f"{out}/spec"
     if Path(d_spec).exists() and glob.glob(f"{d_spec}/*_summary.json"):
         df = pss.verify_dir(d_spec)
         rep["spec"] = {"n_runs": int(len(df)), "n_bad": int((~df.ok).sum()) if len(df) else 0, "runs": df.to_dict("records")}
         if len(df) and (~df.ok).any():
             rep["problems"].append(f"spec: {int((~df.ok).sum())} run(s) not verified: {df[~df.ok].run.tolist()}")
+        dev_rows = []
         for r in df.to_dict("records"):
             nm = parse_spec_name(r["run"])
             if nm is None:
                 rep["problems"].append(f"spec/{r['run']}: unexpected file name"); continue
+            pv = f"{d_spec}/{r['run']}_prov.json"
+            dev_rows.append({"arm": nm["arm"], "device_name": ((json.load(open(pv, encoding="utf-8")).get("execution") or {}).get("device_name")
+                                                               if Path(pv).exists() else None)})
             if r["seed"] != nm["seed"]:
                 rep["problems"].append(f"spec/{r['run']}: seed vs name")
             ov = json.loads(r["optic"] or "{}")
@@ -423,6 +491,9 @@ def verify_all(out: str, log: str | None) -> dict:
             hi = sm.get("hook_info") or {}
             if (nm["arm"] in HOOK_ARMS) != bool(hi.get("active")):
                 rep["problems"].append(f"spec/{r['run']}: hook_info.active {hi.get('active')} on arm {nm['arm']}")
+        rep["devices_by_arm"]["spec"] = arm_device_sets(dev_rows)
+        rep["problems"] += device_problems(rep["devices_by_arm"]["spec"], "spec")
+        rep["spec"]["devices_by_arm"] = rep["devices_by_arm"]["spec"]
     bench = sorted(glob.glob(f"{out}/bench/*_prov.json"))
     if bench:
         rows = []
@@ -436,7 +507,9 @@ def verify_all(out: str, log: str | None) -> dict:
                 rep["problems"].append(f"{p}: resolved stream_rectify differs from arm {s['arm']}")
             rows.append({"file": p, "arm": s["arm"], "seed": s["seed"], "ok": ok, "device": s["provenance"]["execution"].get("device_name"), "wall_s": s.get("wall_s"),
                          **{ch["key"]: ch["status"] for ch in (s.get("checks") or [])}})
-        rep["bench"] = {"n_runs": len(rows), "runs": rows}
+        rep["devices_by_arm"]["bench"] = arm_device_sets(rows, device_key="device")
+        rep["problems"] += device_problems(rep["devices_by_arm"]["bench"], "bench")
+        rep["bench"] = {"n_runs": len(rows), "devices_by_arm": rep["devices_by_arm"]["bench"], "runs": rows}
     return rep
 
 
@@ -450,6 +523,8 @@ def cmd_verify(args) -> int:
         print(f"spec: {rep['spec']['n_runs']} runs, {rep['spec']['n_bad']} not verified")
     if rep["bench"]:
         print(f"bench: {rep['bench']['n_runs']} runs")
+    for sec, devs in (rep.get("devices_by_arm") or {}).items():
+        print(f"devices per arm ({sec}, reference {REFERENCE_ARM}): " + json.dumps(devs))
     print(f"expected outputs missing: {len(rep['expected_missing'])}")
     print("problems: " + ("; ".join(rep["problems"][:40]) if rep["problems"] else "none") + (f" ... ({len(rep['problems'])} total)" if len(rep["problems"]) > 40 else ""))
     if args.json:
@@ -595,6 +670,8 @@ def analyse_sphere(out: str, win: pd.DataFrame) -> dict:
             if len(ow):
                 comps += fam(ow, nw, bw, t, "abs_drive_median", arm, "upstream_windowed", DIAMS)
     # ---------------------------------------------------------------- per-arm answers
+    devs = arm_device_sets(per_run.to_dict("records"), device_key="device")      # the realised GPU model per arm
+    stamp_same_device(comps, devs)                                              # every vs-base row says whether the box was shared
     cdf = pd.DataFrame(comps)
     answers = {}
     for arm in arms_present:
@@ -635,7 +712,7 @@ def analyse_sphere(out: str, win: pd.DataFrame) -> dict:
     levels = lvl.groupby("arm").agg(**{c: (c, "mean") for c in lvl.columns if "." in c}, n_runs=("run", "size")).reset_index()
     levels_sd = lvl.groupby("arm").agg(**{c + "_sd": (c, "std") for c in lvl.columns if "." in c}).reset_index()
     return {"per_body": per_body, "per_run": per_run, "upstream_runs": up, "levels": levels.merge(levels_sd, on="arm"), "levels_runs": lvl, "comparisons": comps, "preference": pref,
-            "answers": answers, "time_course": pd.DataFrame(tc_out), "footprint": fps, "footprint_runs": fp_df, "prov0": prov0, "arms": arms_present,
+            "answers": answers, "time_course": pd.DataFrame(tc_out), "footprint": fps, "footprint_runs": fp_df, "prov0": prov0, "arms": arms_present, "devices_by_arm": devs,
             "n_runs": {f"{a}:{'null' if n else 'obj'}": int(((per_run.arm == a) & (per_run.null == n)).sum() / len(LC_TYPES + UPSTREAM)) for a in arms_present for n in (False, True)}}
 
 
@@ -654,11 +731,13 @@ def analyse_spec(out: str) -> dict:
         sm = json.load(open(sf, encoding="utf-8"))
         a_name, b_name = ("blank_a", "blank_b") if nm["null"] else ("stim", "blank")
         A = common.Recording.load(Path(stem + f"_{a_name}.npz")); B = common.Recording.load(Path(stem + f"_{b_name}.npz"))
-        if prov0 is None and os.path.exists(stem + "_prov.json"):
-            prov0 = json.load(open(stem + "_prov.json", encoding="utf-8"))
+        pv = json.load(open(stem + "_prov.json", encoding="utf-8")) if os.path.exists(stem + "_prov.json") else {}
+        if prov0 is None and pv:
+            prov0 = pv
         fs = pss.family_stats(A, B)
-        row = dict(run=Path(stem).name, arm=nm["arm"], stim=nm["stim"], null=nm["null"], seed=nm["seed"], device=sm.get("device"), hook_active=bool((sm.get("hook_info") or {}).get("active")),
-                   wall_s=sum((sm.get("wall_s") or {}).values()))
+        row = dict(run=Path(stem).name, arm=nm["arm"], stim=nm["stim"], null=nm["null"], seed=nm["seed"], device=sm.get("device"),
+                   device_name=(pv.get("execution") or {}).get("device_name"),      # the GPU MODEL: the arm/box confound is read off this
+                   hook_active=bool((sm.get("hook_info") or {}).get("active")), wall_s=sum((sm.get("wall_s") or {}).values()))
         for t in LC_TYPES:
             for q in SPEC_LC:
                 row[f"{t}.{q}"] = fs.get(t, {}).get(q, np.nan)
@@ -684,6 +763,8 @@ def analyse_spec(out: str) -> dict:
                 col = f"{t}.{q}"
                 comps.append(orb.compare_row(o[col].to_numpy(), nulls[col].to_numpy(), {"family": f"spec:{arm}:{st}:{t}:{q}", "arm": arm, "stim": st, "type": t, "statistic": q, "against": "null", "role": "specificity"}))
                 comps.append(orb.compare_row(o[col].to_numpy(), b[col].to_numpy(), {"family": f"spec:{arm}:{st}:{t}:{q}", "arm": arm, "stim": st, "type": t, "statistic": q, "against": "base", "role": "specificity"}))
+    devs = arm_device_sets(df.to_dict("records"))
+    stamp_same_device(comps, devs)
     cdf = pd.DataFrame(comps)
     answers = {}
     for arm in arms_present:
@@ -716,7 +797,7 @@ def analyse_spec(out: str) -> dict:
                      "dark_sd": float(dk.std(ddof=1)) if len(dk) > 1 else None, "null_mean": float(n.mean()) if len(n) else None, "bright_over_dark": float(br.mean() / dk.mean()) if len(br) and len(dk) and dk.mean() != 0 else None}
         a["bright_dark"] = bd
         answers[arm] = a
-    return {"per_run": df, "comparisons": comps, "answers": answers, "prov0": prov0, "arms": arms_present,
+    return {"per_run": df, "comparisons": comps, "answers": answers, "prov0": prov0, "arms": arms_present, "devices_by_arm": devs,
             "n_runs": {f"{a}:{st}": int(((df.arm == a) & (df.stim == st)).sum()) for a in arms_present for st in SPEC}}
 
 
@@ -763,7 +844,9 @@ def analyse_bench(out: str) -> dict:
                     costs.append(k)
         s["costs_sections"] = costs
         summ[arm] = s
-    return {"per_run": df, "comparisons": comps, "summary": summ, "arms": arms_present}
+    devs = arm_device_sets(rows, device_key="device")
+    stamp_same_device(comps, devs)
+    return {"per_run": df, "comparisons": comps, "summary": summ, "arms": arms_present, "devices_by_arm": devs}
 
 
 # ==================================================================================================== analyse
@@ -771,7 +854,8 @@ def _fmt(c: dict) -> str:
     key = c.get("diam_deg", c.get("stim", c.get("statistic")))
     return (f"{c['arm']:10s} {c['type'] if 'type' in c else '':6s} {str(key):>9s} {c['statistic']:28s} vs {c['against']:4s} arm {c['stim_mean']:+.4f} +- {c['stim_sd']:.4f} (n {c['stim_n']}) "
             f"ref {c['null_mean']:+.4f} +- {c['null_sd']:.4f} (n {c['null_n']}) z {c['z']:+.2f} p {c['p']:.4f} (ties {c['n_tied']}) p_holm {c.get('p_holm', float('nan')):.4f} -> {c['verdict']}"
-            f"{' SURVIVES HOLM' if c.get('survives_holm') else ''}")
+            f"{' SURVIVES HOLM' if c.get('survives_holm') else ''}"
+            f"{'' if c.get('same_device_as_reference', True) else ' DEVICE-CROSSED'}")
 
 
 def cmd_analyse(args) -> int:
@@ -816,8 +900,12 @@ def cmd_analyse(args) -> int:
         cls[arm] = {"letter": ARMS[arm]["letter"], "carries_small_field": a["carries_small_field"], "carries_T3_only": a["carries_T3_only"], "lc11_follows": a["lc11_follows"],
                     "releases_bar_grating_flicker": s.get("releases_bar_grating_flicker"), "T2_T3_keep_on_and_off": s.get("T2_T3_keep_on_and_off"),
                     "costs_benchmark_sections": b.get("costs_sections"), "adopted": False}
-    res.summary = {"predeclared": PREDECLARED, "arms": ARMS, "windows": win_summary, "answers": answers, "classification": cls, "verify": rep,
-                   "reading": "verdicts are common.compare's (z on the null SD, exact U, p_floor); p is the tie-aware exact permutation U; p_holm is Holm within the named family; only a `result` with p_holm <= 0.05 is called; nothing is adopted"}
+    devices = {"reference_arm": REFERENCE_ARM, "sphere": (sph or {}).get("devices_by_arm"), "specificity": (spec or {}).get("devices_by_arm"),
+               "transfer": (bench or {}).get("devices_by_arm")}
+    res.summary = {"predeclared": PREDECLARED, "arms": ARMS, "windows": win_summary, "answers": answers, "classification": cls, "verify": rep, "devices_by_arm": devices,
+                   "reading": "verdicts are common.compare's (z on the null SD, exact U, p_floor); p is the tie-aware exact permutation U; p_holm is Holm within the named family; only a `result` with p_holm <= 0.05 is called; nothing is adopted"
+                              "; every arm-vs-base comparison row carries `same_device_as_reference`, false when the arm's realised device_name set differs from base's or either is unknown -- such a call is device-crossed "
+                              "(arm confounded with box) until a same-device pair confirms it (docs/INTERP.md 10.4 item 9; cluster_run.py --arm-block)"}
     res.validation = {"name": "fixed-anatomy model comparison on the matched sphere ladder: predeclared P1 (T3 / T2 carrier figure) and P2 (LC11 windowed drive) per arm, the specificity battery, the benchmark transfer",
                       "reference": {"P1": "docs/audits/deficit_object.md 4.3: the held-carrier arms gave T3 0.062 / 0.072 +- 0.002 against 0.024 +- 0.005 (scale reference, another protocol)",
                                     "specificity": "Keles et al. 2020: no release of bar / grating responses; T2 / T3 respond to both ON and OFF"},

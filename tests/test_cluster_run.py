@@ -1,5 +1,5 @@
-"""Offline contracts for scripts/cluster_run.py: config parsing, tunnels, least-loaded scheduling, fetch guard,
-the exit-status guard.
+"""Offline contracts for scripts/cluster_run.py: config parsing, tunnels, least-loaded scheduling, --arm-block
+(an experimental factor is never the unit of scheduling), the fetch guard, the exit-status guard.
 
 Nothing here touches a real cluster: the heimdall API is a canned in-process HTTP server, ssh/scp are
 patched out, and the tunnel subprocess is faked. No job is ever submitted anywhere.
@@ -477,6 +477,187 @@ class RunTests(unittest.TestCase):
         self.assertEqual(len(b.submitted), 2)
         self.assertEqual(a.submitted, [])
         self.assertEqual(sorted({t for t, _ in calls["ssh"]}), ["b"])
+
+
+# ── blocking (--arm-block) ───────────────────────────────────────────────────
+
+class BlockKeyTests(unittest.TestCase):
+    """The block name of a job command: the value after `<KEY>_`, an explicit map, or None (placed per job)."""
+
+    def test_block_value_reads_the_token_after_the_key(self):
+        line = "python scripts/object_round2_compare.py run-job --job sph_base --out out/objr2c --runs 5"
+        self.assertEqual(cr.block_value(line, "sph"), "base")
+        self.assertEqual(cr.block_value(line, "job"), None)              # `--job ` is not `job_`
+        # a value keeps _ . + - so multi-word arms and rungs survive; the key must start its own token
+        self.assertEqual(cr.block_value("run-job --job arm_rect_adapt --rung rung_4.5", "arm"), "rect_adapt")
+        self.assertEqual(cr.block_value("run-job --job arm_rect_adapt --rung rung_4.5", "rung"), "4.5")
+        self.assertIsNone(cr.block_value("python x.py --job xsph_base", "sph"))
+        self.assertEqual(cr.block_value("python x.py --job out/r2/fam_sphere.json", "fam"), "sphere.json")
+
+    def test_block_names_join_several_keys_and_leave_unmatched_commands_loose(self):
+        cmds = ["a fam_sph sec_gpu", "b fam_sph sec_cpu", "c nothing here"]
+        self.assertEqual(cr.block_names(cmds, ["fam"]), ["sph", "sph", None])
+        self.assertEqual(cr.block_names(cmds, ["fam", "sec"]), ["sph+gpu", "sph+cpu", None])
+        self.assertEqual(cr.group_blocks(cr.block_names(cmds, ["fam"])), {"sph": [0, 1]})
+
+    def test_an_explicit_map_overrides_the_keys_and_accepts_a_list(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "m.json")
+            Path(p).write_text(json.dumps({"0": "one", "1": "one", "2": "two"}), encoding="utf-8")
+            self.assertEqual(cr.load_block_map(p), {"0": "one", "1": "one", "2": "two"})
+            Path(p).write_text(json.dumps({"blocks": ["x", "x", "y"]}), encoding="utf-8")
+            self.assertEqual(cr.load_block_map(p), {"0": "x", "1": "x", "2": "y"})
+            self.assertEqual(cr.block_names(["a fam_sph", "b fam_sph", "c fam_sph"], ["fam"], cr.load_block_map(p)),
+                             ["x", "x", "y"])
+            Path(p).write_text("3", encoding="utf-8")
+            with self.assertRaises(SystemExit) as e:
+                cr.load_block_map(p)
+            self.assertIn("job index -> block name", str(e.exception))
+
+    def test_assign_blocks_charges_the_whole_block_and_deals_largest_first(self):
+        a, b = target("a", slots=8), target("b", slots=8)
+        blocks = {"small": [0], "big": [1, 2, 3], "mid": [4, 5]}
+        placed = cr.assign_blocks(blocks, [a, b], balance=True)
+        self.assertEqual({k: v.name for k, v in placed.items()}, {"big": "a", "mid": "b", "small": "a"})
+        self.assertEqual((a.load, b.load), (4, 2))                      # charged len(block), not 1
+        c, d = target("c", slots=4), target("d", slots=3)
+        placed = cr.assign_blocks(blocks, [c, d], balance=False)        # least-loaded, once per block
+        self.assertEqual({k: v.name for k, v in placed.items()}, {"small": "c", "big": "c", "mid": "d"})
+        self.assertEqual((c.load, d.load), (4, 2))                      # c filled up on the block it took
+
+
+class ArmBlockRunTests(unittest.TestCase):
+    """The submitted batch: a block stays on one box, blocks balance over the boxes, a dead block falls back per job,
+    and an unblocked batch with more jobs than targets is warned about."""
+
+    def two_boxes(self, slots=(8, 8), **kw):
+        a, b = FakeHeimdall(**kw), FakeHeimdall(**kw)
+        self.addCleanup(a.stop)
+        self.addCleanup(b.stop)
+        cfg = {"user": "tel0s", "targets": {
+            "a": dict(TARGET, api=a.api, slots=slots[0], runs="/root/runs-a"),
+            "b": dict(TARGET, api=b.api, slots=slots[1], runs="/root/runs-b")}}
+        return a, b, cfg
+
+    def test_every_job_of_a_block_goes_to_one_target_whatever_the_load(self):
+        a, b, cfg = self.two_boxes(slots=(1, 9))                        # b is by far the least loaded box
+        cmds = [f"python run.py --job fam_sph --seed {i}" for i in range(4)]
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block", "fam", *cmds], cfg)
+        self.assertEqual(code, 0)
+        # one block, one box: all four stay on a, which the per-job rule would have given one job and no more
+        self.assertEqual(len(a.submitted), 4)
+        self.assertEqual(b.submitted, [])
+        self.assertIn("block sph: 4 job(s) -> @a", log)
+        self.assertEqual(len([l for l in log.splitlines() if "[block sph]" in l]), 4)
+        self.assertRegex(log, r"job \w+ queued  @a  x-\w+-0 \[block sph\]: python run\.py --job fam_sph --seed 0")
+
+    def test_blocks_are_dealt_round_robin_over_the_two_targets_largest_first(self):
+        a, b, cfg = self.two_boxes()
+        cmds = ([f"python run.py --job fam_sph --seed {i}" for i in range(3)]
+                + ["python run.py --job fam_bench --seed 0", "python run.py --job fam_bench --seed 1"])
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block", "fam", *cmds], cfg)
+        self.assertEqual(code, 0)
+        self.assertIn("block sph: 3 job(s) -> @a  (round-robin, largest first)", log)
+        self.assertIn("block bench: 2 job(s) -> @b  (round-robin, largest first)", log)
+        self.assertEqual([n.rsplit("-", 1)[-1] for n in a.names()], ["0", "1", "2"])
+        self.assertEqual([n.rsplit("-", 1)[-1] for n in b.names()], ["3", "4"])
+
+    def test_a_block_whose_target_dies_falls_back_to_per_job_placement_and_says_so(self):
+        a, b, cfg = self.two_boxes()
+        cmds = [f"python run.py --job fam_sph --seed {i}" for i in range(3)]
+        real_api = cr.api
+
+        def flaky(t, path, body=None, method=None, retry=True, timeout=cr.API_TIMEOUT):
+            if t.name == "a" and path == "/jobs" and body is not None and len(a.submitted) >= 1:
+                raise RuntimeError("boom")                              # a takes the first job of the block, then dies
+            return real_api(t, path, body, method, retry, timeout)
+
+        with patch.object(cr, "api", flaky):
+            code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block", "fam", *cmds], cfg)
+        self.assertEqual(code, 0)
+        self.assertIn("block sph: 3 job(s) -> @a", log)
+        self.assertIn("block sph: FALLBACK, @a is unavailable; the rest of the block is placed per job", log)
+        self.assertEqual(len(a.submitted), 1)
+        self.assertEqual(len(b.submitted), 2)                           # the remaining two are placed per job
+        self.assertEqual(len([l for l in log.splitlines() if "[block sph]" in l]), 3)   # still recorded per job
+
+    def test_a_command_without_the_key_is_placed_per_job_beside_the_blocks(self):
+        a, b, cfg = self.two_boxes()
+        cmds = ["python run.py --job fam_sph --seed 0", "python run.py --job fam_sph --seed 1", "python loose.py"]
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block", "fam", *cmds], cfg)
+        self.assertEqual(code, 0)
+        self.assertIn("block sph: 2 job(s) -> @a", log)
+        self.assertIn("no block key in 1 job(s) (2): placed per job", log)
+        self.assertEqual(len(a.submitted), 2)
+        self.assertEqual(len(b.submitted), 1)
+        self.assertNotIn(cr.ARM_BLOCK_WHY.split("{")[0].strip(), log.replace("WARNING command", ""))
+
+    def test_no_balance_blocks_resolves_each_block_with_the_least_loaded_rule(self):
+        a, b, cfg = self.two_boxes(slots=(9, 1))                        # a has far more free slots than b
+        cmds = ["python run.py --job fam_sph --seed 0", "python run.py --job fam_bench --seed 0"]
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block", "fam", "--no-balance-blocks", *cmds],
+                                cfg)
+        self.assertEqual(code, 0)
+        self.assertIn("block sph: 1 job(s) -> @a  (least-loaded)", log)
+        self.assertIn("block bench: 1 job(s) -> @a  (least-loaded)", log)
+        self.assertEqual(len(a.submitted), 2)
+        self.assertEqual(len(b.submitted), 0)
+
+    def test_an_explicit_map_blocks_job_lines_that_carry_no_key(self):
+        a, b, cfg = self.two_boxes()
+        cmds = ["python run.py --arm base", "python run.py --arm rectify", "python bench.py --arm base"]
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "blocks.json")
+            Path(p).write_text(json.dumps({"0": "sphere", "1": "sphere", "2": "bench"}), encoding="utf-8")
+            code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block-map", p, *cmds], cfg)
+        self.assertEqual(code, 0)
+        self.assertIn("block sphere: 2 job(s) -> @a", log)
+        self.assertIn("block bench: 1 job(s) -> @b", log)
+        self.assertEqual([n.rsplit("-", 1)[-1] for n in a.names()], ["0", "1"])   # both arms on ONE box
+        self.assertEqual([n.rsplit("-", 1)[-1] for n in b.names()], ["2"])
+
+    def test_more_jobs_than_targets_without_arm_block_is_warned_about_at_submit_time(self):
+        a, b, cfg = self.two_boxes()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code, log, _ = run_main(["--name", "x", "--poll", "0.01", "c0", "c1", "c2"], cfg)
+        self.assertEqual(code, 0)
+        want = ("WARNING: 3 jobs over 2 targets with no --arm-block: any factor encoded in the job name will be "
+                "confounded with the box.")
+        self.assertIn(want, log)                                        # in the console log the round tees
+        self.assertIn(want, err.getvalue())                             # and on stderr
+
+    def test_the_warning_is_silent_when_it_cannot_bite(self):
+        a, b, cfg = self.two_boxes()
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "c0", "c1"], cfg)   # 2 jobs, 2 targets
+        self.assertEqual(code, 0)
+        self.assertNotIn("no --arm-block", log)
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block", "fam",
+                                 "r.py --job fam_sph", "r.py --job fam_sph", "r.py --job fam_sph"], cfg)
+        self.assertEqual(code, 0)
+        self.assertNotIn("no --arm-block", log)                         # blocked: nothing to warn about
+        h = FakeHeimdall()                                              # one target: the box cannot confound anything
+        self.addCleanup(h.stop)
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "c0", "c1", "c2"], dict(TARGET, api=h.api, slots=4))
+        self.assertEqual(code, 0)
+        self.assertNotIn("no --arm-block", log)
+
+    def test_a_key_that_matches_nothing_says_so_and_places_every_job_per_job(self):
+        a, b, cfg = self.two_boxes()
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--arm-block", "fam", "c0", "c1"], cfg)
+        self.assertEqual(code, 0)
+        self.assertIn("--arm-block fam: no job command carries the key; every job is placed per job", log)
+        self.assertEqual((len(a.submitted), len(b.submitted)), (1, 1))
+
+    def test_a_broken_block_map_exits_before_anything_is_shipped(self):
+        h = FakeHeimdall()
+        self.addCleanup(h.stop)
+        code, log, calls = run_main(["--name", "x", "--arm-block-map", "no/such/file.json", "c0"],
+                                    dict(TARGET, api=h.api))
+        self.assertIsInstance(code, str)
+        self.assertIn("--arm-block-map no/such/file.json", code)
+        self.assertEqual(h.submitted, [])
+        self.assertEqual(calls["ssh"], [])
 
 
 # ── fetch ────────────────────────────────────────────────────────────────────

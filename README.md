@@ -176,8 +176,17 @@ program gets to 6 cm, the CX module feeds in 2 of 6 runs, and CX + `KlinotaxisPr
 near-field subsystem, `--program cx+klinotaxis`) in 2 of 3. Read those as descriptions of single runs,
 not as a ranking: meals are too rare to score anything at this exposure (0.13-0.50 per fly at every
 horizon and metabolic drain tested, and identical to plain arrivals), so they cannot separate two models
-(`docs/audits/feeding_horizon.md`). The two open model questions behind
-the rest -- the silent compass and the absent small-object pathway -- are mapped in the notes.
+(`docs/audits/feeding_horizon.md`). The two open model questions behind the rest are mapped in the
+notes: the compass that receives no signed rotation signal, and the small-object channel. On the
+latter, round 2 ran the controlled assay -- object elevation, distance, angular size and angular
+speed held constant per frame, blank and object radiance recorded in the loop -- and the answer is
+that **no size preference is detected in LC11 or LC10a at six runs per arm on a predeclared
+per-body statistic**, while the small-field medulla stage upstream carries a large object figure
+that grows with size. A fixed-anatomy comparison of eight physiological arms (per-stream
+rectification, fast adaptation, centre-surround suppression and combinations, all opt-in and off
+by default) found **no mechanism that produces a small-object figure while keeping the specificity
+the literature requires**: the one arm that carries the figure also makes LC11 respond to bars,
+gratings and full-field flicker. Nothing was adopted and no default changed.
 
 The principled replacement is a **module that plugs into the brain**: the screens (below) showed
 the model's central complex is silent -- no compass, no goal comparison -- while its inputs (wind

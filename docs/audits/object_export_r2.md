@@ -83,8 +83,16 @@ batch, and nothing here claims one: the batch check that replaced it is
 `python scripts/probe_object_matched.py verify out/objr2/sph` -> **`out/objr2/verify_sph.json`, problems none** over
 all **84 sphere runs** (every run `device cuda`, the file name's lobe / null / diameter / seed against the JSON's own
 record, `retina.mode = in_loop_capture`, LC11 143 / LC10a 275 per run, the dimmed-elevation band consistent to
-1.76 deg across runs). The per-process console files (`out/objr2/sph/*.txt`) came with the data, and every run's
-realised `execution.device_name` is in the `runs` table of every export directory.
+1.76 deg across runs). Every run's realised `execution.device_name` is in the `runs` table of every export directory.
+
+**Correction (found on review).** An earlier draft of this section said "the per-process console files
+(`out/objr2/sph/*.txt`) came with the data". **Only 14 of 84 arrived**: `ls out/objr2/sph/*.txt | wc -l` = **14**
+against 84 run JSONs, and `verify_sph.json` records `console_device_cuda: None` for **70 of the 84** runs. The
+**device claim still holds, but it rests on the run JSONs** -- all 84 read `execution.device = cuda`, and that is
+what `runs.device_name` is copied from -- not on the console cross-check. The consequence is that the
+console-vs-JSON check `docs/INTERP.md` 10.4 item 4 makes mandatory, and which was supposed to *replace* the missing
+`<n> job(s), 0 failed` line for this batch, exists for **14 runs, not 84**. (The compare batch's hand fetch pulled
+240/240 and is the model to copy: pull `*.json` and `*.txt` before the `*.npz`.)
 
 The fetch had one wrinkle worth recording: a finished 12 s matched-sphere run npz is **114 MB**, of which **106 MB**
 is the two `(1200, 12235)` graded per-frame arrays `a__optic_dr` / `b__optic_dr` -- the captured radiance of both
@@ -165,6 +173,30 @@ The ladder summary (`objr2-ladder-20260913T232912Z-72041020`), 14 tables:
 | `old_ladder_footprint` | 4 | 7 | `b5df12be46690f232811a39cd4cd81242d779b1885d17642138a1443beadf15a` |
 | `old_ladder_geometry` | 4 | 9 | `2e798dad99d7a845f3063c1015e696ca69405591be06ed259984a340eac61d1c` |
 | `export_directories` | 12 | 5 | `6de820b904e4e5cdd1158929ebb0860b03670bb91446853ebe23141a833c24ca` |
+
+**Correction (found on review): the ladder summary's `preference.csv` shipped a refuted p, and has been
+re-emitted.** In the 2026-09-13 delivery, four of `preference`'s 24 rows -- both lobes x both LC types, statistic
+`spikes_median`, **all four `role = primary`** -- carried `spearman_p_perm = 4.999750012499375e-05` with an **empty**
+`spearman_rho` (and `null_spearman_p_perm = 4.9975e-04` beside them). The Spearman is undefined there because every
+spike median is exactly 0.0 in all 36 object runs, so the correct value is NaN; the 5e-05 is the
+`spearman_perm` floor the baseline skeptic refuted (`cnt = 0` when rho is NaN, giving p = 1/20001). The export
+copies the analysis through and computes no statistic of its own, so this is a defect of
+`out/interp/objr2/baseline.json` as it stood, faithfully carried into the table.
+
+**Closed 2026-09-14, on CPU, without touching the cluster.** `scripts/object_round2_baseline.py analyse` was re-run
+on the already-fetched batch and `scripts/object_round2_export.py ladder --out out/objr2 --baseline
+out/interp/objr2/baseline.json --family primary` re-emitted all **13 directories** (194 tables, 42,750,310 rows,
+`export.verify()` problems none in every one; index `out/export/objr2_index.json`,
+`baseline_sha256 393b7631cc37cfa9...`). In
+`out/export/objr2-ladder-20260914T024906Z-035363c0/preference.csv` those four rows now carry empty `spearman_rho`
+**and** empty `spearman_p_perm`; no other number in the delivery changed. The 2026-09-13 directories stay on disk
+as the superseded delivery, and the row hashes in the two tables above are theirs.
+
+One cost of the re-emit, recorded rather than hidden: the 2026-09-14 directories were written from a working tree
+that had drifted since the batch ran, so their `flyverse_commit` reads `unknown` with `source_match.verified false`
+(19 of 29 loaded identical, 30 of 43 glob), where the 2026-09-13 directories carry commit `653179b4...` **verified
+29/29 loaded and 43/43 glob** (section 1). For content-pinned provenance, read the 2026-09-13 pair; for the
+corrected `preference.csv`, read the 2026-09-14 ladder summary.
 
 ## 5. Validation
 

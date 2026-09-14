@@ -44,9 +44,20 @@ A job line that ends with `; tail ...` or `; cat ...` after a redirect is WARNED
 never rewritten): `;` makes the job's exit status tail's, not python's, so a run that died mid-write still exits 0 and
 `'<n> job(s), 0 failed'` proves nothing. Write `&& tail -4 <file>` or `st=$?; tail -4 <file>; exit $st`.
 
+AN EXPERIMENTAL FACTOR IS NEVER THE UNIT OF SCHEDULING (docs/INTERP.md 10.4 item 9): least-loaded-first places one job
+per command, so "one job per arm" makes ARM collinear with BOX -- and the fleet mixes GPU models. `--arm-block
+KEY[,KEY...]` keeps every job whose command carries the same `<KEY>_<value>` on ONE target: the KEY names the BLOCK that
+must stay together (the comparison family), not the factor, so every arm inside a block is compared on one box. Blocks
+are assigned round-robin over the available targets, largest first (`--balance-blocks`, the default under --arm-block;
+`--no-balance-blocks` resolves each block with the least-loaded rule instead), and a block whose target drops out falls
+back to per-job placement with a printed line. `--arm-block-map file.json` gives the blocks explicitly (job index ->
+block name) when the job names do not carry a usable key. A batch with more jobs than targets and no --arm-block is
+warned about at submit time.
+
 Options: --targets a,b,c / --target x, --minutes (estimate, default 30), --no-wait, --priority, --node, --tags,
---poll seconds, --sync-only, --allow-bare-fetch. Run directories are kept on each target (results and logs stay
-there under the printed paths). See docs/CLUSTER.md section 14.
+--poll seconds, --sync-only, --allow-bare-fetch, --arm-block, --arm-block-map, --balance-blocks /
+--no-balance-blocks. Run directories are kept on each target (results and logs stay there under the printed paths).
+See docs/CLUSTER.md section 14.
 """
 from __future__ import annotations
 
@@ -341,6 +352,86 @@ def pick_target(targets: list) -> Target:
     return max(live, key=lambda t: t.free)
 
 
+# ── blocking: keeping an experimental factor off the scheduler ────────────────
+#
+# Least-loaded-first is a per-JOB rule, so a batch of "one job per arm" hands each arm its own box and the fleet mixes
+# GPU models: object round 2 ran `base` on a B200 and `rectify` / `suppress` on H200s, which made the decisive
+# arm-vs-base question a comparison of arm-on-box-X with base-on-box-Y (docs/INTERP.md 10.4 item 9). A BLOCK is the set
+# of jobs that must share one box -- the whole comparison family, every arm of it -- named by the value that follows
+# `<KEY>_` in the job command, or given outright by --arm-block-map.
+
+ARM_BLOCK_WHY = ("WARNING: {n} jobs over {m} targets with no --arm-block: any factor encoded in the job name will be "
+                 "confounded with the box.")
+
+_BLOCK_VALUE = r"[A-Za-z0-9][A-Za-z0-9_.+-]*"     # the rest of the token: stops at whitespace, / \ = , ; : and quotes
+
+
+def block_value(command: str, key: str) -> str | None:
+    """The value following `<key>_` in a job command (the rest of that token), or None when the key is not there.
+
+    `--job sph_base --out out/objr2c` with key `sph` -> `base`; key `fam` on `--fam fam_sphere` -> `sphere`. The key
+    must start its own token (`xsph_base` does not match key `sph`), and the value keeps `_ . + -` so multi-word arm
+    names (`rect_adapt`) and rungs (`4.5`) survive."""
+    m = re.search(rf"(?<![A-Za-z0-9_.+-]){re.escape(key)}_({_BLOCK_VALUE})", command)
+    return m.group(1) if m else None
+
+
+def load_block_map(path: str) -> dict:
+    """--arm-block-map file.json: {"0": "sph", "1": "sph", ...} (or {"blocks": {...}}, or a list of block names)."""
+    try:
+        raw = json.load(open(path, encoding="utf-8"))
+    except Exception as e:                                             # noqa: BLE001 - a bad map must not submit anything
+        sys.exit(f"--arm-block-map {path}: {e}")
+    if isinstance(raw, dict) and "blocks" in raw:
+        raw = raw["blocks"]
+    if isinstance(raw, list):
+        raw = {i: v for i, v in enumerate(raw)}
+    if not isinstance(raw, dict):
+        sys.exit(f"--arm-block-map {path}: expected an object of job index -> block name, or a list of block names")
+    return {str(k): str(v) for k, v in raw.items() if v is not None}
+
+
+def block_names(commands: list[str], keys: list[str], block_map: dict | None = None) -> list:
+    """One block name per command: the map's entry, else the keys' values joined by '+', else None (placed per job)."""
+    out = []
+    for i, command in enumerate(commands):
+        if block_map and str(i) in block_map:
+            out.append(block_map[str(i)])
+            continue
+        vals = [block_value(command, k) for k in keys]
+        out.append("+".join(v or "" for v in vals) if any(v is not None for v in vals) else None)
+    return out
+
+
+def group_blocks(names: list) -> dict:
+    """{block name: [job index, ...]} in first-appearance order; unnamed jobs are left out."""
+    groups: dict = {}
+    for i, n in enumerate(names):
+        if n is not None:
+            groups.setdefault(n, []).append(i)
+    return groups
+
+
+def assign_blocks(blocks: dict, targets: list, balance: bool = True) -> dict:
+    """One target per BLOCK, charged with the block's size at assignment so later blocks see the real load.
+
+    balance (the default under --arm-block): blocks are sorted by size, largest first, and dealt round-robin over the
+    available targets, so a 3-block x 2-box batch does not pile onto one box. Otherwise each block is resolved with
+    pick_target (most free slots), which is the per-job rule applied once per block."""
+    live = [t for t in targets if t.ok]
+    if not live:
+        raise ClusterError("no target available")
+    order = list(blocks)
+    if balance:
+        order.sort(key=lambda n: (-len(blocks[n]), list(blocks).index(n)))
+    placed = {}
+    for k, name in enumerate(order):
+        t = live[k % len(live)] if balance else pick_target(live)
+        placed[name] = t
+        t.load += len(blocks[name])                                    # the whole block lands here, not one job
+    return placed
+
+
 # ── run steps ────────────────────────────────────────────────────────────────
 
 def bare_fetch_paths(paths: list[str]) -> list[str]:
@@ -446,11 +537,51 @@ def build_spec(t: Target, jname: str, command: str, args) -> dict:
     return spec
 
 
+_BLOCK_TARGETS: dict = {}        # block name -> Target, for the run being submitted
+
+
+def plan_blocks(targets: list, commands: list[str], args) -> list:
+    """The block name per command, after printing the block -> target plan (or the no-block warning).
+
+    Returns the names list; `assign_blocks` has already charged each block's target by then, and the placement is read
+    back out of `_BLOCK_TARGETS` by submit_all."""
+    _BLOCK_TARGETS.clear()
+    keys = [k.strip() for k in (getattr(args, "arm_block", None) or "").split(",") if k.strip()]
+    bmap = load_block_map(args.arm_block_map) if getattr(args, "arm_block_map", None) else None
+    live = [t for t in targets if t.ok]
+    if not (keys or bmap):
+        if len(commands) > len(live) > 1:                              # one target cannot confound anything
+            msg = ARM_BLOCK_WHY.format(n=len(commands), m=len(live))
+            print(msg)
+            print(msg, file=sys.stderr)
+        return [None] * len(commands)
+    names = block_names(commands, keys, bmap)
+    blocks = group_blocks(names)
+    if not blocks:
+        print(f"--arm-block {','.join(keys) or '(map)'}: no job command carries the key; every job is placed per job")
+        return names
+    balance = True if getattr(args, "balance_blocks", None) is None else bool(args.balance_blocks)
+    placed = assign_blocks(blocks, targets, balance)
+    for name, idx in blocks.items():
+        print(f"block {name}: {len(idx)} job(s) -> @{placed[name].name}"
+              + ("  (round-robin, largest first)" if balance else "  (least-loaded)"))
+    loose = [i for i, n in enumerate(names) if n is None]
+    if loose:
+        print(f"no block key in {len(loose)} job(s) ({', '.join(str(i) for i in loose)}): placed per job")
+    _BLOCK_TARGETS.update(placed)
+    return names
+
+
 def submit_all(targets: list, commands: list[str], run: str, args) -> tuple[list, int]:
-    """One job per command, least-loaded target first; returns the job records and the submit failures."""
+    """One job per command; a blocked job goes to its block's target, everything else least-loaded first.
+
+    Returns the job records and the submit failures. A block whose target became unavailable falls back to per-job
+    placement, and the fallback is printed so the console log records where the block broke."""
     jobs, lost = [], 0
+    names = plan_blocks(targets, commands, args)
     for i, command in enumerate(commands):
         jname = run if len(commands) == 1 else f"{run}-{i}"
+        block = names[i]
         tried: list = []
         while True:
             live = [t for t in targets if t.ok and t not in tried]
@@ -458,7 +589,14 @@ def submit_all(targets: list, commands: list[str], run: str, args) -> tuple[list
                 print(f"SUBMIT FAILED {jname}: no target took it: {command}")
                 lost += 1
                 break
-            t = pick_target(live)
+            t = _BLOCK_TARGETS.get(block) if block is not None else None
+            if t is not None and (not t.ok or t in tried):
+                print(f"block {block}: FALLBACK, @{t.name} is unavailable; the rest of the block is placed per job")
+                _BLOCK_TARGETS.pop(block, None)
+                t = None
+            blocked = t is not None
+            if t is None:
+                t = pick_target(live)
             try:
                 r = api(t, "/jobs", {"spec": build_spec(t, jname, command, args), "submitted_by": t.user})
                 job = r["job"]
@@ -467,10 +605,13 @@ def submit_all(targets: list, commands: list[str], run: str, args) -> tuple[list
                 t.ok = False
                 tried.append(t)
                 continue
-            t.load += 1
+            if not blocked:
+                t.load += 1                                            # a block was charged in full at assignment
             t.njobs += 1
-            jobs.append({"t": t, "id": job["id"], "name": jname, "command": command, "job": job, "last": None})
-            print(f"job {job['id']} {job['status']}  @{t.name}  {jname}: {command}"
+            jobs.append({"t": t, "id": job["id"], "name": jname, "command": command, "job": job, "last": None,
+                         "block": block})
+            print(f"job {job['id']} {job['status']}  @{t.name}  {jname}"
+                  + (f" [block {block}]" if block is not None else "") + f": {command}"
                   + (f"  warnings: {r['warnings']}" if r.get("warnings") else ""))
             break
     return jobs, lost
@@ -507,6 +648,18 @@ def main() -> int:
     ap.add_argument("--no-wait", action="store_true")
     ap.add_argument("--poll", type=float, default=20.0)
     ap.add_argument("--sync-only", action="store_true", help="prepare the run directories and print them; submit nothing")
+    ap.add_argument("--arm-block", default=None, metavar="KEY[,KEY...]",
+                    help="keep every job whose command carries the same '<KEY>_<value>' on ONE target. The KEY names "
+                         "the block that must stay together (the comparison family), not the factor: an arm / "
+                         "condition / treatment that varies WITHIN a block is then compared on one box. Several keys "
+                         "block on the tuple of their values. Without this, one job per arm makes the arm collinear "
+                         "with the box and the fleet mixes GPU models (docs/INTERP.md 10.4 item 9)")
+    ap.add_argument("--arm-block-map", default=None, metavar="FILE.json",
+                    help="explicit blocks: a JSON object of job index -> block name (or a list of block names), for "
+                         "job lines that carry no usable key")
+    ap.add_argument("--balance-blocks", action=argparse.BooleanOptionalAction, default=None,
+                    help="deal the blocks round-robin over the available targets, largest block first (the default "
+                         "under --arm-block); --no-balance-blocks resolves each block with the least-loaded rule")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--targets", default=None, help="comma-separated target names (default: the config's \"default\" list, else every enabled target)")
     g.add_argument("--target", default=None, help="a single target name")
@@ -516,6 +669,8 @@ def main() -> int:
     if bare and not args.allow_bare_fetch:
         sys.exit(BARE_FETCH_WHY.format(paths=" ".join(bare)))
     warn_exit_masking(args.commands)
+    if args.arm_block_map:
+        load_block_map(args.arm_block_map)                              # a bad map exits before anything is shipped
 
     targets, default = load_config()
     want = [n.strip() for n in (args.targets or args.target or "").split(",") if n.strip()] or None

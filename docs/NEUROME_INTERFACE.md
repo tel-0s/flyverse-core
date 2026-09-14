@@ -259,6 +259,153 @@ re-rendered at a pinned pose), so a replay is never silently labelled as recorde
    declared hypothesis, not a free scale factor. **LC10a state gating is a separate follow-up**, opened only once
    LC10a's matched visual response can be measured.
 
+## 3c. Round 2 (2026-09-13) -- the matched assay delivered, the model comparison run
+
+**Export location** (schema `flyverse.neurome.export/2`, revision 2; thirteen run directories,
+194 tables, 42,750,310 rows, `export.verify()` `problems: none` in every one; index
+`out/export/objr2_index.json`, flat SHA-256 list `out/export/objr2_tables.csv`). These are the
+**2026-09-14 re-emit** from the corrected Result; the identically-shaped 2026-09-13 directories
+(`objr2-*-20260913T2329*Z-*`, ladder `objr2-ladder-20260913T232912Z-72041020`) remain on disk as
+the superseded delivery:
+
+| rung | lobe `ship` | lobe `fb0` (`gain_fb = 0`, deterministic control) |
+|---|---|---|
+| 4.5 deg | `out/export/objr2-ship-d045-20260914T024747Z-5f117772/` | `objr2-fb0-d045-20260914T024629Z-8f991830/` |
+| 8.8 deg | `objr2-ship-d088-20260914T024801Z-e6b2d4fb/` | `objr2-fb0-d088-20260914T024642Z-c1a2c537/` |
+| 11 deg | `objr2-ship-d110-20260914T024814Z-28adcffb/` | `objr2-fb0-d110-20260914T024655Z-7469fef6/` |
+| 15 deg | `objr2-ship-d150-20260914T024827Z-6d201251/` | `objr2-fb0-d150-20260914T024708Z-2cb077e8/` |
+| 20 deg | `objr2-ship-d200-20260914T024840Z-3d77182b/` | `objr2-fb0-d200-20260914T024722Z-67a7460e/` |
+| 30 deg | `objr2-ship-d300-20260914T024853Z-820b11d5/` | `objr2-fb0-d300-20260914T024735Z-7e9c07f0/` |
+| ladder summary | `objr2-ladder-20260914T024906Z-035363c0/` (both lobes, all six rungs, the predeclared Holm columns, the old ladder beside it) | |
+
+One provenance cost of the re-emit, stated up front: the 2026-09-14 directories were written from
+a working tree that had drifted since the batch ran, so their `flyverse_commit` reads `unknown`
+with `source_match.verified false` (19 of 29 loaded source files identical, 30 of 43 glob). The
+2026-09-13 directories carry commit `653179b4...` **verified 29/29 loaded and 43/43 glob**. The
+tables are otherwise identical apart from the four preference cells named at the end of this
+section; if you need the content-pinned provenance, read it from the 2026-09-13 pair.
+
+**Experiment 1 (matched visual assay) -- delivered, with two items short of the request.**
+Elevation, distance, angular diameter and angular speed are held per frame (realised deviation
+0.0 deg / 1.4e-14 deg / 40.000 deg/s), against the old ladder's 0.88-13.71 deg elevation and
+2.4x speed change. Object AND blank radiance are captured **in the loop** on both arms
+(`retina.mode = in_loop_capture`); recomputing the footprint from the two Parquet tables alone
+reproduces the probe's numbers to 2.2e-16. Not delivered: (a) **effective retinal contrast is not
+matched** across the sphere ladder -- the median per-frame extreme relative luminance change is
+-0.504 / -0.869 / -0.876 / -0.899 / -0.927 / -0.948 across 4.5 -> 30 deg, because a 4.5-deg ball
+only partially fills a 4.6-deg column; the contrast-matched families are the synthetic rectangle
+ladders, which are recorded on the cluster but not yet fetched or exported. (b) **The per-body RF
+localizer does not localize LC11.** At the predeclared `z_min` 5 not one of 143 LC11 bodies is
+fitted in either lobe's 15-deg three-pass map (LC10a 13 of 275 = 4.7 %), so **405 of 418 LC
+windows are the anatomical fallback** (`window_source = anat`; `rf_map` says per body which clause
+it took). Please do not read these as measured receptive fields. The effective per-rung body
+counts are in `sphere_per_run.n_bodies_windowed`: LC11 55 / 99 / 99 / 99 / 103 / 103 of 143 and
+LC10a 73 / 76 / 76 / 76 / 79 / 90 of 275. Ground truth for the localizer is Mi1, which it places
+at its hex-annotated column to a median 2.2-3.5 deg with a 0-0.1 % false-fit rate on the blank arm.
+
+**Answers, to the predeclared rules** (`out/objr2/predeclared.json`, stamped 2026-09-13T21:45:39Z,
+before the 21:46:06Z submission; 6 runs per arm, one submission; 12 members per LC type; Holm
+inside the family; a preference is CALLED only on `result` AND `p_holm <= 0.05`):
+
+* **LC11: 12 of 12 members `null`** (smallest p 0.180, smallest `p_holm` 1.000). Excess over null
+  +0.103 / +0.042 / +0.051 / +0.009 / +0.015 / +0.005 mV across 4.5 -> 30 deg -- largest at the
+  smallest rung, the direction Keles & Frye 2017 predicts -- but Spearman rho -0.216 (p_perm
+  0.206) and the small-minus-large contrast +0.029 mV (p_perm 0.277). **No size preference called.**
+* **LC10a: 11 `null`, one `result`** -- 30 deg drive median +0.0155 +- 0.0132 mV against a null of
+  -0.0046 +- 0.0060, z +3.37, p 0.00866 -- **which does not survive Holm (`p_holm` 0.1039)**. The
+  member sits inside the 15-30 deg range you gave from Schretter et al. 2024; it is reported as
+  exploratory. **No size preference called.**
+* `spikes_median` is exactly 0.000 +- 0.000 in every arm of every rung, object and null alike:
+  the spike half of each family is uninformative, not negative. The populations are not silent.
+* **Upstream** (exploratory, surviving its own family's Holm): `diff_signed_best_cell` reaches
+  `result` at T2 and Tm5Y from 11 deg and at T3 and TmY21 from 20 deg, rising monotonically with
+  size (T2 +0.0141 -> +0.0442 against +0.0081 +- 0.0016, z +3.8 -> +23.0). The population
+  `diff_signed_mean` stays `null` at every rung for every type, and `diff_abs_best_cell_mean`
+  gives a third verdict: the three statistics are shipped as separate rows and are never collapsed.
+  On the old headline max-over-cells statistic the LC types move only at 30 deg (LC11 +0.159 vs a
+  null of +0.053, z +10.6) -- the large end, and exactly the statistic your intake warned about.
+
+**Experiment 2 (fixed-anatomy model comparison) -- run, not exported.** Eight arms on the same
+matched ladder (5 runs each), a seven-stimulus specificity battery (4 runs each) and three
+benchmark draws per arm, all in one submission. **No mechanism class passes.** Per-stream
+rectification is the only arm that carries the T3 and T2 carrier figure (6.0 / 10.5 / 9.0x base at
+4.5 / 8.8 / 11 deg), and it **releases bar, grating and flicker responses at LC11** -- the grating
+0.611 -> 3.202 mV and 0.042 -> 2.92 Hz, the flicker 0.145 -> 2.994 mV and 4.71 -> 10.67 Hz -- which
+is the Keles 2020 constraint failing. Its figure also grows with object size (Spearman rho +0.937
+on the LC11 max-over-cells excess), lives entirely in the extremum over cells (the per-body
+RF-windowed T3/T2 medians read `null` against base in all 48 rows), and comes with an
+operating-point shift (T3 blank-arm mean deviation +0.00002 -> +0.0284; LC11 blank-arm drive
+0.093 -> 0.348 mV) that the spatially uniform flicker reproduces. Adaptation (100 and 300 ms) is
+inert. Spatial suppression produces no figure and costs the escape benchmark
+(`loom_escape.GF_peak_hz` 50.0 -> 31.2 Hz, escapes 1.0 -> 0.33). **LC11 output follows in no arm.**
+**Nothing is adopted; every hook stays `None` by default and is bit-identical off.** Two caveats
+we owe you: (i) the scheduler put each arm on the least-loaded box, so `rectify` and `suppress`
+ran on a different GPU model from `base` -- the rectification magnitude is confirmed on base's own
+GPU model by the two combination arms, and a same-device re-run of `base` is owed; (ii) the flash
+stimulus is a periodic square, so the `flashon` / `flashoff` rows of the batch separate a
+**bright** flash from a **dark** one and pool both transition polarities inside each.
+
+**The ON/OFF split you asked for now exists**, re-derived on CPU from the 2,048 stored specificity
+recordings (`out/interp/objr2c/spec_transitions.json`; 0.3 s window after each ON and each OFF
+edge, truncated at the next edge, the blank/blank arm scored on each family's own edge schedule as
+the floor). **Both transitions survive in every arm**: no ON or OFF window at T2 or T3, in either
+flash family, falls below 0.56x base's, so the "T2 and T3 respond to both ON and OFF transitions"
+constraint holds for all eight arms. What rectification changes is the asymmetry -- base's two
+windows sit within 6-30 % of each other (T3 bright 0.063 / 0.057 mV; T3 dark 0.083 / 0.064), while
+`rectify` tilts the dark flash's T3 toward ON by 3.1x (0.142 / 0.045) and its T2 toward OFF by
+1.5x, and `rect_supp` does the same at T3 (2.1x); adaptation and spatial suppression leave the
+ratios near base's. Read these as 4-run magnitudes of a max-over-cells statistic with no
+null-referenced verdict, and note the accompanying limit: measured against the matched blank/blank
+floor on the same edge schedule, almost every 0.3 s window sits at its own null (0.68-1.71x), and
+only `rectify` and `rect_supp` on the dark flash's ON window clear it (2.36x and 2.38x). A 0.3 s
+window is 30 frames, and a maximum over 1,940 cells has a high noise floor there.
+
+**Field changes in this export, against revision 2's list:** `paired_control_ids` (the record and
+arm the `control_value` came from, `#arm_b` suffixed) and `null_reference_ids` (the independent
+blank/blank runs), disjoint in every directory, with `control_ids` kept for one revision as a
+deprecated alias of the latter -- the labelling defect you found is closed. `retina_radiance_blank`
+ships beside `retina_radiance` (1,759,200 rows each, identical schema). `manifest.retina.mode` is
+`in_loop_capture` with the probe's own sampling sentence; nothing in this export is a replay.
+`manifest.statistic_definitions` (13 entries) plus a per-row `statistic_definition` column.
+`retina_object_track` carries azimuth / centre elevation / angular diameter / distance / angular
+speed **per frame as measured in the loop**. Two rank tests per row (`p`, the predeclared tie-aware
+exact permutation U over all C(12,6) assignments, and `p_mannwhitney` with `p_method` in
+{exact, asymptotic_tie_corrected}; they agree to 1.1e-16 on the 129 untied rows of 288, and the
+159 tied rows read `asymptotic_tie_corrected`, never a false `exact`). Two multiplicity corrections
+that do not overwrite each other: `family` / `p_holm` (the predeclared family) and
+`analysis_family` / `analysis_p_holm` (the analysis' own), with `role` per row.
+
+**One defect found on review, now closed.** The 2026-09-13 ladder summary's `preference.csv`
+carried `spearman_p_perm = 5.0e-05` with an empty `spearman_rho` on four rows (both lobes x both
+LC types, statistic `spikes_median`), **all four `role = primary`**. The Spearman is undefined
+there because every spike median is exactly 0.0; the correct value is NaN. The permutation code
+was fixed, the analysis re-run on the already-fetched batch (CPU) and the ladder re-exported: in
+`objr2-ladder-20260914T024906Z-035363c0/preference.csv` those four rows now carry **empty**
+`spearman_rho` and `spearman_p_perm`, and no other number in the delivery changed. If you are
+holding the 2026-09-13 ladder summary, treat those four cells as missing, not as p = 5e-05, and
+prefer the 2026-09-14 directory.
+
+**What we ask Neurome for next, in order of leverage:**
+1. **Receptor tiers for Tm5Y, TmY21, TmY13 and LC11.** All four still run on the presynaptic-sign
+   fallback for 100 % of their input, and all four are load-bearing in this pathway (T3 and T2 are
+   LC11's two largest inputs at 69,205 and 36,917 predicted pairs; Tm5Y and TmY21 are LC10a's at
+   14,221 and 7,406). This is the single change that would replace a modelling assumption with data.
+2. **Per-body LC11 / LC10a recordings at these six angular sizes** (4.5 / 8.8 / 11 / 15 / 20 /
+   30 deg) under matched geometry, keyed by `bodyId` decimal string against `readout_per_body.csv`
+   (`n_trials` 6, both `upstream_drive_mV` and `output_Hz` rows per body, plus the RF-windowed
+   columns). We can compare shape under an explicit observation model; we cannot yet compare
+   absolute Hz or mV.
+3. **The Keles 2020 Rdl constraint as a test, not a citation.** LC11-specific Rdl disruption
+   reduced small-dark-object responses by ~40 % *without* releasing bar or grating responses. That
+   is a two-sided criterion our rectification arm fails on the second half. If you can supply the
+   quantitative form -- the effect size on the small-object response and the bound on the
+   bar/grating release -- we will add it to `flyverse/data/expected_responses.csv` as a scored row
+   and run every future arm against it, instead of the magnitude rule we used this round.
+4. A note on what would help most on the measurement side: our LC11 localizer finds no
+   stimulus-driven receptive field at any square size we ran (4.5, 8.8, 15 deg). If the animal's
+   LC11 receptive fields are known per cell type at a comparable resolution, that would let us
+   replace 143 anatomical boxes with measured regions.
+
 ## 4. Neurome evidence bundles
 
 Accepted initially as **read-only observations**: predicted anatomical counts, source annotations, reconstruction
@@ -277,16 +424,31 @@ suite before adoption.
   the compiler side: none. Field changes needed on the **export** side: `paired_control_ids` / `null_reference_ids`
   split, the matched `retina_radiance_blank` table, and `manifest.json` `retina.mode`
   (`in_loop_capture` | `geometry_replay`) -- implemented in the export.py revision, `docs/audits/interp_export.md`.
-- Open on our side, in order: the **matched visual assay** of section 3b (fixed-centre square ladder, then separate
-  height and width ladders; per-body RF localizer; in-loop blank and object radiance; predeclared per-type primary
-  statistics and Holm family; >= 5 runs per arm in one submission), then the **fixed-anatomy model comparison**
-  (sum / per-presynaptic-stream rectification with signs preserved / adaptation + spatial suppression, with
-  `gain_fb 0` and feedback-hold controls and the bright/dark, ON/OFF, flicker, bar and grating specificity battery),
-  then the **transfer test** with fixed parameters and held-out stimuli. LC10a state gating is deferred.
-- Open for Neurome: per-body LC11 / LC10a physiology at matched geometry when it exists; the receptor tiers of the
-  unprofiled types (Tm5Y, TmY21, TmY13, LC11 -- 100 % fallback-tier input). Their Keles 2020 receptor / perturbation
-  constraints are recorded as literature rows in `flyverse/data/expected_responses.csv` (op `report`), not adopted as
-  gains or signs.
+- **Done in round 2** (section 3c): the **matched visual assay** (sphere ladder at six rungs, elevation / distance /
+  angular diameter / angular speed held per frame, in-loop blank and object radiance on both arms, per-body RF
+  localizer, predeclared per-type primary statistics with Holm inside a 12-member family, 6 runs per arm in one
+  submission) -- delivered and exported; the **fixed-anatomy model comparison** (base, `gain_fb 0`, per-stream
+  rectification with signs preserved, 100 / 300 ms adaptation, spatial suppression and the two combinations, with the
+  bright/dark, flash, flicker, bar and grating specificity battery and three benchmark draws per arm) -- run, **not
+  exported**. Nothing adopted; no default moved.
+- Open on our side, in order: (a) the **contrast-matched synthetic rectangle ladders** (height and width separately,
+  as Keles & Frye did) -- recorded on the cluster, never fetched (~10 GB, 150 expected outputs missing); (b) the
+  **export of the compare arms** (`object_round2_export.py compare --out out/objr2c --baseline
+  out/interp/objr2c/compare.json`); (c) a **same-device `base` re-run** to de-confound arm from GPU model; (d) a
+  **stimulus-driven LC11 localizer** (0 of 143 bodies fit at `z_min` 5); then the **transfer test** with fixed
+  parameters and held-out stimuli. LC10a state gating is deferred. **Done since the round closed:** the **ON/OFF
+  transition split**, re-derived on CPU from the stored specificity recordings
+  (`out/interp/objr2c/spec_transitions.json`; section 3c).
+- Open for Neurome: per-body LC11 / LC10a physiology at matched geometry when it exists (the matched sizes now exist
+  and are exported, section 3c); the receptor tiers of the unprofiled types (Tm5Y, TmY21, TmY13, LC11 -- 100 %
+  fallback-tier input); and the **quantitative form of the Keles 2020 Rdl constraint** (the effect size on the
+  small-object response and the bound on the bar / grating release) so it can become a scored ledger row rather than
+  the magnitude rule round 2 used. Their Keles 2020 receptor / perturbation constraints are today recorded as
+  literature rows in `flyverse/data/expected_responses.csv` (op `report`), not adopted as gains or signs.
+- **Delivery correction carried forward:** the 2026-09-13 ladder summary's `preference.csv` shipped four
+  `spikes_median` preference rows (all `role = primary`) with `spearman_p_perm = 5.0e-05` against an undefined rho.
+  Fixed and re-emitted 2026-09-14 (`objr2-ladder-20260914T024906Z-035363c0`); the 2026-09-13 directories stay on disk
+  as the superseded delivery.
 - Whether `bodyId` alone is stable across MaleCNS releases; we key on it and record the release.
 - Cluster paths: agreed -- Neurome's namespace is `$NEUROME_NS/{runs,evidence,exports}/`;
   flyverse keeps `$CLUSTER_FLYVERSE/` and `$CLUSTER_RUNS/`.

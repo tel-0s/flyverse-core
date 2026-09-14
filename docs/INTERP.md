@@ -777,6 +777,29 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
   `provenance.compiled_connectome.md5` + `files.effective_weights_md5` + `provenance.source_fingerprint` (the loaded
   files, matched by content -- written by `provenance()` itself since this revision, no longer only by the export);
   quote those, not the commit.
+* **A max-over-cells statistic never travels alone.** A statistic defined as an extremum over a population
+  (`diff_signed_best_cell`, `diff_max_over_cells_mean_mv`, `drive_max`) has a null that is itself an extremum over
+  thousands of cells, and an arm can multiply it 10x while leaving the typical cell where it was: in object round 2,
+  per-stream rectification raised T3's `diff_signed_best_cell` 6-10x over base at every small rung while the per-body
+  RF-windowed median |drive| read `null` against base in all 48 arm x type x rung rows. **Report the per-body median
+  (or mean) of the same quantity in the same table, and say in the sentence that the headline is a within-run
+  population maximum.** Neurome's round-1 correction is a standing rule, not a one-off.
+* **A family member whose statistic is constant by construction is not a test.** If a member's value is known in
+  advance to be identical in every run of both arms (an all-zero spike median, a saturated count), it contributes no
+  information, returns p = 1.0 through ties, and still inflates the Holm denominator -- in object round 2 six of each
+  twelve-member family were all-zero spike medians, which is the whole reason the arm size had to rise from 5 to 6
+  runs. **Declare such quantities as reported magnitudes outside the family**, and size the family (and therefore the
+  arm count) from the members that can move.
+* **Read a zero-SD null's p as a structural constant, never as evidence.** `compare` returns `undetermined` and the
+  exact-U p collapses to `p_floor` whenever an arm has SD 0, so a deterministic arm (`gain_fb = 0`) produces
+  `p = 0.00216` at 6 v 6 and `p_holm = 0.026` on every member regardless of sign or size: in object round 2's
+  `primary:fb0` families all six drive rows read exactly that while their diffs alternate -,+,+,-,+,-. Quote the
+  magnitude with its scatter; never tabulate such a row in the same column as a Holm-surviving call.
+* **A stimulus label is a claim about the stimulus, and must be checked against its generator.** A periodic
+  square-wave flash contains both an ON and an OFF transition in every run, so a whole-window time mean of it
+  separates bright from dark, not ON from OFF -- object round 2's `flashon` / `flashoff` battery was labelled
+  "isolated ON / OFF transitions" and measured neither. Before a specificity rule is written, read the generator and
+  the recorded `params`.
 
 ### 10.4 Process rules the round learned (rules, not advice)
 
@@ -832,6 +855,42 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
    (the cache, a GPU, a network fetch) -- if the new work needs one, the work is named on the command line.
    And a provenance defect is fixed in `flyverse/interp/common.py`, where every tool inherits the fix; a per-tool
    workaround for a shared-layer bug is the thing section 11 exists to retire.
+9. **An experimental factor is never the unit of scheduling.** `cluster_run.py` places one job per command on the
+   least-loaded target, so "one job per arm" makes arm collinear with box -- and the fleet mixes GPU models. In object
+   round 2 `base` ran on a B200 while `rectify` and `suppress` ran on H200s, and `base` itself sat on a different GPU
+   model for the sphere than for the specificity and bench sections, so the primary arm-vs-base question compared
+   arm-on-box-X with base-on-box-Y. **Block the family: put every arm of a comparison family on one box (see
+   `--arm-block` below), or replicate the reference arm on every box that hosted a treatment arm, in the same
+   submission.** Record the realised `device_name` per run AND add a verifier problem when an arm and its reference
+   differ; a `result` on a cross-device comparison is reported as device-crossed until a same-device pair confirms it.
+
+   `python scripts/cluster_run.py --arm-block KEY[,KEY...]` keeps every job whose command carries the same
+   `<KEY>_<value>` on ONE target: the KEY names the **block** that must stay together (the comparison family), not the
+   factor, so every arm inside a block is compared on one box. Blocks are dealt round-robin over the available
+   targets, largest first (`--balance-blocks`, the default under `--arm-block`; `--no-balance-blocks` resolves each
+   block with the least-loaded rule), each block's target is charged with the block's whole size at assignment, and a
+   block whose target drops out falls back to per-job placement with a printed line. `--arm-block-map file.json` (job
+   index -> block name) blocks job lines that carry no usable key. Every job line then records its block and its box
+   (`job 7f3a queued  @rent-a  objr2c-ab12-3 [block sphere]: python ...`), and a batch with more jobs than targets and
+   no `--arm-block` is warned about at submit time. `object_round2_compare.py verify` raises one problem per arm whose
+   realised `device_name` set differs from `base`'s, and every arm-vs-base row of the Result carries
+   `same_device_as_reference` (false also when either device is unknown), which the console prints as
+   `DEVICE-CROSSED`.
+10. **The predeclaration is the stamped JSON, never the prose audit.** The audit doc is written around the stamp and
+    is routinely edited after submission (object round 2: `predeclared.json` 15:04:04Z, submit 15:06:37Z, audit doc
+    15:07:27Z). Cite the JSON path and its `stamped_utc`; never cite an audit section as the predeclaration.
+11. **The Result records the analysis code that produced it, and a post-hoc fix obliges a re-emit.** "Stamped before
+    submission" covers the reading rules, not the reducer. In object round 2 the `spearman_perm` NaN floor was fixed
+    in the script 1h41m AFTER the Result was written, and the shipped Result and the exported `preference.csv` still
+    carry `p = 5e-05` with an undefined rho on two PRIMARY preference rows. **`common.provenance` must carry the
+    sha256 of the analysis script and its imported reducers, and any change to them after a Result is emitted requires
+    re-running the analysis on the same fetched batch (CPU, cheap) and re-emitting every artifact derived from it.**
+12. **The fetch is part of the experiment: slim on the box and pull the consoles first.** A 12-s matched-sphere run
+    writes a 114 MB npz of which 106 MB is per-frame graded arrays no consumer reads; object round 2's two batches
+    cost 1.7 GB (slimmed) and 36 GB (not). Slim on the box before the transfer, and **pull `*.json` and `*.txt` before
+    the `*.npz`** -- only 14 of 84 consoles of the baseline batch survived its hand fetch, which left the
+    console-vs-JSON device cross-check of item 4 unavailable for 70 runs. A tool's `verify` must count consoles
+    against runs and raise a problem when they do not match.
 
 ### 10.3 The minimal command sequence (an odour-to-DN question, as an example)
 
