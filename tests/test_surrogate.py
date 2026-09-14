@@ -200,13 +200,18 @@ class SurrogateMatchesInferenceTests(unittest.TestCase):
                               spatial_suppress=[("^Mi1$", .5, 5.)])
         lobe = optic_mod.OpticLobe(self.c_hex, self.r_hex, hooked, device="cpu", surrogate_grad=True)
         lobe.relax()
-        radiance = torch.full((self.r_hex.n_columns, 4), .5, requires_grad=True)
+        # A CONSTANT radiance on a relaxed lobe is a degenerate gradient test: the lobe sits exactly at its operating
+        # point (dr = 0 everywhere), the `pos` rectifier's gate has zero gradient at exactly 0, and on an exact CPU
+        # build the whole gradient is 0.0 (it was only non-zero locally through CUDA-build float noise). Modulate the
+        # radiance across frames so the contrast stage and the rectified stream are both away from their kinks.
+        base = torch.full((self.r_hex.n_columns, 4), .5, requires_grad=True)
         spikes = torch.zeros(1, self.c_hex.n)
-        for _ in range(4):
+        for k in range(4):
+            radiance = base * (1. + .5 * float(k % 2))          # 0.5 / 0.75 alternating: a non-zero contrast step
             drive = lobe.step_frame(radiance, spikes, 10.)
         drive.sum().backward()
-        self.assertTrue(bool(torch.isfinite(radiance.grad).all()))
-        self.assertGreater(float(radiance.grad.abs().sum()), 0.)
+        self.assertTrue(bool(torch.isfinite(base.grad).all()))
+        self.assertGreater(float(base.grad.abs().sum()), 0.)
         lobe.reset()
         self.assertFalse(lobe.v.requires_grad)
         self.assertFalse(lobe.stream_adapt_state.requires_grad)
