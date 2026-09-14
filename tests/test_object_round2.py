@@ -643,5 +643,65 @@ class SyntheticStimuliTests(unittest.TestCase):
         self.assertGreater(float(dv.during_first_flash_max), 0.1); self.assertGreater(float(dv.last_third_mean), 0.1); self.assertLess(float(dv.corr_last_third), 0.9)
 
 
+class ArmBoxConfoundTests(unittest.TestCase):
+    """scripts/object_round2_compare.py: the same-device check (docs/INTERP.md 10.4 item 9). One job per arm on the
+    least-loaded target makes ARM collinear with BOX, and the fleet mixes GPU models -- `verify` must raise a problem
+    when an arm's realised `device_name` set differs from the reference arm's, and every arm-vs-base comparison row
+    must carry `same_device_as_reference` so the caveat survives into the export."""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.m = _load_module("object_round2_compare")
+        except Exception as e:                                          # noqa: BLE001 - no connectome / torch here
+            raise unittest.SkipTest(f"object_round2_compare not importable: {e}")
+
+    def test_device_sets_per_arm_drop_blanks_and_never_invent_agreement(self):
+        m = self.m
+        rows = [{"arm": "base", "device_name": "NVIDIA B200"}, {"arm": "base", "device_name": "NVIDIA B200"},
+                {"arm": "rectify", "device_name": "NVIDIA H200"}, {"arm": "fb0", "device_name": "NVIDIA B200"},
+                {"arm": "suppress", "device_name": None}, {"arm": "mixed", "device_name": "NVIDIA B200"},
+                {"arm": "mixed", "device_name": "NVIDIA H200"}]
+        devs = m.arm_device_sets(rows)
+        self.assertEqual(devs, {"base": ["NVIDIA B200"], "rectify": ["NVIDIA H200"], "fb0": ["NVIDIA B200"],
+                                "suppress": [], "mixed": ["NVIDIA B200", "NVIDIA H200"]})
+        self.assertTrue(m.same_device_as_reference(devs, "fb0"))
+        self.assertFalse(m.same_device_as_reference(devs, "rectify"))
+        self.assertFalse(m.same_device_as_reference(devs, "suppress"))  # unknown is never "same"
+        self.assertFalse(m.same_device_as_reference(devs, "mixed"))
+        self.assertFalse(m.same_device_as_reference({"rectify": ["NVIDIA H200"]}, "rectify"))   # no reference arm
+
+    def test_verify_raises_one_problem_per_arm_that_ran_on_another_box(self):
+        m = self.m
+        devs = {"base": ["NVIDIA B200"], "fb0": ["NVIDIA B200"], "rectify": ["NVIDIA H200"], "suppress": []}
+        probs = m.device_problems(devs, "sphere")
+        self.assertEqual(len(probs), 2)
+        self.assertIn("sphere/rectify", probs[0]); self.assertIn("differs from base", probs[0])
+        self.assertIn("arm confounded with box", probs[0])
+        self.assertIn("sphere/suppress", probs[1])
+        self.assertEqual(m.device_problems({"base": ["NVIDIA B200"], "fb0": ["NVIDIA B200"]}, "sphere"), [])
+        self.assertEqual(m.device_problems({}, "sphere"), [])           # nothing measured: nothing to say
+        # the reference arm that itself straddles two boxes is a problem of its own (base was on B200 for the
+        # sphere and H200 for the specificity section in object round 2)
+        self.assertIn("the reference arm itself ran on", m.device_problems({"base": ["NVIDIA B200", "NVIDIA H200"]}, "spec")[0])
+        self.assertIn("no realised device_name for the base arm", m.device_problems({"rectify": ["NVIDIA H200"]}, "bench")[0])
+
+    def test_every_arm_vs_base_row_carries_same_device_as_reference(self):
+        m = self.m
+        devs = {"base": ["NVIDIA B200"], "rectify": ["NVIDIA H200"], "fb0": ["NVIDIA B200"]}
+        comps = [{"arm": "rectify", "against": "base", "verdict": "result"},
+                 {"arm": "rectify", "against": "null", "verdict": "result"},
+                 {"arm": "fb0", "against": "base", "verdict": "undetermined"},
+                 {"arm": "base", "against": "base", "verdict": "null"}]
+        m.stamp_same_device(comps, devs)
+        self.assertEqual([c.get("same_device_as_reference") for c in comps], [False, None, True, True])
+        self.assertNotIn("same_device_as_reference", comps[1])          # vs-null rows are untouched
+        # the console marks the device-crossed call, and only that one
+        row = dict(comps[0], type="T3", diam_deg=4.5, statistic="diff_signed_best_cell", stim_mean=1.0, stim_sd=0.1, stim_n=6,
+                   null_mean=0.1, null_sd=0.05, null_n=6, z=9.0, p=0.002, n_tied=0, p_holm=0.026, survives_holm=True)
+        self.assertIn("DEVICE-CROSSED", m._fmt(row))
+        self.assertNotIn("DEVICE-CROSSED", m._fmt(dict(row, same_device_as_reference=True)))
+
+
 if __name__ == "__main__":
     unittest.main()

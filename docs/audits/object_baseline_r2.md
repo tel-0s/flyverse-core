@@ -53,3 +53,72 @@ The rules are the `PREDECLARED` dict of `scripts/object_round2_baseline.py`, dum
   is NOT matched across the sphere ladder** (a 4.5-deg ball only partially fills a 4.6-deg column); the synthetic
   ladders are contrast-matched by construction (Weber +-0.995 per covered fraction), so the bright synthetic square
   ladder is the contrast-matched bright control, and the sphere `lamp` ball (not contrast-matched) is not run here.
+
+## 0b. Verification
+
+**The baseline skeptic** (`verify:baseline`, Opus, verdict **mostly sound**) read the design and the queued batch
+before any of it was analysable; the verdict is recorded verbatim in `docs/audits/receptor_verification.md`
+("Object round 2"). Its three refutations:
+
+1. **`spearman_perm` returns the smallest attainable permutation p whenever rho is undefined.**
+   `cnt += abs(rho_perm) >= abs(rho) - 1e-12` is False for every shuffle when rho is NaN, so `cnt = 0` and
+   p = 1/20001 = 4.99975e-05. The skeptic predicted the exposure exactly: every LC population spike median is
+   exactly 0.0 in every run of both arms, so at 6 v 6 the `spikes_median` rho is NaN across all 36 object runs and
+   **a predeclared PRIMARY preference test would print p = 5e-05**. It did. See "The spearman floor" below.
+2. **No `<n> job(s), 0 failed` line will ever exist for this batch** -- `out/objr2_cluster.log` is 0 bytes and the
+   client was killed. Correct: the analysis was run with `--force` and the Result carries the problem string; the
+   replacement check is `probe_object_matched.py verify out/objr2/sph` -> `out/objr2/verify_sph.json`, **problems
+   none over all 84 runs**.
+3. The status line "all 16 jobs were QUEUED, no process had started" was true at the 21:46Z stamp and false by the
+   time the skeptic ran. The batch completed.
+
+Its corrections that bear on the numbers in this file: the analysis script was itself edited after the
+predeclaration stamp (below); the 12 members of each primary family share the **same six blank/blank runs**, so
+they are strongly dependent (Holm is still valid under arbitrary dependence, but they are not twelve independent
+tests); six of each twelve are the structurally uninformative `spikes_median` members, which is the whole reason
+the arm count had to rise from five to six (a drive-only six-member family needs p <= 0.00833, reachable at 5 v 5's
+floor of 0.00794) -- and changing that now would be post-hoc, so it is predeclared for the next round, not applied
+here; and the specificity battery is **not in this batch** by design (it belongs to the model comparison,
+`object_compare_r2.md`), which should be stated rather than implied.
+
+**The round-2 critic's corrections**, recomputed from `out/interp/objr2/baseline.json` and the run files:
+
+* **The spearman floor was live in the shipped Result and in the export.** The fix landed in
+  `scripts/object_round2_baseline.py` (mtime 2026-09-14T00:58:40Z) **1h41m after** `baseline.json` was written
+  (2026-09-13T23:17:09Z), so the delivered Result and the 2026-09-13 ladder export's `preference.csv` carried
+  `spearman_p_perm = 4.99975e-05` with an empty `spearman_rho` on **four** `spikes_median` preference rows
+  (ship x LC11, ship x LC10a, fb0 x LC11, fb0 x LC10a) -- **all four `role = primary`** -- with
+  `null_spearman_p_perm = 4.9975e-04` beside them. **Closed 2026-09-14**: `analyse` was re-run on the
+  already-fetched batch (CPU, no GPU), `out/interp/objr2/baseline.json` now carries `None` / NaN on all four rows
+  and on their null counterparts, **every other number is unchanged and the primary families are identical**, and
+  the ladder was re-exported to `out/export/objr2-ladder-20260914T024906Z-035363c0` whose `preference.csv` leaves
+  those cells empty. The 2026-09-13 directories remain on disk as the superseded delivery.
+* **Only 14 of 84 consoles arrived.** `ls out/objr2/sph/*.txt` = **14** against 84 run JSONs, and
+  `verify_sph.json` records `console_device_cuda: None` for **70 of 84**. The device claim survives because all 84
+  run JSONs read `execution.device = cuda`, but the console-vs-JSON cross-check `docs/INTERP.md` 10.4 item 4 makes
+  mandatory -- and which was supposed to *replace* the missing `0 failed` line -- exists for 14 runs, not 84. The
+  compare batch has 240/240 and is the model to copy.
+* **The analysis code was edited after the predeclaration stamp.** `predeclared.json` 21:45:39Z, `submit_console.txt`
+  21:46:06Z, and `scripts/object_round2_baseline.py` edited at 21:46:53Z and again at 2026-09-14T00:58:40Z. The box
+  copy differs from the local one and `tree_state.json` records the box hash. The skeptic diffed the first edit (15
+  lines, analysis-only: `compare_row`'s empty-arm branch and a duplicate `contrast_readout` key; `build_jobs`,
+  `cmd_run_job` and the process command strings byte-identical), so the running batch is unaffected -- but
+  "stamped before submission" covers the reading rules, not the reducer, and the eventual analysis was run by a
+  script the boxes never saw.
+* **The `spikes_median` family members are uninformative, not negative.** All six are exactly
+  **0.000 +- 0.000 in every arm of every rung** for both LC types and both lobes; U = 18 and p = 1.000 by ties, and
+  `p_holm` 1.000. They are 6 of each 12-member family. The LC populations are **not silent** -- `bodies_firing_a/b`
+  is nonzero in most runs -- they simply emit essentially no spikes in this protocol, so the spike half of each
+  family carries no information.
+* **Effective contrast is not matched, and the mismatch is large.** `sphere_footprint.extreme_rel_change_median`
+  runs **-0.504 / -0.869 / -0.876 / -0.899 / -0.927 / -0.948** across 4.5 -> 30 deg and
+  `mean_rel_change_over_changed_set` **-0.266 -> -0.665**. This is declared in `predeclared.not_matched` above, so
+  it is disclosed rather than hidden, but it is the one item of Neurome's five requirements ("trajectory, speed,
+  **contrast** and background controlled") that the sphere ladder only partly meets. The contrast-matched families
+  are the synthetic rectangle ladders, which were never fetched.
+* **The RF map covers 0 of 143 LC11 bodies.** `summary.windows.sources`: LC11 **143/143 `anat`**, LC10a 262 `anat`
+  + 7 `rf_ship` + 6 `rf_fb0` = 13/275 = 4.7 % fitted -- so **405 of 418 LC windows are anatomical boxes**, not
+  measured receptive fields. Two coverage numbers that belong beside the primary statistic and were not in this
+  file: `sphere_per_run.n_bodies_windowed` gives LC11 **55 / 99 / 99 / 99 / 103 / 103** of 143 and LC10a
+  **73 / 76 / 76 / 76 / 79 / 90** of 275 across 4.5 -> 30 deg. The 4.5-deg rung -- the biologically decisive one --
+  is a median over **55 anatomically-placed boxes**.

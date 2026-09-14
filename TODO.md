@@ -75,12 +75,39 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
   - [ ] **intrinsic / spontaneous activity**: the model's only noise is sensory Poisson; per-type baseline
         rates (DNs in walking flies — Aymanns 2022; ANs — Chen 2018; CX) as ledger rows and as a documented
         Poisson-background mechanism per type if the data support it.
-- [ ] **Small-object pathway (LC11).** Lost by opposite-signed carrier convergence at T2/T3, the residual
-      scrambled by spiking feedback, pooled away at LC11/LC10a. Object round 2 (`scratchpad/object_round2.js`,
-      paused): the matched assay Neurome asked for + the three opt-in rate-lobe hooks (per-stream
-      rectification with signs preserved, per-stream adaptation, spatial suppression) with the specificity
-      battery. Data: receptor tiers for Tm5Y / TmY21 / TmY13 / LC11 (Neurome); Keleş 2020 / Tanaka & Clark 2020
-      constraints are in the ledger.
+- [~] **Small-object pathway (LC11).** Lost by opposite-signed carrier convergence at T2/T3, the residual
+      scrambled by spiking feedback, pooled away at LC11/LC10a. **Object round 2 done
+      and measured** (`docs/audits/object_matched_assay.md`, `object_synthetic_stimuli.md`,
+      `optic_stream_hooks.md`, `object_baseline_r2.md`, `object_compare_r2.md`,
+      `object_export_r2.md`; the three rate-lobe hooks ship opt-in, default `None`, bit-identical
+      off on a deterministic backend). Answers: the **matched assay** removes the elevation /
+      speed / diameter confound (realised deviation 0.0 deg, 1.4e-14 deg, 40.000 deg/s) and
+      **no size preference is called for either LC type at 6 v 6** — LC11 12/12 `null`, LC10a's
+      one `result` at 30 deg fails Holm (p_holm 0.104) and lies inside its own 15–30 deg target;
+      the **model comparison finds no passing mechanism** — rectification carries the T3/T2
+      carrier figure at 6–10× base but releases bar / grating / flicker at LC11 (the Keleş 2020
+      constraint), creates a size-increasing figure, moves only the max over cells and shifts the
+      operating point; adaptation is inert; spatial suppression costs the escape benchmark
+      (GF peak 50.0 → 31.2 Hz). **Nothing adopted, no default changed.** Still owed before
+      anything here can advance: (a) a **stimulus-driven LC11 localizer** — 0 of 143 bodies fit
+      at `z_min` 5, so 405 of 418 LC windows are anatomical boxes; try a smaller probe square,
+      more passes, or a lower `z_min` with its false-fit rate quoted; (b) a **same-device `base`
+      re-run** (5 runs + 5 nulls on the box that hosted `rectify` and `suppress`) to de-confound
+      arm from GPU model; (c) the **contrast-matched
+      synthetic rectangle ladders** (height and width separately, as Keleş & Frye did), recorded
+      on the boxes but never fetched (150 expected outputs missing); (d) **export of the compare
+      arms** (`object_round2_export.py compare`), which no directory under `out/export/` carries.
+      **Closed since the critic's list:** the pre-fix `spearman_perm` floor (`p = 5e-05` with an
+      undefined rho on four primary rows) — `out/interp/objr2/baseline.json` was re-analysed and
+      the ladder re-exported on 2026-09-14 (`objr2-ladder-20260914T024906Z-035363c0`), the
+      2026-09-13 directories remaining as the superseded delivery; and the **ON/OFF transition
+      split**, re-derived on CPU from the stored spec recordings
+      (`out/interp/objr2c/spec_transitions.json`) — both transitions survive in every arm
+      (no window below 0.56× base's), what rectification moves is the ON/OFF asymmetry, and almost
+      every 0.3 s window sits at its own blank/blank floor (`object_compare_r2.md` 6.1).
+      Data: receptor tiers for Tm5Y / TmY21 / TmY13 / LC11 (Neurome); per-body LC11/LC10a
+      recordings at the six matched sizes; the Keleş 2020 Rdl constraint in quantitative form so
+      it can be a **scored** ledger row rather than the magnitude rule this round used.
 - [ ] **Feeding / terminal approach.** Not a model-default question: the cx program's approach fails in the
       last centimetres (plume downwind-only, no concentration-change rule). Model-side alternative worth one
       round: bilateral antennal sampling → AL → LH → DN route already exists; test whether a data-implied
@@ -103,7 +130,11 @@ types and for DA / OA / 5-HT receptors; (2) per-type baseline firing in behaving
 (3) unitary synaptic strengths by transmitter (mV per synapse; the global scale is the one number every
 attractor depends on); (4) proprioceptor firing ranges (Mamiya 2018; Agrawal 2020); (5) behavioural
 kinematics ground truth for the ledger (DeAngelis 2019 walking; Katsov 2017 turning statistics; Álvarez-Salvado
-2018 plume navigation; von Reyn 2014 escape latency); (6) per-body LC11 / LC10a recordings at matched sizes.
+2018 plume navigation; von Reyn 2014 escape latency); (6) **[now actionable]** per-body LC11 / LC10a recordings at
+matched sizes — object round 2 built and exported the matched geometry, so this is no longer hypothetical: the six
+rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / speed held per frame) are in
+`out/export/objr2-{ship,fb0}-d*/readout_per_body.csv`, keyed by `bodyId` decimal string with `n_trials` 6 and both
+`upstream_drive_mV` and `output_Hz` rows per body (`docs/NEUROME_INTERFACE.md` 3c, ask 2).
 
 ## C. Extensibility (make "glue anything on" a supported path)
 

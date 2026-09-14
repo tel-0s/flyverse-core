@@ -1906,6 +1906,130 @@ the lowest shipped-default draw on record (a `result`, small against the 0.1 bou
 because nothing is adopted). De-scoring `walk.power_max` does **not** license retiring LPi x4, the drive
 clip or the AL LN override.
 
+## Session 10, object round 2 (2026-09-13)
+
+Six threads (build:sphere, build:synthetic, build:hooks, then the baseline / compare / export
+batch threads), five Opus skeptics, 758 cluster processes in two submissions (238 + 520). **No model
+default changed**: the three new `OpticParams` fields (`stream_rectify`, `stream_adapt`,
+`spatial_suppress`) plus `fb_hold` all default to `None`, are bit-identical off on a
+deterministic backend (`tests/test_optic_hooks.py`, 14 tests; `git show HEAD:flyverse/optic.py`
+loaded as a sibling module, `torch.equal` on drive/v/adapt/delta_rate over 12 frames of an
+18-type subset), and **nothing is adopted**. Audits: `object_matched_assay.md`,
+`object_synthetic_stimuli.md`, `optic_stream_hooks.md`, `object_baseline_r2.md`,
+`object_compare_r2.md`, `object_export_r2.md`, `receptor_verification.md` "Object round 2".
+
+**The matched assay Neurome asked for exists, and the LC size effect went away with the
+confound.** `probe_object_matched.py` holds the ball at a fixed elevation, distance and angular
+diameter on a constant-speed arc: realised centre-elevation deviation **0.0 deg** at every rung,
+angular-diameter deviation **<= 1.4e-14 deg**, speed **40.000 deg/s**, against the old ladder's
+elevation **0.88 / 4.34 / 8.66 / 13.71 deg**, diameter shrinking 30.18 -> 19.52 within a sweep
+and speed 45.84 -> 18.79. Radiance is captured **in the loop, for both arms** (`retina.mode =
+in_loop_capture`); the footprint recomputed from the exported Parquet alone reproduces the
+probe's own numbers to 2.2e-16 at every rung. On that assay, at **6 runs per arm in one
+submission** with a predeclared 12-member family per LC type: **LC11 12/12 `null`** (smallest
+p 0.180, p_holm 1.000) and **LC10a 11 `null` + one `result`** -- 30 deg drive median
++0.0155 +- 0.0132 mV against a null of -0.0046 +- 0.0060, z +3.37, p 0.0087 -- which **fails
+Holm at p_holm 0.104**. By the predeclared call rule **no size preference is called for either
+type**. LC10a's one unadjusted `result` sits inside its own published 15-30 deg range
+(Schretter 2024) and is exploratory; the LC11 excess over null is largest at the smallest rung
+(+0.103 / +0.042 / +0.051 / +0.009 / +0.015 / +0.005 mV, Spearman rho -0.216, p_perm 0.206) --
+the Keles & Frye direction, inside the scatter. `spikes_median` is exactly 0.000 +- 0.000 in
+every arm of every rung, so six of each family's twelve members are structurally uninformative;
+the LC populations are not silent, they emit essentially no spikes in this protocol.
+
+**Upstream the figure is large, clean and size-monotone the wrong way.** `diff_signed_best_cell`
+(a max over cells) reaches `result` surviving its own family's Holm at **T2 from 11 deg**
+(+0.0141 -> +0.0442, z +3.8 -> +23.0 against a null of +0.0081 +- 0.0016), **Tm5Y from 11 deg**
+(z +4.7 -> +28.2), **T3 and TmY21 from 20 deg** -- and 4.5 deg is null or negative at all four.
+The population `diff_signed_mean` stays `null` at every rung for every type (|diff| <= 3.8e-4 mV)
+and `diff_abs_best_cell_mean` gives a third answer again; the three statistics are kept apart, as
+Neurome asked. The old headline `diff_max_over_cells_mean_mv` does move at the LC types -- LC11
++0.159 vs a null of +0.053 (z +10.6), LC10a +0.165 vs +0.074 (z +3.6) -- **only at 30 deg**, i.e.
+at the large end, on a within-run maximum over 143 / 275 cells.
+
+**The fixed-anatomy model comparison: no mechanism class passes.** Eight arms (base, gain_fb 0,
+per-stream rectification, 100 and 300 ms adaptation, spatial suppression, and the two
+combinations) on the matched ladder at 5 runs per arm, plus a seven-stimulus specificity battery
+at 4 runs and three benchmark draws, all in one submission of 20 jobs = 520 processes.
+**Rectification is the only arm that carries the predeclared carrier figure** -- T3
+`diff_signed_best_cell` **6.0 / 10.5 / 9.0x** base at 4.5 / 8.8 / 11 deg and T2 3.1-3.7x, `result`
+on both questions at every small rung -- and it fails on four counts. (1) It **releases exactly
+what Keles 2020 says LC11 must not release**: at LC11 the grating rises 0.611 -> 3.202 mV
+(z +98.8) and 0.042 -> 2.92 Hz, the full-field flicker 0.145 -> 2.994 mV (z +66.1) and
+4.71 -> 10.67 Hz, the bar 0.182 -> 0.705 mV. (2) The figure it creates **grows with size**
+(T3 0.021 / 0.037 / 0.045 / 0.055 / 0.058 across 4.5 -> 30 deg; LC11's max-over-cells excess
+Spearman rho +0.937) -- a large-object figure. (3) It is **entirely in the extremum**: the
+per-body RF-windowed T3 and T2 medians move by at most 27 % and read `null` against base in
+**all 48 arm x type x rung rows of every arm**. (4) It **shifts the operating point** -- T3's
+blank-arm mean deviation +0.00002 -> +0.0284, LC11's blank-arm drive 0.093 -> 0.348 mV -- which
+is what the uniform flicker stimulus is in the battery to detect. **LC11 output does not follow
+in any arm** (`lc11_follows` false 8/8). Adaptation at 100 and 300 ms is inert (T3 0.66-1.01x
+base, every row null, no release, no bench cost). Spatial suppression produces no figure and
+**costs the escape section**: `loom_escape.GF_peak_hz` 50.0 -> 31.2 Hz and escapes 1.0 -> 0.33,
+two of three draws failing checks base passes in all three, replicated on the same GPU model by
+the rect+suppress arm. Every hook parameter -- the streams, the modes, tau, gain, k, radius -- is
+a **hand-set hypothesis, not a datum**; the `neg` mode preserves the sign of W but inverts the
+sign of the signal, a stand-in for an unmodelled OFF pathway. Nothing is adopted and no default
+moved.
+
+**The ON/OFF question the battery could not answer was answered afterwards, on CPU.** The batch's
+`flashon` / `flashoff` rows are a **bright** and a **dark** periodic square, and the spec statistic is a
+whole-window mean, so they separate bright from dark and pool both transition polarities -- the
+predeclared `T2_T3_keep_on_and_off = true` is a bright-vs-dark statement. Re-deriving the split
+from the 2,048 stored recordings (`probe_synthetic_stimuli.py analyse --transition-window-s 0.3`
+-> `out/interp/objr2c/spec_transitions.json`, 46,144 rows, problems none) gives the real answer:
+**every arm keeps a T2 and T3 figure on both the ON and the OFF window in both flash families**,
+never below 0.56x base's, so the "keep both transitions" half of the Keles 2020 constraint holds
+for all eight arms. What rectification changes is the **asymmetry**: base's two windows sit within
+6-30 % of each other, while `rectify` tilts the dark flash's T3 toward ON by 3.1x
+(0.142 / 0.045 mV) and its T2 toward OFF by 1.5x, and `rect_supp` does the same at T3 (2.1x);
+adaptation and suppression leave the ratios near base's. Against the matched blank/blank floor on
+the same edge schedule, though, almost every 0.3 s window is at its own null (0.68-1.71x) -- only
+`rectify` and `rect_supp` on the dark flash's ON window clear it (2.36x, 2.38x). Magnitudes over
+4 runs of a max-over-cells statistic, no verdict. `object_compare_r2.md` 6.1.
+
+**A finding about the shipped model that the battery produced for free:** base LC11 already
+responds to a 30-deg grating (0.611 mV vs a blank/blank null of 0.085, z +21.5), to a 7-deg bar
+(0.182, z +4.0) and to 2-Hz full-field flicker (4.71 Hz at the best cell), while an 11-deg dark
+square sits at the null (0.081 vs 0.085, z -0.2) -- the opposite selectivity from the animal's
+LC11, before any arm is applied.
+
+**Export.** The matched ladder went to Neurome through the revision-2 exporter: 13 run directories
+(`out/export/objr2-{ship,fb0}-d{045,088,110,150,200,300}-*` plus the ladder summary), 194 tables,
+42,750,310 rows, `export.verify()` `problems: none` in all 13, with `paired_control_ids` /
+`null_reference_ids` split (the section 3b field defect closed), `retina_radiance_blank`,
+`retina.mode = in_loop_capture`, statistic definitions and both rank tests. It was delivered on
+2026-09-13 (`objr2-*-20260913T2329*Z-*`, ladder `objr2-ladder-20260913T232912Z-72041020`) and
+**re-emitted on 2026-09-14** from the corrected Result (`objr2-*-20260914T024*Z-*`, ladder
+`objr2-ladder-20260914T024906Z-035363c0`); the 2026-09-13 directories stay on disk as the
+superseded delivery. The compare arms and the synthetic rectangle ladders are **not** exported.
+
+**Process, honestly.** Both batches lost their `cluster_run.py` client before the fetch, so
+neither has a `<n> job(s), 0 failed` line and both were fetched by hand; the replacement is the
+tool's own `verify` (`out/objr2/verify_sph.json` problems none over 84 runs; `out/objr2c/verify.json`
+`expected_missing` 0 over 240 + 256 + 24). Only **14 of 84** baseline consoles came across, so the
+console-vs-JSON device cross-check the process rule requires exists for 14 runs, not 84 (the
+compare batch has 240/240). **Arm was confounded with box**: the scheduler put one job per arm on
+the least-loaded target, so base ran on a B200 and the two arms `rectify` and `suppress` on H200s
+-- and base itself sat on a different GPU model for the sphere (B200) than for the specificity and
+bench sections (H200). The rectification result survives because the two combination arms carry
+the same hook on base's own GPU model, and the suppression bench cost survives for the same
+reason; this was luck, not design. The analysis code was edited **after** the predeclaration stamp
+and after the Result was written -- `scripts/object_round2_baseline.py` at 2026-09-14T00:58Z
+against `baseline.json` at 2026-09-13T23:17Z -- so the 2026-09-13 Result and the 2026-09-13
+exported `preference.csv` carried the pre-fix `spearman_perm` floor: `spearman_p_perm = 5.0e-05`
+with an empty rho on the four `spikes_median` preference rows (all `role = primary`), where the
+correct value is NaN. **Both were re-emitted on CPU on 2026-09-14** -- `analyse` re-run on the
+already-fetched batch (`out/interp/objr2/baseline.json`, now NaN on those four rows, every other
+number unchanged and the primary families identical) and the ladder re-exported
+(`objr2-ladder-20260914T024906Z-035363c0`, whose `preference.csv` carries empty `spearman_rho` /
+`spearman_p_perm` there). One cost of the re-emit: the 2026-09-14 directories were written from a
+working tree that had drifted since the batch, so their `flyverse_commit` reads `unknown` with
+`source_match.verified false` (19/29 loaded, 30/43 glob), where the 2026-09-13 directories carry
+commit `653179b4...` verified 29/29 and 43/43. The compare audit doc was stamped 22:07:27Z, after
+the 22:06:37Z submission; its `predeclared.json` (22:04:04Z) is the real stamp and the two are
+byte-identical.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
