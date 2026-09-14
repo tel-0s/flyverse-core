@@ -204,11 +204,14 @@ class SurrogateMatchesInferenceTests(unittest.TestCase):
         # point (dr = 0 everywhere), the `pos` rectifier's gate has zero gradient at exactly 0, and on an exact CPU
         # build the whole gradient is 0.0 (it was only non-zero locally through CUDA-build float noise). Modulate the
         # radiance across frames so the contrast stage and the rectified stream are both away from their kinks.
-        base = torch.full((self.r_hex.n_columns, 4), .5, requires_grad=True)
+        # ... and use the same random per-frame radiance the sibling tests use (uniform 0.1-1 per column and channel,
+        # fresh every frame), which keeps every stage of the lobe away from its clamp boundaries on any build.
+        rng = np.random.default_rng(11)
+        base = torch.ones((self.r_hex.n_columns, 4), requires_grad=True)
         spikes = torch.zeros(1, self.c_hex.n)
-        for k in range(4):
-            radiance = base * (1. + .5 * float(k % 2))          # 0.5 / 0.75 alternating: a non-zero contrast step
-            drive = lobe.step_frame(radiance, spikes, 10.)
+        for _ in range(6):
+            frame = torch.as_tensor(rng.uniform(.1, 1., (self.r_hex.n_columns, 4)), dtype=torch.float32)
+            drive = lobe.step_frame(base * frame, spikes, 10.)
         drive.sum().backward()
         self.assertTrue(bool(torch.isfinite(base.grad).all()))
         self.assertGreater(float(base.grad.abs().sum()), 0.)
