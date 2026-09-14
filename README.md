@@ -82,7 +82,7 @@ plain torch). Spike trains match the torch path exactly; continuous state and ra
 |---|---|---|---|
 | photoreceptors R1-R6, R7 (UV), R8 (blue / green) | 5,895 placed on 1,466 real hex columns of the two eyes | ray-traced spectral radiance [UV,B,G,R] per ommatidium, low-pass + contrast adaptation | `retina.py`, `world.py` |
 | optic lobe (lamina, medulla, lobula, lobula plate) | 89,390 `ol_intrinsic` | graded rate units on the signed, input-normalised connectome (flyvis-style); T4/T5 rectify with strong delayed inhibition and are **direction selective** with the correct preferred direction for all eight subtypes -- on the T5 side that "delayed inhibition" entry is mostly a **drive gain**: 78 % of the 101,619 edges it multiplies are cholinergic Tm9 / Tm4 input, so it is documented as a stop-gap rather than a mechanism (`docs/audits/optic_measures.md`) | `optic.py` |
-| everything else: visual projection neurons, central brain, VNC, motor neurons | 71,625 | Shiu et al. 2024 leaky integrate-and-fire on the GPU, plus adaptation, a per-connection saturation cap, a fan-in cap for giant neurons, same-type synapse damping and antennal-lobe-only depression; synapse signs from the presynaptic transmitter, corrected per postsynaptic type by the receptor-expression table where six transcriptomic sources decide it (26 % of the weight; `LIFParams.receptor_model`, `None` restores the presynaptic rule; `docs/NT_INTEGRATION.md`); one type gain (LC4 / LPLC2 -> DNp01 x3) and two pathway gains (DN -> VNC x3, visual projection -> DN x2). The central-complex ring is silent at these defaults; under experiment gains a bump persists with the senses on but does not track heading and does not steer (`docs/audits/compass_room.md`, `cx_shift.md`), and `--program cx` food-finding fails in the last few centimetres of the approach (`docs/audits/feeding_horizon.md`) | `brain.py` |
+| everything else: visual projection neurons, central brain, VNC, motor neurons | 71,625 | Shiu et al. 2024 leaky integrate-and-fire on the GPU, plus adaptation, a per-connection saturation cap, a fan-in cap for giant neurons, same-type synapse damping and antennal-lobe-only depression; synapse signs from the presynaptic transmitter, corrected per postsynaptic type by the receptor-expression table where six transcriptomic sources decide it (26 % of the weight; `LIFParams.receptor_model`, `None` restores the presynaptic rule; `docs/NT_INTEGRATION.md`); one type gain (LC4 / LPLC2 -> DNp01 x3) and two pathway gains (DN -> VNC x3, visual projection -> DN x2). The central-complex ring is silent at these defaults; no per-transmitter unitary bracket forms a bump either; under experiment gains a bump persists with the senses on but does not track heading and does not steer (`docs/audits/compass_room.md`, `cx_shift.md`), and `--program cx` food-finding fails in the last few centimetres of the approach (`docs/audits/feeding_horizon.md`) | `brain.py` |
 | taste | 165 labellar sugar GRNs, found by connectivity to the known sweet interneurons | Poisson while touching fruit -> Usnea / Rattle / Phantom / G2N-1 -> proboscis MN9 | `scripts/find_sweet_grns.py`, `flyverse/data/taste_grns.csv` |
 | smell | 2,639 ORNs in 53 glomeruli, sided to the left / right antenna by their PN targets | every fruit is a **wind-blown plume** (Gaussian, puffing) sampled by two antennae 1 mm apart | `air.py` |
 | wind | Johnston's organ C / E neurons, sided by their AMMC/WED targets | antennal deflection per side from the wind vector in the body frame | `air.py` |
@@ -148,12 +148,25 @@ way `Wind` feeds Johnston's organ -- leg chordotonal / hair-plate / campaniform 
 motor-neuron rates and ground contact, haltere afferents from the haltere motor-neuron rate, every rate law
 inside a published range recorded as an unscored ledger row. Turning it on makes the wiring carry: the
 ascending cells fire, the efference-copy chain into the compass fires for the first time, and a sided
-excitatory term appears on the steering neuron DNa02. It does not make the fly turn (DNa02 moves a fifth of
-the way to threshold, and the term is symmetric because the body model has no leg cycle) and it does not
-make the compass follow a self-turn (the report arrives without a sign, because the haltere motor readout is
-a single bilateral number). It is shipped as a **module, not a default**: with it on, the suite's `rest`
-check fails by construction -- a fly standing still has firing proprioceptors, and that check is defined as
-"no input". `docs/audits/proprioception_transducer.md`, `docs/audits/vnc_drive.md`.
+excitatory term appears on the steering neuron DNa02. With a stance / swing leg cycle on the body
+(`body.LegCycle`, tripod timing from the realised speed, DeAngelis 2019 / Mendes 2013) and the haltere motor
+readout split by side, the leg afferents fire at literature-typical rates, DNa02 fires and the fly meanders
+(clean-frame yaw SD 2.7 -> 7.8 deg/s, straightness 0.995 -> 0.85) -- but it does not turn the way the animal
+does: no frame above 100 deg/s, a fixed left drift that is the connectome's own asymmetry, and a sided
+afferent report that follows the turn instead of leading it. The compass still receives no signed report of a
+self-turn: it exists at the ascending neurons and is diluted to nothing two synapses on
+(`docs/audits/body_sided_state.md`, `round3_integration.md`). All of it ships as a **module, not a default**:
+with the sense on, the suite's `rest` check fails by construction -- a fly standing still has firing
+proprioceptors, and that check is defined as "no input". `docs/audits/proprioception_transducer.md`,
+`docs/audits/vnc_drive.md`, `docs/audits/body_sided_state.md`.
+
+Two things we measured and did not add: the monoamine synapses (2.7 M, sign 0) can be routed through a slow
+receptor class, but one scalar cannot carry dopamine, octopamine and serotonin at once -- at the value that
+leaves behaviour untouched it fails the taste check on CPU, at ten times that the mushroom body runs away in
+half a second (`docs/audits/monoamine_slow_term.md`); and a per-transmitter unitary strength (the one 0.275 mV
+is a cholinergic calibration; the inhibitory ratio is an argument, not a measurement) breaks the take-off motor
+at every data-anchored bracket (`docs/audits/unitary_strength.md`). Nothing from either was adopted and no
+default moved.
 
 ## Food-finding, and what is the brain's and what is not
 

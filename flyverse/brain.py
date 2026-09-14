@@ -146,6 +146,15 @@ class LIFParams:
     slow_tau_by_class: dict | None = None
     slow_mode: str = "additive"               # "additive" | "gain" | "threshold" (see above)
     slow_gain_clip: tuple = (0.0, 4.0)        # bounds of the multiplicative factor in "gain" mode
+    # Per-transmitter unitary strength (docs/audits/unitary_strength.md; opt-in, thread:unitary). {transmitter: factor}
+    # keyed by connectome.NT_SIGN names: every entry whose PRESYNAPTIC cell carries that transmitter is multiplied by
+    # the factor on |W| in _shaped_weights BEFORE the connection cap (so the cap still saturates at conn_cap synapse-
+    # equivalents of the SCALED count), after the receptor sign / gain-class stage and before the path gains, the
+    # same-type damping and the fan-in normalisation (which therefore partly renormalises a uniform per-transmitter
+    # scale on cells above input_norm_ref). Transmitters absent from the dict keep x1; sign-0 entries stay zero. None
+    # (the default) executes nothing and the shaped weights are byte-identical (tests/test_unitary.py). The optic-lobe
+    # rate model normalises its own weights by in_syn and is NOT touched. w_syn stays the single global scale.
+    w_syn_by_nt: dict | None = None
     surrogate_grad: bool = False            # experimental Torch-only gradients through short windows
 
 
@@ -273,6 +282,23 @@ def _receptor(c: Connectome, p: LIFParams, receptor: ReceptorSigns | None = None
     return receptor
 
 
+def _nt_factor(c: Connectome, by_nt: dict) -> np.ndarray:
+    """(N,) float32 per-cell factor of LIFParams.w_syn_by_nt: the factor of the cell's transmitter (NT_SIGN names;
+    cells without a label count as 'unknown'), 1 for transmitters absent from the dict."""
+    from .connectome import NT_SIGN
+    bad = sorted(set(by_nt) - set(NT_SIGN))
+    if bad:
+        raise ValueError(f"w_syn_by_nt: unknown transmitters {bad}; use {sorted(NT_SIGN)}")
+    nt = c.neurons.nt.fillna("unknown").to_numpy() if "nt" in c.neurons.columns else np.full(c.n, "unknown")
+    f = np.ones(c.n, dtype=np.float32)
+    for k, v in by_nt.items():
+        v = float(v)
+        if not (math.isfinite(v) and v >= 0):
+            raise ValueError(f"w_syn_by_nt[{k!r}] must be finite and >= 0, got {v}")
+        f[nt == k] = np.float32(v)
+    return f
+
+
 def _shaped_weights(c: Connectome, p: LIFParams, receptor: ReceptorSigns | None = None):
     """Apply the calibrated connection rules before fan-in normalization."""
     W = c.W.tocsr().copy()                                          # always a copy: the gain loops below write into W.data
@@ -281,6 +307,8 @@ def _shaped_weights(c: Connectome, p: LIFParams, receptor: ReceptorSigns | None 
         # sign (and gain class) per edge from the receptor table, on the magnitudes, BEFORE the cap; unmatched edges keep
         # NT_SIGN of the presynaptic cell (fast_sign == sign(W.data) there), explicit zeros stay zero
         W.data = np.abs(W.data) * receptor.fast_factor(_receptor_gain(p))
+    if p.w_syn_by_nt:
+        W.data = W.data * _nt_factor(c, p.w_syn_by_nt)[W.indices]      # csr: indices = PREsynaptic column
     if p.conn_cap > 0:
         W.data = np.sign(W.data) * np.minimum(np.abs(W.data), np.float32(p.conn_cap))
     path_gain = DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain
@@ -380,7 +408,8 @@ class Brain:
             ref = c.reference
             key = repr((p.conn_cap, DEFAULT_PATH_GAIN if p.path_gain is None else p.path_gain,
                         DEFAULT_TYPE_PATH_GAIN if p.type_path_gain is None else p.type_path_gain,
-                        p.same_type_gain, _receptor_key(p)))
+                        p.same_type_gain, _receptor_key(p))
+                       + ((tuple(sorted(p.w_syn_by_nt.items())),) if p.w_syn_by_nt else ()))
             if ref is c:
                 tot = np.asarray(abs(W).sum(axis=1)).ravel()
                 ref._norm_cache[key] = tot

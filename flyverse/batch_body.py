@@ -52,6 +52,9 @@ class BatchBody:
         # produces is one of the two, so hops_escape + hops_voluntary equals the count of false->true airborne edges.
         self.hops_escape = np.zeros(self.B,dtype=np.int64); self.hops_voluntary = np.zeros(self.B,dtype=np.int64)
         self.launched_escape = np.zeros(self.B,dtype=bool); self.launched_voluntary = np.zeros(self.B,dtype=bool)
+        # Opt-in leg cycle (body.LegCycle; None = off, the shipped path). Advanced for every row at the end of step()
+        # from the realised speed / yaw / airborne state; read by nothing in the dynamics (proprio_state only).
+        self.leg_cycle = None
 
     def readout(self, motor, dt_s):
         # Scalar MotorRates.row promotes float32 neural samples to Python doubles.
@@ -77,14 +80,32 @@ class BatchBody:
         wcommands = [{k:float(v[i]) for k,v in wings.items()} for i in range(self.B)]
         return commands,wcommands
 
-    def proprio_state(self, motor):
+    def proprio_state(self, motor, haltere_sides=None):
         """The batch body state the opt-in proprioception transducer reads (senses.Proprioception.rates): the previous
         frame's leg MN rates per side and haltere MN rate (zeros before the first frame), each row's airborne flag and
-        its realised yaw rate (rad/s; read only by the labelled stop-gap Coriolis term)."""
+        its realised yaw rate (rad/s; read only by the labelled stop-gap Coriolis term). With a leg cycle attached the
+        dict also carries `legs` (body.LegCycle.state: per-leg phase / stance / amp, per-side stance load), and with
+        `haltere_sides` = (haltere_L, haltere_R) from motor.read_haltere_sides it carries the side-split haltere MN
+        rates (zeros before the first frame, like the other MN rates)."""
         def m(name):
             return np.zeros(self.B) if motor is None else np.broadcast_to(np.asarray(getattr(motor,name),dtype=float),(self.B,)).copy()
-        return dict(leg_L=m("leg_L"),leg_R=m("leg_R"),haltere=m("haltere"),
-                    airborne=attr(self.flies,"airborne").astype(bool),yaw_rate=attr(self.flies,"yaw_rate").astype(float))
+        out = dict(leg_L=m("leg_L"),leg_R=m("leg_R"),haltere=m("haltere"),
+                   airborne=attr(self.flies,"airborne").astype(bool),yaw_rate=attr(self.flies,"yaw_rate").astype(float))
+        if self.leg_cycle is not None:
+            out["legs"] = body.LegCycle.state(self.flies)
+        if haltere_sides is not None:
+            hL,hR = haltere_sides
+            zero = motor is None
+            out["haltere_L"] = np.zeros(self.B) if zero else np.broadcast_to(np.asarray(hL,dtype=float),(self.B,)).copy()
+            out["haltere_R"] = np.zeros(self.B) if zero else np.broadcast_to(np.asarray(hR,dtype=float),(self.B,)).copy()
+        return out
+
+    def _cycle(self, dt):
+        """Advance the opt-in leg cycle for every row from the realised body state (after the walk / flight update)."""
+        k = self.leg_cycle.advance(attr(self.flies,"leg_phase"),attr(self.flies,"speed"),attr(self.flies,"yaw_rate"),attr(self.flies,"airborne"),dt)
+        for i,fly in enumerate(self.flies):
+            fly.leg_phase = k["phase"][i]; fly.leg_stance = k["stance"][i]; fly.leg_amp = k["amp"][i]; fly.stance_frac = float(k["beta"][i])
+            fly.stance_load_L = float(k["load_L"][i]); fly.stance_load_R = float(k["load_R"][i])
 
     def step(self, commands, wings, tasting, dt_s):
         airborne = attr(self.flies,"airborne")
@@ -108,6 +129,7 @@ class BatchBody:
         moving = [dict(c,speed=0.,yaw=0.) if self.feeding[i] else c for i,c in enumerate(commands)]
         self._walk(np.flatnonzero(walk),moving,dt_s)
         self._flight(np.flatnonzero(airborne),wings,dt_s)
+        if self.leg_cycle is not None: self._cycle(dt_s)
         return self.feeding.copy()
 
     def _metabolism(self, tasting, airborne, active, dt):

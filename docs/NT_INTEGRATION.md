@@ -441,6 +441,13 @@ default. Where each item now stands:
    mV/s of symmetric PS196_b against a ring at 25-145 Hz. The compass item is now a **body-model** item
    (a side-split haltere MN readout in `motor.py`; a leg cycle in `body.py`), not a receptor or
    transmitter item. `docs/audits/vnc_drive.md` 6; `out/vncd/analysis/compass_*.csv`.
+   **[Behaviour round 3] The body-model items are built and the answer is unchanged.** `body.LegCycle` + `motor.read_haltere_sides`
+   (opt-in) make the leg afferents fire at 88 Hz and the haltere channel sided (L 15.3 / R 18.1 Hz); the signed self-turn report
+   now exists at depth 1 (AN04B003 flip -9.8 to -12.2 Hz vs nulls ~1 Hz), reaches PS196_b at 1-3 Hz (-3.00 +- 0.29 under the
+   transducer + unitary-high combination) and is gone at GLNO (|flip| <= 0.5 Hz) and PEN / EPG; drift |mean| <= 0.005 w/s vs 4.0
+   in every arm. At the shipped gains no bump forms under any bracket of the per-transmitter unitary (48 / 48 survival 0.00 s): a
+   transmitter scale cannot set the Delta7 : ring ratio. The compass item is now (a) a type-level ring mechanism and (b) the GLNO
+   fan-in / sign-0 link, both untouched. `docs/audits/body_sided_state.md` 6, `unitary_strength.md` 4, `round3_integration.md` 5-6.
 2. **Object -- the stage is named.** The figure is lost by ON/OFF cancellation at T2 / T3 / Tm5Y / TmY21 and then
    by l1 pooling at LC10 / LC11 (LC11 +0.046 mV, LC10a +0.080 against LPLC2's +0.54 and a 7 mV criterion). No
    hand-crafted optic measure sits on those edges and none of 16 ablations moves it; the LPLC2 object null under
@@ -526,5 +533,55 @@ default. Where each item now stands:
    haltere Coriolis term -- a loop through `body.Locomotion`'s hand-written yaw scalar. If a minimal default
    is ever costed, cost **arm C** (the three leg channels), which reproduces the whole measured effect while
    the haltere channel alone reproduces none of it.
+   **[Behaviour round 3] Extended with a leg cycle and a side-split haltere readout, still a MODULE.** Arm D
+   (`'all+leg_cycle+haltere_sided'`): DNa02 0.54 / 0.38 Hz, clean yaw SD 7.9 deg/s, straightness 0.83, 7 / 16 flies off the table,
+   a fixed +1.2 deg/s left drift from the connectome's own asymmetry; no clean frame above 100 deg/s; the sided term on DNa02 is
+   tripod-locked and does not lead the yaw. **The C-vs-B effect is a LEVEL effect** (chordotonal 23 -> 88 Hz) not separated from the
+   phase structure: the level-matched control (`'all'`, `mn_ref_hz` ~3.5) is the first thing to run. Owed for a default: that
+   control, the ledger rows `lit.walk.*`, the hops section + room protocol at >= 6 runs per arm with the sided spec, `half_width_m`
+   measured, `MotorRates.haltere_L/_R` (owner decision -- **deferred**, session 11). The pinned suite cannot carry the sense (only
+   `sec_hops` builds a `BatchSim`).
+8. **Monoamine slow class -- measured at data-anchored magnitudes, and parked again (behaviour round 3;
+   `docs/audits/monoamine_slow_term.md`).** Coverage 27.2 % of the 1.88 M monoamine synapses carried, 0 onto the VNC / ascending
+   neurons, none onto DNa02 / DNp09 / MDN / DNp01 / MN9. `add_low` 0.02: behaviour `null` (5 v 5 H200, 4 v 4 B200), +3 % spikes,
+   `taste.MN9_hz` 10.93 -> 2.48 on CUDA and **1.97 < 2 FAIL on the CPU reference path**; 0.2 / 1.0 additive: runaway in 5 / 5 (the
+   KC <-> DAN loop, causal on CPU); 0.2 gain: x2.55 spikes, MBONs zeroed, hopping. The anchors (Cohn 2015 ~0 mV on KCs; Longden
+   2010 / Maimon 2010 x1.5-2 OA gain) are 50-100x apart on one scalar. **Do not scale the monoamine class with one scalar again.**
+   What is needed: `SLOW_CLASSES` split per transmitter (`receptor_signs` slow_class per presynaptic transmitter; `slow_gain_by_class`
+   / `slow_tau_by_class` with three keys, default None, CPU bit-identity test); a KC>MBON plasticity module gated by the DAN rate
+   (`lit.MBON11.kc_mbon_depression`); separate E / I accumulators in gain mode; VNC receptor rows (no VNC expression source is in
+   the builder's five). The `full` model stays opt-in; `sign` stays the default.
+9. **Per-transmitter unitary strength -- an instrument, not a mechanism (behaviour round 3; `docs/audits/unitary_strength.md`).**
+   `LIFParams.w_syn_by_nt` (default None, byte-identical) scales |W| per presynaptic transmitter before the cap. Data: ORN -> PN
+   x0.79 of 0.275 (Kazama & Wilson 2008 over Tobin 2017's counts; the primary may read 7 mV = x1.11 -- pin it), PN -> KC x0.12-0.36,
+   PN -> LHN x0.45-1.2; no Drosophila central unitary IPSP; the one insect unitary I/E is 0.28 (Periplaneta, J Neurosci 34:13039,
+   to be added as a ledger row); `unitary.IoverE.chloride_driving_force`'s E_Cl endpoints are uncited. Every I/E < 1 bracket fails
+   `walk.power_sustained_hz` (89-194 vs < 50) and hops the fly off the table; no bracket forms a bump. Next: an ACh-only family
+   ({acetylcholine: 0.8} / 0.5, inhibition x1) through the suite, compass and room (transducer on and off), one block, with
+   `taste.MN9_hz` re-read as the re-calibration it is. The field itself is **kept** as an opt-in instrument (owner decision,
+   session 11); no bracket of it is adoptable.
+10. **Optic stop-gaps -- the two adopt-alone suites were run and both candidates are NOT adoptable (`anti_runaway.md` round 7,
+    `guard_suites_r3.md`).** `drive_clip_mv`: suite clean, room voluntary take-offs x2 (3.96 vs 1.94 per 1,000 fly-s; B200 4 v 4
+    `result` p 0.029); the clip binds on the wing-power route. LPi x1: 34.6 per 1,000 fly-s, 48 / 48 flies with a walking GF above
+    the 33 Hz escape threshold. Replacement statements unchanged (a bound on the optic -> spiking injected current; a sign-correct
+    LPi -> LPLC2 strength from data), each to be scored in the room at >= 6 runs per arm. Item 6's 'pending 3 independent draws'
+    for the clip is closed: the draws were run and the room refuted it.
+11. **NT sources 4 and 5 -- the two public female connectomes (session 11; `docs/audits/flywire_banc_survey.md`,
+    `docs/CONNECTOME_BACKENDS_SPEC.md`).** The receptor data are exhausted; the *transmitter* data are not. **FlyWire FAFB v783**
+    carries six-class per-cell NT probabilities (`da/ser/gaba/glut/ach/oct_avg`) plus an `nt_type` call for 86 % of its 139,255
+    cells; **BANC v888** carries a predicted nine-class label and, for **65,369 cells, a *verified* transmitter from the
+    literature**, co-transmitters included (`glutamate,serotonin`). Read by type name against MaleCNS's 3,312 sign-0 bodies:
+    dopamine is **solid** (395 MaleCNS -> FAFB DA 372; BANC verified dopamine 365); octopamine is mixed (OCT 37, **GABA 18**,
+    absent 78; BANC octopamine 82, `?` 24); **serotonin is the least corroborated** (SER 72 but **DA 68**, ACh 20, Glu 12, absent
+    239; BANC serotonin 56, **tyramine 46**, glycine 8, `?` 140) -- MaleCNS's `serotonin` class splits SER / DA / tyramine across
+    sources, which is the same class item 8's slow-class split has to name per transmitter. And **about 400 of the 2,361
+    `unknown` cells MaleCNS silences carry a classical-transmitter prediction in BANC** (ACh 150 / GABA 148 / Glu 111), so part of
+    the silenced set is reachable without new receptor data. Conflict rows to add to the NT table: **PFL3** (ACh 24/24 in MaleCNS
+    and FAFB, BANC *predicts* TYR 24/25 -- and BANC has PFL2 *verified* tyramine 12/12); **Delta7** (BANC verified
+    `glutamate,serotonin` co-transmission against MaleCNS glutamate); **LAL074**, a PS059 input (MaleCNS / FAFB glutamate, BANC
+    predicts SER on 2 of 4). Two rules come with the data: BANC's predictor **over-calls dopamine** relative to FAFB (8,072 vs
+    584 DA cells brain-wide; 4.4 % vs 0.5 % of synapses), so BANC *predicted* monoamine labels are used only where its *verified*
+    column agrees; and counts never cross releases unscaled (synapse yield MaleCNS : FAFB : BANC ~ 1 : 0.6 : 0.3). Nothing here
+    is adopted -- it is a survey of two sources, and any use of them goes through the same audit-and-verify procedure.
 
 Do not start a round 6 of receptor work.

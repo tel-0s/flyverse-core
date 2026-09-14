@@ -2030,6 +2030,330 @@ commit `653179b4...` verified 29/29 and 43/43. The compare audit doc was stamped
 the 22:06:37Z submission; its `predeclared.json` (22:04:04Z) is the real stamp and the two are
 byte-identical.
 
+## Session 11, behaviour round 3 (2026-09-14)
+
+Five threads (build:body-state, run:monoamines, run:unitary, run:guards, then integrate), five Opus skeptics with their own
+fresh-seed house-cluster replications, 165 cluster jobs in six completed submissions (vncd3b 22, mono 25, unit1 28, unit2 12,
+guard7 27, r3int 51; 0 failed) plus 58 skeptic jobs (0 failed), split across the rented H200s and the house B200s. **No model
+default changed and nothing is adopted**: `git diff -- flyverse/optic.py flyverse/data/receptors_by_type.csv` is empty, every
+new field defaults OFF (`Locomotion.cycle = None`, `BatchBody.leg_cycle = None`, the spec tokens `leg_cycle` / `haltere_sided`
+/ `haltere_coriolis` unnamed, `LIFParams.w_syn_by_nt = None`), the shipped path is bit-identical on CPU with the cycle attached
+and the sense off (`tests/test_body_cycle.py`, atol 0 on every brain tensor), and the 13 new ledger rows (`unitary.*`, `lit.HS/Mi4/KC/MBON11/PN.*`)
+are all `op report`. Audits: `docs/audits/body_sided_state.md`, `monoamine_slow_term.md`, `unitary_strength.md`, `guard_suites_r3.md`,
+`anti_runaway.md` round 7, `round3_integration.md`; verdicts in `receptor_verification.md` "Behaviour round 3". All four thread
+verdicts and the integration verdict are **mostly sound**; the refuted claims (a false 4-run/5-run agreement statement, a
+CUDA-only suite pass, a per-file `--arm-block`, three overstated wordings) are corrected in the audits and none reverses a conclusion.
+
+**A leg cycle and a side-split haltere readout make the never-driven afferents fire at literature-typical rates, DNa02 fires, and
+the fly meanders and drifts left -- by the connectome's own asymmetry, not by sensing a turn.** `body.LegCycle` (tripod, stance
+`0.9328 s x v^-1.025` from DeAngelis 2019, swing 30 ms from Mendes 2013 with the 30-50 ms bracket UNCERTAIN, per-leg ground
+speed `v - s yaw b` with `half_width_m` 1.0 mm UNMEASURED) is a stance/swing phase derived from the realised speed that feeds
+nothing back into the walk; `motor.read_haltere_sides` reads the 8 L / 8 R haltere MNs the anatomy already separates. With the
+cycle on, the commanded chordotonal rate goes 23.4 -> **88.1 Hz** (hair plate 14 -> 47, campaniform 50 -> 25, every one inside its
+bracket), AN04B003 3.7 -> 23 Hz, and the leg-afferent term on DNa02 outgrows the haltere-afferent inhibition (AN04B003/L +57.9 ->
+**+360.4 mV/s** against PS059/L -114 -> -208; DNa02_L net -233 -> **+110**): DNa02_L / _R 0.031 / 0.104 -> **0.540 / 0.383 Hz**,
+clean-frame yaw SD 3.35 -> **7.87 +- 0.14 deg/s** (per seed 7.84 / 7.96 / 8.01 / 7.66 / 7.88; z +51, `result` at 5 v 5),
+straightness 0.979 -> 0.826, 7 of 16 flies off the table top within 60 s, hops 0.46 per fly -- replicated on a B200 on the eager
+path (2.75 -> 7.67; DNa02 0.505 / 0.385) and at fresh seeds 5-8 (`out/vncd3sk`, 4 v 4: DNa02_L 0.024 -> 0.559, z +61.5). The
+side-split haltere (D vs C) and the Coriolis control (E vs D) are `null` on every behavioural and DNa02 row. Three things stop
+this from being turning: **no clean frame in any arm of any batch exceeds 100 deg/s** (the animal saccades at 200-450 deg/s every
+~250 ms; max on record 63.8), the extra yaw is a **fixed left drift** (+1.23 +- 0.16 deg/s in 78 / 80 flies, DNa02 L > R in 68 / 80,
+from the connectome's inhibitors -- IN12B014's capped wiring is identical on both sides and its RATE differs, 11.1 vs 8.4 Hz -- with
+the excitatory rows equalised by `conn_cap`), and the sided afferent term that does reach DNa02 (-0.35 Hz per tripod half-cycle,
+-3.39 Hz on AN04B003) alternates at 7.9 Hz under the 80 ms motor filter with a DC part 2.5 % of the alternation, and correlates
+with the realised yaw at -0.06 to -0.15 with the **kinematic** sign (the turn shapes the afferent). The leg-MN L-R stays positive in
+400 / 400 fly-runs. **The level confound qualifies all of it**: the round changed the afferents' LEVEL (23 -> 88 Hz) and their phase
+structure together, and the level alone accounts for the DNa02 firing; the level-matched control (`'all'` with `mn_ref_hz` ~3.5 Hz)
+has not been run. The module ships opt-in; what a default needs is `body_sided_state.md` 8.
+
+**The compass receives no signed report of the self-turn under any combination, and forms no bump at the shipped gains under any
+brain configuration.** Wedge protocol at gE = gD = gR = 1: `compass.EPG.bump_survival_s` **0.00 s in 48 / 48 runs** (unitary's four
+brackets on H200, the integration's four brain configurations on B200, the skeptic's fresh seeds), rate and width
+`NOT_APPLICABLE`, PEN at 0.04-0.15 Hz because its net drive is +1.2 to +2.3 mV against the 7 mV gap; a per-transmitter scale
+multiplies the tuned Delta7 inhibition and the untuned ring feedback by the same factor and cannot supply the type-level ratio that
+gE 2 / gD 15 did. Efferent protocol under the gains: bump drift |mean| <= 0.005 w/s in every phase of every arm against +-4.0 ideal.
+The signed report now exists at depth 1 (AN04B003 flip -9.8 to -12.2 Hz against nulls of ~1 Hz, every seed), reaches PS196_b at
+depth 2 (-1.1 under D, **-3.00 +- 0.29** under ABC) and is **gone at GLNO** (|flip| <= 0.5 Hz; GLNO L-R +27-34 Hz at every phase) and
+at PEN / EPG. The block is the GLNO fan-in plus the sign-0 GLNO -> PEN link, and no attractor for a report to move.
+
+**The monoamine slow class is inert at 0.02, runs away at 0.2, and fails the taste check on the CPU.** Coverage: 72.8 % of the
+1.88 M monoamine synapses are silenced in every model, the VNC / ascending / OA-VUM targets have 0 signed synapses, DNa02 / DNp09
+/ MDN / DNp01 / MN9 carry no monoamine load; the dopamine class is 59 % DAN -> KC (+1, Dop1R2-led). `add_low` (the shipped 0.02):
+every behaviour key `null` at 5 v 5 and again at 4 v 4 on the B200; spikes +3 %; `taste.MN9_hz` 10.93 -> 2.48 seed-locked on
+CUDA and **5.09 -> 1.97 on the CPU, i.e. FAIL against `> 2`** (MN9 is the residual of +1,786 / -1,677 mV/s inputs; a sub-mV 5-HT
+tone on the SEZ tips it). `add_mid` 0.2 and `add_high` 1.0 additive: runaway in 5 / 5 runs each (665.6 +- 3.2 and 1,277.0 +- 0.5
+spikes/step at the abort; the KC <-> DAN loop -- KCg-m gives PAM08 163 mV per volley and carries 75.8 dopamine syn-eq per cell,
+0.83 mV of tone per Hz of the DAN population at 0.2; deleting `W_slow` onto the 4,064 KCs on CPU removes it, a cell-matched
+control lesion does not). `gain_mid`: x2.55 spikes, the MBONs zeroed by their Dop2R rows, OA-VUMa2 at 329 Hz, 1.5 voluntary
+take-offs per fly, DNa02 at 0.1 Hz -- a baseline change, not a behavioural gain. The two literature anchors are 50-100x apart on
+one scalar (Cohn 2015: ~0 mV on KCs; Longden 2010 / Maimon 2010: x1.5-2 OA gain on HS / VS), so **one class scalar cannot carry
+the three transmitters**; the split per transmitter, a KC>MBON plasticity module and VNC receptor rows are what an adoption needs.
+
+**One 0.275 mV for every transmitter is a cholinergic calibration; every data-anchored inhibitory bracket breaks the suite and
+the room.** The one anchor with both the EPSP and the count measured (ORN -> PN, ~5 mV over ~23 synapses) is x0.79 of 0.275; no
+per-synapse fast IPSP in a Drosophila central neuron is on record (the one insect unitary I/E, 0.28, is Periplaneta -- J Neurosci
+34:13039 -- and belongs in the ledger). Brackets ACh x0.5 / 0.8 / 1.0 with I/E 0.25 / 0.5 / 0.75: `walk.power_sustained_hz`
+**89-194 Hz against < 50 in every bracket and every draw**, low also fires the GF at 128-130 Hz to a walk stimulus; in the room
+`high` hops 39-42 times a minute and leaves the table in 3.5-7.9 s, `mid` is airborne two thirds of the time with a fixed DNa02
+R-L bias of -11 Hz in 16 / 16 flies. Combined with the transducer (AC / ABC) the disinhibition turns the connectome's sidedness
+into a +1.12 Hz DNa02 L-R of one sign in 80 / 80 fly-runs and a +5-6 deg/s left drift on a fly that is off the table in 11 s;
+the transducer halves C's hops (43 -> 22) without making it steer. B does not interact with A (AB vs A `null` on every key).
+
+**The two retirement candidates are refuted on the room, by the adopt-alone rule they were owed.** `no_drive_clip`: suite 27 / 0
+/ 2 x3, room 5.069 vs 3.125 take-offs per 1,000 fly-s (CI 2.279-4.181), the excess entirely voluntary (3.958 vs 1.944), escape and
+walking-GF tail unchanged -- so the clip binds on the wing-power route, and round 6's walking-GF prediction is **not confirmed**;
+the skeptic's B200 rerun at 4 v 4 gives the first callable verdict, `hops_voluntary_total` +10.5, z 3.57, p 0.029 `result`.
+`pair_gain_lpi_x1`: 34.6 per 1,000 fly-s (11x), 451 escapes against 17, walking-GF median 38.1 Hz with **48 / 48 flies above the
+33 Hz escape threshold** -- the factor is what keeps the walking giant-fibre drive under the threshold in the closed loop, and the
+pinned `walk.GF_max` (4.63 -> 9.80 against 38) does not predict it. The shipped default's reference for these boxes: 3.125 (H200),
+3.750 (B200), 3.89 (round 5). The `walk.power_max` triple 48.4805 / 20.1091 / 4.6292 reproduced the recorded value exactly in
+every native GPU draw of the round and reads 57.38 / 26.66 / 9.76 on the CPU: a backend property, not a model constant.
+
+**Process, honestly.** Every predecessor agent died at a session limit and the rented boxes were stopped ~5 h for funds, so four
+of six batches were fetched by hand (`scripts/box_status.py`, `scripts/fetch_run.py`); the body-state five-run tables span two
+submissions (seed 2 from `vncd3-f3bb50`, seeds 0/1/3/4 from `vncd3b`) and the audit's claim that the single-submission four-run
+tables differ in no verdict is false (15 of 765 pairwise and 7 of 548 room-table verdict cells flip; no headline row among them);
+unitary batch 1's `--arm-block fam` resolved to one block per FILE and was dealt round-robin over two H200s (balanced, not
+confounded, and reproduced in one block on the B200); the guards batch ran an intermediate `body.py` (md5 46e3c10a) so its
+'transducer on' arms are the round-2 sense; every batch shipped uncommitted cross-task files. The integration batch (`r3int-9a78e4`,
+51 jobs, one submission, one node, `verify` 88 / 88 JSONs 0 problems) is the round's clean design and its shipped arm on the eager
+path is the reference for any future cross-backend replication.
+
+**Next (the round-3 plan, in order; items 1-6 need the cluster, 7 does not).**
+
+1. THE LEVEL-MATCHED CONTROL (house, ONE submission, ~20 jobs, blocks `fam_r<seed>`): arms shipped / `'all'` with
+   `mn_ref_hz` set so the window-mean chordotonal rate is 88 Hz (~3.5 Hz; a LABELLED control) / `'all+leg_cycle'` /
+   `'all+leg_cycle+haltere_sided'`, 5 brain seeds x 16 flies x 60 s, the `probe_vnc_drive` room protocol with the
+   clean-frame statistics, DNa02 decompose per arm, and the same 4 arms on the efferent compass at 4 seeds (so the
+   flip rows are callable). Decides the one thing the round could not: whether the per-leg / per-phase structure
+   contributes anything beyond the afferent level (if the level control fires DNa02 as C does, the cycle's
+   contribution is its level). Do first: add the ledger rows `lit.walk.step_frequency_hz_at_speed`,
+   `lit.walk.stance_fraction_at_speed`, `lit.walk.swing_duration_ms` (30-50 UNCERTAIN),
+   `lit.walk.outer_leg_step_ratio_in_turn` (op report; CPU) and fix the `sided_frames` lag + the DNa02 mask before
+   the analysis.
+2. THE ADOPTION-LICENSING RUN FOR THE MODULE (house, ONE submission, one block `fam_lic`): shipped vs
+   `'all+leg_cycle+haltere_sided'` on `benchmark.py --sections hops` (2,400 fly-s) x 6 draws and the
+   `batch_sustain` room take-off protocol (16 x 300 s) x 6 batches at seed-matched seeds, plus the 29-check suite
+   x 3 for the record (with the statement that 28 of 29 checks cannot carry the sense), plus the room ledger rows
+   under the sided spec; verdicts `common.compare` at 6 v 6 and the two-sample exact Poisson. This is what
+   `body_sided_state.md` 8 item 3 and guards 1b jointly say a default needs; run it only if item 1 shows the phase
+   structure matters, otherwise the module stays a module.
+3. THE ACh-ONLY UNITARY FAMILY (house, ONE submission, `--arm-block-map` so the family is ONE block; ~24 jobs):
+   `w_syn_by_nt` {acetylcholine: 0.8} and {acetylcholine: 0.5} with inhibition x1 (plus the KC / LHN anchors as arms
+   if budget allows) through the suite x 4 draws, the wedge compass x 4 seeds and the room x 4 runs with the
+   transducer OFF and ON (integration 9 item 5b); `taste.MN9_hz` re-read as the re-calibration it is, not re-passed.
+   Before submission (CPU): pin Kazama & Wilson 2008's primary EPSP (5 vs 7 mV), add the Periplaneta unitary I/E
+   0.28 as a ledger row, cite or relabel `unitary.IoverE.chloride_driving_force`, and fix `probe_unitary`'s
+   rounding-before-compare.
+4. THE MONOAMINE CLASS SPLIT (code first, then ONE submission): thread B/C work on CPU -- `receptor_signs`
+   slow_class per presynaptic transmitter (DA / OA / 5-HT) and `LIFParams.slow_gain_by_class` / `slow_tau_by_class`
+   accepting the three keys (default None, CPU bit-identity test), separate E/I accumulators in gain mode; then one
+   house submission, 5 runs per arm, blocks `fam_r<seed>`: off / DA 0 + OA gain 1-3 (with the opt-in
+   `OpticLobe(slow=)` term so the HS / VS / Mi4 anchors are reachable) + 5-HT additive 0.02-0.2, with health, the
+   plain-fly room, the suite on the GPU AND the same suite sections on the CPU (the CPU-path requirement the round
+   exposed), and the compass rows under the OA arm (the ring leaves silence under octopamine; is it heading-locked?).
+   A KC>MBON plasticity module gated by the DAN rate against `lit.MBON11.kc_mbon_depression` is a separate build,
+   not a scale.
+5. A TYPE-LEVEL RING MECHANISM, OR NONE: the round proved a transmitter scale cannot set the Delta7 : ring ratio;
+   before any compass batch, a CPU structure pass (`interp_paths` / `structure.json`) naming what data-implied fact
+   could change that ratio (receptor tiers on ER / ExR -> EPG, the GLNO transmitter, a conductance-based synapse) --
+   if none exists, the compass is parked at 'no attractor at shipped gains' and the free-walking compass room under
+   A at the experiment gains (4 seeds, one block, bump metrics + `circ_corr_heading`) is run once to close
+   `body_sided_state.md` 8 item 5 (expected negative: the report is gone by GLNO).
+6. NO RERUN OF THE TWO RETIREMENT CANDIDATES. Close `drive_clip_mv` and LPi x1 as NOT adoptable in
+   `anti_runaway.md`; the next submission on that thread is only for a candidate REPLACEMENT mechanism (a bound on
+   the optic -> spiking injected current seen by the wing-power route; a sign-correct LPi -> LPLC2 strength from
+   data), scored in the room at >= 6 runs per arm with the two-sample exact Poisson and the 29-check suite x 3, one
+   submission, one block.
+7. BOOKKEEPING, NO GPU: apply the section-7 audit corrections; regenerate the integration pairwise with z to one
+   decimal and the mask caveat; add `fetch_run.py` sha256 receipts and a `cluster_run.py --attach` mode plus the
+   one-job-block guard; write the object round 3 NOTES entry; commit the round-3 tree in one commit with the
+   fingerprints quoted.
+
+## Session 11, object round 3 (2026-09-14, Astra)
+
+The object half of round 3 ran as a separate workflow. After the API 529s took this session off it mid-round it was
+handed to **Astra** under `docs/HANDOFF_ROUND3_ASTRA.md` (git-ignored, one owner per file); Astra's reply is
+`docs/HANDOFF_ROUND3_REPLY.md`. **No commit, no push, no model or default change**: `flyverse/optic.py` and
+`flyverse/brain.py` are byte-identical to the handoff snapshot (`out/round3_astra/start/state.json`,
+`brain.py` 7fadb8d6..., `optic.py` afb78cfe...), and `brain.py`'s only diff is the *behaviour* round's opt-in
+`LIFParams.w_syn_by_nt`, recorded `null` in all 180 same-device runs. Audits:
+`docs/audits/object_samedevice_r3.md`, `object_rectangles_r3.md`, `object_localizer_r3.md`, `object_export_r3.md`.
+
+**What ran.** The three predecessor H200 batches were completed, checked and given recovered scheduler receipts
+after their polling clients died -- `objr3sd-d6f06a` (5 jobs = 90 paired runs), `objr3rect-e9a8f3` (12 jobs = 324
+paired runs), `objr3rf-a2fc62` (10 jobs = 10 runs) -- and each was replicated at fresh seeds on the house B200s:
+`r3sdcheck-00126d` (5 jobs, 90 runs, seeds 1000-1004), `r3rectcheck-6f0cbc` (12 jobs, 324 runs, object seeds
+2000-2005) and `r3rfcheck-c82c1e` (10 jobs, 10 runs, seeds 1000-1004) -- 27 house jobs, 424 paired runs,
+**0 failed anywhere in either half**. Every replication was one `cluster_run.py --arm-block fam --target house
+--node <cluster-node>` call with the reference arm and its treatments in the same block; every replication recording reports
+NVIDIA B200 on host `<cluster-node>`, every original reports NVIDIA H200 on one host per batch, so the round-2 arm/box
+confound is closed inside each batch. The `FETCH FAILED` lines in the native logs are **transfer** failures, not
+failed simulations: the interrupted SCP transfers were resumed through compressed tar with SHA-256 checks, which
+caught two partial files that a size-only compare had passed (one rectangle NPZ, one sphere JSON); both were
+replaced and every final batch verifier reports no problems.
+
+**Same-device (`object_samedevice_r3.md`): the H200 batch reproduces in full, the B200 batch is PARTIAL, and the
+reference arm itself is not the same on the two boxes.** Rectify exceeds base at every small T3 / T2 maximum in
+both batches (H200 ratios T3 6.281 / 9.528 / 13.063 and T2 2.356 / 3.369 / 3.068 at 4.5 / 8.8 / 11 deg, all six
+rows Holm p .023810; B200 T3 6.131 / 9.028 / 12.598, T2 3.522 / 3.421 / 3.225). The declared reproduction rule
+needs T3 *and* T2 at all three small rungs: on H200 both pass (`REPRODUCES`), on B200 rectify T2 at 4.5 deg reads
+z **+2.66825** against its own blank/blank null and so is `null` under `common.compare`'s z >= 3 gate despite
+Holm p .023810 -- hence **PARTIAL**. The separation there is complete (the five rectify runs all exceed all five
+null runs, U 25/25, p at the exact 5 v 5 floor .0079365); the z gate is missed because one null run inflates the
+null SD to .005302 against the H200 null's .001147. Two things the audit reported narrowly and the skeptic
+corrected in the body: the **large-rung companion effect is a three-batch effect, not a B200 observation** --
+rectify's windowed-median T3 companion exceeds base at 20 deg (.006050 +/- .000709 vs .004445 +/- .000414,
+z +3.88) and 30 deg (.007377 +/- .000775 vs .004259 +/- .000400, z +7.80) and its T2 companion at 30 deg
+(z +3.56), all Holm .039683, on **H200 as well as B200**, and round 2 already carried the T3-at-30 row (z +9.795,
+ratio 1.827), so `companion_all_null_all_rungs` is false in both round-3 Results and the "typical cells unchanged"
+reading holds only at the three small rungs; and the **base arm's own T2 maximum crosses the effect gate on the
+B200 and not on the H200** (base T2 vs its own null: B200 z +6.12652 at 8.8 deg and +9.29988 at 11 deg, both
+Holm .023810 = `result`; H200 z +0.35 / +1.02 / +1.96, `null` at every small rung). The two round-3 batches have
+**identical source fingerprints** (all 44 `files` entries and all 29 `files_loaded` entries match) and differ only
+in GPU model, box, seeds and execution history -- which still does not isolate a causal GPU-model effect, and no
+base-vs-base row between them was computed. Suppress's primary `null` pattern and the absence of an LC11 rescue
+reproduce in both (`both_null` on T3, T2 and LC11; `lc11_follows` false in every arm of both batches). **Nothing
+adopted; rectify and suppress remain hand-set opt-in control arms.**
+
+**Rectangles (`object_rectangles_r3.md`): 40 of 40 primary verdicts `null` in both batches, no animal-shape
+preference called, and retinal contrast is matched only at width >= 8.8 deg.** Each batch is 216 object runs
+(9 shapes x 2 contrasts x 6 seeds x 2 lobes) + 108 blank/blank null runs (9 shapes x 6 seeds x 2 lobes) = 324;
+nulls carry no contrast, so a shape's six nulls serve both its dark and its bright family and those two families
+are **not independent of each other**. The object's Weber contrast is fixed at +/- .995, but fractional coverage
+of the retinal acceptance kernel caps the per-column change wherever a rectangle is narrower than a column's
+4.5-deg acceptance: peak per-column effective contrast reaches +/- .995 **only at width >= 8.8 deg -- three of the
+nine rectangles, all in the width ladder**, while the whole height ladder runs at width 4.4 and is capped at max
+coverage .88530 / extreme -.65262 (its 2.2 and 4.4 rungs, .42649 / -.22826 and .65590 / -.53849, are matched to
+nothing). The stamped `effective_contrast` clause had already declared that cap and its 0.885 value before
+submission; what the radiance capture refutes is the *shorthand* "retinal contrast matched by construction", not
+the design. The one sub-.05 row is B200 dark LC10a at width 15 deg (diff +.055055 mV, z **+2.17788**, Holm
+p .021645) -- `null` under the z >= 3 gate, and the **H200 batch has the opposite sign at the same type, ladder,
+contrast and rung** (-.015022 mV, z -.45490, Holm 1), so the question is open in both directions. The
+size-monotonicity reading is a **two-directional knife-edge, not a non-replication**: of the 16 declared
+(ladder x contrast x type) joint tests exactly one passes in each batch and it is a **different** one (B200
+`hlad:dark:T2`, H200 `hlad:bright:Tm5Y`), the two batches agree in sign on both statistics, and both calls flip
+under a different permutation seed (H200 median p .049248 -> .053047; B200 `hlad:bright:T2` .050797 -> .047048) --
+so no upstream size-monotonicity conclusion leaves this round, and the declared rule (`docs/INTERP.md` 10.4 item
+2) forbids the cross-batch row comparison anyway. Two protocol caveats belong beside every null: Keles & Frye's
+Figure 3D height sweep held **width at 30 deg**, so the width-4.4 height ladder here is an adapted assay with no
+published counterpart (the width ladder, at a fixed height of 8.8 deg, does match Figure 3E), and **Figure 3B says
+maximum contrast is not LC11's optimum** -- dropping OFF-object Weber contrast from 100 % to 30 % "nearly doubled
+the amplitude of the calcium response", while both ladders here run at |Weber| .995.
+
+**Localizer (`object_localizer_r3.md`): neither LC population localizes under the static 4.5-deg probe, on either
+lobe, in either batch.** LC11 has **zero fits at the fixed z = 5** on both lobes in both batches. In the B200 `fb0`
+map the blank-selected threshold is z* = 4, which yields 4 of 143 LC11 fits against 1 of 143 blank fits -- and
+still fails both the population-coverage and the spatial-enrichment criteria; shipped B200 LC10a has free-peak
+enrichment above 2x chance but insufficient fitted coverage. **The Mi1 positive control (pooled coverage ~53 % in
+both batches) is on `optic_dr`, not on the `drive_mv` quantity the LC negative is measured in**: every control type
+(Mi1, T2, T3, Tm5Y, TmY21) is an optic-lobe rate unit, and the only `drive_mv` rows in the map are the 418 LC
+bodies, so the control shows that the grid, the dwell, the pooling and the fitter work on rates, not that a
+`drive_mv` receptive field of the same strength would have been detected. Two deviations from the request, both on
+record: the probe was **4.5 deg, not the 2-4 deg asked for, and static rather than the moving physiological RF
+probe**, and the presented grid was 1,466 of 1,787 reachable nodes (82 % of the eye; the per-cell box restriction
+applies at fit time only). Read the result as stimulus-, prior- and fit-limited: it does **not** license "no
+stimulus can localize LC cells", and it is not a statement about firing -- the fitted quantity is received drive,
+and the LC populations emit essentially no spikes in this protocol (137 of 143 LC11 bodies emit exactly zero over
+the 1,466.5 s recording). The round's ladder windows were left unchanged: all 143 LC11 windows are the anatomical
+fallback, and using new RF maps in inference needs a separately stamped analysis. The final RF thresholding was
+corrected to agree with the fitter on zero-MAD peaks and amplitude / node floors; both the original and the fresh
+maps were re-analysed under the corrected rule, the fix changed no reported number (28 of 28 cells identical), and
+all three stamped rule dictionaries are unchanged.
+
+**Skeptic passes: all three `mostly sound`, with every number reproduced twice.** Same-device: every headline
+statistic recomputed twice, once with the shipped script and once with an independent numpy/scipy implementation
+that never imports the project's reducers, plus a raw-array check of the max-over-cells primary; 1,860
+raw-derived values and 928 comparisons / 204 scored families matched per batch, 0 differences. Rectangles: an
+independent primary reimplementation reproduces all 40 members per batch to max |deviation| 1.332e-15 (H200) /
+1.665e-15 (B200) with 0 verdict mismatches, plus 1,280 comparisons / 236 scored families, 1,728 preference and 756
+contrast statistics per batch and 3,888 raw values on the originals. Localizer: an independent scalar
+implementation matched 7,031 bodies x five runs on each lobe in all four maps, 0 differences. The delivery checker
+scans all 1,712 tables and 91 LC frame lattices and reproduces nine complete paired LC drive mean / SD traces
+exactly. The governance caveat stands and is stated in each audit: **these passes are Astra's own separately
+implemented checks plus fresh cluster runs, not a second agent or a human review** -- and in the same-device audit
+the `## Report`'s self-review is now filed under `author_self_review`, with the independent pass as the `skeptic`
+block.
+
+**Export (`object_export_r3.md`).** Entry point `out/export/objr3_index.json`, schema
+`flyverse.neurome.export/2`, revision 2: **95 directories, 1,712 tables, `problems` empty**, over four component
+indices -- `objr3_r2compare_index.json` (41 directories), `objr3_samedevice_index.json` (16),
+`objr3_rectangles_index.json` (36), `objr3_rfmap_index.json` (2) -- with `objr3_tables.json` listing every table
+and `objr3_skeptic.json` the independent delivery checks. All 91 sphere / rectangle rungs carry all 418 LC bodies
+at all 1,200 frames, with run means and sample SDs. The four fresh-seed **B200 replication Results are linked
+separately** under `replication_evidence` -> `out/export/objr3_house_results/index.json` (sha256 466c4fb2...,
+`n_results` 4: the house same-device Result, the house rectangles Result and the two house RF maps), kept as
+native Results rather than folded into the 95 original directories. Per-section reference devices are explicit
+(round-2 sphere base B200; specificity / benchmark base H200) and the literal verdict text `null` is preserved
+through the CSV round trip. One honest limitation: **the long RF recorder retained only node / role-window means**,
+so the delivery ships node response tables and says so, rather than a reconstructed per-cell frame chronology;
+getting that would need a new recording, not a reconstruction from means.
+
+**What the object half owes.** (1) A **separately declared** localizer -- a moving-probe RF assay with blank
+controls and a level-matched, smaller probe -- before any absence claim under other stimuli; the static 4.5-deg
+negative is scoped to its own protocol. (2) **More LC10a runs under a new declaration**, to settle the width-15
+row the two batches sign-reverse on and to give the free-peak-enrichment coverage test real power. (3) The
+**Neurome receptor-tier question**: LC11, T2 and T3 (and Tm5Y / TmY21 / TmY13) still run on the presynaptic-sign
+fallback for 100 % of their input, and that is the single change that would replace a modelling assumption with
+data. There is no adoption decision to execute from this round, and any future candidate still needs
+specificity / ON-OFF evidence, the full benchmark draws and the applicable room / anti-runaway guards.
+
+## Session 11, process, owner decisions and the FlyWire / BANC survey (2026-09-14)
+
+**Process, across both workflows.** Every predecessor agent died at a session limit, and the rented H200s were
+stopped about five hours when the account ran out of funds and then restarted, so four of the six behaviour
+batches lost their `cluster_run.py` client and were attached to and pulled by hand with the two helpers written
+for it -- `scripts/box_status.py` (`--wait` on a live submission; scheduler states by job ID) and
+`scripts/fetch_run.py` (resume a named run directory, compare every local / remote file). Astra's object batches
+hit the same dead-client failure on all three H200 submissions and recovered them from the scheduler's own job
+IDs. API 529s took the object workflow off this session mid-round; it was handed to Astra under
+`docs/HANDOFF_ROUND3_ASTRA.md`, which names every file's owner, and came back as `docs/HANDOFF_ROUND3_REPLY.md`.
+The **rented boxes were destroyed after the fetches, and those fetches were size-verified, not hash-verified**:
+nothing in `cluster_run.py` or `fetch_run.py` computes a digest, so unitary batch 1's "md5-verified against the
+box" is corrected to "size-verified (`FETCHED.txt`)" and `r3-h200b` is gone, which is why it cannot be re-checked.
+The rule that follows is `docs/INTERP.md` 10.4 item 19: `fetch_run.py` writes a per-file sha256 receipt computed
+on the box before transfer, and only a receipt path licenses the word "verified". Astra's house transfers already
+work that way -- compressed tar with SHA-256 compare -- which is how the two partial files with matching sizes
+were caught; no object box was destroyed.
+
+**Three owner decisions, recorded.** (a) **`LIFParams.w_syn_by_nt` is KEPT, as an opt-in instrument, not a
+mechanism.** Default `None`; shaped weights byte-identical under `None` / `{}` / all-ones (md5 6c36faf3...), 47
+CPU tests including bit-identity. The governance point goes on record with it: `flyverse/brain.py` was on this
+round's never-edit list and thread unitary used the "a new `LIFParams` field is unavoidable" carve-out, whose two
+conditions (default `None` plus a CPU bit-identity test) were met -- and which must from now on also carry a line
+in the hand-off. No bracket of the field is adoptable (`unitary_strength.md` 4). (b) **`MotorRates.haltere_L` /
+`_R` as fields is DEFERRED.** It is a one-line `read_motor` change plus `haltere_side_groups` cached on
+`WingGroups`, but it forces regeneration of `tests/test_bit_identity.py`'s golden (which hashes
+`asdict(fb.motor())`); until that is wanted, `motor.read_haltere_sides` stays a free function beside `MotorRates`.
+(c) **The adopt-alone rate-half is restated as a two-sample exact Poisson comparison.** The CI-containment form the
+guards audit cited was never the rule of rounds 4-6 (round 5 read it one-sided, "not worse in either route"), it
+ignores the candidate's own sampling error (14.9-15.6 % false failure for an identical true rate at 3-6 batches
+per arm, and it does not improve with n), and it was applied asymmetrically -- the transducer arm, also outside
+the CI but *below* it, was passed. From round 7 on: the rate-half is a two-sample exact Poisson (conditional
+binomial) at equal exposure, quoted beside the run-level `common.compare`; the direction is stated once for every
+arm; and the prescribed replication comes from a power calculation on the observed contrast (>= 6 runs per arm
+here: power 0.85 at n 6, 0.50 at n 4), not a fixed ">= 4".
+
+**FlyWire FAFB v783 / BANC v888 survey.** `docs/audits/flywire_banc_survey.md` reads the two public Princeton /
+FlyWire female releases on disk against the MaleCNS v1.0 graph flyverse ships on (CPU only, no model change);
+`docs/CONNECTOME_BACKENDS_SPEC.md` is the implementation spec handed to Astra. FAFB v783 is the brain with both
+optic lobes (139,255 cells, 50.7 M synapses, six-class per-cell NT probabilities, a `column_assignment` table of
+45,528 cells over ~790 columns/side); BANC v888 is brain **and** VNC (158,262 cells, 23.6 M synapses, a *verified*
+transmitter for 65,369 cells, `Body Part` / `Function` / `Nerve` labels for sensory cells, 259 hemilineages).
+Exact type-name overlap with MaleCNS covers 59 % (FAFB) and 72 % (BANC) of MaleCNS cells -- BANC carries the VNC
+types at identical cell counts (`AN04B003` 6/6, `IN12B014` 4/4, `PS059` 4/4, `GLNO` 4/4) -- and
+`flyverse/data/type_aliases.csv` already holds 22,200 alias rows, so a loader adapter is a name normalisation, not
+a re-typing. The round-1..3 turning anatomy re-reads on the female CNS with the same top rows (PS049 / PS059 ->
+DNa02 GABA, VES051 / LAL126 / AOTU019, AN04B003 and LT51 excitation, IN12B014's symmetric contralateral pair,
+PS196a -> PS059 contralateral), and DNa02's excitation : inhibition by presynaptic transmitter is 2.0 : 1 in
+MaleCNS, 1.96 : 1 in FAFB and 1.7 : 1 in BANC -- so the net-inhibited resting state rounds 1-3 rest on is a **rate
+statement, not a reconstruction artefact of the male graph**, which is what a reviewer will ask. Two caveats:
+synapse yield scales MaleCNS : FAFB : BANC ~ 1 : 0.6 : 0.3 (counts are not comparable across releases without a
+per-release scale; ratios within a release are), and BANC's optic lobes are under-proofread (T2 853 vs FAFB 1,466
+vs MaleCNS 1,630). For the NT thread: about 400 of the 2,361 `unknown` cells MaleCNS silences carry a
+classical-transmitter prediction in BANC, and MaleCNS's `serotonin` class splits SER / DA / tyramine across
+sources. Ranked uses are in `TODO.md` section F; nothing here changed a model.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
