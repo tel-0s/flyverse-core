@@ -249,6 +249,25 @@ class NullHelperTests(unittest.TestCase):
         r4 = common.compare([10.0, 10.1, 9.9, 10.2], [0.0, 0.1, -0.1, 0.2])
         self.assertAlmostEqual(r4["p_floor"], 2 / 70); self.assertEqual(r4["verdict"], "result")
 
+    def test_four_runs_per_arm_is_the_call_rule_whatever_the_other_arm_is(self):
+        """The run-count rule is `min(n_a, n_b) >= 4` (docs/INTERP.md 10.1(3) / 10.2), NOT the symmetric exact-U
+        floor: 3 v 5 floors at p 0.036, under alpha, and used to let three runs be called a result. `p_floor` and
+        `MIN_REPLICATES` (3, the scatter) are unchanged and still reported; the applied floor is `min_n`."""
+        self.assertEqual(common.MIN_REPLICATES, 3); self.assertEqual(common.CALL_REPLICATES, 4)
+        self.assertAlmostEqual(common.p_floor(3, 5), 2 / 56)                 # 0.0357: under alpha, and still 3 runs
+        r = common.compare([10.0, 10.1, 9.9], [0.0, 0.1, -0.1, 0.2, -0.2])   # 3 v 5, a huge separation
+        self.assertEqual(r["verdict"], "underpowered")
+        self.assertAlmostEqual(r["p_floor"], 2 / 56); self.assertLess(r["p_floor"], r["alpha"])
+        self.assertEqual(r["n_min"], 3); self.assertEqual(r["min_n"], 4); self.assertEqual(r["min_replicates"], 3)
+        # ... and it cannot be bought back by asking for a lower floor
+        self.assertEqual(common.compare([10.0, 10.1, 9.9], [0.0, 0.1, -0.1, 0.2, -0.2], min_n=2)["verdict"], "underpowered")
+        # 4 v 4 is not underpowered by count (the floor, 0.029, is what it always was)
+        r4 = common.compare([10.0, 10.1, 9.9, 10.2], [0.0, 0.1, -0.1, 0.2])
+        self.assertEqual(r4["n_min"], 4); self.assertEqual(r4["verdict"], "result")
+        self.assertEqual(common.compare([0.0, 0.1, -0.1, 0.2], [0.0, 0.1, -0.1, 0.2])["verdict"], "null")
+        # a small effect still declares itself: min_n=5 is honoured upwards
+        self.assertEqual(common.compare([10.0, 10.1, 9.9, 10.2], [0.0, 0.1, -0.1, 0.2], min_n=5)["verdict"], "underpowered")
+
     def test_a_deterministic_null_is_undetermined(self):
         """SD(null) == 0 (bit-identical draws) leaves z undefined: the verdict is 'undetermined' and the magnitude is
         `diff` -- not a z of NaN ('null' on +83 Hz), not one of 1e41 on a near-zero group, and not a per-tool
@@ -327,6 +346,44 @@ class ResultSchemaTests(unittest.TestCase):
         self.assertTrue(any("execution" in p for p in problems) and any("sensitivity" in p for p in problems))
         with self.assertRaises(ValueError):
             common.Result.new("nonsense", prov)
+
+    def test_modified_files_keep_their_first_character(self):
+        """`git status --porcelain` is 'XY path', but `_git` STRIPS the command's output, so the first line arrives
+        without its leading space and the old fixed `line[3:]` ate a character of it ('ocs/INTERP.md' for
+        'docs/INTERP.md') -- a modified_files list no reader could match against a checkout."""
+        from unittest import mock
+        porcelain = ("M docs/INTERP.md\n"                         # the first line, already stripped by _git
+                     " M flyverse/interp/common.py\n"
+                     "?? out/new.json\n"
+                     "AM scripts/cluster_run.py\n"
+                     "R  scripts/old.py -> scripts/new.py\n")
+        with mock.patch.object(common, "_git", lambda *a: "0" * 40 if a[0] == "rev-parse" else porcelain):
+            st = common.git_state()
+        self.assertEqual(st["modified_files"], ["docs/INTERP.md", "flyverse/interp/common.py", "out/new.json",
+                                                "scripts/cluster_run.py", "scripts/new.py"])
+        self.assertTrue(st["dirty"]); self.assertEqual(st["commit"], "0" * 40)
+        self.assertEqual(common.porcelain_path(" M docs/INTERP.md"), "docs/INTERP.md")   # either way round
+        self.assertEqual(common.porcelain_path("M docs/INTERP.md"), "docs/INTERP.md")
+        with mock.patch.object(common, "_git", lambda *a: "0" * 40 if a[0] == "rev-parse" else ""):
+            self.assertEqual(common.git_state(), {"commit": "0" * 40, "dirty": False, "modified_files": []})
+        # every entry names a path of this checkout, in the real state too
+        for f in common.git_state()["modified_files"]:
+            self.assertFalse(f.startswith(" ")); self.assertNotIn(" -> ", f)
+
+    def test_execution_record_carries_the_device_without_a_flybrain(self):
+        """A tool with no FlyBrain to ask (scripts/retire_measures.py) passes the device it resolved; it used to be
+        dropped into `device_requested` alone, leaving `execution.device` null -- which `Result.check()` rejects --
+        while the tool's own config block held the device it really ran on."""
+        rec = common.execution_record(device="cpu")
+        self.assertEqual(rec["device"], "cpu"); self.assertEqual(rec["device_requested"], "cpu")
+        self.assertIsNone(common.execution_record()["device"])            # nothing said, nothing claimed
+        c = graph()
+        with_fb = common.execution_record(fake_fb(c, np.zeros(8)), device="cuda")
+        self.assertEqual(with_fb["device"], "cpu")                        # a brain still wins: the request is not the record
+        self.assertEqual(with_fb["device_requested"], "cuda")
+        prov = common.provenance(c, device="cpu")
+        self.assertEqual(prov["execution"]["device"], "cpu")
+        self.assertEqual([p for p in common.Result.new("ledger", prov).check() if "device" in p], [])
 
     def test_cli_helpers(self):
         import argparse
@@ -1106,7 +1163,10 @@ class AtlasTests(unittest.TestCase):
     def test_run_roundtrip_and_null_comparison(self):
         from flyverse.interp import atlas as A
         c = self.brain_subset()
-        pops, runs = self.runs(c, 3)
+        # FOUR runs, not three: `common.compare` calls nothing whose smaller arm is under CALL_REPLICATES, however
+        # many null draws the atlas piles up on the other side (3 v 6 floors at p 0.024 and used to be callable).
+        # What this test is about -- the undetermined / z_floor split -- needs a callable arm to be about anything.
+        pops, runs = self.runs(c, 4)
         self.assertEqual([p.label for p in pops], ["DNa02_L", "DNa02_R", "LC4"])
         r0 = runs[0]
         self.assertEqual(r0.values["mean"].shape, (3, len(r0.readouts)))
@@ -1125,10 +1185,10 @@ class AtlasTests(unittest.TestCase):
 
         res = A.analyse_runs(runs, c=c, top=2)
         df = res.table("atlas")
-        self.assertEqual(res.summary["n_runs"], 3); self.assertEqual(res.summary["n_populations"], 3)
+        self.assertEqual(res.summary["n_runs"], 4); self.assertEqual(res.summary["n_populations"], 3)
         self.assertEqual(res.check(), [])
-        self.assertEqual(res.replicates["unit"], "runs"); self.assertEqual(res.replicates["n"], 3)
-        self.assertEqual(res.replicates["null"]["n_draws"], 6)
+        self.assertEqual(res.replicates["unit"], "runs"); self.assertEqual(res.replicates["n"], 4)
+        self.assertEqual(res.replicates["null"]["n_draws"], 8)
         def row(pop, ro):
             return df[(df.population == pop) & (df.readout == ro)].iloc[0]
         self.assertGreater(row("DNa02_L", "type.DNa02_L")["diff"], 10.0)   # the pulse drives the cell it names
@@ -1136,7 +1196,7 @@ class AtlasTests(unittest.TestCase):
         # effect size z_floor (diff / max(SD, 0.05 Hz)) is what calls the row a mover (atlas.called)
         self.assertEqual(row("DNa02_L", "type.DNa02_L")["verdict"], "undetermined")
         self.assertEqual(row("DNa02_L", "type.DNa02_L")["verdict_z_floor"], "result")
-        self.assertEqual(row("DNa02_L", "type.DNa02_L")["n_runs"], 3)
+        self.assertEqual(row("DNa02_L", "type.DNa02_L")["n_runs"], 4)
         self.assertEqual(row("LC4", "type.DNa02_L")["verdict"], "null")    # an unconnected pulse moves nothing
         self.assertEqual(list(A.called(df[df.readout == "type.DNa02_L"]).population), ["DNa02_L"])
         self.assertAlmostEqual(row("LC4", "type.DNa02_L")["diff"], 0.0, places=6)

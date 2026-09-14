@@ -4,6 +4,7 @@
     python scripts/build_hold_tables.py --groups Brain,Optic        # only those two
     python scripts/build_hold_tables.py --verify                    # + counts the entries each table changes vs sign(W.data)
     python scripts/build_hold_tables.py --fanin                     # round-5 fan-in probe (CPU, no simulation)
+    python scripts/build_hold_tables.py --groups OpticHis,OpticGlu,OpticRandom --verify   # the take-off class split (G.6)
 
 Each table is flyverse/data/receptors_by_type.csv (its '#' header kept) with one group of rows set back to the
 presynaptic prior (`connectome.NT_SIGN`): fast_sign_abs = NT_SIGN[transmitter] (glutamate / histamine -1, i.e. no +1
@@ -23,6 +24,21 @@ Groups:
             the KC and DN1 groups (3,709 entries / 8,551 syn), so holdBrainGlu is round 4's holdKC + holdDN1 applied
             together; its histamine rows are the 123 entries / 282 syn round 4 was left with, so holdBrainHis holds
             exactly that residual. The pair dissociates taste (the histamine group) from smell (the glutamate group).
+  dynamics round 2 (the take-off class split with a dose control, receptor_integration.md G.6) -- ALONE tables: the
+  named optic class is the ONLY set of rows that keeps its receptor-derived sign; every other row that differs from
+  the prior (the rest of the optic side AND the whole Brain side) is held. The file is still receptors_hold<G>.csv and
+  the batch arm is hold<G>, so read 'hold' here as 'hold everything but <G>':
+    OpticHis    = the optic side's histamine rows alone (45 rows, the -1 -> 0 silencings; 17,256 entries / 83,191 |W|)
+    OpticGlu    = the optic side's glutamate rows alone (T1, Dm9, Lai: the -1 -> +1 iGluR flips; 27,207 / 87,920)
+    OpticRandom = a seeded random subset of the optic side's rows whose connectome entry count is EXACTLY the Brain
+                  side's 3,832 (the dose control of G.5 item 5): drawn uniformly, with numpy default_rng(RANDOM_SEED),
+                  among all subsets of the 33 optic-side rows that own at least one stored entry whose entry counts
+                  sum to 3,832 (dynamic-programming count + backward sampling, so every exact-sum subset is equally
+                  likely). The per-row entry counts come from the loaded cache (this group alone loads it), and the
+                  header lists the drawn rows with their counts. Two limits, by construction: the table is per
+                  (type, transmitter), so the control is row-granular, not entry-granular; and T1 (21,157) and Dm9
+                  (5,981) can never be drawn, so the control samples the histamine silencings (+ Lai's 69 glutamate
+                  entries) -- it matches the Brain side's ENTRY dose, not its |W| and not the glutamate class.
   The 28 synthetic `<nt=...>` / `<superclass=...>` rows (superclass NaN) are in neither side: receptor_signs excludes
   them from the per-type lookup and reads them only under nt_class_fallback, which is off in every run here.
 
@@ -35,6 +51,7 @@ import hashlib
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -47,7 +64,15 @@ OPTIC_SUPERCLASSES = ("ol_intrinsic", "ol_sensory")
 # {group: (side, transmitter or None)} -- 'brain' = the types whose table superclass is NOT ol_intrinsic / ol_sensory.
 SIDE_GROUPS = {"Brain": ("brain", None), "Optic": ("optic", None),
                "BrainGlu": ("brain", "glutamate"), "BrainHis": ("brain", "histamine")}
-GROUPS = (*TYPE_GROUPS, *SIDE_GROUPS)
+# {group: transmitter or 'random'} -- ALONE tables (docstring): only the optic-side rows of this class keep the table sign.
+ALONE_GROUPS = {"OpticHis": "histamine", "OpticGlu": "glutamate", "OpticRandom": "random"}
+RANDOM_SEED = 0            # numpy default_rng seed of the OpticRandom draw
+RANDOM_ENTRIES = 3832      # the Brain side's changed-entry count (receptor_integration.md G.0), the dose to match
+GROUPS = (*TYPE_GROUPS, *SIDE_GROUPS, *ALONE_GROUPS)
+# The bare `--groups` default. The three ALONE tables are OPT-IN by name: OpticRandom's exact-dose draw counts
+# connectome entries (optic_row_entries), so leaving them in the default made a bare invocation of a table builder
+# load the connectome cache. Naming any of them still builds it; no table's content changes either way.
+DEFAULT_GROUPS = (*TYPE_GROUPS, *SIDE_GROUPS)
 # connectome.NT_SIGN, duplicated so the table can be built without importing torch / loading the cache.
 NT_SIGN = {"acetylcholine": 1.0, "gaba": -1.0, "glutamate": -1.0, "histamine": -1.0,
            "dopamine": 0.0, "octopamine": 0.0, "serotonin": 0.0}
@@ -64,6 +89,8 @@ def hold_table(group: str) -> tuple[str, pd.DataFrame, int]:
         header += (f"# scripts/build_hold_tables.py: {int(sel.sum())} glutamate rows of {group} "
                    f"({', '.join(TYPE_GROUPS[group])}) held at NT_SIGN (fast_sign_abs -1, gain none, fast_net_abs held)\n")
         return header, t, int(sel.sum())
+    if group in ALONE_GROUPS:
+        return alone_table(group, header, t)
     if group not in SIDE_GROUPS:
         raise ValueError(f"unknown group {group!r}; known: {', '.join(GROUPS)}")
     which, nt = SIDE_GROUPS[group]
@@ -82,6 +109,82 @@ def hold_table(group: str) -> tuple[str, pd.DataFrame, int]:
            ("" if nt is None else f", {nt} rows only")
     header += (f"# scripts/build_hold_tables.py: {int(sel.sum())} rows of {what} held at NT_SIGN "
                f"(fast_sign_abs = NT_SIGN[transmitter], gain none, fast_net_abs held); by transmitter {by}\n")
+    return header, t, int(sel.sum())
+
+
+def optic_row_entries(t: pd.DataFrame, rows_mask) -> pd.Series:
+    """Stored connectome entries per (postsynaptic type, presynaptic transmitter) of the masked table rows, from the
+    loaded cache (the same (type, nt) lookup connectome.receptor_signs does). Index = the table's row labels."""
+    sys.path.insert(0, ROOT)
+    from flyverse import connectome as cn
+    c = cn.load(verbose=False)
+    coo = c.W.tocoo()
+    ty = c.neurons.type.fillna("").to_numpy()
+    nt = c.neurons.nt.fillna("unknown").to_numpy() if "nt" in c.neurons.columns else np.array(["unknown"] * c.n)
+    key = pd.Series(ty[coo.row]).astype(str) + "|" + pd.Series(nt[coo.col]).astype(str)
+    counts = key.value_counts()
+    labels = t.loc[rows_mask, "malecns_type"].astype(str) + "|" + t.loc[rows_mask, "transmitter"].astype(str)
+    out = labels.map(counts).fillna(0).astype(int)
+    out.attrs["cache"] = f"nnz {c.W.nnz:,}, sum|W| {float(np.abs(c.W.data).sum()):,.0f}, n {c.n:,}"
+    return out
+
+
+def random_exact_subset(counts: pd.Series, total: int, seed: int) -> tuple[list, int]:
+    """A uniformly random subset (row labels) of `counts` whose values sum to exactly `total`: a subset-sum DP counts
+    the subsets of the first i rows reaching each sum (exact Python ints), then the draw walks the rows backwards,
+    including row i with probability (#subsets of rows < i reaching s - c_i) / (#subsets of rows <= i reaching s).
+    Returns (chosen labels in table order, number of exact-sum subsets)."""
+    labels = list(counts.index)
+    vals = [int(v) for v in counts.to_numpy()]
+    n = len(vals)
+    f = [[0] * (total + 1) for _ in range(n + 1)]
+    f[0][0] = 1
+    for i, v in enumerate(vals, 1):
+        prev, cur = f[i - 1], f[i]
+        for s_ in range(total + 1):
+            cur[s_] = prev[s_] + (prev[s_ - v] if v <= s_ else 0)
+    if f[n][total] == 0:
+        raise ValueError(f"no subset of the {n} rows sums to exactly {total} entries")
+    rng = np.random.default_rng(seed)
+    chosen, s_ = [], total
+    for i in range(n, 0, -1):
+        v = vals[i - 1]
+        with_i = f[i - 1][s_ - v] if v <= s_ else 0
+        if with_i and rng.random() < with_i / f[i][s_]:
+            chosen.append(labels[i - 1]); s_ -= v
+    assert s_ == 0 and sum(int(counts[l]) for l in chosen) == total
+    return chosen[::-1], int(f[n][total])
+
+
+def alone_table(group: str, header: str, t: pd.DataFrame) -> tuple[str, pd.DataFrame, int]:
+    """An ALONE table (docstring): every row that differs from the prior is held EXCEPT the optic-side rows of the
+    named class (OpticHis / OpticGlu) or the seeded random exact-dose subset of optic-side rows (OpticRandom)."""
+    what = ALONE_GROUPS[group]
+    optic = t.superclass.isin(OPTIC_SUPERCLASSES)
+    synthetic = t.malecns_type.astype(str).str.startswith("<")
+    prior = t.transmitter.map(NT_SIGN).astype(float)
+    differs = (t.fast_sign_abs.astype(float) != prior) & ~synthetic
+    if what == "random":
+        cand = differs & optic
+        ent = optic_row_entries(t, cand)
+        ent = ent[ent > 0]                                   # 33 rows own entries; the 15 empty ones cannot carry a dose
+        chosen, n_sub = random_exact_subset(ent, RANDOM_ENTRIES, RANDOM_SEED)
+        keep = t.index.isin(chosen)
+        drawn = ", ".join(f"{t.malecns_type[i]}/{t.transmitter[i]} {int(ent[i])}" for i in chosen)
+        note = (f"OpticRandom: {len(chosen)} optic-side rows drawn with numpy default_rng({RANDOM_SEED}) uniformly among the "
+                f"{n_sub:,} subsets of the {len(ent)} entry-owning optic-side rows whose entry counts sum to exactly "
+                f"{RANDOM_ENTRIES} (the Brain side's dose); cache {ent.attrs['cache']}; drawn (type/transmitter entries): {drawn}")
+    else:
+        keep = (differs & optic & (t.transmitter == what)).to_numpy()
+        note = f"{group}: the {int(keep.sum())} optic-side {what} rows alone keep their table sign"
+    sel = differs & ~keep                                    # hold everything else that differs from the prior
+    t.loc[sel, "fast_sign_abs"] = prior[sel].astype(int)
+    t.loc[sel, "fast_gain_class_abs"] = "none"
+    t.loc[sel, "fast_net_abs"] = "held"
+    by = t.loc[sel].groupby(["superclass", "transmitter"], dropna=False).size().to_dict()
+    header += (f"# scripts/build_hold_tables.py: ALONE table -- {note}; the other {int(sel.sum())} rows that differ from "
+               f"NT_SIGN (the rest of the optic side and the whole Brain side) held at NT_SIGN (fast_sign_abs = "
+               f"NT_SIGN[transmitter], gain none, fast_net_abs held); held by (superclass, transmitter) {by}\n")
     return header, t, int(sel.sum())
 
 
@@ -131,8 +234,16 @@ def verify(paths: dict) -> None:
         else:
             print(f"  remaining changes by postsynaptic superclass (entries, |W|): {split(d)}")
             print(f"  held entries by postsynaptic superclass (entries, |W|): {split(held)}")
-            exp = {"Brain": 44463, "Optic": 3832, "BrainGlu": 44586, "BrainHis": 48172}[g]
+            exp = {"Brain": 44463, "Optic": 3832, "BrainGlu": 44586, "BrainHis": 48172,
+                   "OpticHis": 17256, "OpticGlu": 27207, "OpticRandom": 3832}[g]
             print(f"  EXPECTED {exp} entries changed -> {'OK' if int(d.sum()) == exp else 'MISMATCH'}")
+            if g in ALONE_GROUPS:
+                pre_nt = c.neurons.nt.fillna("unknown").to_numpy()[c.W.tocoo().col]
+                sil, flp = d & (r.fast_sign == 0), d & (r.fast_sign == 1)
+                print(f"  remaining: silencings {int(sil.sum())} (|W| {float(wabs[sil].sum()):.0f}), flips {int(flp.sum())} "
+                      f"(|W| {float(wabs[flp].sum()):.0f}); by presynaptic transmitter "
+                      f"{pd.Series(pre_nt[d]).value_counts().to_dict()}; by postsynaptic type "
+                      f"{pd.Series(types[post[d]]).value_counts().head(12).to_dict()}")
 
 
 def fanin(paths: dict, out_dir: str) -> None:
@@ -301,7 +412,10 @@ def fanin(paths: dict, out_dir: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default=os.path.join(ROOT, "out"))
-    ap.add_argument("--groups", default=",".join(GROUPS), help=f"comma-separated subset of {', '.join(GROUPS)}")
+    ap.add_argument("--groups", default=",".join(DEFAULT_GROUPS),
+                    help=f"comma-separated subset of {', '.join(GROUPS)} (default: {', '.join(DEFAULT_GROUPS)}; the "
+                         f"ALONE tables {', '.join(ALONE_GROUPS)} are built only when named -- OpticRandom loads the "
+                         f"connectome cache)")
     ap.add_argument("--verify", action="store_true", help="count changed entries with connectome.receptor_signs (loads the local cache)")
     ap.add_argument("--fanin", action="store_true", help="fan-in normalisation probe: per-cell input_scale under each table (CPU)")
     a = ap.parse_args()

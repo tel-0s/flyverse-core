@@ -1,4 +1,5 @@
-"""Offline contracts for scripts/cluster_run.py: config parsing, tunnels, least-loaded scheduling, fetch guard.
+"""Offline contracts for scripts/cluster_run.py: config parsing, tunnels, least-loaded scheduling, fetch guard,
+the exit-status guard.
 
 Nothing here touches a real cluster: the <scheduler> API is a canned in-process HTTP server, ssh/scp are
 patched out, and the tunnel subprocess is faked. No job is ever submitted anywhere.
@@ -534,6 +535,52 @@ class FetchTests(unittest.TestCase):
         self.assertEqual(seen[0][1], "root@1.2.3.4:/root/runs-a/x-abc/out/run/.")   # dir/. merges the contents
         self.assertIn("fetched out/run/ @a", buf.getvalue())
         self.assertIn("fetched out/run/ @b", buf.getvalue())
+
+
+class ExitStatusTests(unittest.TestCase):
+    """A job line that ends with `; tail ...` / `; cat ...` after a redirect exits with TAIL's status, not python's:
+    a run that died mid-write still reports `completed exit 0`, and `'<n> job(s), 0 failed'` then proves nothing.
+    cluster_run warns (stderr and the console log) and submits the command unchanged."""
+
+    def test_only_a_semicolon_tail_after_a_redirect_is_flagged(self):
+        bad = "mkdir -p out/od && python scripts/interp_trace.py record > out/od/a.txt 2>&1; tail -4 out/od/a.txt"
+        self.assertEqual(cr.exit_masking_suffix(bad), "tail -4 out/od/a.txt")
+        self.assertEqual(cr.exit_masking_suffix(bad + ";"), "tail -4 out/od/a.txt")
+        self.assertEqual(cr.exit_masking_suffix("python x.py > a.log 2>&1 ; cat a.log"), "cat a.log")
+        # the two forms that keep python's status
+        self.assertIsNone(cr.exit_masking_suffix("python x.py > a.log 2>&1 && tail -4 a.log"))
+        self.assertIsNone(cr.exit_masking_suffix("python x.py > a.log 2>&1; st=$?; tail -4 a.log; exit $st"))
+        # nothing was redirected, so nothing is being hidden; and a plain job line is not flagged
+        self.assertIsNone(cr.exit_masking_suffix("python x.py; tail -4 a.log"))
+        self.assertIsNone(cr.exit_masking_suffix("python scripts/benchmark.py --json out/bench.json"))
+
+    def test_the_warning_names_the_line_and_both_repairs(self):
+        err = io.StringIO()
+        bad = "python x.py > a.log 2>&1; tail -4 a.log"
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(err):
+            flagged = cr.warn_exit_masking(["python ok.py > a.log 2>&1 && tail -4 a.log", bad])
+        self.assertEqual(flagged, [bad])
+        for text in (out.getvalue(), err.getvalue()):                   # the console log AND stderr
+            self.assertIn("WARNING command 1", text)
+            self.assertIn("tail -4 a.log", text)
+            self.assertIn("0 failed", text)                             # says what the totals line is then worth
+            self.assertIn("&& tail", text)
+            self.assertIn("st=$?", text)
+            self.assertNotIn("command 0", text)
+
+    def test_the_run_warns_and_submits_the_command_unchanged(self):
+        h = FakeHeimdall()
+        self.addCleanup(h.stop)
+        bad = "mkdir -p out/od && python scripts/interp_trace.py record > out/od/a.txt 2>&1; tail -4 out/od/a.txt"
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code, log, _ = run_main(["--name", "x", "--poll", "0.01", bad, "python y.py --json out/y.json"],
+                                    dict(TARGET, api=h.api, slots=2))
+        self.assertEqual(code, 0)
+        self.assertIn("WARNING command 0", log)                         # in the log the round tees
+        self.assertIn("WARNING command 0", err.getvalue())              # and on stderr
+        self.assertNotIn("WARNING command 1", log)
+        self.assertEqual(h.submitted[0]["spec"]["command"], f"source .venv/bin/activate && {bad}")
 
 
 if __name__ == "__main__":

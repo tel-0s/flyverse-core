@@ -97,8 +97,11 @@ class FlyBrain:
 
     @property
     def available_senses(self):
+        # 'proprioception' appears only when a caller attaches a senses.Proprioception instance as
+        # `proprioception_sense` (opt-in; BatchSim(..., proprioception=...)); nothing builds one by default.
         return tuple(name for name, value in (("vision", self.optic), ("smell", self.olfaction),
-                     ("wind", self.wind_sense), ("taste", self.taste_sense)) if value is not None)
+                     ("wind", self.wind_sense), ("taste", self.taste_sense),
+                     ("proprioception", getattr(self, "proprioception_sense", None))) if value is not None)
 
     def neurotransmitters(self, batch_index=0) -> NTSnapshot | None:
         """Optional live NT levels, sampled on demand through a read-only adapter.
@@ -164,6 +167,15 @@ class FlyBrain:
     def taste(self, sugar):
         self._require("taste", self.taste_sense)
         self._input("taste", self.taste_sense.sweet, self.taste_sense.rates(sugar, self.B))
+
+    def proprioception(self, leg_L, leg_R, haltere, airborne, yaw_rate=0.0):
+        """Opt-in (senses.Proprioception attached as `proprioception_sense`): the leg MN rates per side, the haltere
+        MN rate and the airborne flag of the body -> afferent Hz per channel, injected like wind. `yaw_rate` is read
+        only by the labelled stop-gap Coriolis term and is ignored otherwise."""
+        sense = getattr(self, "proprioception_sense", None)
+        self._require("proprioception", sense)
+        for name, idx, hz in sense.rates(leg_L, leg_R, haltere, airborne, yaw_rate, self.B):
+            self._input(f"proprioception_{name}", idx, hz)
 
     def stimulate(self, selection, hz, ms):
         """Force a pulse, combined with sensory drive by maximum; expire on a LIF boundary."""

@@ -128,7 +128,7 @@ provenance block of section 3 so a recording is self-describing).
 ### 2.4 Null and replicate helpers -- the scatter rule, in code
 
 ```python
-compare(stim_values, null_values, z_min=3.0, min_n=3, alpha=0.05)
+compare(stim_values, null_values, z_min=3.0, min_n=3, alpha=0.05)   # the call rule is max(min_n, CALL_REPLICATES=4) per arm
   -> {"stim": ArmStats, "null": ArmStats, "diff", "z", "welch", "U", "p", "p_floor", "null_sd_zero", "verdict", ...}
 p_floor(n_a, n_b)   # 2 / C(n_a + n_b, n_a): 3 v 3 -> 0.10, 4 v 4 -> 0.029, 5 v 5 -> 0.0079
 ```
@@ -191,6 +191,68 @@ reaches the tool as `args.null_runs` (a list of globs; the wrappers that label a
 ledger's `--null`, so the round's command lines still run. A subcommand that has to **generate** the null arm
 declares its own bare `--null` switch (`interp_export.py record --null`); `add_common_args` no longer does, which is
 what made `analyse --null-arm X --null` silently drop the control.
+
+### 2.7 The RF-map file (`flyverse.interp.rfmap/1`; generator `scripts/probe_synthetic_stimuli.py rfmap`)
+
+A per-body receptive-field map measured with the synthetic localizer (a 4.5-deg dark square flashed for 200 ms at every
+node of a 10-deg azimuth x elevation grid on the radiance path, `docs/audits/object_synthetic_stimuli.md`). It fixes
+each body's measurement region for the matched assays (`probe_object_matched.py --rf-map`, `probe_synthetic_stimuli.py
+analyse --rf-map`) and is the stimulus-driven alternative to the anatomical column of `trace.column_of_cells`. Two
+files, the same rows:
+
+* **`<name>.csv`** -- one row per recorded body (every body of the recorded types, fitted or not). The first seven
+  columns are the interface every consumer reads, in this order:
+
+  | column | meaning |
+  |---|---|
+  | `bodyId` | decimal string (MaleCNS body id) |
+  | `type` | the cell type |
+  | `az_deg`, `el_deg` | the RF centre (azimuth + left, elevation + up, degrees; `Retina.col_az_el`'s frame); **NaN when not fitted** |
+  | `width_deg` | the equivalent-disc FWHM: `2 sqrt(n spacing^2 / pi)` over the nodes at or above half-maximum, at least one grid spacing; NaN when not fitted |
+  | `peak` | the peak per-node response (`on` window minus the pre-onset `base`; `drive_mv` for spiking cells, `optic_dr` for rate units), signed |
+  | `n_nodes_above_threshold` | the nodes at or above half-maximum of the same sign (0 when not fitted) |
+
+  then the fit's bookkeeping: `sign` (+1 / -1), `noise_mad` (1.4826 x MAD over nodes), `z_peak` (|peak| / noise),
+  **`fitted`** (|peak| >= `z_min` x noise; `z_min` 5 by default), `peak_node_az_deg` / `peak_node_el_deg`, `quantity`,
+  `window` (`on` | `off` | `onoff`), `model_index`, `spikes_on_minus_base_hz_peak`; over several runs `n_runs_fitted`,
+  `az_sd_runs` / `el_sd_runs`, `centre_spread_deg` (the largest pairwise great-circle distance between the runs'
+  centres -- the reproducibility of the map, on file per body); and the anatomical comparison `anat_column`,
+  `anat_az_deg` / `anat_el_deg` (the column of `trace.column_of_cells`), `hex_annotated`, `anat_distance_deg`
+  (great-circle, fitted centre vs anatomical column). A consumer selects `fitted == True` (equivalently a finite
+  `az_deg`); a body without a row, or with `fitted` false, has no localizer and its windowed statistics are NaN,
+  never 0. `height_deg` is absent: the fit is isotropic and consumers default it to `width_deg`.
+* **`<name>.json`** -- a `Result` (tool `trace`) whose `tables.rf_map` holds the same rows and `tables.rf_per_type` the
+  per-type summary (`coverage` = the fraction of bodies fitted, `n_fitted_all_runs`, `width_median_deg`,
+  `anat_distance_median_deg`, `anat_within_10deg` / `_15deg`, `centre_spread_median_deg`, and
+  `false_fit_rate_blank_arm_mean` -- the same fit applied to the localizer's **blank arm**, i.e. the fraction of
+  bodies the rule 'fits' from noise alone); `summary.schema` = `flyverse.interp.rfmap/1`, `summary.fit_rule` (the
+  docstring of `fit_rf`), `summary.optic_overrides` (`{}` = the shipped lobe, `{'gain_fb': 0}` = the deterministic
+  lobe), and the full provenance of the first run (resolved `LIFParams` / `OpticParams`, realised device, cache
+  fingerprint, source fingerprint). `replicates.runs` lists the localizer runs the map averages over (several runs
+  = the map is the mean centre of the bodies fitted in EVERY run) and `replicates.null.blank_arm_files` the blank
+  arms behind the false-fit rate.
+
+The per-run inputs are `<run>_nodes.npz` (stimulus arm) / `<run>_nodes_blank.npz` (blank arm): `node_az_deg`,
+`node_el_deg` (n_nodes), `idx` / `body_ids` / `types` (n_cells), and per window `on__` / `off__` / `base__` x
+`drive_mv` / `optic_dr` / `spikes_per_frame` as (n_nodes, n_cells) means, with `n_on` / `n_off` / `n_base` frame
+counts (20 / 10 / 10 at 10 ms). The map is one localizer's magnitudes: coverage and agreement are quoted with the
+centre scatter over >= 3 runs (`centre_spread_deg`) and the blank-arm false-fit rate, never alone. The `window`
+column names the node window the response was read in (`on` = the flash frames, `off` = the frames after the offset)
+-- the same ON / OFF role split the family analysis reports as its `transition = on | off` rows
+(`probe_synthetic_stimuli.py analyse`, `object_synthetic_stimuli.md` 6.1); it is not a bright-vs-dark label.
+
+**What is on file, and what a consumer must carry with it** (object round 2, 2026-09-13; the `verify:synthetic`
+corrections). Five maps exist and only one has a replicate: `out/synth/rfmap_shipped.csv` (4.5 deg, 1 pass, **3
+runs**, so `centre_spread_deg` is a real number) against `out/synth/rfmap_fb0.csv`, `out/synth2/rfmap_088_fb0_p3.csv`,
+`rfmap_088_shipped_p3.csv` and `rfmap_150_fb0_p3.csv`, which are **one run each** (`n_runs_fitted` 1,
+`centre_spread_deg` NaN -- no scatter, against the round rule of >= 3 runs of one localizer in one submission).
+**No map on file carries a fitted LC11 row** at `z_min` 5 (0 of 143 bodies at 4.5, 8.8 and 15 deg, peak node at
+chance), and LC10a rows exist only in `rfmap_150_fb0_p3.csv` (13 of 275 = 4.7 %, ONE run, `gain_fb=0`; the 15-deg
+localizer was never run on the shipped lobe). So an LC body's window is normally the anatomical fallback -- the
+round-2 sphere ladder windows 405 of its 418 LC bodies that way -- and any consumer that windows an LC statistic
+states which map it used and that LC11 has no fitted centre in any of them (`object_synthetic_stimuli.md` 4.1 / 4.2 /
+8). The maps measured with `gain_fb=0` describe the deterministic lobe, not the shipped one; `summary.optic_overrides`
+is the field to read.
 
 ---
 
@@ -626,12 +688,17 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
    cancelling pair, and whether any route into the readout is signed at every link. This is where GLNO -> PEN
    (sign 0, 19.4 % of PEN's input) and LLPC1 / PFL3 / AOTU015 -> DNa02 were found before any GPU job ran.
 3. **One cluster batch (GPU), replicates as runs.** Record stimulus / matched control / control-again (**the null**)
-   under the shipped model, **>= 4 runs per arm, 5 when the effect is small** -- three runs cannot give a `result`
-   through `common.compare` (exact U floor p = 0.10 at 3 v 3; 0.029 at 4 v 4; 0.0079 at 5 v 5). Add the
+   under the shipped model, **`min(n_a, n_b) >= 4` runs, 5 when the effect is small**. The rule is about the SMALLER
+   arm, not about the symmetric exact-U floor: 3 v 3 floors at p 0.10, but 3 v 5 floors at 0.036 and 3 v 6 at 0.024,
+   both under alpha, so a big null arm used to buy a three-run stimulus arm a `result`. `common.compare` applies both
+   (`CALL_REPLICATES`, and `p_floor > alpha`) and returns `underpowered` below four runs in either arm whatever the
+   floor says; `MIN_REPLICATES` stays 3 because three runs still buy the scatter. Add the
    deterministic arm when one exists (`--optic gain_fb=0` for optic-lobe questions: its null is exactly 0 and it is
    read as magnitudes, not verdicts). One `cluster_run.py` call, `mkdir -p` in every job line, `--fetch` a NAMED
-   subdirectory, one client per directory; read `'<n> job(s), 0 failed'` and every job's `device cuda` before
-   analysing; `interp_apply_rotation.py verify-batch <dir>` (or the tool's console-vs-meta check) before analysis.
+   subdirectory, one client per directory, and a job line that preserves python's exit code (`&& tail` /
+   `st=$?; tail; exit $st`, 10.4 item 4); read `'<n> job(s), 0 failed'`, then count the expected artefacts and check
+   every run block's `device` and arm spec before analysing; `interp_apply_rotation.py verify-batch <dir>` (or the
+   tool's console-vs-meta check) before analysis.
    Two same-code batches with the same seeds are not the same draws (the GPU rollout is not seed-reproducible):
    the replicate unit is the job.
 4. **Trace, then decompose at the lost stage (CPU).** `interp_trace.py analyse --source <sensory spec> --stimulus
@@ -657,7 +724,8 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
    label.
 6. **Attribute with the lesion matrix when a suite check is the failure.** `interp_lesion.py plan --manifest <holds
    or your own> --replicates 3` for bit-identical checks (taste, smell, bitter, `walk.GF_max` under the pinned walk,
-   `rest`), **>= 4-5** for any check with run scatter (`loom.GF_peak_hz`, `rotate.DNp20_flip_hz`, the walk power pair,
+   `rest`) -- bit-identity is a CPU / `gain_fb=0` property (10.4 item 2) and those three draws are ONE effective
+   replicate, read as magnitudes (`undetermined`), never as a called difference -- **>= 4-5** for any check with run scatter (`loom.GF_peak_hz`, `rotate.DNp20_flip_hz`, the walk power pair,
    anything from the room); read `dissociations` only for rows called by bit-identity or by seed pairing, and quote a
    scatter-rule dissociation with its draw count (the same `holds` manifest gave 1 / 8 / 17 dissociations over three
    batches of 4 / 4 / 3 draws; only the (holdDN1, holdKC) x (Shiu sugar, Shiu bitter) pair survived all three).
@@ -666,13 +734,28 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
    done), every number from a named file or run with its scatter over >= 3 runs, the batch line, the defects found in
    the tools. `interp_export.py analyse --result <the Result>` for every JSON a partner may read (the export refuses a
    Result whose `check()` is non-empty; `verify` must print `problems: none`). Add a ledger row for the new
-   localization so the next round scores it. Nothing in `flyverse/` outside `interp/` changes.
+   localization so the next round scores it. Two separate obligations about `flyverse/`, and they are not the same
+   one:
+
+   * **(a) Authorship.** Nothing in `flyverse/` outside `interp/` is AUTHORED by the task -- no edit of `brain.py`,
+     `optic.py`, `body.py`, `programs.py`, `room_demo.py`, `room_ui.py` lands from this work, and a counterfactual is
+     a `LIFParams` / `OpticParams` override, a `--receptor-table` or an in-process mask (section 10's opening).
+   * **(b) Dependency.** Every `flyverse/` file the task DEPENDS on that is **not at `origin/main`** is listed in the
+     audit header with its diffstat (`git diff --stat origin/main -- <file>`) and the task that owns it; the run's
+     `provenance.source_fingerprint` is quoted as the code identity of the numbers (10.4 item 6); and a cross-task
+     dependency is **committed before the batch is submitted** -- `cluster_run.py` ships the working tree, so an
+     uncommitted file from another task is in the run and in nobody's history, and the audit's numbers then have no
+     code they can be reproduced from.
 
 ### 10.2 Reading rules (the ones this round had to learn)
 
-* A `result` needs |z| >= 3 **and** p <= 0.05, and p <= 0.05 is not reachable at 3 v 3 runs (the exact U floors at
-  0.10): `common.compare` reports that floor as `p_floor` and returns `underpowered`, so a 3-run comparison is z and
-  the values and never a result. A deterministic null (SD 0) makes z NaN or astronomical; `compare` returns
+* A `result` needs |z| >= 3 **and** p <= 0.05 **and** `min(n_a, n_b) >= 4` (5 for a small effect). The run count is a
+  rule about the smaller arm, not about the exact-U floor: the floor is symmetric (3 v 3 -> 0.10, 4 v 4 -> 0.029,
+  5 v 5 -> 0.0079), so pairing three runs against five (0.036) or against a pile of null rows (3 v 6 -> 0.024) clears
+  it while the claim still rests on three draws. `common.compare` reports the floor as `p_floor`, the applied run
+  floor as `min_n` and the smaller arm as `n_min`, and returns `underpowered` when either bites: a 3-run comparison
+  is z and the values, never a result, whatever the other arm's size.
+  A deterministic null (SD 0) makes z NaN or astronomical; `compare` returns
   `undetermined` (`null_sd_zero` true) and the reading is the magnitude `diff` with `p`, plus whatever effect size
   the tool declares (atlas `z_floor`). Neither verdict is a tool's own invention any more -- both come from
   `compare`, in every JSON.
@@ -697,20 +780,36 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
 
 ### 10.4 Process rules the round learned (rules, not advice)
 
-1. **Replicates are jobs, and four is the floor.** The replicate unit is the cluster job, not the seed and not the
-   batch row. `>= 4 runs per arm, 5 when the effect is small`: the exact two-sided U floors at p 0.10 at 3 v 3
-   (`common.p_floor`), so three runs can only ever read `underpowered`. Three runs still buy the scatter and are
-   right for a bit-identical check (taste, smell, the pinned walk).
-2. **The GPU rollout is not seed-reproducible.** Two same-code batches at the same seeds are different draws
-   (same-seed leg L-R +0.190 vs +0.208; ring histories differ). Never quote a seed as if it pinned a number, never
-   compare a new batch to an old one row by row, and quote a one-batch claim as a one-batch claim.
+1. **Replicates are jobs, and four is the floor -- in the SMALLER arm.** The replicate unit is the cluster job, not
+   the seed and not the batch row. The rule is `min(n_a, n_b) >= 4`, 5 when the effect is small, and it is not the
+   exact-U floor: the floor is symmetric (`common.p_floor`: 0.10 at 3 v 3, 0.036 at 3 v 5, 0.024 at 3 v 6), so a
+   three-run arm against a large one clears it and still rests on three draws. `common.compare` enforces the run
+   count itself (`CALL_REPLICATES`), so three runs read `underpowered` whatever the other arm is. Three runs still
+   buy the scatter and are right for a bit-identical check (taste, smell, the pinned walk) -- read as magnitudes.
+2. **The GPU rollout is not seed-reproducible, and 'bit-identical' is a CPU claim.** Two same-code batches at the
+   same seeds are different draws (same-seed leg L-R +0.190 vs +0.208; ring histories differ). Never quote a seed as
+   if it pinned a number, never compare a new batch to an old one row by row, and quote a one-batch claim as a
+   one-batch claim. **`bit-identical` is a property of a CPU arm, or of an arm that is deterministic by construction
+   (`gain_fb=0`), and never of the shipped GPU path**: at a fixed seed on one box it diverges run to run
+   (`out/proprio_bitid/compare.txt`: identical to frame 500 of 6,000, then not), so a plan that says 'three runs,
+   bit-identical' is a plan for the CPU. Record the **realised device per job** (`provenance.execution.device`,
+   `device_name`; 10.4 item 5) and say which arm was which. And N bit-identical draws are **one effective
+   replicate**, not N: `compare` sees SD 0, returns `null_sd_zero` / `undetermined`, and the reading is the magnitude
+   `diff` with the tool's declared effect size -- never a verdict, and never an n of N in a power statement.
 3. **Never point two clients at one `--fetch` directory.** Two `cluster_run.py` calls fetching into the same
    directory interleave and silently mix runs of different arms. One batch, one NAMED subdirectory, `mkdir -p` in
    every job line.
-4. **Verify the batch before any analysis.** Read `'<n> job(s), 0 failed'` and every job's `device cuda` from the
-   console log, then run the batch check (`interp_apply_rotation.py verify-batch <dir>`, or the tool's own
-   console-vs-meta check) -- a job that fell back to the CPU or died mid-write produces a file that analyses fine
-   and means nothing.
+4. **A job line must preserve the python exit code, and `'0 failed'` is never sufficient.** A line that ends
+   `... > file 2>&1; tail -4 file` exits with **tail's** status: the python can die mid-write and the job still
+   reports `completed exit 0`. Write `... > file 2>&1 && tail -4 file` (the tail runs only on success and the failure
+   survives) or `...; st=$?; tail -4 file; exit $st`. `cluster_run.py` warns on the `;` form (stderr and the console
+   log) and submits the command unchanged.
+
+   `'<n> job(s), 0 failed'` is **necessary and never sufficient**. Before any analysis: count the expected artefacts
+   (`ls out/<name>/ | wc -l` against arms x runs) and open **each** run's block in the console log -- its
+   `device cuda` line (a job that fell back to the CPU analyses fine and means nothing), the device it really used,
+   and the arm spec it echoed (a job that ran the wrong arm is the failure mode `'0 failed'` cannot see). Then run
+   the batch check (`interp_apply_rotation.py verify-batch <dir>`, or the tool's own console-vs-meta check).
 5. **A CPU smoke on Windows needs `CUDA_VISIBLE_DEVICES=-1`, set before torch is imported.** The empty string
    (`""`) is what `--device cpu` used to export, and Windows *unsets* an empty environment variable, so the "CPU"
    smoke runs on the desktop's GPU and writes `device_requested cpu` / `device cuda` into the provenance. `-1` is
@@ -720,6 +819,19 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
    (`files.effective_weights_md5`, `ed1df661...`) and `provenance.source_fingerprint` when
    `flyverse_commit.commit` is `unknown`; `export.match_sources(fp)` turns that fingerprint back into a local
    commit when every file matches.
+7. **The analysis is regenerated on the complete fetch, before any number is written.** No table is quoted from a
+   staged or partial analysis directory -- re-run the analysis on the fetched batch as a whole and read the numbers
+   off that run. The audit **pastes the analysis console's run-count line verbatim, per table, with the directory it
+   came from** (`n_runs 5 (out/od/stim_r*.npz)`), so a reader can see which draws each table rests on. An audit that
+   still contains an unfilled `ALL_CAPS_NOTE` / `_TABLE` placeholder does not ship: grep for `[A-Z_]{6,}` in step 7,
+   before the commit.
+8. **A new arm family is opt-in, and a default invocation stays cheap.** A new arm / group family (a hold-table
+   group, a lesion set, a context) goes behind an **explicit flag or an explicit name**, never into a tool's bare
+   default: `scripts/build_hold_tables.py`'s three ALONE groups sat in the `--groups` default and made a bare
+   table build load the connectome cache. **A tool's default invocation must not acquire a new heavy dependency**
+   (the cache, a GPU, a network fetch) -- if the new work needs one, the work is named on the command line.
+   And a provenance defect is fixed in `flyverse/interp/common.py`, where every tool inherits the fix; a per-tool
+   workaround for a shared-layer bug is the thing section 11 exists to retire.
 
 ### 10.3 The minimal command sequence (an odour-to-DN question, as an example)
 
@@ -727,8 +839,11 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
 PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py --results "out/interp/*/*.json" out/benchmark_suite.json --status "FAIL,KNOWN GAP" --json out/interp/ledger/fails.json
 PYTHONIOENCODING=utf-8 python scripts/interp_paths.py --a "class=olfactory" --b "DNa02" --k 3 --json out/interp/paths/orn_dna02.json
 PYTHONIOENCODING=utf-8 python scripts/interp_decompose.py analyse --static --target DNa02 --json out/interp/decompose/dna02_static.json
-cmds=(); for a in stim ctrl null; do for s in 0 1 2 3 4; do cmds+=("mkdir -p out/od && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/interp_trace.py record --protocol odour --arm $a --seed $s --series-every 5 --out out/od/${a}_r$s > out/od/${a}_r$s.txt 2>&1; tail -4 out/od/${a}_r$s.txt"); done; done
-python scripts/cluster_run.py --name od --minutes 40 "${cmds[@]}" --fetch out/od/ 2>&1 | tee out/od_cluster.log      # read: 15 job(s), 0 failed; device cuda x15
+# `st=$?; tail ...; exit $st` keeps PYTHON's exit code as the job's (a bare `; tail` makes it tail's: 10.4 item 4).
+# The \$ below is escaped so THIS shell leaves it for the job's shell; ${a} / $s are expanded here, on purpose.
+cmds=(); for a in stim ctrl null; do for s in 0 1 2 3 4; do cmds+=("mkdir -p out/od && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/interp_trace.py record --protocol odour --arm $a --seed $s --series-every 5 --out out/od/${a}_r$s > out/od/${a}_r$s.txt 2>&1; st=\$?; tail -4 out/od/${a}_r$s.txt; exit \$st"); done; done
+python scripts/cluster_run.py --name od --minutes 40 "${cmds[@]}" --fetch out/od/ 2>&1 | tee out/od_cluster.log      # read: 15 job(s), 0 failed; then 15 .npz in out/od/, and each run block's device cuda + its --arm
+ls out/od/*.npz | wc -l; grep -c "device cuda" out/od_cluster.log     # necessary, not sufficient: 15 and 15
 PYTHONIOENCODING=utf-8 python scripts/interp_trace.py analyse --source "class=olfactory" --stimulus "out/od/stim_r*.npz" --control "out/od/ctrl_r*.npz" --null-runs "out/od/null_r*.npz" --stat mean --min-cells 2 --decompose-at DNa02,DNg56 --json out/interp/trace/odour_dna02.json
 PYTHONIOENCODING=utf-8 python scripts/interp_paths.py --a "class=olfactory" --b DNa02 --k 3 --recording out/od/stim_r0.npz --json out/interp/paths/orn_dna02_nf.json
 PYTHONIOENCODING=utf-8 python scripts/interp_export.py analyse --result out/interp/trace/odour_dna02.json --out out/export

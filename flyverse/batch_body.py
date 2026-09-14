@@ -77,6 +77,15 @@ class BatchBody:
         wcommands = [{k:float(v[i]) for k,v in wings.items()} for i in range(self.B)]
         return commands,wcommands
 
+    def proprio_state(self, motor):
+        """The batch body state the opt-in proprioception transducer reads (senses.Proprioception.rates): the previous
+        frame's leg MN rates per side and haltere MN rate (zeros before the first frame), each row's airborne flag and
+        its realised yaw rate (rad/s; read only by the labelled stop-gap Coriolis term)."""
+        def m(name):
+            return np.zeros(self.B) if motor is None else np.broadcast_to(np.asarray(getattr(motor,name),dtype=float),(self.B,)).copy()
+        return dict(leg_L=m("leg_L"),leg_R=m("leg_R"),haltere=m("haltere"),
+                    airborne=attr(self.flies,"airborne").astype(bool),yaw_rate=attr(self.flies,"yaw_rate").astype(float))
+
     def step(self, commands, wings, tasting, dt_s):
         airborne = attr(self.flies,"airborne")
         gf,power = (np.array([w[k] for w in wings]) for k in ("gf","power"))

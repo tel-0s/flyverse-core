@@ -46,6 +46,27 @@ FAMILY_OF_TYPE = {"R1-R6": 0, "R7p": 1, "R7y": 2, "R7d": 1, "R7_unclear": 2, "R8
 
 @dataclass
 class OpticParams:
+    """Parameters of the rate optic lobe (the module docstring gives the model). The last four fields are OPT-IN
+    per-presynaptic-stream hooks (docs/audits/optic_stream_hooks.md); all default to None = off, and off is
+    bit-identical to the shipped model (tests/test_optic_hooks.py). A stream is the block of W_rr / W_sr entries
+    whose presynaptic type full-matches pre_regex and whose postsynaptic type full-matches post_regex; the hooks
+    replace what the block MULTIPLIES -- the presynaptic deviation dr_j = r_j - b_j becomes x_j before the sum --
+    and never the weights, so every synaptic sign is preserved. Per entry (i <- j), in this order:
+
+        spatial_suppress  [(pre_regex, k, radius_deg)]        u_j = dr_j - k * mean_{j' in N(j)} dr_j'
+                          N(j) = the cells of j's type within radius_deg of j's retinal column, j included
+                          (columns from interp.trace.column_of_cells); a cell without a column keeps u_j = dr_j
+        stream_adapt      [(pre_regex, post_regex, tau_ms, gain)]   y_j = u_j - gain * A_j,
+                          A_j <- u_j + (A_j - u_j) exp(-dt / tau_ms) after each substep (one state per entry,
+                          OpticLobe.stream_adapt_state, beside the lobe's own adapt)
+        stream_rectify    [(pre_regex, post_regex, mode)]     x_j = max(y_j, 0) 'pos' | max(-y_j, 0) 'neg' | |y_j| 'abs'
+                          (x_j >= 0: an entry contributes W_ij x_j with the sign of W_ij under every mode)
+        input_i = gain_rr (sum_{j unmatched} W_ij dr_j + sum_{j matched} W_ij x_j) + ...;  the output sum W_sr alike.
+
+    The first matching entry of a list wins on overlap. Any of the three active runs the Torch substep (the CUDA /
+    Metal optic kernels are untouched). fb_hold [(spiking_pre_regex, rate_post_regex)] removes the matched
+    spiking -> rate entries of W_rs at build time (a weight edit; the native kernels stay in use); [('.*', '.*')]
+    is gain_fb = 0."""
     tau_ms: float = 10.0
     dt_ms: float = 1.0
     baseline: float = 0.5
@@ -72,6 +93,34 @@ class OpticParams:
     tau_adapt_ms: float = 300.0
     contrast_clip: float = 2.0
     eps: float = 0.02
+    # ---- opt-in per-presynaptic-stream hooks (docs/audits/optic_stream_hooks.md). ALL default to None = off, and off is
+    # bit-identical to the model above (tests/test_optic_hooks.py). A 'stream' is the block of synapses from the rate
+    # units whose type full-matches pre_regex onto the rate units / spiking cells whose type full-matches post_regex
+    # (re.fullmatch on the type string; the weights of the block are the shipped W_rr / W_sr entries, untouched).
+    # The hooks change what the block MULTIPLIES -- the presynaptic deviation dr_j = r_j - b_j is replaced by a
+    # transformed x_j BEFORE the sum over j -- never the weights, so every synaptic sign is preserved. Per entry
+    # (i <- j), in this order (u -> y -> x):
+    #   spatial_suppress   u_j = dr_j - k * mean_{j' in N(j)} dr_j'   (N(j): the cells of j's TYPE whose retinal column
+    #                      lies within radius_deg of j's column, j itself included; cells without a column: u_j = dr_j)
+    #   stream_adapt       y_j = u_j - gain * A_j,  A_j <- u_j + (A_j - u_j) exp(-dt / tau_ms) after each substep
+    #                      (a separate fast-adaptation state per hook entry, kept beside OpticLobe.adapt; 'fast-adapting
+    #                      inputs', Tanaka & Clark 2020)
+    #   stream_rectify     x_j = max(y_j, 0) ('pos') | max(-y_j, 0) ('neg') | |y_j| ('abs')   -- a half-wave / full-wave
+    #                      rectification of the presynaptic deviation: x_j >= 0, so an entry contributes W_ij x_j with
+    #                      the sign of W_ij under every mode (an inhibitory entry never excites; 'neg' is the OFF
+    #                      half-wave signalled as a positive drive, 'abs' both transitions)
+    #   contribution_ij = W_ij x_j;  input_i = gain_rr (sum_{j unmatched} W_ij dr_j + sum_{j matched} W_ij x_j) + ...
+    # The first matching hook entry wins where two entries of the same list overlap. Any of the three active forces
+    # the Torch substep (the CUDA / Metal optic kernels receive the recurrent product only for the plain sum; a
+    # 'warp' cuda_sparse request is downgraded to 'torch' with a warning). fb_hold is a build-time weight edit and
+    # keeps the native kernels.
+    stream_rectify: list = None   # [(pre_regex, post_regex, mode)], mode in {'pos', 'neg', 'abs'}
+    stream_adapt: list = None     # [(pre_regex, post_regex, tau_ms, gain)]
+    spatial_suppress: list = None # [(pre_regex, k, radius_deg)]  (all postsynaptic targets of the stream)
+    # feedback hold: [(spiking_pre_regex, rate_post_regex)] -- the spiking -> rate entries of W_rs in the matched
+    # blocks are removed (held at 0). [('.*', '.*')] is gain_fb = 0 (the deterministic lobe of optic_measures.md 6);
+    # a narrower block holds one feedback pathway (LoVC16 -> T3, say) and leaves the rest of the feedback stochastic.
+    fb_hold: list = None
 
 
 DEFAULT_TAU_BY_TYPE = {"Mi4": 150.0, "Mi9": 150.0, "CT1": 150.0, "Tm9": 150.0, "L3": 40.0, "Mi1": 8.0, "Tm3": 8.0,
@@ -81,18 +130,24 @@ DEFAULT_TAU_BY_TYPE = {"Mi4": 150.0, "Mi9": 150.0, "CT1": 150.0, "Tm9": 150.0, "
 # selective (DSI 0.16-0.26 with the correct preferred direction for all 8 subtypes; see NOTES).
 T4T5 = ["T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d"]
 DEFAULT_BASELINE_BY_TYPE = {t: 0.0 for t in T4T5}
-DEFAULT_PAIR_GAIN = [(r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0), (r"^(Tm4|Tm9|CT1|TmY15)$", r"^T5[abcd]$", 5.0),
+DEFAULT_PAIR_GAIN = [# T4 input x5: the delayed-inhibition arm of the direction-selective motion detector
+                     (r"^(Mi4|Mi9|CT1|C3)$", r"^T4[abcd]$", 5.0),
+                     # T5 input x5 -- annotated as "delayed inhibition" until session 10, but 78 % of the 101,619 edges it
+                     # multiplies are cholinergic Tm9 / Tm4 -> T5 (T5a input: Tm9 28.5 %, Tm4 17.3 %; CT1 / TmY15 GABA are
+                     # 22 %), so it is mostly a DRIVE gain on T5's excitatory centre; ablating it costs T5's drive (loom
+                     # 29-36 Hz, DSI 0.44 -> 0.15), not its selectivity. A documented stop-gap (docs/audits/optic_measures.md).
+                     (r"^(Tm4|Tm9|CT1|TmY15)$", r"^T5[abcd]$", 5.0),
                      # LPi -> LPLC2: the lobula-plate inhibitory interneurons make LPLC2 expansion-selective in the animal;
                      # under the uniform synapse they were a tenth of its T4/T5 excitation, so the fly's own turning
                      # drove the giant fibre. x4 halves the walking GF and keeps the loom (NOTES, session 9).
                      (r"^LPi(34|43)$", r"^LPLC2$", 4.0),
-                     # T4/T5 outputs x4: rectified, strongly inhibited DS units respond weakly to natural
+                     # T4/T5 outputs x2 (the factor below; an older comment said x4): rectified, strongly inhibited DS units respond weakly to natural
                      # scenes; this restores drive to LPi / HS / VS / LPLC and the descending neurons
-                     (r"^T[45][abcd]$", r".*", 2.0),
-                     # the loom detectors LC4 / LPLC2 keep x1 optic-lobe drive: in the full sensory context
-                     # (smell + wind on) x1.25 already gives 3-4 spontaneous GF escapes per 5 s of walking;
-                     # the loom margin comes from the x3 LC4/LPLC2 -> GF synapses in brain.py instead
-                     (r".*", r"^(LC4|LPLC2)$", 1.0)]
+                     (r"^T[45][abcd]$", r".*", 2.0)]
+# The loom detectors LC4 / LPLC2 keep x1 optic-lobe drive (the T4/T5 -> LC4/LPLC2 edges carry the x2 above and nothing
+# else): in the full sensory context x1.25 already gave 3-4 spontaneous GF escapes per 5 s of walking; the loom margin
+# comes from the x3 LC4|LPLC2 -> DNp01 type gain in brain.py instead. Until session 10 this was a literal no-op entry
+# (r".*", r"^(LC4|LPLC2)$", 1.0) in the list; removed (factor 1.0, bit-identical weights).
 
 
 def _csr(D: sp.spmatrix, device, use_metal: bool = False, cuda_sparse: str = "torch"):
@@ -141,11 +196,19 @@ class OpticLobe:
         self.slow = slow if (slow is not None and receptor is not None and slow.gain) else None
         self.B = int(batch)
         self.device = resolve(device)
-        if self.slow is not None and (metal_kernels or cuda_kernels):
+        # the per-stream hooks (OpticParams.stream_rectify / stream_adapt / spatial_suppress): Torch substep only
+        self._hooks = bool(self.p.stream_rectify or self.p.stream_adapt or self.p.spatial_suppress)
+        torch_only = self.slow is not None or self._hooks
+        if torch_only and (metal_kernels or cuda_kernels):
             import warnings
-            warnings.warn("the optic lobe's slow receptor term is not in the native optic kernels; using the Torch substep")
-        self.metal = metal.use(self.device, False if self.slow is not None else metal_kernels)
-        self.cuda = cuda.use(self.device, False if self.slow is not None else cuda_kernels)
+            what = "slow receptor term" if self.slow is not None else "per-stream hooks"
+            warnings.warn(f"the optic lobe's {what} are not in the native optic kernels; using the Torch substep")
+        self.metal = metal.use(self.device, False if torch_only else metal_kernels)
+        self.cuda = cuda.use(self.device, False if torch_only else cuda_kernels)
+        if cuda_sparse == "warp" and self._hooks and not self.cuda:
+            import warnings
+            warnings.warn("cuda_sparse 'warp' needs the CUDA optic kernels, which the per-stream hooks disable; using 'torch'")
+            cuda_sparse = "torch"
         if cuda_sparse not in ("torch", "warp") or (cuda_sparse == "warp" and not self.cuda):
             raise ValueError("cuda_sparse must be torch or warp; warp requires CUDA kernels")
         if not np.isfinite(self.p.dt_ms) or self.p.dt_ms <= 0:
@@ -186,13 +249,26 @@ class OpticLobe:
                 M.data[sel] *= f
             return M.tocsr()
 
-        rt = types[self.rate_idx]
-        self.W_rr = _csr(apply_pair_gain(Wn_ol[self.rate_idx][:, self.rate_idx], rt, rt), self.device, self.metal, cuda_sparse)
+        rt = types[self.rate_idx]; st = types[self.spk_idx]
+        M_rr = apply_pair_gain(Wn_ol[self.rate_idx][:, self.rate_idx], rt, rt)
+        M_rs = Wn_ol[self.rate_idx][:, self.spk_idx].tocsr()
+        M_sr = apply_pair_gain((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], rt, st)
+        if self.p.fb_hold:                                     # spiking -> rate feedback of the matched blocks held at 0
+            M_rs = self._hold_feedback(M_rs, st, rt)
+        self.W_rr = _csr(M_rr, self.device, self.metal, cuda_sparse)
         self.W_rp = _csr(Wn_ol[self.rate_idx][:, self.pr_idx], self.device, self.metal)
-        self.W_rs = _csr(Wn_ol[self.rate_idx][:, self.spk_idx], self.device, self.metal)
-        self.W_sr = _csr(apply_pair_gain((Wn_ol if self.p.out_norm == "l2" else Wn)[self.spk_idx][:, self.rate_idx], rt, types[self.spk_idx]), self.device, self.metal)
+        self.W_rs = _csr(M_rs, self.device, self.metal)
+        self.W_sr = _csr(M_sr, self.device, self.metal)
         self.rate_idx_t = torch.as_tensor(self.rate_idx, device=self.device)
         self.spk_idx_t = torch.as_tensor(self.spk_idx, device=self.device)
+        # per-stream hooks: the (rate <- rate) and (spiking <- rate) matrices split into the matched blocks (one per
+        # distinct (rectify entry, adapt entry) combination) and the rest; the spatial operator; the adaptation states
+        self.streams, self.W_rr_rest, self.W_sr_rest, self.G_supp = [], None, None, None
+        self.hook_info = {"active": self._hooks}
+        if self._hooks:
+            self._build_streams(M_rr, M_sr, rt, st, cuda_sparse)
+        K_a = len(self.p.stream_adapt or [])
+        self.stream_adapt_state = torch.zeros(K_a, self.B, self.n_rate, device=self.device)   # A_k, one per stream_adapt entry
 
         # slow (metabotropic / monoamine) term: per active class the spiking -> rate and rate -> rate slow matrices
         # (None where a class has no entries), normalised like Wn_ol; scale_k = gain_k tau_k / tau_syn; a_k = exp(-dt / tau_k)
@@ -259,6 +335,146 @@ class OpticLobe:
         self.b_vec = torch.from_numpy(np.array([bl_map.get(t, self.p.baseline) for t in types[self.rate_idx]], dtype=np.float32)).to(self.device)
         self._a_ad = float(np.exp(-self.p.dt_ms / self.p.adapt_tau_ms))
 
+    # ------------------------------------------------------------------ per-stream hooks (opt-in; OpticParams docstring)
+    @staticmethod
+    def _type_mask(regex: str, type_list) -> np.ndarray:
+        """Boolean mask over cells whose type full-matches `regex` (re.fullmatch; pair_gain's rule is re.match)."""
+        import re
+        pat = re.compile(str(regex))
+        ok = {t: bool(pat.fullmatch(t)) for t in np.unique(type_list)}
+        return np.array([ok[t] for t in type_list], dtype=bool)
+
+    @staticmethod
+    def _csr_select(C: sp.csr_matrix, keep: np.ndarray) -> sp.csr_matrix:
+        """The entries of C (CSR order) flagged by `keep`, in their original order: a sparse product over the result sums
+        the surviving terms of each row in the same sequence as over C, so an unselected entry changes nothing (bit for bit)."""
+        C = C.tocsr(); rows = np.repeat(np.arange(C.shape[0]), np.diff(C.indptr))
+        indptr = np.concatenate([[0], np.cumsum(np.bincount(rows[keep], minlength=C.shape[0]))])
+        return sp.csr_matrix((C.data[keep], C.indices[keep], indptr), shape=C.shape)
+
+    def _hold_feedback(self, M_rs, spk_types, rate_types):
+        """fb_hold: the spiking (pre) -> rate (post) entries of the matched blocks removed from W_rs (the other entries keep
+        their order, so their products are unchanged bit for bit)."""
+        C = M_rs.tocsr(); rows = np.repeat(np.arange(C.shape[0]), np.diff(C.indptr)); keep = np.ones(C.nnz, bool); held = []
+        for pre_re, post_re in self.p.fb_hold:
+            sel = self._type_mask(pre_re, spk_types)[C.indices] & self._type_mask(post_re, rate_types)[rows]
+            held.append({"pre": pre_re, "post": post_re, "entries": int(sel.sum()), "syn_eq": float(np.abs(C.data[sel]).sum())})
+            keep &= ~sel
+        self.hook_info_fb = {"held": held, "entries_before": int(C.nnz), "entries_after": int(keep.sum())}
+        return self._csr_select(C, keep)
+
+    def _build_streams(self, M_rr, M_sr, rt, st, cuda_sparse):
+        """Split M_rr / M_sr into the hook blocks and the rest, build the spatial operator and the adaptation constants."""
+        p = self.p
+        rect = list(p.stream_rectify or []); adapt = list(p.stream_adapt or []); supp = list(p.spatial_suppress or [])
+        for k, (pre_re, post_re, mode) in enumerate(rect):
+            if mode not in ("pos", "neg", "abs"):
+                raise ValueError(f"stream_rectify[{k}]: mode must be pos, neg or abs, got {mode!r}")
+        for k, (pre_re, post_re, tau, gain) in enumerate(adapt):
+            if not (np.isfinite(tau) and tau > 0):
+                raise ValueError(f"stream_adapt[{k}]: tau_ms must be positive and finite")
+        # per presynaptic rate cell: which spatial_suppress entry applies (first match wins)
+        supp_id = -np.ones(self.n_rate, np.int64)
+        for k, (pre_re, kk, radius) in enumerate(supp):
+            m = self._type_mask(pre_re, rt) & (supp_id < 0); supp_id[m] = k
+        self._a_stream = [float(np.exp(-p.dt_ms / float(tau))) for (_, _, tau, _) in adapt]
+        self._g_stream = [float(gain) for (_, _, _, gain) in adapt]
+
+        def split(M, post_types, tag):
+            # entries in the CSR order of M, so that every sub-matrix keeps M's per-row summation order (bit-identity)
+            C = M.tocsr(); row = np.repeat(np.arange(C.shape[0]), np.diff(C.indptr)); col = C.indices
+            rect_id = -np.ones(C.nnz, np.int64); adapt_id = -np.ones(C.nnz, np.int64)
+            for k, (pre_re, post_re, _) in enumerate(rect):
+                sel = self._type_mask(pre_re, rt)[col] & self._type_mask(post_re, post_types)[row] & (rect_id < 0); rect_id[sel] = k
+            for k, (pre_re, post_re, _, _) in enumerate(adapt):
+                sel = self._type_mask(pre_re, rt)[col] & self._type_mask(post_re, post_types)[row] & (adapt_id < 0); adapt_id[sel] = k
+            active = (rect_id >= 0) | (adapt_id >= 0) | (supp_id[col] >= 0)
+            blocks = {}
+            for key in sorted({(int(r), int(a)) for r, a in zip(rect_id[active], adapt_id[active])}):
+                sel = active & (rect_id == key[0]) & (adapt_id == key[1])
+                blocks[key] = {"M": self._csr_select(C, sel), "entries": int(sel.sum()), "syn_eq": float(np.abs(C.data[sel]).sum()),
+                               "n_pre": int(len(np.unique(col[sel]))), "n_post": int(len(np.unique(row[sel])))}
+            return blocks, self._csr_select(C, ~active), int(active.sum())
+
+        b_rr, rest_rr, n_rr = split(M_rr, rt, "rr"); b_sr, rest_sr, n_sr = split(M_sr, st, "sr")
+        self.W_rr_rest = _csr(rest_rr, self.device, self.metal, cuda_sparse); self.W_sr_rest = _csr(rest_sr, self.device, self.metal)
+        info_streams = []
+        for key in sorted(set(b_rr) | set(b_sr)):
+            r_id, a_id = key
+            s = {"rect_id": r_id, "adapt_id": a_id, "mode": rect[r_id][2] if r_id >= 0 else None,
+                 "W_rr": _csr(b_rr[key]["M"], self.device, self.metal, cuda_sparse) if key in b_rr else None,
+                 "W_sr": _csr(b_sr[key]["M"], self.device, self.metal) if key in b_sr else None}
+            self.streams.append(s)
+            info_streams.append({"rect": list(rect[r_id]) if r_id >= 0 else None, "adapt": list(adapt[a_id]) if a_id >= 0 else None,
+                                 "rate_to_rate": {k: v for k, v in b_rr[key].items() if k != "M"} if key in b_rr else None,
+                                 "rate_to_spiking": {k: v for k, v in b_sr[key].items() if k != "M"} if key in b_sr else None})
+        self.hook_info.update({"streams": info_streams, "entries_rr_matched": n_rr, "entries_rr_rest": int(rest_rr.nnz),
+                               "entries_sr_matched": n_sr, "entries_sr_rest": int(rest_sr.nnz), "torch_substep": not (self.cuda or self.metal)})
+        # spatial suppression: G[j, j'] = k / n_j over the cells j' of j's type whose column is within radius_deg of j's
+        # column (j included); u = dr - G dr.  Columns from trace.column_of_cells (hex annotation + propagation).
+        if supp:
+            from .interp.trace import column_of_cells
+            col_all, n_ann = column_of_cells(self.c, self.r, self.rate_idx)
+            col = col_all[self.rate_idx]
+            cd = np.asarray(self.r.col_dir, dtype=np.float64)
+            cosang = np.clip(cd @ cd.T, -1.0, 1.0)                                       # (n_col, n_col)
+            rows, cols, vals = [], [], []; info_s = []
+            for k, (pre_re, kk, radius) in enumerate(supp):
+                A = sp.csr_matrix(cosang >= np.cos(np.radians(float(radius))))            # column adjacency, diagonal included
+                cells = np.flatnonzero(supp_id == k); with_col = cells[col[cells] >= 0]
+                n_nb = []
+                for t in np.unique(rt[with_col]):
+                    ct = with_col[rt[with_col] == t]
+                    E = sp.csr_matrix((np.ones(len(ct)), (np.arange(len(ct)), col[ct])), shape=(len(ct), self.r.n_columns))
+                    Mt = (E @ A @ E.T).tocoo()                                            # (cells of t) x (cells of t): within radius
+                    cnt = np.asarray(Mt.sum(1)).ravel()
+                    rows.append(ct[Mt.row]); cols.append(ct[Mt.col]); vals.append(float(kk) / cnt[Mt.row]); n_nb.append(cnt)
+                n_nb = np.concatenate(n_nb) if n_nb else np.zeros(0)
+                info_s.append({"pre": pre_re, "k": float(kk), "radius_deg": float(radius), "cells": int(len(cells)), "cells_with_column": int(len(with_col)),
+                               "neighbours_mean": float(n_nb.mean()) if len(n_nb) else None, "neighbours_min": int(n_nb.min()) if len(n_nb) else None,
+                               "neighbours_max": int(n_nb.max()) if len(n_nb) else None})
+            G = sp.csr_matrix((np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape=(self.n_rate, self.n_rate)) if rows else \
+                sp.csr_matrix((self.n_rate, self.n_rate))
+            self.G_supp = _csr(G, self.device, self.metal)
+            self.hook_info["spatial"] = {"entries": info_s, "rate_cells_annotated": int(n_ann), "G_nnz": int(G.nnz)}
+
+    def _stream_signals(self, dr: torch.Tensor, update: bool = False) -> list:
+        """x per stream block from the presynaptic deviations dr (B, n_rate): u = dr - G dr, y = u - gain A, x = f(y).
+        `update` advances every adaptation state A_k towards u (once per substep)."""
+        u = dr if self.G_supp is None else dr - _mv(self.G_supp, dr)
+        xs = []
+        for s in self.streams:
+            y = u if s["adapt_id"] < 0 else u - self._g_stream[s["adapt_id"]] * self.stream_adapt_state[s["adapt_id"]]
+            m = s["mode"]
+            x = y if m is None else (y.clamp(min=0.0) if m == "pos" else ((-y).clamp(min=0.0) if m == "neg" else y.abs()))
+            xs.append(x)
+        if update:
+            for k in range(len(self._a_stream)):
+                Ak = self.stream_adapt_state[k]
+                torch.add(u, (Ak - u) * self._a_stream[k], out=Ak)
+        return xs
+
+    def _recurrent(self, dr: torch.Tensor, update: bool = False) -> torch.Tensor:
+        """gain_rr x the recurrent input: the plain product without hooks (the shipped expression, bit-identical), else
+        the rest block on dr plus every stream block on its transformed x."""
+        if not self._hooks:
+            return self.p.gain_rr * _mv(self.W_rr, dr)
+        acc = _mv(self.W_rr_rest, dr)
+        for s, x in zip(self.streams, self._stream_signals(dr, update)):
+            if s["W_rr"] is not None:
+                acc = acc + _mv(s["W_rr"], x)
+        return self.p.gain_rr * acc
+
+    def _output(self, dr: torch.Tensor) -> torch.Tensor:
+        """W_sr @ dr (the drive before gain_out / clip), with the stream blocks on their transformed x under the hooks."""
+        if not self._hooks:
+            return _mv(self.W_sr, dr)
+        acc = _mv(self.W_sr_rest, dr)
+        for s, x in zip(self.streams, self._stream_signals(dr, False)):
+            if s["W_sr"] is not None:
+                acc = acc + _mv(s["W_sr"], x)
+        return acc
+
     # ------------------------------------------------------------------ photoreceptors
     @torch.no_grad()
     def photoreceptor_activity(self, col_radiance: torch.Tensor, dt_ms: float) -> torch.Tensor:
@@ -295,7 +511,7 @@ class OpticLobe:
         dr = self.rates() - self.b_vec[None]                                                 # (B, n_rate)
         if self.slow is None:
             # Keep the addition order: combining the held inputs would change rounding.
-            inp = p.gain_rr * _mv(self.W_rr, dr) + pr_input - p.adapt_gain * self.adapt
+            inp = self._recurrent(dr, update=True) + pr_input - p.adapt_gain * self.adapt
             inp = inp + spk_input
         else:
             # slow tone per class: relax towards scale x (held spiking part + recurrent part)
@@ -306,7 +522,7 @@ class OpticLobe:
                 gk = self.g_slow_cls[k]
                 torch.add(target * self._slow_scale[k], (gk - target * self._slow_scale[k]) * self._a_slow[k], out=gk)
             torch.sum(self.g_slow_cls, dim=0, out=self.g_slow)
-            syn = p.gain_rr * _mv(self.W_rr, dr) + pr_input + spk_input
+            syn = self._recurrent(dr, update=True) + pr_input + spk_input
             if self.slow.mode == "additive":
                 inp = syn - p.adapt_gain * self.adapt + self.g_slow
             elif self.slow.mode == "gain":
@@ -361,19 +577,19 @@ class OpticLobe:
         torch.sub(self.rates(), self.r0, out=self.delta_rate)
         dr = self.delta_rate
         drive = torch.zeros(self.B, self.c.n, device=self.device)
-        drive[:, self.spk_idx_t] = (self.p.gain_out_mv * _mv(self.W_sr, dr)).clamp(-self.p.drive_clip_mv, self.p.drive_clip_mv)
+        drive[:, self.spk_idx_t] = (self.p.gain_out_mv * self._output(dr)).clamp(-self.p.drive_clip_mv, self.p.drive_clip_mv)
         self.last["dr"] = dr
         return drive
 
     def reset(self, rows=None) -> None:
         if rows is None:
             self._fresh[:] = True; self.v.zero_(); self.adapt.zero_()
-            self.g_slow_cls.zero_(); self.g_slow.zero_(); self._slow_in_s.zero_()
+            self.g_slow_cls.zero_(); self.g_slow.zero_(); self._slow_in_s.zero_(); self.stream_adapt_state.zero_()
             self._pending_ms = 0.0
         else:
             sel = torch.as_tensor(np.asarray(rows), device=self.device, dtype=torch.long)
             self._fresh[sel] = True; self.v[sel] = 0.0; self.adapt[sel] = 0.0
-            self.g_slow_cls[:, sel] = 0.0; self.g_slow[sel] = 0.0; self._slow_in_s[:, sel] = 0.0
+            self.g_slow_cls[:, sel] = 0.0; self.g_slow[sel] = 0.0; self._slow_in_s[:, sel] = 0.0; self.stream_adapt_state[:, sel] = 0.0
 
     # ------------------------------------------------------------------ inspection
     def delta_rate_by_type(self, top: int = 15, row: int = 0):

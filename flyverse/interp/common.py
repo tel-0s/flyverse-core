@@ -12,9 +12,9 @@ The toolkit reads the model; it never changes it. This module holds the five thi
    quantities of a cell set from a FlyBrain / Sim / BatchSim into a `Recording` (npz + json) that the CPU half of
    every tool analyses; `record_frames` is the loop.
 4. **Null / replicate helpers** -- `ArmStats`, `compare`, `p_floor`: the object-sweep statistic (z against a
-   none-vs-none null, Welch, exact Mann-Whitney) and the scatter rule -- no 'result' below three independent runs per
-   arm, and none below the run count at which the exact rank test can reach alpha at all (`p_floor`; 4 per arm, 5 for
-   a small effect). A deterministic null (SD 0) is 'undetermined', never a z of NaN or 1e41.
+   none-vs-none null, Welch, exact Mann-Whitney) and the scatter rule -- no 'result' below FOUR independent runs per
+   arm (`CALL_REPLICATES`; five for a small effect), and none below the run count at which the exact rank test can
+   reach alpha at all (`p_floor`). A deterministic null (SD 0) is 'undetermined', never a z of NaN or 1e41.
 5. **The result schema** -- `Result` + `provenance`: one JSON for all tools, carrying everything the Neurome
    export (docs/NEUROME_INTERFACE.md) needs, so export is a serializer.
 
@@ -53,8 +53,11 @@ UNIT_KINDS = ("spiking", "graded", "photoreceptor")
 CONTRIBUTION_KINDS = ("anatomical_count", "effective_weight_mV", "current", "voltage", "activity")
 FRAME_MS, OPTIC_DT_MS = 10.0, 1.0
 MIN_REPLICATES = 3          # the scatter rule: a difference is quoted only over >= 3 independent runs per arm
-#: A difference is CALLED only where the exact rank test can reach alpha: `compare` reports `p_floor` and says
-#: 'underpowered' while it exceeds alpha, so 3 v 3 buys the scatter and 4 v 4 (5 v 5 for a small effect) buys a result.
+CALL_REPLICATES = 4         # the CALL rule (docs/INTERP.md 10.1(3), 10.2): min(n_a, n_b) >= 4, 5 for a small effect
+#: A difference is CALLED only over `CALL_REPLICATES` runs in EVERY arm -- a rule about the smaller arm, not about the
+#: symmetric exact-U floor: 3 v 3 floors at p 0.10, but 3 v 5 floors at 0.036 and would otherwise let three runs be
+#: called. `compare` applies both (it reports `p_floor` and says 'underpowered' while it exceeds alpha), so three runs
+#: buy the scatter and four per arm (five for a small effect) buy a result, whatever the other arm's size.
 Z_RESULT = 3.0              # the object-sweep criterion (docs/audits/object_sweep.md 8.5)
 NEVER_FIRING_HZ = 0.5       # a cell whose max rate over a rollout stays below this is 'never_firing'
 
@@ -662,9 +665,10 @@ def p_floor(n_a: int, n_b: int) -> float:
     """The smallest two-sided exact Mann-Whitney p that two arms of `n_a` and `n_b` runs can reach -- every draw of one
     arm above every draw of the other: 2 / C(n_a + n_b, n_a).
 
-    3 v 3 runs floor at 0.10, 4 v 4 at 0.029, 5 v 5 at 0.0079 (docs/audits/object_sweep.md 8.4). Three runs per arm is
-    therefore simultaneously the floor for not being 'underpowered' (MIN_REPLICATES) and a guaranteed 'null' at
-    alpha 0.05, whatever the separation: `compare` reports this number and calls that case underpowered."""
+    3 v 3 runs floor at 0.10, 4 v 4 at 0.029, 5 v 5 at 0.0079 (docs/audits/object_sweep.md 8.4). The floor is
+    SYMMETRIC and is therefore not the run-count rule: 3 v 5 floors at 0.036, which is under alpha and would let a
+    three-run arm be called. `compare` applies the floor AND `CALL_REPLICATES` (>= 4 runs in the smaller arm);
+    this function reports the floor alone."""
     from math import comb
     n_a, n_b = int(n_a), int(n_b)
     if n_a < 1 or n_b < 1:
@@ -679,10 +683,14 @@ def compare(stim, null, z_min: float = Z_RESULT, min_n: int = MIN_REPLICATES, al
 
     The verdict, in this order:
 
-    * `'underpowered'` -- fewer than `min_n` runs in an arm (the scatter rule), **or** `p_floor > alpha`: at this many
-      runs the rank test cannot reach alpha however large the effect, so no z can make the difference a result
-      (3 v 3 floors at p 0.10). `MIN_REPLICATES` stays 3 -- three runs still buy the scatter -- but four per arm is
-      the smallest that can be called (five when the effect is small): docs/INTERP.md 10.2.
+    * `'underpowered'` -- fewer than `max(min_n, CALL_REPLICATES)` runs in the SMALLER arm, **or** `p_floor > alpha`:
+      at this many runs the rank test cannot reach alpha however large the effect, so no z can make the difference a
+      result (3 v 3 floors at p 0.10). The two conditions are not the same one: the floor is symmetric, so 3 v 5
+      floors at 0.036 and used to be callable on three runs -- the rule is `min(n_a, n_b) >= 4` (docs/INTERP.md
+      10.1(3) / 10.2), and `min_n` is raised to `CALL_REPLICATES` whatever the caller asks for. `MIN_REPLICATES`
+      stays 3 -- three runs still buy the scatter, and a bit-identical check is right to use them -- but four per arm
+      is the smallest that can be CALLED, five when the effect is small. The applied floor is returned as `min_n` and
+      the smaller arm as `n_min`.
     * `'undetermined'` -- the null arm is deterministic (SD 0, up to float noise: bit-identical draws, an all-silent
       readout, a `gain_fb=0` lobe), the arms differ, and the rank test does not settle it as null (p <= alpha, or no
       p at all). z is the criterion and z is not defined there, so neither a huge z nor a NaN one is a verdict: read
@@ -709,7 +717,9 @@ def compare(stim, null, z_min: float = Z_RESULT, min_n: int = MIN_REPLICATES, al
     # 'deterministic' is SD exactly 0 or below float noise on the arm's own scale -- the case that sent z to 1e41 on
     # near-zero groups as surely as the exactly-zero one sent it to NaN.
     det_null = bool(b.n >= 2 and np.isfinite(b.sd) and b.sd <= 1e-12 * max(1.0, abs(b.mean)))
-    if min(a.n, b.n) < min_n or (np.isfinite(floor) and floor > alpha):
+    n_min = int(min(a.n, b.n))
+    called_n = max(int(min_n), CALL_REPLICATES)      # the run-count rule is about the SMALLER arm, not about p_floor
+    if n_min < called_n or (np.isfinite(floor) and floor > alpha):
         verdict = "underpowered"
     elif det_null and diff != 0 and not (np.isfinite(p) and p > alpha):
         verdict = "undetermined"
@@ -718,7 +728,8 @@ def compare(stim, null, z_min: float = Z_RESULT, min_n: int = MIN_REPLICATES, al
     else:
         verdict = "null"
     return {"stim": a.record(), "null": b.record(), "diff": float(diff), "z": float(z), "welch": float(welch),
-            "U": U, "p": p, "verdict": verdict, "z_min": z_min, "min_n": min_n, "alpha": alpha,
+            "U": U, "p": p, "verdict": verdict, "z_min": z_min, "min_n": called_n, "min_n_requested": int(min_n),
+            "min_replicates": MIN_REPLICATES, "n_min": n_min, "alpha": alpha,
             "p_floor": float(floor), "null_sd_zero": det_null}
 
 
@@ -760,11 +771,25 @@ def _git(*args) -> str:
         return ""
 
 
+def porcelain_path(line: str) -> str:
+    """The path of one `git status --porcelain` line ('XY path', 'R  old -> new').
+
+    Not `line[3:]`: the XY field is two columns and a space, but `_git` **strips** the command's output, so the FIRST
+    line arrives without its leading space (' M docs/INTERP.md' -> 'M docs/INTERP.md') and the fixed slice ate a
+    character of the path ('ocs/INTERP.md'), which no reader of `modified_files` could match against a checkout.
+    Strip the status field by its shape instead, and keep the target of a rename."""
+    m = re.match(r"^\s*[A-Z?!ADMRCU ]{1,2}\s+(.*)$", line.rstrip())
+    path = (m.group(1) if m else line).strip()
+    if " -> " in path:                                   # 'R  old -> new': the file that is there now
+        path = path.split(" -> ", 1)[-1].strip()
+    return path.strip('"')
+
+
 def git_state() -> dict:
     """{'commit', 'dirty', 'modified_files'} of this checkout ('unknown' when git is unavailable)."""
     head = _git("rev-parse", "HEAD") or "unknown"
     status = _git("status", "--porcelain")
-    files = [ln[3:] for ln in status.splitlines() if ln.strip()]
+    files = [porcelain_path(ln) for ln in status.splitlines() if ln.strip()]
     return {"commit": head, "dirty": bool(files), "modified_files": files[:200]}
 
 
@@ -870,14 +895,23 @@ def model_record(lif=None, optic=None, body: bool = True) -> dict:
 
 
 def execution_record(fb=None, device=None, seeds=None, env_seeds=None, batch=None, backend=None, replicate_unit="runs") -> dict:
-    """The realised device (fb.brain.device, never the request), backend flags, dt, seeds, batch size, host."""
+    """The realised device (fb.brain.device, never the request), backend flags, dt, seeds, batch size, host.
+
+    With no `fb` there is no brain to ask, and `execution.device` used to stay null while the tool's own config block
+    held the device it really ran on (`scripts/retire_measures.py`'s cluster JSONs; `Result.check()` then rejects the
+    result for a device it was told). A caller with no FlyBrain passes the device it RESOLVED, and it is recorded as
+    the realised one -- `device_requested` keeps the string either way."""
     rec = {"device_requested": None if device is None else str(device), "device": None, "device_name": None,
            "backend": dict(backend or {}), "dt": {"lif_ms": None, "optic_ms": OPTIC_DT_MS, "frame_ms": FRAME_MS},
            "seeds": {"brain": to_jsonable(seeds), "env": to_jsonable(env_seeds)}, "batch": batch,
            "replicate_unit": replicate_unit, "host": socket.gethostname(), "platform": platform.platform()}
+    if fb is None and device is not None:
+        rec["device"] = str(device)                      # no brain to ask: the caller's resolved device IS the record
     try:
         import torch
         rec["torch"] = torch.__version__
+        if fb is None and rec["device"] and "cuda" in rec["device"] and torch.cuda.is_available():
+            rec["device_name"] = torch.cuda.get_device_name(torch.device(rec["device"]))
         if fb is not None:
             b = getattr(fb, "brain", fb)
             dev = getattr(b, "device", None)
@@ -1010,23 +1044,45 @@ def print_table(df: pd.DataFrame, floatfmt: str = "{:+.3f}", max_rows: int = 60,
 
 
 # ---------------------------------------------------------------------------------------------- 6. CLI helpers
+TUPLE_LIST_KEYS = ("stream_rectify", "stream_adapt", "spatial_suppress", "fb_hold", "pair_gain")
+
+
 def parse_kv(items) -> dict:
     """['w_syn=0.3', 'path_gain=[]', 'receptor_model=None'] -> {'w_syn': 0.3, 'path_gain': [], 'receptor_model': None}
-    (values parsed as JSON, else Python literals, else strings)."""
+    (values parsed as JSON, else Python literals, else strings).
+
+    List-of-tuple fields (the OpticParams stream hooks and pair_gain, `TUPLE_LIST_KEYS`) also accept a shell-friendly
+    grammar when the value is neither JSON nor a Python literal: entries separated by ';', fields by ',', each field a
+    number where it parses as one, else a string (a regex): `stream_rectify=^(Mi1|Tm3|Tm2)$,^T3$,pos;^(Tm1|Tm4)$,^T3$,neg`
+    -> [['^(Mi1|Tm3|Tm2)$', '^T3$', 'pos'], ['^(Tm1|Tm4)$', '^T3$', 'neg']]; `spatial_suppress=^(Mi1|Tm1|Tm3|Tm4)$,0.5,10`
+    -> [['^(Mi1|Tm1|Tm3|Tm4)$', 0.5, 10.0]]. A value containing ';' takes the grammar under any key. A regex that itself
+    contains ',' or ';' needs the JSON form."""
     import ast
     out = {}
     for it in items or []:
         if "=" not in it:
             raise ValueError(f"expected KEY=VALUE, got {it!r}")
         k, v = it.split("=", 1)
+        k = k.strip()
         try:
-            out[k.strip()] = json.loads(v)
+            out[k] = json.loads(v)
         except json.JSONDecodeError:
             try:
-                out[k.strip()] = ast.literal_eval(v)
+                out[k] = ast.literal_eval(v)
             except (ValueError, SyntaxError):
-                out[k.strip()] = v
+                out[k] = _parse_tuple_list(v) if (";" in v or (k in TUPLE_LIST_KEYS and "," in v)) else v
     return out
+
+
+def _parse_tuple_list(v: str) -> list:
+    """'a,b,1;c,d,2.5' -> [['a', 'b', 1.0], ['c', 'd', 2.5]] (numbers where a field parses as float, else strings)."""
+    def field(s: str):
+        s = s.strip()
+        try:
+            return float(s)
+        except ValueError:
+            return s
+    return [[field(f) for f in entry.split(",")] for entry in v.split(";") if entry.strip()]
 
 
 def add_common_args(ap) -> None:

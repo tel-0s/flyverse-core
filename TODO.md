@@ -16,7 +16,7 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
 - [~] **Packaging** (2026-09-13: pyproject metadata, extras, `flyverse.interp` now shipped in wheels, `CITATION.cff` validated, `docs/INSTALL.md`; still owed: a clean-clone CUDA run-through and a lock file): `pip install -e .` from a clean clone works (pyproject has the deps; add `python_requires`,
       optional extras `[cuda]`, `[ui]`, `[interp]`), `python scripts/fetch_data.py --malecns` then
       `python scripts/room_demo.py` runs on CPU-only and on CUDA; pin torch/numpy minimums; a `requirements-lock`.
-- [x] **CI** (2026-09-13: `.github/workflows/ci.yml`, data-free subset via `tests/conftest.py` markers — 236 passed locally; first GitHub run still to shake out; `ruff --select F821` reports 12 undefined names in `scripts/cx_shift.py` / `cx_wedge.py` nested closures — verify whether those paths are dead or rely on an enclosing scope, then fix). Original item: GitHub Actions running the CPU test subset (`tests/test_control.py`, `test_world.py`,
+- [x] **CI** (2026-09-13: `.github/workflows/ci.yml`, data-free subset via `tests/conftest.py` markers — 236 passed locally, first GitHub run green in 1m43s; `ruff --select F821` reports 12 undefined names in `scripts/cx_shift.py` / `cx_wedge.py` nested closures — verify whether those paths are dead or rely on an enclosing scope, then fix). Original item: GitHub Actions running the CPU test subset (`tests/test_control.py`, `test_world.py`,
       `test_nt_readout.py`, `test_interp.py -k "not cluster"`, `test_receptor_model.py`) on a synthetic /
       subset connectome so it needs no 3 GB download; lint.
 - [ ] **README pass**: one page a newcomer can follow — run it, what is simulated, what emerges unprompted,
@@ -28,11 +28,19 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       `docs/media/` (git-ignore rule currently excludes `*.gif`/`*.mp4` — carve out `docs/media/`).
 - [ ] **Reproducibility statement**: the shipped default model (LIFParams / OpticParams / gains) with the cache
       fingerprint (sum|W| 121,460,584; W md5) and the exact commit the benchmark table was produced at; note
-      that the GPU rollout is not seed-reproducible (round-1 finding) and that runs are the replicate unit.
-- [ ] **Owed bookkeeping before the numbers are quoted publicly**: de-score `walk.power_max` (unfit bound;
-      `docs/audits/optic_measures.md`), remove the no-op pair-gain entry (`DEFAULT_PAIR_GAIN[4]`), re-label the
-      T5 pair gain as a drive gain in `optic.py`'s comment, fix the `optic.py:89` "x4" comment; record the
-      `drive_clip_mv` decision once its 3 draws exist.
+      that the GPU rollout is not seed-reproducible (round-1 finding) and that runs are the replicate unit,
+      and that a bit-identity claim about the shipped output is a CPU claim only: two identical runs of one
+      tree at one seed on a B200 diverge from frame 500 of 6,000 (`out/proprio_bitid/compare.txt`).
+- [~] **Owed bookkeeping before the numbers are quoted publicly** (all four edits made 2026-09-13, in the
+      working tree): de-score `walk.power_max` — **decided from the data** (`docs/audits/anti_runaway.md`
+      round 6; 12/12 draws at 48.48, margin inside the worst single-arm scatter, non-monotone, Spearman
+      −0.600 against the room take-off rate) and **DONE**: `scripts/benchmark.py:85` now carries the
+      `notnone` form of `loom.escape_cm`, and the row stays in the pass tally as a report
+      (`benchmark.py:135`); the no-op pair-gain entry (`DEFAULT_PAIR_GAIN[4]`) **REMOVED** and the T5 pair
+      gain re-labelled a drive gain and the "x4" comment fixed in `optic.py` — **DONE**; record the
+      `drive_clip_mv` decision — **RECORDED: 7 draws, 10 PASS / 0 FAIL ×6, `walk.power_max` 49.2480,
+      `walk.GF_max` 4.63 → 13.26, `motion.min_dsi` 0.0040 below the lowest shipped draw on record; NOT
+      adopted — the adopt-alone rule's 29-check suite × ≥ 3 and the room take-off protocol were not run.**
 - [ ] **Neurome acknowledgement** and the interchange note (`docs/NEUROME_INTERFACE.md`): agree with Astra what
       is public (their reports are in their repo).
 
@@ -44,10 +52,17 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
       (−1.6 / −2.0 mV steady vs a 7 mV gap) while every lateralised excitatory route is silent at source: PFL3
       (compass at 0 Hz by default), AOTU015 (object route), most LLPC1; the VNC runs open-loop — every
       `vnc_sensory` cell at 0 Hz. Routes, in order:
-  - [ ] the **proprioceptive / haltere transducer** (dynamics round 2, `scratchpad/vnc_round2.js`, paused): leg
-        chordotonal / hair-plate / campaniform from the leg-MN rates and ground contact, haltere from the
-        haltere-MN rate; literature-ranged; the Coriolis term only as a labelled control. Decides whether the
-        ascending chain (AN04B003 → DNa02's VNC inhibitors; AN07B037_a → PS196_b → GLNO → PEN) carries anything.
+  - [~] the **proprioceptive / haltere transducer** (dynamics round 2, done and measured; shipped as an
+        opt-in module, default OFF — `docs/audits/proprioception_transducer.md`, `vnc_drive.md`). Answer:
+        the ascending chain **does** carry it — AN04B003 0.589/0.314 → 3.713/3.690 Hz, PS196_b → 1.44/1.51,
+        GLNO → 0.66/0.66, all `result` at 5 runs/arm — and **neither deficit closes**: DNa02's operating
+        point moves −1.52 → −1.17 mV against a 7.0 mV gap (2–3 % of the required dose, the ascending
+        excitation cancelled on the spot by PS059), and the compass report arrives **unsigned** (PS196_b's
+        L−R moves the same way in both turn directions even when driven to 11 Hz). Still owed before any
+        default: `rest` redefined with a ledger row (the arm reads 6.0 against `< 5` by construction), the
+        full 29-check suite × ≥ 3 with the sense on through `BatchSim`, and a measured Drosophila rate per
+        channel. **Next mechanisms, both body-side:** a leg cycle in `body.py` (makes the leg channels sided
+        during a turn) and a side-split haltere MN readout in `motor.py`.
   - [ ] **neuromodulator signs**: 3,312 presynaptic bodies (2.7 M synapses: dopamine, octopamine, serotonin,
         unknown) are silenced (sign 0). Receptor-expression tiers for DA / OA / 5-HT receptors per postsynaptic
         type (same sources as `receptors_by_type.csv`; `docs/NT_INTEGRATION.md`) would un-silence the arousal /
@@ -71,9 +86,16 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
       round: bilateral antennal sampling → AL → LH → DN route already exists; test whether a data-implied
       odour-gradient encoding (ORN adaptation, Nagel & Wilson 2011) makes klinotaxis emerge; keep `--program`
       modules as the documented fallback. Re-instrument the assay (ground-only closest approach, first_contact).
-- [ ] **Take-off cost of the receptor signs**: the histamine / glutamate class split with a dose control
-      (dynamics round 2); if one class carries it, the contested-flip rule in `docs/NT_INTEGRATION.md` gets
-      re-examined.
+- [~] **Take-off cost of the receptor signs** — split done with a dose control and replicated at fresh
+      seeds (dynamics round 2, `receptor_integration.md` G.6): the **histamine silencings** carry the hop,
+      voluntary and GF-median cost (null vs the default, 7.21× off on hops pooled over 7 runs/arm) and the
+      larger glutamate class carries none; entry/|W| dose is refuted. **Correction to this item as
+      written:** the class is a product of the **silencing rule**, not the contested-flip rule
+      (`fast_net_abs none`, `flip_contested` empty on 45/45), so `docs/NT_INTEGRATION.md` gets an item on
+      the *silencing* rule's premise for photoreceptor → medulla edges — and first as an `optic.py`
+      question (`optic.py:165-225` applies the receptor factor to photoreceptor → rate edges too), never
+      decided on the room take-off rate. Still open: which rows within the class (per-row split), and
+      **dose in postsynaptic cells touched**, which this design structurally cannot close.
 - [ ] **Escape and wind orientation** pass today; keep them in every suite run as regression guards.
 
 Most useful experimental data, ranked by leverage: (1) receptor / conductance profiles for the unprofiled

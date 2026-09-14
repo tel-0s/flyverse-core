@@ -82,7 +82,10 @@ REFERENCES = {
     "dn.MDN_top_hz": Ref(152, "<", 250, "4", note="MDN drives its backward-walking set (IN06B020 ~150 Hz), no 300 Hz storm"),
     "dn.DNp09_top_hz": Ref(45, "<", 250, "4", note="DNp09 drives its premotor set (~45 Hz), no AVLP storm"),
     "walk.GF_max_hz": Ref(26, "<", 38, "4-8", note="walking optic flow (smell on) keeps the GF below Flight.gf_hz"),
-    "walk.power_max_hz": Ref(22, "<", 50, "4", note="per-frame max of the wing-power MN mean (22 Hz with DN->VNC x3, 50 at x6)"),
+    "walk.power_max_hz": Ref(22, "notnone", 0, "4", note="REPORTED, NOT SCORED since session 10: per-frame max of the wing-power MN mean. "
+                            "The old < 50 bound was Flight.takeoff_power_hz (a 0.3 s sustained criterion) applied to a per-frame max; it failed under "
+                            "13 of 16 optic ablations, is non-monotone in every gain scan, and anti-correlates with the room take-off rate "
+                            "(docs/audits/anti_runaway.md round 6). walk.power_sustained_hz keeps the take-off criterion."),
     "walk.power_sustained_hz": Ref(22, "<", 50, "4", note="max 0.3 s running mean: a voluntary takeoff needs Flight.takeoff_power_hz (50) sustained for 0.3 s"),
     "loom.GF_peak_hz": Ref(26, ">=", 20, "4", note="black ball at 1 m/s from the left -> GF burst (20-76 Hz across sessions)"),
     "loom.escape_cm": Ref(3.5, "notnone", 0, "2-4", note="range at which the GF crosses 20 Hz (3.5 cm)"),

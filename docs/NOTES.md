@@ -1394,7 +1394,12 @@ against a 7 mV threshold gap) while its three lateralised excitatory classes are
 AOTU015 / AOTU001 at 0.000 Hz, most of LLPC1 never firing and LPT22 cancelling what survives at corr -0.86) and the
 one live lateralised route, the wind, is ~90x under dose; and the **VNC runs open-loop** -- every `vnc_sensory` cell
 is at 0 Hz in the room, so the walking body reports nothing back. `docs/audits/deficit_turning.md`; "Session 10,
-interpretability toolkit".] Starvation does nothing in the plain model by design: hunger-driven search exists only as programs
+interpretability toolkit".] [2026-09-13, dynamics round 2: the open-loop VNC was **closed and the fly still walks
+straight**. `senses.Proprioception` (opt-in, default OFF) drives all 941 afferents from the body state, every silent
+ascending stage fires, and DNa02's operating point moves only -1.52 -> -1.17 mV against the 7.0 mV gap while its L-R
+stays a fixed offset; the yaw-rate SD that does rise (2.848 -> 3.317 deg/s, straightness 0.9956 -> 0.9818) is entirely
+the leg-MN branch of `body.Locomotion`'s hand-written yaw law and never changes sign. `docs/audits/vnc_drive.md`;
+"Session 10, dynamics round 2".] Starvation does nothing in the plain model by design: hunger-driven search exists only as programs
 (`--program anemotaxis` / `cx`).
 
 So this is a real, previously masked deficit of the full model rather than a regression: the connectome model has no
@@ -1454,7 +1459,13 @@ makes 0 synapses onto the PS196_b / LAL / GLNO chain** (so the efferent arm test
 loop, and the sided report the VNC does send up reaches nothing in the PEN chain), and what the eye delivers arrives
 at GLNO / ER1_a **direction-blind** and at 0.1 % of GLNO's drive -- so signing GLNO would carry nothing (the gaba
 arms: -3,752 / -3,797 vs -3,749 mV/s onto PEN_a). `docs/audits/deficit_rotation.md`; "Session 10, interpretability
-toolkit".]
+toolkit".] [2026-09-13, dynamics round 2: **PS196_b now fires** -- 0.193/0.519 -> 1.437/1.505 Hz with the
+proprioceptive / haltere transducer on, and GLNO with it (0.034/0.038 -> 0.664/0.657 Hz, the first time PEN's nodulus
+input carries anything in the plain fly) -- **and the bump still does not move** (-0.0047 to +0.0036 wedges/s against
+4.0 ideal). The route is **unsigned by construction**: the only afferent class two steps from PS196_b is the haltere
+SApp and `MotorRates.haltere` is one bilateral number, so under the labelled Coriolis stop-gap, with PS196_b driven
+13x harder (11.05/7.52 Hz), its L-R moves the *same* way in both turn directions (+3.52 ccw, +3.95 cw). Signing GLNO
+stays moot. `docs/audits/vnc_drive.md` 6; "Session 10, dynamics round 2".]
 
 **Where the small object is lost, named at last.** The static-apple figure is carried by the lamina (L1 z
 +18.4, L2 +12.0), the medulla (Mi1 -8.8, Tm3 -6.8, Tm20 +5.3, Tm4 +4.8, Tm1 +4.5) and T4c/d / LPLC2, and it is
@@ -1618,6 +1629,16 @@ surviving motion signal at corr -0.85 to -0.86 (the sd of the sum is 34-36 mV/s 
 wiring). The wind route (JO -> PS230 -> DNa02) is live and lateralised (r -0.61 with the wind side across 48 flies)
 at ~0.08 mV -- **~90x under the dose needed, not the audit's 25x**. And the VNC runs **open-loop**: every
 `vnc_sensory` cell is at 0 Hz in the room (SNpp39 / 45 / 50, LgLG), a missing-input fact of the body model.
+[2026-09-13, dynamics round 2: **route (b) was built and run, and the input it supplied is not enough.**
+`senses.Proprioception` (opt-in, default OFF) drives the 941 proprioceptors from the realised leg-MN / haltere-MN
+rates and ground contact; AN04B003 goes 0.589/0.314 -> 3.713/3.690 Hz and the sided excitatory term the audit asked
+for appears (AN04B003/L -> DNa02_L +9.09 -> +57.35 mV/s), but the same transducer's haltere channel cancels it on the
+spot through PS059 (-90.8 -> -113.5), DNa02's net input moves only -303 -> -235 / -363 -> -342 mV/s (-1.52 -> -1.17
+and -1.81 -> -1.71 mV against the 7.0 mV gap, 2-3 % of the required dose) and **DNa02 still does not fire** (0.02/0.10
+Hz, `null`). The leg L-R that does grow (+0.151 -> +0.301 Hz) is a **fixed positive offset**, positive in all 400
+fly-runs and still +0.09 to +0.33 Hz at 1.6 rad/s of imposed clockwise turn, so `missing input` is closed on this
+route and shown insufficient: what remains is the operating point, the transducer's own cancellation, and a body
+model with no leg cycle. `docs/audits/proprioception_transducer.md`, `vnc_drive.md`; "Session 10, dynamics round 2".]
 Data-driven route: (a) the JO transducer's rate-vs-wind-speed calibration against measured JO responses (a sensor
 calibration, not a gain); (b) proprioceptive / haltere drive of the `vnc_sensory` superclass from the body's
 realised state, the cells picked from what MaleCNS says those ascending neurons receive (the same route as the
@@ -1679,8 +1700,19 @@ syn, PS239 312, AN08B026 -> LAL104 269), (b) a `paths` query of what those ascen
 sensory, haltere, `vnc_intrinsic`), (c) drive those afferents as a sensor from the leg / haltere state the VNC motor
 neurons actually produce -- **not** from `body.Locomotion`'s yaw scalar, which would close a loop through a
 hand-written module -- then repeat the efferent arm in two batches with `verify-batch`; if PS196_b / LAL / WED fire
-and GLNO gains a body-locked sided term, the GLNO sign becomes testable on a signal. **Hand-crafting, named and not
-done:** a GLNO `TYPE_NT_OVERRIDE`, a gain on PS196_b / PLP078, the EPG <-> PEN gains as a default, or a module that
+and GLNO gains a body-locked sided term, the GLNO sign becomes testable on a signal. [2026-09-13, dynamics round 2:
+(a)-(c) were run and the prediction **failed on its second half**. The afferents were driven from the VNC's own motor
+readout (never from `body.Locomotion`'s yaw scalar) and **PS196_b fires** -- 0.193/0.519 -> 1.437/1.505 Hz, GLNO
+0.034/0.038 -> 0.664/0.657, both `result` at 5 runs/arm -- but the term GLNO gains is **not body-locked and not
+sided**: bump drift stays -0.0047 to +0.0036 wedges/s against 4.0 ideal, GLNO's L-R stays +26.93 to +28.07 Hz in
+every phase of every arm, and under the labelled Coriolis stop-gap (13x the drive, PS196_b at 11.05/7.52 Hz)
+PS196_b's L-R moves the same way in both turn directions (+3.52 ccw, +3.95 cw) -- a **sign** failure, not a dose
+failure. `AN07B037_a`, the named route, stays at 0.000-0.004 Hz in the room (a rate threshold, not a wiring one: it
+fires at 3.1/2.2 Hz under the 80 Hz stop-gap turn); PS196_b is reached through CB0675 / GNG580 / PS047_b instead. So
+the classification becomes **missing input (supplied) + a route that cannot be sided in this body + a sign-0 link
+that is moot until it can be**, and the actionable item moves to the body model -- a side-split haltere MN readout in
+`motor.py`, a leg cycle in `body.py`. `docs/audits/vnc_drive.md`; "Session 10, dynamics round 2".] **Hand-crafting,
+named and not done:** a GLNO `TYPE_NT_OVERRIDE`, a gain on PS196_b / PLP078, the EPG <-> PEN gains as a default, or a module that
 writes PFL3 / PEN.
 
 **Facts that supersede earlier readings in this file** (each is cross-referenced at the entry it corrects):
@@ -1703,7 +1735,10 @@ writes PFL3 / PEN.
   x0.3 damp as if it were the default and are wrong.
 * The VNC is **open-loop** (every `vnc_sensory` cell at 0 Hz in the room) and **DNa02 makes 0 synapses onto the
   PS196_b / LAL139 / LAL184 / WED040_a / GLNO chain** (its 14,446 outputs go to the VNC; 669 onto 1,846 ascending
-  neurons in total): the body's own turn has no route back to the compass.
+  neurons in total): the body's own turn has no route back to the compass. [2026-09-13, dynamics round 2: the first
+  half is now a statement about the *default*, not about the model -- with `senses.Proprioception` on (opt-in,
+  default OFF) all 941 afferents fire and the ascending chain carries. The second half stands: the report that
+  arrives is unsigned, so the body's own turn still has no *signed* route back to the compass.]
 
 **Process rules this round paid for.** Replicates are **jobs, and >= 4 per arm** (5 for small effects), because
 `common.compare`'s exact-U floor is p = 0.10 at 3 v 3 (0.029 at 4 v 4, 0.0079 at 5 v 5) -- a 3 v 3 "result" cannot
@@ -1761,6 +1796,115 @@ per arm in one submission), then a fixed-anatomy model comparison (sum / per-pre
 signs preserved / adaptation + spatial suppression, with `gain_fb 0` and the feedback-hold as controls and a
 bright-dark / ON-OFF / flicker / bar / grating specificity battery), then a transfer test with fixed parameters and
 held-out stimuli.]
+
+## Session 10, dynamics round 2 (2026-09-13)
+
+Four threads (build:transducer, run:vnc-drive, run:takeoff-split, run:pm-bound), four Opus skeptics, ~100
+cluster jobs. **No model default changed**: `git diff -- flyverse/brain.py flyverse/body.py` is empty, the
+transducer is opt-in and OFF, and the two benchmark / optic lines the round decides about are named --
+`scripts/benchmark.py:85` is de-scored (a measurement, not a model default) and `OpticParams.drive_clip_mv`
+is untouched. Audits: `docs/audits/proprioception_transducer.md`, `vnc_drive.md`, `receptor_integration.md` G.6,
+`anti_runaway.md` round 6. One verdict was **unsound on its numbers** (`vnc-drive` had quoted a partial
+staging directory) and the audit was rewritten from the final 5-run data; its three conclusions were
+re-derived at 5 v 5 by the skeptic and hold.
+
+**A transducer on the never-driven VNC afferents: the wiring carries it, and DNa02 still does not fire.**
+`senses.Proprioception` drives 941 wired-but-never-driven proprioceptors from the body state the VNC motor
+neurons produce -- chordotonal (615 cells, `10 + 140 x legMN / 30` Hz), hair plate (113, `5 + 95 x legMN / 30`),
+leg campaniform (12, 50 Hz on the ground, 0 airborne), haltere (201, = the haltere-MN rate) -- a
+body-state -> afferent-rate model of the `Wind` -> JO kind, every law inside a literature bracket recorded as
+an `op report` ledger row and none chosen against behaviour. In 60 s room runs, 16 flies, 5 runs per arm,
+every stage the round-1 audits found silent now fires: **AN04B003 0.589/0.314 -> 3.713/3.690 Hz**,
+AN07B035 +0.72/+0.31, AN06A026 +0.62/+0.18, **PS196_b 0.193/0.519 -> 1.437/1.505** -- the efference-copy input
+of GLNO that `deficit_rotation.md` found at 0.03-0.16 Hz in all 160 phases -- and **GLNO 0.034/0.038 ->
+0.664/0.657 Hz**, the first time the nodulus input of PEN carries anything in the plain fly (all `result`,
+p 0.0079). The decompose of DNa02's input shows the sided excitatory term the audits asked for **does
+appear** -- AN04B003/L -> DNa02_L +9.09 -> **+57.35 mV/s**, /R -> /R +4.75 -> +55.78, SNpp45 direct +39.97/+17.12,
+the tonic VNC inhibitors relaxing by +5.0 to +7.4 each -- and is **cancelled on the spot** by the haltere
+afferents' own second-step inhibition (PS059/L -90.8 -> -113.5, /R -49.4 -> -75.3; the tool's own
+`cancelling_pair`). Net input -303 -> -235 and -363 -> -342 mV/s = **-1.52 -> -1.17 mV and -1.81 -> -1.71 mV of
+steady `g` against a 7.0 mV threshold gap**: the operating point moves a fifth of the way, 2-3 % of the
+~1,750 mV/s `deficit_turning.md` 7 computed as the requirement, and DNa02 stays at 0.02/0.10 Hz (`null`).
+`missing input` is closed on this route and shown insufficient; what is left is the operating point, the
+transducer's own cancellation, and a body model with no leg cycle.
+
+**The steering that does change is a bias in a hand-written readout, and its sign never changes.** Yaw-rate
+SD 2.848 -> 3.317 deg/s (`result`, p 0.032), straightness 0.9956 -> 0.9818 (z -20.7, every B/C/E run below
+every A run) -- but the whole change is the leg-MN branch of `body.Locomotion`'s yaw law: leg L-R
+**+0.151 -> +0.301 Hz** (z +33) = +0.50 -> +1.00 deg/s of fixed bias, with a wider temporal SD (0.414 ->
+0.529 Hz), while DNa02 L-R stays a -0.07 to -0.10 Hz fixed offset. **The leg L-R is positive in all 400
+fly-runs of all 25 room runs** (+0.098 .. +0.385) and stays +0.09 to +0.33 Hz at 1.6 rad/s *clockwise* with
+DNa02 L-R = -18.2 Hz. This is not turning and must not be quoted as progress on the spontaneous-turning
+gap. The leg channels alone (arm C) produce the whole effect; the haltere channel alone (D) none of it.
+
+**The compass does not see the self-turn, with the sense on or off -- and the failure is sign, not dose.**
+Bump drift -0.0047 .. +0.0036 wedges/s on the phase means of A / B / E against **4.0 ideal**, every one of
+36 arm-phase-runs inside -0.0097 .. +0.0060, with realised self-turns of +96.5 to +108.3 / -85.9 to -99.1
+deg/s; GLNO's L-R stays +26.93 to +28.07 Hz in every phase of every arm. Under the labelled stop-gap arm
+(the Coriolis term on the haltere channel, `body.Locomotion`'s yaw scalar fed back as if it were a sense)
+the efference-copy chain is driven **hard** -- the commanded haltere afferent rate reaches 80.10 Hz ccw /
+74.50 cw and **PS196_b reaches 11.05/7.52 Hz, 13x its rest rate** -- and **its L-R still moves the same way
+in both turn directions** (+3.52 ccw, +3.95 cw). The reason is structural: the only afferent class with a
+two-step route into PS196_b is the haltere SApp, whose rate is one bilateral number in this body, and the
+sided leg channels reach it only at k = 3. So `deficit_rotation.md`'s "missing input + a sign-0 link"
+becomes **missing input (supplied), a route that cannot be sided in this body, and a GLNO -> PEN sign-0 link
+that is moot until it is** -- and the actionable item moves to the body model (a side-split haltere MN
+readout in `motor.py`, a leg cycle in `body.py`), not the connectome and not the GLNO transmitter call.
+`AN07B037_a`, the route `deficit_rotation.md` 2.5 named, stays at 0.000-0.004 Hz in every room arm at 193
+SApp synapses and 10.7 Hz of drive -- but fires at 3.1/2.2 Hz under the 80 Hz stop-gap turn, so it is a rate
+threshold, not a wiring one. The stop-gap loop is positive but **stable** (haltere MN 9.38 -> 27.55 Hz,
+realised in-turn gain ~0.26; 0.163 at the ground operating point), and stays a control arm, never a default.
+
+**Nothing is adopted, and the suite says why.** With the sense on, `rest.spikes_per_step` reads **6.0
+against `< 5`, FAIL in both GPU draws** -- by construction, because the check is defined as "no input" and
+740 tonically-driven afferents are input -- and four further bench measures move by 37-81 % while still
+passing loose one-sided bounds: `taste.MN9_hz` 10.93 -> 4.15 (-62 %), `smell.PN_hz` 7.86 -> 2.82 (-64 %),
+`smell.KC_active` 816 -> 511 (-37 %), `walk.GF_max_hz` 4.63 -> 8.39 (+81 %). A leg/haltere transducer moving
+taste and olfaction by 60 % is a broad cross-modal effect on a bare `brain.Brain`, not a `rest`
+redefinition problem, and whether it is real or an artefact of the probe's body-less harness is unmeasured;
+the two bench "draws" are bit-identical on 8 of 10 checks, so the bench carries **one effective replicate
+per arm**. The transducer ships as a **swappable module, default OFF**. Closed this round: the opt-in
+path's checkpoint gap (`BatchSim.state_dict` now carries the motor snapshot, `load_state_dict` restores it,
+a partial `reset(rows=)` zeroes only the selected rows; `tests/test_proprioception.py::CheckpointAndResetTests`).
+
+**The take-off cost of the receptor signs belongs to the histamine silencings, and the rule it questions is
+not the flip rule.** Five arms in one submission, four runs each, then a fresh-seed replication at brain
+seeds 4/5/6 (7 runs per arm pooled, 33,600 fly-s each): the 17,256 two-source histamine silencings alone
+(90 % of their entries photoreceptor -> medulla) reproduce the shipped default -- `compare` **null** on hops,
+escape, voluntary and the GF median (pooled hops 0.840x [0.669, 1.054]) -- and beat off on all four
+(z +9.4 / +3.4 / **+29.2** / +4.0, 7.21x on hops); the **larger** 27,207-entry glutamate class (T1 / Dm9 /
+Lai) reproduces off on all four, with **0 voluntary take-offs in 19,200 fly-s**. A 3,832-entry random draw
+from the carrying class, matched to the Brain side's entry dose and |W|, also reproduces off -- so dose
+measured in **entries or |W| does not order the arms**. What this design cannot close, and structurally
+never can: **postsynaptic cells touched** orders every arm monotonically with the outcome (off 0, Glu 2,091,
+Random 2,505, His 10,411, shipped 14,161) and an entry-matched subset can never match its class's cell
+count. The **escape** channel stays unattributable, as in G.5: the reported batch's 103.6 % does not
+replicate (fresh seeds 0.633x [0.353, 1.116]), and at 7 v 7 even `off` vs shipped is `compare`-null on
+escape (|z| 1.92 < 3). Off's voluntary rate is not exactly zero either -- 1 in 86,400 fly-s over 18 batches.
+The class is a product of the **silencing rule**, not the contested-flip rule (`fast_net_abs none`,
+`fast_sign_abs 0`, `flip_contested` empty on 45/45, sources unanimous), so what goes on
+`docs/NT_INTEGRATION.md`'s list is the silencing rule's premise on photoreceptor -> medulla edges -- and
+first as an `optic.py` question (the receptor factor is applied to photoreceptor -> rate edges too), never
+decided on the room take-off rate.
+
+**`walk.power_max` decided from the data: de-score it.** Under the shipped defaults it is 48.4805 Hz in
+12 of 12 independent GPU draws, **1.5195 Hz** under a hand-set 50 -- a margin **inside the worst single-arm
+scatter on record** (`out/sk_les_holds_all/holdOptic_r{0..3}.json` span 11.86 Hz on the same arm; the `off`
+suite arm spans 1.56 Hz). It is **non-monotone** in the one three-point scan (LPi x1/x2/x4 = 51.51 / 48.00 /
+48.48) while the quantity that gain was added for is monotone; the two path gains move it in **opposite**
+directions (DN->VNC x1 = 32.41, both gains off = 34.24); and across the four take-off hold arms its rank
+correlation with the room take-off rate is **Spearman -0.600** -- the two arms that FAIL the check are the
+two quietest rooms. The 50 is not an animal number: it is `body.Flight.takeoff_power_hz`, 50 Hz held 0.3 s,
+applied to a per-frame maximum, and the sustained form (`walk.power_sustained_hz`) is the check that keeps
+that referent. `scripts/benchmark.py:85` now takes the `notnone` form `loom.escape_cm` already uses -- with
+the precision that `benchmark.py:135` makes `notnone` pass whenever the value exists, so the row stays **in
+the pass tally** as a report. **Not** recommended: re-deriving the referent from a gain scan. The drive-clip
+retirement candidate (`OpticParams.drive_clip_mv` 35, `optic.py:90`) is 10 PASS / 0 FAIL in 6 of 6 draws at
+`walk.power_max` 49.2480 and `walk.GF_max` 4.63 -> 13.26; **nothing is adopted** -- the adopt-alone rule needs
+its own 29-check suite x >= 3 and the room take-off protocol, and `motion.min_dsi` 0.2371 sits 0.0040 below
+the lowest shipped-default draw on record (a `result`, small against the 0.1 bound, and irrelevant only
+because nothing is adopted). De-scoring `walk.power_max` does **not** license retiring LPi x4, the drive
+clip or the AL LN override.
 
 ## Batched brains and the RL environment
 
