@@ -6,14 +6,18 @@ by default: ``FlyBrain(preset="raw")`` -- the default -- constructs none of thes
 beside ``compiled_connectome`` (keys ``preset`` and ``instruments``), so a JSON always says which of its numbers came
 from the connectome and which from a hand-written stand-in.
 
-Three kinds live here:
+The registry includes:
+
+* ``compass.CompassDriver`` (kind ``stop-gap``): an imposed angular memory, enabled by name ``compass``.
+  It receives held yaw velocity through ``FlyBrain.proprioception`` and writes only EPG Poisson Hz through
+  the ordinary attached-module scheduler. This explicit motion receiver is specific to named instruments;
+  it does not give modules access to the body or supply a world-heading/goal oracle.
 
 * ``SidedTurnAfferent`` (kind ``stop-gap``): the body's signed yaw rate -> Poisson spikes on PS196_b's named ascending
   afferents, on the side the connectome's contralateral routing implies. It is a *body-derived* signal, so it lives
   where the ``haltere_coriolis`` stop-gap lives -- the ``senses.Proprioception`` transducer, token ``'turn_afferent'``
   -- and reaches the cells through the channel that already exists (``FlyBrain.proprioception(..., yaw_rate=)``,
-  ``FlyBrain._input``). No body -> module channel is invented: a ``flyverse.modules`` module sees neural quantities
-  only, and no neural quantity in this model carries the fly's own turn with a sign (docs/audits/vnc_drive.md 6).
+  ``FlyBrain._input``). Its runtime remains in the sense, separate from CompassDriver's imposed memory.
 * ``EdgeHold`` (kind ``edges``): the record of a factor-0 hold installed through ``LIFParams.type_path_gain``
   (``cx_wedge.py --hold-edges``, round 6A). PRESETS_SPEC section 2 item 4: a held edge is an instrument too. The
   object does not install the hold -- the caller's ``LIFParams`` does -- but ``install()`` refuses a FlyBrain whose
@@ -27,6 +31,14 @@ import numpy as np
 
 PRESETS = ("raw", "instrumented")
 INSTRUMENT_KINDS = {"stop-gap", "mechanism", "edges", "relabel"}
+
+
+def make_instrument(c, name):
+    """Resolve an explicit named instrument after the connectome/subset has been selected."""
+    if name == 'compass':
+        from .compass import CompassDriver
+        return CompassDriver(c)
+    raise ValueError(f'unknown instrument {name!r}; named instruments: compass')
 
 
 def identifier(obj):

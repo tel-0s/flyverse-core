@@ -243,7 +243,11 @@ class RoomUI:
         graphs = "on" if getattr(getattr(sim,"fb",None),"cuda_graphs",False) else "off"
         config = f"{device} / {backend} / {events}:{sparse}   lif {brain.p.dt:g}ms   optic {optic_dt:g}ms   {weights}   graphs {graphs}"
         self.text(surface,config,(12,72),11,DIM,width=surface.get_width()-330)
-        self.text(surface,"D. melanogaster / closed loop",(surface.get_width()-12,72),11,DIM,right=True)
+        fb = getattr(sim, 'fb', None)
+        preset = getattr(fb, 'preset', 'raw')
+        names = '+'.join(getattr(fb, 'instruments', {}))
+        model_label = preset + (' / ' + names if names else '')
+        self.text(surface,model_label,(surface.get_width()-12,72),11,LILAC if names else DIM,right=True)
 
     def _rule(self, surface, rect, title, color=MUTED):
         self.label(surface,title,(rect.x,rect.y),color,width=rect.w)
@@ -464,6 +468,7 @@ class RoomUI:
         name = type(program).__name__ if program is not None else "none"
         end_right = self._row(surface,right,end_right+29,"program",name)
         fb = getattr(sim, "fb", None)
+        end_right = self._row(surface,right,end_right,'preset',getattr(fb,'preset','raw'),LILAC)
         attached = getattr(fb, "attached_modules", {})
         hooks = getattr(fb, "hooks", [])
         active_ids = {id(module) for module in attached.values()}

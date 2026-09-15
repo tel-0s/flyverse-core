@@ -53,17 +53,20 @@ class FlyBrain:
         from .instruments import PRESETS, _check_instrument
         if preset not in PRESETS:
             raise ValueError(f"preset must be one of {PRESETS}, got {preset!r}")
-        instruments = list(instruments or [])
+        instruments = [instruments] if isinstance(instruments, str) else list(instruments or [])
         if preset == "raw" and instruments:
             raise ValueError("preset 'raw' attaches no instrument (docs/PRESETS_SPEC.md 1); use preset='instrumented'")
-        names = [_check_instrument(inst) for inst in instruments]
-        if len(set(names)) != len(names):
-            raise ValueError(f"instrument names must be unique: {names}")
         self.preset = preset
         self.instruments = {}
         if c is not None and dataset is not None and c.dataset != dataset:
             raise ValueError("dataset disagrees with the supplied connectome")
         self.c = regions.subset(c if c is not None else connectome.load(dataset=dataset, verbose=False), modules)
+        if any(isinstance(inst, str) for inst in instruments):
+            from .instruments import make_instrument
+            instruments = [make_instrument(self.c, inst) if isinstance(inst, str) else inst for inst in instruments]
+        names = [_check_instrument(inst) for inst in instruments]
+        if len(set(names)) != len(names):
+            raise ValueError(f"instrument names must be unique: {names}")
         if self.c.n == 0:
             raise ValueError("FlyBrain needs at least one neuron")
         lp = lif_params or brain.LIFParams()
@@ -193,12 +196,23 @@ class FlyBrain:
         self._release_extensions()
 
     def attach(self, module):
+        validate = getattr(module, "validate_parent", None)
+        if callable(validate):
+            validate(self)
+        is_instrument = getattr(module, "required_preset", None) is not None
+        if is_instrument:
+            from .instruments import _check_instrument
+            _check_instrument(module)
+            if self.preset != module.required_preset or module.name in self.instruments:
+                raise ValueError("module instrument requires its named preset and a unique instrument name")
         try:
             self._extension_runtime().attach(module)
         except Exception:
             self._release_extensions()
             raise
         self._graphs.clear()
+        if is_instrument:
+            self.instruments[module.name] = module
         return module
 
     def detach(self, name):
@@ -206,6 +220,8 @@ class FlyBrain:
             raise KeyError(name)
         module = self._extensions.modules[name]
         self._extensions.remove(name)
+        if self.instruments.get(name) is module:
+            del self.instruments[name]
         self._release_extensions()
         return module
 
@@ -227,11 +243,12 @@ class FlyBrain:
 
     @property
     def available_senses(self):
-        # 'proprioception' appears only when a caller attaches a senses.Proprioception instance as
-        # `proprioception_sense` (opt-in; BatchSim(..., proprioception=...)); nothing builds one by default.
+        # The explicit compass instrument can receive angular motion without enabling other afferents.
+        # Neither a proprioceptive sense nor an instrument is built by default.
+        motion = any(callable(getattr(inst, "observe_turn", None)) for inst in self.instruments.values())
         return tuple(name for name, value in (("vision", self.optic), ("smell", self.olfaction),
                      ("wind", self.wind_sense), ("taste", self.taste_sense),
-                     ("proprioception", getattr(self, "proprioception_sense", None))) if value is not None)
+                     ("proprioception", getattr(self, "proprioception_sense", None) or (True if motion else None))) if value is not None)
 
     def neurotransmitters(self, batch_index=0) -> NTSnapshot | None:
         """Optional live NT levels, sampled on demand through a read-only adapter.
@@ -301,12 +318,16 @@ class FlyBrain:
     def proprioception(self, leg_L, leg_R, haltere, airborne, yaw_rate=0.0):
         """Opt-in (senses.Proprioception attached as `proprioception_sense`): the leg MN rates per side, the haltere
         MN rate and the airborne flag of the body -> afferent Hz per channel, injected like wind. `yaw_rate` is read
-        only by the labelled stop-gap Coriolis term and is ignored otherwise."""
+        by the labelled Coriolis term, signed afferent, or an explicit angular-motion instrument."""
         sense = getattr(self, "proprioception_sense", None)
-        self._require("proprioception", sense)
+        receivers = [inst for inst in self.instruments.values() if callable(getattr(inst, "observe_turn", None))]
+        self._require("proprioception", sense if sense is not None else (receivers or None))
+        for inst in receivers:
+            inst.observe_turn(yaw_rate)
         self._register_sense_instrument()
-        for name, idx, hz in sense.rates(leg_L, leg_R, haltere, airborne, yaw_rate, self.B):
-            self._input(f"proprioception_{name}", idx, hz)
+        if sense is not None:
+            for name, idx, hz in sense.rates(leg_L, leg_R, haltere, airborne, yaw_rate, self.B):
+                self._input(f"proprioception_{name}", idx, hz)
 
     def stimulate(self, selection, hz, ms):
         """Force a pulse, combined with sensory drive by maximum; expire on a LIF boundary."""
