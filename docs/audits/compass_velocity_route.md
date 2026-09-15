@@ -21,6 +21,7 @@ turn -- with the ring's DC brake held and GLNO signed -- and does anything downs
 | HG | `ring_dc_hold` + `glno_sign` (= 6A's H3G) | the near-bump without a velocity input (replicates 6A) |
 | HGV | `ring_dc_hold` + `glno_sign` + `sided_turn_afferent` | **the arm**: the bump should move with the turn |
 | HGV- | HGV with the afferent sign flipped | the sign control: the bump should move the other way, or the effect is not the afferent |
+| HGVp | HGV with the hold restricted to PEN (`^(ExR6|ER6|ER4m)$:^PEN_`; EPG keeps its DC input) | added 2026-09-15 after 6B (`compass_local_recurrence.md` section 0): the hold on EPG removes the off-tile inhibition that H3E's hump lacked; does keeping it confine the bump |
 
 The afferent instrument: Poisson `poisson_hz` on AN07B037_a/_b (and CB0675 / GNG580 / PS047_b in a second variant only
 if V is null on the first), rate = `k * max(0, +-yaw_deg_s)` on the side the connectome's contralateral routing
@@ -30,7 +31,7 @@ descriptive.
 
 ## 3. Predeclared measures and family
 
-Primary (Holm, m = 5, 6 v 6 exact U, floor 0.0022 -- satisfiable):
+Primary (Holm, m = 6, 6 v 6 exact U, floor 0.0022 x 6 = 0.013 -- satisfiable; m was 5 until the HGVp arm was added, before submission):
 
 1. `bump_follow_wedges_per_s` HGV vs HG: the bump's mean angular velocity over the turn, sign-matched to the turn
    (ideal 4.0 w/s at 90 deg/s; 6A measured 0.00 +- 0.01 in every arm).
@@ -38,9 +39,14 @@ Primary (Holm, m = 5, 6 v 6 exact U, floor 0.0022 -- satisfiable):
 3. `GLNO_LR_hz` V vs S: the afferent reaches GLNO with a side.
 4. `PEN_LR_hz` HGV vs HG: the side reaches PEN.
 5. `DNa02_LR_hz` HGV vs HG: anything gets back down.
+6. `frac_confined_post` HGVp vs HGV: keeping EPG's DC input confines the bump (added with the HGVp arm, 2026-09-15, before submission).
 
-Descriptive (no verdict): bump survival / rate / width per arm as in 6A, the k-sweep, per-type ring rates (6B's
-recorded groups if merged by then), PS196_b's own L-R at each k.
+Descriptive (no verdict): bump survival / rate / width per arm as in 6A, the k-sweep (HGVk025, HGVk1 on HGV only),
+per-type ring rates (6B's recorded groups, merged at a41d0f2), PS196_b's own L-R at each k, the afferent / PS196_b /
+GLNO / PEN / DNa02 L-R per side. The turn in `cx_wedge` is a prescribed protocol parameter (`--turn 90
+--turn-window 0.5:3.5`), not a body: the instrument reads the prescribed yaw, and the body-driven version is the
+room run that follows a result. Batch: 8 arms x 6 seeds = 48 jobs in two `cluster_run.py` calls, `out/cx8/batch.sh`,
+`set -o pipefail`.
 
 Verdict vocabulary result / null / underpowered / undetermined per INTERP 10.4. Per-seed scatter emitted by the
 analysis script to `out/cx8/analysis/per_seed.csv` and pasted (rule 28). Nothing adopted into `raw` under any outcome;
