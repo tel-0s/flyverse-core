@@ -415,12 +415,18 @@ class Connectome:
     @property
     def has_optic_columns(self):
         """Whether an annotated map or an explicitly opted-in candidate is present."""
-        return "optic_columns" in capabilities(self.dataset) or self.vision is not None
+        return "optic_columns" in capabilities(self.dataset) or (
+            self.dataset == "banc" and self.vision is not None
+            and self.vision.get("mode") == "candidate" and self.vision.get("eye") == "R"
+            and self.vision.get("release") == self.release
+            and self._extension.get("dataset") == "synthetic"
+            and self._extension_base is not None and self._extension_base.dataset == "banc")
 
     @property
     def vision(self):
         """Candidate checks/provenance, or None for a biological release graph."""
-        return (self._extension or {}).get("vision")
+        record = (self._extension or {}).get("vision")
+        return record if isinstance(record, dict) else None
 
     def require(self, capability):
         if capability not in set().union(*CAPABILITIES.values()):

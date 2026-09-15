@@ -86,6 +86,7 @@ def test_candidate_cartridges_roundtrip_prune_and_provenance(candidate, tmp_path
     r = retina.build_retina(x)
     assert r.n_columns == 2 and set(r.col_side) == {"R"}
     y = cn.load(x.cache_dir, verbose=False)
+    bv.validate_candidate_cache(y)
     identical_csr(y.W, x.W)
     np.testing.assert_array_equal(cn.sign0_counts(y)[:2], cn.sign0_counts(x)[:2])
     restored = y.prune(y.neurons.bodyId.lt(0).to_numpy())
@@ -143,3 +144,43 @@ def test_right_eye_selection_preserves_directions():
     assert selected.pr_index.tolist() == [9, 10]
     assert selected.pr_column.tolist() == [0, 1]
     np.testing.assert_array_equal(selected.col_az_el, r.col_az_el[1:])
+
+
+@pytest.mark.parametrize(
+    "record", [True, "candidate", {}, {"mode": "unknown"}, {"mode": "candidate"}]
+)
+def test_arbitrary_vision_record_does_not_grant_columns(candidate, record):
+    candidate._extension = {"vision": record}
+    assert not candidate.has_optic_columns
+    with pytest.raises(cn.NotAvailable):
+        retina.build_retina(candidate)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["metadata", "base_weights", "base_annotations", "columns", "synthetic_weights"],
+)
+def test_probe_rejects_changed_persisted_candidate(candidate, tmp_path, damage):
+    from types import SimpleNamespace
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from probe_vision_common import load
+
+    path = tmp_path / "candidate"
+    x = bv.extend_candidate(candidate, cache_dir=path)
+    if damage == "metadata":
+        x.vision["columns_sha256"] = "not the pinned map"
+    elif damage == "base_weights":
+        x._extension_base.W.data[0] += 1
+    elif damage == "base_annotations":
+        x._extension_base.neurons.loc[0, "type"] = "different"
+    elif damage == "columns":
+        x.neurons.loc[0, "hex1"] += 1
+    elif damage == "synthetic_weights":
+        x.W.data[x.W.indices >= candidate.n] *= 2
+    cn.save(x, path)
+    args = SimpleNamespace(
+        vision_cache=path, vision="candidate", dataset="banc", eye="right"
+    )
+    with pytest.raises(ValueError, match="mismatch|different|differ"):
+        load(args)
