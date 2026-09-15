@@ -72,7 +72,7 @@
    "glutamate": true,
    "hold": "^(ExR6|ER6|ER4m)$:^PEN_",
    "instrument": "sided_turn_afferent:k=0.5",
-   "role": "HGV with the hold on the PEN side only (6B section 0: with EPG held too the off-tile cells lose their inhibition)",
+   "role": "HGV with the hold on the PEN side only (6B: test the EPG hold separately; the earlier rest-of-ring inhibition inference was withdrawn)",
    "preset": "instrumented",
    "instruments": [
     "sided_turn_afferent",
@@ -152,6 +152,21 @@
   "HGVp"
  ],
  "follow_gate_confined_frac": 0.5,
- "generated_utc": "2026-09-15T19:46:24Z",
- "status": "DRAFT, not submitted"
+ "generated_utc": "2026-09-15T20:58:33Z",
+ "status": "DRAFT, not submitted",
+ "protocol": {
+  "gE": 1.0,
+  "gD": 1.0,
+  "gR": 1.0,
+  "delta7_pen": true,
+  "background_hz": 10.0,
+  "pulse_hz": 40.0,
+  "pulse_s": 2.0,
+  "seconds_after": 5.0,
+  "width": 4,
+  "start_wedge": 0,
+  "settle_s": 1.0,
+  "receptor_model": "sign",
+  "receptor_net_rule": "class"
+ }
 }

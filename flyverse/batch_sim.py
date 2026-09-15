@@ -94,6 +94,10 @@ class BatchSim:
                  program="none", escape_gating=False, proprioception=None, preset="raw", instruments=None):
         if not isinstance(batch,(int,np.integer)) or batch<1:
             raise ValueError("batch must be a positive integer")
+        if proprioception not in (None,False,"","off","none"):
+            channels, _ = senses.Proprioception.parse_flags(proprioception)
+            if "turn_afferent" in channels and preset != "instrumented":
+                raise ValueError("turn_afferent requires preset='instrumented'")
         self.B = int(batch)
         self.seeds = tuple(int(s) for s in (range(seed,seed+self.B) if seeds is None else seeds))
         if len(self.seeds) != self.B: raise ValueError("provide one environment seed per batch row")
@@ -119,6 +123,7 @@ class BatchSim:
             # preset 'instrumented' (docs/PRESETS_SPEC.md): a stand-in that rides on the sense re-installs onto this one
             for inst in self.fb.instruments.values():
                 if callable(getattr(inst,"install",None)): inst.install(self.fb)
+            self.fb._register_sense_instrument()
         if self.optic is not None: self.optic.diagnostics = False
         self.sensory_cuda_graphs = cuda_graphs if sensory_cuda_graphs is None else sensory_cuda_graphs
         pairs = [world.make_room(s,fruit_set) for s in self.seeds]

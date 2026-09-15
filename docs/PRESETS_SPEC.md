@@ -10,11 +10,20 @@ instrument has something to be measured against.
 | preset | what it is | bit-identity |
 |---|---|---|
 | `raw` | The connectome, the LIF, the receptor table, the senses and the motor readout exactly as shipped. No module attached, no held edge, no relabel beyond the sourced `TYPE_NT_OVERRIDE` rows. This is the plain model every audit refers to. | Byte-identical to today's `FlyBrain()` on every path (`tests/test_bit_identity.py` extends to assert it). |
-| `instrumented` | `raw` plus a **named list of instruments**, each a `flyverse.modules` object of kind `stop-gap` or `mechanism`, attached through the ordinary `attach()` surface -- an external input at the neural boundary, never a rewritten synapse (CONTROL_SURFACE "Hooks, modules, graph extension" already forbids that). | Provenance records `preset` and the instrument list with each instrument's `describe()`; removing every instrument reproduces `raw`. |
+| `instrumented` | `raw` plus a **named list of instruments**, installed through the existing surface for their kind: neural computations use ordinary `attach()` modules; body-derived inputs use the proprioception transducer; the held-edge and relabel candidates below verify an explicit caller configuration. No runtime module rewrites a parent synapse. | Provenance records `preset` and each instrument's `describe()`. An empty list on the original connectome and LIF parameters reproduces `raw`. |
 
 The preset is one keyword on the constructors and the CLIs (`FlyBrain(preset="raw")`, `--preset raw`), threaded into
 `provenance()` beside `connectome_fingerprint`. Which preset is the default is the owner's call and is **not** decided
 here; either way `raw` stays one word away, and every audit states which preset it ran.
+
+Round-7 review clarification (2026-09-15, before submission): the handoff explicitly places
+`SidedTurnAfferent` in `senses.Proprioception`, reading the existing `yaw_rate` channel. This is the
+body-derived input case above, not a new body-to-neural-module API. The section-3 `edges` and `relabel`
+candidates are configuration records: they verify holds already installed through `LIFParams` and
+labels already compiled in a scratch connectome. Removing such a record alone does not undo that
+configuration; returning to raw also means restoring the original connectome and parameters.
+The default remains `raw`. Legacy explicit `--hold-edges` / `--nt-override` diagnostics retain their
+separate provenance under raw, as required by the handoff; raw without those flags is the plain comparator.
 
 ## 2. What an instrument must be
 
@@ -30,6 +39,8 @@ only with all of:
 3. **The neural boundary only.** It reads `rate_hz` / `drive_mv` of selected cells and writes `poisson_hz` / `drive_mv`
    to selected cells. It never writes the body's yaw or speed (that is a *program*, `flyverse.programs`, and stays
    labelled as such), never touches weights, receptors or `NT_SIGN`.
+   A body-derived transducer reads the existing sensory arguments and writes the same neural input channels.
+   Held-edge/relabel records verify caller configuration before stepping; they do not perform runtime mutation.
 4. **A held edge is an instrument too.** `--hold-edges` (6A) is an `edges`-kind hold; under `instrumented` it is
    attached and described like any module, so a preset with the ExR6 / ER6 / ER4m hold *says so* in every JSON.
 5. **Its own suite run.** The 29-check suite under `instrumented` is a second column beside `raw`; an instrument that

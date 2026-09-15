@@ -6,8 +6,8 @@
            `--fetch out/cx8/`) and out/cx8/arms.json (the arm table the analysis checks every run against).
     PYTHONIOENCODING=utf-8 python scripts/cx_velocity_route.py --analyse --runs out/cx8 --out out/cx8/analysis
         -> runs.csv (one row per run with its checks), per_seed.csv (arm, key, seeds, values: the per-seed lists every
-           quoted number is pasted from, docs/INTERP.md 10.4 rule 28), compare.csv (the five predeclared measures,
-           `common.compare` 6 v 6 exact U with Holm over the family of m = 5), descriptive.csv (per arm mean / sd / n
+           quoted number is pasted from, docs/INTERP.md 10.4 rule 28), compare.csv (the six predeclared measures,
+           `common.compare` 6 v 6 exact U with Holm over the family of m = 6), descriptive.csv (per arm mean / sd / n
            of every key: bump survival / rate / width, the k sweep, the L-R of every group) and analysis.md.
     PYTHONIOENCODING=utf-8 python scripts/cx_velocity_route.py --analyse --runs out/cx6 --out out/cx6/analysis_cx8_pathcheck \\
         --label "PATH CHECK on cx6 runs: NOT cx8" --alias HG=H3 --alias HGV=H3G
@@ -21,12 +21,12 @@ recorded either way; cx_wedge has no body, so the "fly turning itself" of the ef
 parameter here, the analogue of the 90 deg/s imposed visual rotation of deficit_rotation.md):
 
 | arm | preset | hold | GLNO | instrument | role |
-| S | raw | -- | silent | -- | reference |
-| V | instrumented | -- | silent | sided_turn_afferent k 0.5 | the afferent alone |
+| S | raw | -- | sign 0 | -- | reference |
+| V | instrumented | -- | sign 0 | sided_turn_afferent k 0.5 | the afferent alone |
 | HG | instrumented | ring_dc_hold | glutamate (glno_sign) | -- | 6A's H3G |
 | HGV | instrumented | ring_dc_hold | glutamate | sided_turn_afferent k 0.5 | THE ARM |
 | HGV- | instrumented | ring_dc_hold | glutamate | sided_turn_afferent k 0.5 sign -1 | the sign control |
-| HGVp | instrumented | ring_dc_hold_pen (`^(ExR6|ER6|ER4m)$:^PEN_`: EPG keeps its ring input) | glutamate | sided_turn_afferent k 0.5 | HGV with the PEN-side hold only (6B, compass_local_recurrence.md 0: holding EPG too lets 11-12 of 35 off-block cells fire) |
+| HGVp | instrumented | ring_dc_hold_pen (`^(ExR6|ER6|ER4m)$:^PEN_`: EPG keeps its ring input) | glutamate | sided_turn_afferent k 0.5 | HGV with the PEN-side hold only (6B: a separate test of retaining EPG DC input; no causal inference from off-block counts) |
 | HGVk025 / HGVk1 | as HGV at k 0.25 / 1.0 | descriptive (the k sweep on HGV only) |
 
 Predeclared family (Holm, m = 6; 6 v 6 exact-U floor 0.0022 x 6 = 0.013, satisfiable): (1) bump_follow_wedges_per_s
@@ -39,6 +39,8 @@ calls a follow on a bump that was confined in fewer than half the turn-window fr
 from __future__ import annotations
 
 import argparse
+import hashlib
+import math
 import json
 import sys
 import time
@@ -61,7 +63,7 @@ ARMS = [("S", False, None, None, "raw reference"),
         ("HGV", True, HOLD, "sided_turn_afferent:k=0.5", "the arm"),
         ("HGV-", True, HOLD, "sided_turn_afferent:k=0.5:sign=-1", "the sign control"),
         ("HGVp", True, HOLD_PEN, "sided_turn_afferent:k=0.5",
-         "HGV with the hold on the PEN side only (6B section 0: with EPG held too the off-tile cells lose their inhibition)"),
+         "HGV with the hold on the PEN side only (6B: test the EPG hold separately; the earlier rest-of-ring inhibition inference was withdrawn)"),
         ("HGVk025", True, HOLD, "sided_turn_afferent:k=0.25", "descriptive: k 0.25 on HGV"),
         ("HGVk1", True, HOLD, "sided_turn_afferent:k=1.0", "descriptive: k 1.0 on HGV")]
 PRIMARY = ["S", "V", "HG", "HGV", "HGV-", "HGVp"]
@@ -111,6 +113,8 @@ def job_line(cmd, stem, rel):
 def plan_batch(out_dir: Path, seeds, minutes=30, name="cx8"):
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     rel = out_dir.as_posix() if not out_dir.is_absolute() else f"out/{out_dir.name}"
+    if (out_dir / "predeclared.json").exists() or (out_dir / "submitted_at.txt").exists():
+        raise ValueError("batch is frozen; use a new directory for a new predeclaration")
     jobs = []
     for seed in seeds:
         for label, glu, hold, spec, _ in ARMS:
@@ -133,17 +137,160 @@ def plan_batch(out_dir: Path, seeds, minutes=30, name="cx8"):
              f"# then `ls {rel}/*.json | wc -l` = {len(jobs)} and `grep -c 'device cuda' {rel}/*.txt`, then --analyse.",
              "# Arms: " + "; ".join(f"{a[0]} = {a[4]}" for a in ARMS)]
     for i, call in enumerate(calls):
-        lines.append(f"python scripts/cluster_run.py --name {name} --minutes {minutes} --arm-block fam "
-                     + " ".join('"' + j["line"] + '"' for j in call) + f" --fetch {rel}/ 2>&1 | tee {rel}/client_stdout_{i}.txt")
+        lines.append(f"python scripts/cluster_run.py --target house --name {name} --minutes {minutes} --arm-block fam "
+                     + " ".join('"' + j["line"] + '"' for j in call) + f" --fetch {rel}/ 2>&1 | tee {rel}/client_stdout_{i}.txt || exit $?")
     (out_dir / "batch.sh").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     arms = {a[0]: dict(glutamate=a[1], hold=a[2], instrument=a[3], role=a[4], **{k: v for k, v in expected(a[0]).items() if k in ("preset", "instruments")})
             for a in ARMS}
     (out_dir / "arms.json").write_text(json.dumps({"batch": name, "seeds": list(seeds), "turn_deg_s": float(TURN[0]), "turn_window_s": TURN[1],
                                                    "holds": HOLD_NAMES, "arms": arms, "family": FAMILY, "primary_arms": PRIMARY,
                                                    "follow_gate_confined_frac": FOLLOW_GATE, "generated_utc": stamp,
-                                                   "status": "DRAFT, not submitted"}, indent=1), encoding="utf-8")
+                                                   "status": "DRAFT, not submitted", "protocol": PROTOCOL}, indent=1), encoding="utf-8")
     print(f"{len(jobs)} jobs in {len(calls)} call(s) -> {out_dir / 'batch.sh'} (DRAFT, not submitted); {out_dir / 'arms.json'}")
     return jobs, calls
+
+
+# Fixed protocol values are checked independently in each run header and stimulus record.
+PROTOCOL = {"gE": 1.0, "gD": 1.0, "gR": 1.0, "delta7_pen": True, "background_hz": 10.0,
+            "pulse_hz": 40.0, "pulse_s": 2.0, "seconds_after": 5.0, "width": 4, "start_wedge": 0,
+            "settle_s": 1.0, "receptor_model": "sign", "receptor_net_rule": "class"}
+HOLD_COUNTS = {HOLD: (1149, 37256.0, 88), HOLD_PEN: (402, 7893.0, 42)}
+CACHE_MD5 = {False: "ef23cc27bea13be7f6a96f3c04fd3737", True: "7a10d93ba2086f2c76bcdabdca79b4ec"}
+KEYS = list(dict.fromkeys(KEYS + [f"{g}_{side}_hz_turn" for g in ("GLNO", "PEN", "DNa02", "PS196b", "AFF")
+                                for side in ("L", "R")] + [f"{g}_mean_{w}" for g in ("ExR6", "ER6", "ER4m")
+                                                           for w in ("pre", "during", "post")]))
+
+
+def source_hashes():
+    paths = sorted(set(ROOT.glob("flyverse/**/*.py")) | set(ROOT.glob("flyverse/data/*.csv")) |
+                   {Path(__file__).resolve(), ROOT / "scripts/cx_wedge.py", ROOT / "scripts/probe_compass_room.py"})
+    # Git/cluster copies use LF; record that normalization explicitly for Windows checkouts.
+    return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+            for p in paths}
+
+
+def resolved_lif_by_arm():
+    """Resolve the declared shipped-gain protocol before submission, including the diagnostic adaptation hold."""
+    from flyverse import brain
+    from cx_wedge import COMPASS_RE, RING_RE
+    result = {}
+    for name, _, hold, _, _ in ARMS:
+        gains = list(brain.DEFAULT_TYPE_PATH_GAIN) + [
+            (r"^EPG$", r"^PEN_", 1.0), (r"^PEN_", r"^EPG$", 1.0),
+            (r"^EPG$", r"^PEG$", 1.0), (r"^PEG$", r"^EPG$", 1.0),
+            (r"^Delta7$", r"^(EPG$|PEN_)", 1.0), (RING_RE, r"^(EPG$|PEN_|PEG$)", 1.0)]
+        if hold:
+            gains.append((*hold.split(":", 1), 0.0))
+        params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=gains,
+                                 receptor_model="sign", receptor_net_rule="class")
+        result[name] = common.to_jsonable(common.model_record(params)["lif"])
+    return result
+
+
+def predeclare(out_dir):
+    """Freeze the reviewed plan before submission. An existing declaration is never overwritten."""
+    out_dir = Path(out_dir)
+    if (out_dir / "submitted_at.txt").exists() or list(out_dir.glob("*_s*.json")):
+        raise ValueError("cannot predeclare after submission or results exist")
+    plan = json.loads((out_dir / "arms.json").read_text(encoding="utf-8"))
+    if plan["seeds"] != list(range(6)) or plan["family"] != [list(x) for x in FAMILY]:
+        raise ValueError("cx8 requires the reviewed six seeds and six primary contrasts")
+    record = dict(plan, status="PREDECLARED, not submitted", written_before_submission=True,
+                  stamped_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                  batch_sha256=hashlib.sha256((out_dir / "batch.sh").read_bytes()).hexdigest(),
+                  arms_sha256=hashlib.sha256((out_dir / "arms.json").read_bytes()).hexdigest(),
+                  source_sha256_lf=source_hashes(), resolved_lif_by_arm=resolved_lif_by_arm(),
+                  replicate_unit="runs", multiplicity="one Holm family, m=6; missing p values count toward m",
+                  follow_eligibility="confined in >= 0.5 of turn-window frames; disclose excluded run ids and actual n; no data is undetermined",
+                  outcome_rule="primaries 1 and 2 must be positive results, HGV mean > 0 and HGV- mean < 0, with eligible bumps; otherwise no demonstrated turn-following compass",
+                  followup="at most one predeclared batch: alternate afferents if primary 3 is null; GLNO-PEN transfer if 3 is result and no demonstrated follow; insufficient data remain undetermined")
+    with (out_dir / "predeclared.json").open("x", encoding="utf-8", newline="\n") as f:
+        json.dump(record, f, indent=2)
+        f.write("\n")
+    print(f"froze {out_dir / 'predeclared.json'} before submission")
+    return record
+
+
+def instrument_parameters(spec):
+    values = dict(k_hz_per_deg_s=0.5, sign=1, cells="AN07B037", max_hz=250.0)
+    for item in (spec or "").split(":")[1:]:
+        key, value = item.split("=", 1)
+        key = "k_hz_per_deg_s" if key == "k" else key
+        values[key] = value if key == "cells" else float(value)
+    return values
+
+
+def check_run(r, exp, path):
+    """Refuse mislabeled protocols before interpreting any number. No simulation or cache mutation."""
+    bad = []
+    prov, m = r.get("provenance", {}), r.get("metrics", {})
+    def check(ok, reason):
+        if not ok:
+            bad.append(reason)
+    check(r.get("preset") == prov.get("preset") == exp["preset"], "preset/provenance mismatch")
+    records = prov.get("instruments", [])
+    names = [d.get("name") for d in records if isinstance(d, dict)]
+    check(r.get("instruments") == names == exp["instruments"], "instruments/provenance mismatch")
+    check(r.get("instrument_specs", []) == ([exp["spec"]] if exp["spec"] else []), "instrument spec mismatch")
+    byname = {d["name"]: d for d in records if isinstance(d, dict) and "name" in d}
+    for d in records:
+        check(isinstance(d, dict) and all(d.get(k) for k in ("name", "kind", "law", "gap", "removal", "audits")),
+              "instrument description incomplete")
+    if exp["spec"]:
+        d = byname.get("sided_turn_afferent", {})
+        check(d.get("kind") == "stop-gap" and d.get("law") == "unverified", "afferent classification mismatch")
+        pars = d.get("parameters", {})
+        check(all(pars.get(k) == v for k, v in instrument_parameters(exp["spec"]).items()), "afferent parameters mismatch")
+        check(d.get("n_cells") == 6 and all(len(d.get("cells", {}).get(side, [])) == 3 for side in ("L", "R")),
+              "afferent cell selection mismatch")
+    hold = exp["hold"]
+    hold_list = [[*hold.split(":", 1), 0.0]] if hold else []
+    check(r.get("hold_edges", []) == hold_list, "hold spec/factor mismatch")
+    resolved = r.get("hold_edges_resolved", [])
+    if hold:
+        n, syn, npost = HOLD_COUNTS[hold]
+        h = resolved[0] if len(resolved) == 1 else {}
+        check(h.get("n_entries") == n and h.get("synapses") == syn and h.get("n_post_cells") == npost
+              and h.get("n_pre_cells") == 17 and h.get("factor") == 0.0, "hold resolved counts mismatch")
+        d = byname.get(HOLD_NAMES[hold], {})
+        check(d.get("resolved") == h and d.get("parameters") == dict(pre=hold_list[0][0], post=hold_list[0][1], factor=0.0),
+              "hold provenance mismatch")
+    else:
+        check(resolved == [], "unexpected resolved hold")
+    override = {"GLNO": "glutamate"} if exp["glutamate"] else {}
+    check(r.get("nt_override", {}) == override, "GLNO relabel mismatch")
+    check(r.get("glno_nt") == (["glutamate"] if exp["glutamate"] else ["unknown"]), "GLNO labels mismatch")
+    if exp["glutamate"]:
+        check(byname.get("glno_sign", {}).get("parameters") == {"type": "GLNO", "nt": "glutamate"}, "relabel provenance mismatch")
+    check(prov.get("compiled_connectome", {}).get("md5") == CACHE_MD5[exp["glutamate"]], "compiled cache mismatch")
+    stimulus = prov.get("stimulus", {}).get("params", {})
+    for key, value in PROTOCOL.items():
+        if key not in ("pulse_s", "seconds_after"):
+            check(r.get(key) == value, f"protocol {key} mismatch")
+        check(stimulus.get(key) == value, f"stimulus {key} mismatch")
+    check(r.get("lif_overrides", {}) == {} and r.get("edge_gains", []) == [], "unexpected LIF override/edge gain")
+    check(r.get("turn_deg_s") == 90.0 and r.get("turn_window_s") == [0.5, 3.5], "turn/window mismatch")
+    check(m.get("turn_on_s") == 3.5 and m.get("turn_off_s") == 6.5 and m.get("turn_deg_s") == 90.0,
+          "measured turn window mismatch")
+    check(m.get("turn_fed") is bool(exp["spec"]), "turn feeding mismatch")
+    check(m.get("frames") == 800 and m.get("frame_s") == 0.01 and m.get("bump_follow_n_frames") == 300,
+          "recording frame count mismatch")
+    check(str(r.get("device", "")).startswith("cuda"), "device is not CUDA")
+    check(r.get("block") == f"fam_s{r.get('seed')}", "seed block mismatch")
+    lif = prov.get("model", {}).get("lif", {})
+    check(lif.get("same_type_gain") == 0.1 and lif.get("dt") == 0.5 and lif.get("receptor_model") == "sign",
+          "resolved LIF defaults mismatch")
+    check(lif.get("adapt_by_type") == {"^(EPG|PEN|PEG|Delta7)": 0.0}, "compass adaptation mismatch")
+    if hold_list:
+        check(hold_list[0] in lif.get("type_path_gain", []), "resolved LIF lacks hold")
+    for key in ("GLNO_LR_hz", "PEN_LR_hz", "DNa02_LR_hz", "frac_confined_post", "bump_follow_confined_frac"):
+        check(isinstance(m.get(key), (int, float)) and np.isfinite(m[key]), f"missing/nonfinite {key}")
+    check(0 <= m.get("bump_follow_confined_frac", -1) <= 1, "invalid confinement fraction")
+    ledger = r.get("ledger_npz")
+    check(bool(ledger) and (path.parent / Path(str(ledger)).name).is_file(), "missing ledger NPZ")
+    console = path.with_suffix(".txt")
+    check(console.is_file() and "device cuda" in console.read_text(encoding="utf-8", errors="replace"), "missing CUDA console")
+    return bad
 
 
 # ---------------------------------------------------------------------------------------------- analysis
@@ -169,48 +316,64 @@ def holm(pvals: dict, m: int | None = None) -> dict:
 
 
 def load_runs(runs_dir: Path, alias: dict) -> tuple[list, list]:
-    rows, problems = [], []
+    rows, problems, identities, fingerprints = [], [], set(), set()
+    declaration = Path(runs_dir) / "predeclared.json"
+    frozen = json.loads(declaration.read_text(encoding="utf-8")) if declaration.exists() else None
     for path in sorted(Path(runs_dir).glob("*_s*.json")):
         try:
-            data = json.load(open(path, encoding="utf-8"))
-        except Exception as e:  # noqa: BLE001
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as e:
             problems.append(f"{path.name}: unreadable ({e})"); continue
-        for r in data if isinstance(data, list) else [data]:
+        for i, r in enumerate(data if isinstance(data, list) else [data]):
             if not isinstance(r, dict) or "metrics" not in r:
-                continue
+                problems.append(f"{path.name}: missing metrics"); continue
             arm = alias.get(r.get("arm"), r.get("arm"))
-            m = r["metrics"]; prov = r.get("provenance", {})
-            row = dict(arm=arm, arm_in_file=r.get("arm"), seed=r.get("seed"), file=path.name, device=r.get("device"),
-                       preset=r.get("preset", prov.get("preset", "raw")), instruments=",".join(r.get("instruments", [])),
-                       nt_override=json.dumps(r.get("nt_override", {})), hold_entries=sum(h.get("n_entries", 0) for h in r.get("hold_edges_resolved", [])),
-                       turn_deg_s=r.get("turn_deg_s"), turn_fed=m.get("turn_fed"), md5=prov.get("compiled_connectome", {}).get("md5"),
-                       wall_s=r.get("wall_s"))
+            m, prov = r["metrics"], r.get("provenance", {})
+            seed = r.get("seed")
+            run_id = f"{path.name}#{i}"
+            row = dict(arm=arm, arm_in_file=r.get("arm"), seed=seed, file=path.name, run_id=run_id,
+                       device=r.get("device"), preset=r.get("preset", prov.get("preset", "raw")),
+                       instruments=",".join(r.get("instruments", [])), nt_override=json.dumps(r.get("nt_override", {})),
+                       hold_entries=sum(h.get("n_entries", 0) for h in r.get("hold_edges_resolved", [])),
+                       turn_deg_s=r.get("turn_deg_s"), turn_fed=m.get("turn_fed"),
+                       md5=prov.get("compiled_connectome", {}).get("md5"), wall_s=r.get("wall_s"))
             for k in KEYS:
                 v = m.get(k)
-                row[k] = float(v) if isinstance(v, (int, float)) and v is not None else float("nan")
+                row[k] = float(v) if isinstance(v, (int, float)) else float("nan")
             row["follow_gated"] = bool(np.isfinite(row["bump_follow_confined_frac"]) and row["bump_follow_confined_frac"] >= FOLLOW_GATE)
+            bad = []
             exp = expected(arm)
-            row["checks"] = ""
-            if exp is not None and not alias:
-                bad = []
-                if row["preset"] != exp["preset"]:
-                    bad.append(f"preset {row['preset']} != {exp['preset']}")
-                if sorted(r.get("instruments", [])) != sorted(exp["instruments"]):
-                    bad.append(f"instruments {r.get('instruments')} != {exp['instruments']}")
-                if exp["glutamate"] != (r.get("nt_override", {}).get("GLNO") == "glutamate"):
-                    bad.append("GLNO relabel mismatch")
-                held = [f"{h[0]}:{h[1]}" for h in r.get("hold_edges", []) if len(h) >= 2]
-                if ([exp["hold"]] if exp["hold"] else []) != held or bool(exp["hold"]) != (row["hold_entries"] > 0):
-                    bad.append(f"hold {held} != {[exp['hold']] if exp['hold'] else []}")
-                if r.get("turn_deg_s") != float(TURN[0]):
-                    bad.append(f"turn {r.get('turn_deg_s')} != {TURN[0]}")
-                if exp["spec"] and not m.get("turn_fed"):
-                    bad.append("turn not fed to the afferent")
-                if r.get("device") != "cuda":
-                    bad.append(f"device {r.get('device')}")
-                row["checks"] = "; ".join(bad)
-                problems += [f"{path.name}: {b}" for b in bad]
+            if not alias:
+                if exp is None or seed not in range(6):
+                    bad.append("unexpected arm/seed")
+                else:
+                    bad.extend(check_run(r, exp, path))
+                    if frozen and prov.get("model", {}).get("lif") != frozen.get("resolved_lif_by_arm", {}).get(arm):
+                        bad.append("resolved LIF differs from frozen protocol")
+                if (arm, seed) in identities:
+                    bad.append("duplicate arm/seed")
+                identities.add((arm, seed))
+                fp = prov.get("source_fingerprint", {}).get("files", {})
+                if not fp:
+                    bad.append("missing source fingerprint")
+                fingerprints.add(json.dumps(fp, sort_keys=True))
+            row["checks"] = "; ".join(bad)
+            problems.extend(f"{run_id}: {item}" for item in bad)
             rows.append(row)
+    if not alias:
+        wanted = {(a[0], seed) for a in ARMS for seed in range(6)}
+        if identities != wanted or len(rows) != len(wanted):
+            problems.append(f"expected 48 distinct arm/seed runs; got {len(rows)} rows; missing {sorted(wanted-identities)}")
+        if len(fingerprints) != 1:
+            problems.append("source fingerprints differ across runs")
+        if frozen:
+            if frozen.get("family") != [list(x) for x in FAMILY] or frozen.get("follow_gate_confined_frac") != FOLLOW_GATE:
+                problems.append("analysis disagrees with frozen family/eligibility gate")
+            for fp in fingerprints:
+                for file, h in json.loads(fp).items():
+                    want = frozen.get("source_sha256_lf", {}).get(file)
+                    if want and want != h:
+                        problems.append(f"simulation source differs from predeclaration: {file}")
     return rows, problems
 
 
@@ -228,13 +391,13 @@ def analyse(runs_dir: Path, out_dir: Path, label: str | None, alias: dict):
         g = g.sort_values("seed")
         for k in KEYS:
             vals = g[k].to_numpy(float)
-            per.append(dict(arm=arm, key=k, seeds=",".join(str(s) for s in g.seed), values=",".join(f"{v:.4f}" for v in vals),
+            per.append(dict(arm=arm, key=k, seeds=",".join(str(s) for s in g.seed), files=",".join(g.file), run_ids=",".join(g.run_id), values=",".join(f"{v:.4f}" for v in vals),
                             mean=float(np.nanmean(vals)) if np.isfinite(vals).any() else float("nan"),
                             sd=float(np.nanstd(vals, ddof=1)) if np.isfinite(vals).sum() > 1 else float("nan"),
                             n=int(np.isfinite(vals).sum())))
     per_df = pd.DataFrame(per); per_df.to_csv(out_dir / "per_seed.csv", index=False)
     desc = per_df.pivot_table(index="arm", columns="key", values="mean", aggfunc="first").reindex([a[0] for a in ARMS if a[0] in set(df.arm)])
-    desc.to_csv(out_dir / "descriptive.csv")
+    per_df.to_csv(out_dir / "descriptive.csv", index=False)
     # the predeclared family
     comp = []
     for name, key, a, b in FAMILY:
@@ -244,29 +407,38 @@ def analyse(runs_dir: Path, out_dir: Path, label: str | None, alias: dict):
         va, vb = sa[key].to_numpy(float), sb[key].to_numpy(float)
         va, vb = va[np.isfinite(va)], vb[np.isfinite(vb)]
         rec = dict(test=name, key=key, stim=a, null=b, n_stim=int(len(va)), n_null=int(len(vb)),
-                   stim_values=json.dumps([round(float(x), 4) for x in va]), null_values=json.dumps([round(float(x), 4) for x in vb]))
+                   stim_values=json.dumps([round(float(x), 4) for x in va]), null_values=json.dumps([round(float(x), 4) for x in vb]),
+                   stim_run_ids=sa.loc[np.isfinite(sa[key]), "run_id"].tolist(),
+                   null_run_ids=sb.loc[np.isfinite(sb[key]), "run_id"].tolist())
         if len(va) and len(vb):
             c = common.compare(va, vb)
             rec.update(verdict=c["verdict"], diff=c["diff"], z=c["z"], U=c["U"], p=c["p"], p_floor=c["p_floor"], null_sd_zero=c["null_sd_zero"], n_min=c["n_min"])
         else:
-            rec.update(verdict="no data", diff=float("nan"), z=float("nan"), U=float("nan"), p=float("nan"), p_floor=float("nan"), null_sd_zero=None, n_min=0)
+            rec.update(verdict="undetermined", diff=float("nan"), z=float("nan"), U=float("nan"), p=float("nan"), p_floor=float("nan"), null_sd_zero=None, n_min=0)
+        # This is the first-step bound, not a per-test impossibility claim: other smaller p values can
+        # put a test later in Holm's ordering. common.compare supplies the actual replicate/p-floor guard.
+        rec["first_step_holm_floor"] = float(len(FAMILY) * 2 / math.comb(len(va) + len(vb), len(va))) if len(va) and len(vb) else float("nan")
         comp.append(rec)
     adj = holm({r["test"]: r["p"] for r in comp}, m=len(FAMILY))
     for r in comp:
         r["p_holm"] = adj[r["test"]]; r["m"] = len(FAMILY)
         r["verdict_holm"] = ("result" if (r["verdict"] == "result" and np.isfinite(r["p_holm"]) and r["p_holm"] <= 0.05)
                              else ("null" if r["verdict"] == "result" else r["verdict"]))
+        if problems:
+            r["unchecked_verdict"] = r["verdict"]
+            r["verdict"] = r["verdict_holm"] = "undetermined"
     comp_df = pd.DataFrame(comp); comp_df.to_csv(out_dir / "compare.csv", index=False)
     summary = {"label": head, "runs_dir": Path(runs_dir).as_posix(), "n_runs": int(len(df)), "arms": {a: int(n) for a, n in df.arm.value_counts().items()},
                "problems": problems, "alias": alias, "family": comp, "follow_gate_confined_frac": FOLLOW_GATE,
                "files": {k: str(out_dir / f"{k}.csv") for k in ("runs", "per_seed", "compare", "descriptive")},
+               "valid_batch": not problems and not alias, "analysis_sha256": hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
                "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     (out_dir / "analysis.json").write_text(json.dumps(summary, indent=1, default=str), encoding="utf-8")
     md = [f"# {head}", "",
           (f"**{label}** -- the files under `{out_dir.as_posix()}` are a code-path check on another batch's runs and carry no result of round 7." if label else
            f"Runs: `{Path(runs_dir).as_posix()}`, {len(df)} runs, arms {dict(df.arm.value_counts())}."),
           "", f"n_runs {len(df)}; problems {len(problems)}" + (": " + "; ".join(problems[:20]) if problems else ""), "",
-          "## The predeclared family (Holm, m = 5; `compare.csv`)", "",
+          "## The predeclared family (Holm, m = 6; `compare.csv`)", "",
           "| test | key | stim | null | n | verdict | verdict (Holm) | diff | z | p | p_holm | p_floor |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in comp:
         md.append(f"| {r['test']} | {r['key']} | {r['stim']} | {r['null']} | {r['n_stim']} v {r['n_null']} | {r['verdict']} | {r['verdict_holm']} | "
@@ -295,20 +467,25 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--plan-batch", default=None, metavar="DIR", help="write DIR/batch.sh (DRAFT) and DIR/arms.json")
     ap.add_argument("--seeds", default="0-5"); ap.add_argument("--minutes", type=int, default=30); ap.add_argument("--name", default="cx8")
+    ap.add_argument("--predeclare", default=None, metavar="DIR", help="freeze the reviewed plan before submission; never overwrite")
     ap.add_argument("--analyse", action="store_true"); ap.add_argument("--runs", default="out/cx8"); ap.add_argument("--out", default=None)
     ap.add_argument("--label", default=None, help="a heading for every output file (REQUIRED when the runs are not cx8's)")
     ap.add_argument("--alias", action="append", default=None, metavar="NEW=OLD", help="map another batch's arm label onto a round-7 label (path checks only)")
     a = ap.parse_args()
     if a.plan_batch:
         plan_batch(Path(a.plan_batch), parse_seeds(a.seeds), minutes=a.minutes, name=a.name)
+    if a.predeclare:
+        predeclare(a.predeclare)
     if a.analyse:
         alias = {}
         for it in a.alias or []:
             new, old = it.split("=", 1); alias[old] = new
         if alias and not a.label:
             raise SystemExit("--alias is for path checks on another batch: give --label saying so")
-        analyse(Path(a.runs), Path(a.out or (Path(a.runs) / "analysis")), a.label, alias)
-    if not (a.plan_batch or a.analyse):
+        result = analyse(Path(a.runs), Path(a.out or (Path(a.runs) / "analysis")), a.label, alias)
+        if result["problems"] and not alias:
+            raise SystemExit(2)
+    if not (a.plan_batch or a.predeclare or a.analyse):
         ap.print_help()
 
 

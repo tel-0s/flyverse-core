@@ -162,7 +162,8 @@ class SidedTurnAfferentTests(unittest.TestCase):
         inst = fi.parse_instrument("sided_turn_afferent:k=0.25:sign=-1:cells=CB0675", c)
         self.assertEqual((inst.k, inst.sign, inst.cells), (0.25, -1, "CB0675"))
         self.assertEqual(fi.parse_instrument("sided_turn_afferent", c).k, 0.5)
-        for bad in ("", "nope", "sided_turn_afferent:k", "sided_turn_afferent:gain=3", "sided_turn_afferent:cells=XX"):
+        for bad in ("", "nope", "sided_turn_afferent:k", "sided_turn_afferent:gain=3", "sided_turn_afferent:cells=XX",
+                    "sided_turn_afferent:sign=1.5", "sided_turn_afferent:k=0.5:k=1"):
             with self.assertRaises(ValueError):
                 fi.parse_instrument(bad, c)
 
@@ -191,6 +192,44 @@ class ProprioceptionTokenTests(unittest.TestCase):
 
 # ---------------------------------------------------------------------------------------------- FlyBrain presets
 class PresetTests(unittest.TestCase):
+    def test_token_cannot_bypass_raw_or_omit_provenance(self):
+        from flyverse.batch_sim import BatchSim
+        c = graph()
+        with self.assertRaisesRegex(ValueError, "instrumented"):
+            BatchSim(c=c, device="cpu", proprioception="all+turn_afferent", preset="raw")
+        raw = FlyBrain(c, device="cpu", lif_params=LIFParams(receptor_model=None))
+        raw.proprioception_sense = senses.Proprioception(c, "turn_afferent")
+        with self.assertRaisesRegex(ValueError, "instrumented"):
+            raw.proprioception(0, 0, 0, False, yaw_rate=1)
+        with self.assertRaisesRegex(ValueError, "instrumented"):
+            raw.instrument_records()
+        fb = FlyBrain(c, device="cpu", preset="instrumented", lif_params=LIFParams(receptor_model=None))
+        fb.proprioception_sense = senses.Proprioception(c, "turn_afferent")
+        fb.proprioception(0, 0, 0, False, yaw_rate=1)
+        self.assertEqual([d["name"] for d in fb.instrument_records()], ["sided_turn_afferent"])
+
+    def test_checkpoint_rejects_a_different_afferent_sign_before_loading(self):
+        c = graph()
+        make = lambda sign: FlyBrain(c, device="cpu", preset="instrumented", lif_params=LIFParams(receptor_model=None),
+                                    instruments=[fi.SidedTurnAfferent(c, sign=sign)])
+        fb, other = make(1), make(-1)
+        state = fb.state_dict()
+        with self.assertRaisesRegex(ValueError, "instruments"):
+            other.load_state_dict(state)
+        make(1).load_state_dict(state)
+
+    def test_wrong_graph_and_describe_only_instruments_are_refused(self):
+        c = graph(); reordered = graph()
+        reordered.neurons = reordered.neurons.iloc[::-1].reset_index(drop=True)
+        with self.assertRaisesRegex(ValueError, "ordering"):
+            senses.Proprioception(reordered, "turn_afferent", turn_afferent=fi.SidedTurnAfferent(c))
+        class DescriptionOnly:
+            name, kind = "unused", "stop-gap"
+            def describe(self):
+                return dict(name=self.name, kind=self.kind, law="unverified", gap="gap", removal="recording", audits=["audit"])
+        with self.assertRaisesRegex(ValueError, "install"):
+            FlyBrain(c, device="cpu", preset="instrumented", instruments=[DescriptionOnly()])
+
     def test_raw_is_the_default_and_refuses_instruments(self):
         c = graph()
         fb = FlyBrain(c, device="cpu", lif_params=LIFParams(receptor_model=None))

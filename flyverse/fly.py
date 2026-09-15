@@ -133,8 +133,24 @@ class FlyBrain:
 
     def instrument_records(self):
         """[describe() of each instrument], JSON-ready -- provenance()['instruments']; [] under preset 'raw'."""
+        self._register_sense_instrument()
         from .instruments import records
         return records(self.instruments.values())
+
+    def _register_sense_instrument(self):
+        """A named sense token must carry the same provenance and preset guard as a constructor instrument."""
+        inst = getattr(getattr(self, "proprioception_sense", None), "turn_afferent", None)
+        if inst is None:
+            return
+        if self.preset != "instrumented":
+            raise ValueError("turn_afferent requires preset='instrumented'")
+        old = self.instruments.get(inst.name)
+        if old is not None and old is not inst:
+            raise ValueError("turn_afferent differs from the recorded instrument; reinstall the named instrument")
+        if old is None:
+            from .instruments import _check_instrument
+            _check_instrument(inst)
+            self.instruments[inst.name] = inst
 
     def _extension_runtime(self):
         if self._extensions is None:
@@ -288,6 +304,7 @@ class FlyBrain:
         only by the labelled stop-gap Coriolis term and is ignored otherwise."""
         sense = getattr(self, "proprioception_sense", None)
         self._require("proprioception", sense)
+        self._register_sense_instrument()
         for name, idx, hz in sense.rates(leg_L, leg_R, haltere, airborne, yaw_rate, self.B):
             self._input(f"proprioception_{name}", idx, hz)
 
@@ -596,6 +613,7 @@ class FlyBrain:
     def state_dict(self):
         b, o = self.brain, self.optic
         return {"version": 1, "body_ids": self.c.neurons.bodyId.to_numpy().copy(),
+                "preset": self.preset, "instruments": self.instrument_records(),
                 "lif_params": asdict(b.p), "optic_params": asdict(o.p) if o is not None else None,
                 "brain": {k: getattr(b, k).detach().cpu().clone() for k in self.BRAIN_TENSORS},
                 "clock_multipliers": b._kvec.copy() if b._kvec is not None else None,
@@ -614,6 +632,8 @@ class FlyBrain:
                 "extensions": self._extensions.state_dict() if self._extensions else None}
 
     def load_state_dict(self, state):
+        if state.get("preset", "raw") != self.preset or state.get("instruments", []) != self.instrument_records():
+            raise ValueError("state preset/instruments do not match")
         if state["version"] != 1 or not np.array_equal(state["body_ids"], self.c.neurons.bodyId.to_numpy()):
             raise ValueError("state version/connectome does not match")
         if state.get("connectome_extension") != self.c._extension:
