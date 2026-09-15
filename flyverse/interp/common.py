@@ -984,6 +984,8 @@ def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, see
         optic = optic or (candidate_optic if dataclasses.is_dataclass(candidate_optic) else None)
     model = model_record(lif, optic)
     model.update(dataset=c.dataset, release=c.release)
+    if c.vision is not None:
+        model["vision"] = to_jsonable(c.vision)
     if not c.has_optic_columns or (fb is not None and getattr(fb, "optic", None) is None):
         model["optic"] = None
     model["hooks"] = getattr(fb, "hooks", [])
@@ -1000,9 +1002,11 @@ def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, see
             "stimulus": to_jsonable(stimulus) if stimulus is not None else {"protocol": None, "params": {}, "control": None},
             "retina": retina_record,
             "units": UNITS if c.dataset == "malecns" else [
-                {"item": "node_set", "rule": f"{c.dataset} {c.release}; retained release neurons; see compiled_connectome.manifest"},
+                {"item": "node_set", "rule": f"{c.dataset} {c.release}; retained release neurons; see compiled_connectome.manifest"
+                    + ("; negative-ID synthetic R1-R6 candidate extension" if c.vision is not None else "")},
                 {"item": "graded", "rule": "ol_intrinsic rate units where an optic module exists; otherwise LIF"},
-                {"item": "photoreceptor", "rule": "anatomical photoreceptor identity; optical drive exists only with a retina and optic module"},
+                {"item": "photoreceptor", "rule": ("synthetic input layer on a candidate lattice; native R7/R8 retained"
+                    if c.vision is not None else "anatomical photoreceptor identity; optical drive exists only with a retina and optic module")},
                 *UNITS[3:]]}
 
 

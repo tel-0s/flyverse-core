@@ -6,8 +6,9 @@ an integer, collision-free drawing is not evidence that its columns are correct.
 
     python scripts/recover_banc_columns.py --fafb-control --plot --out out/banc_columns
 
-Exit 2 means the report was written but the anatomical validation gate did not
-pass. T4a/b choose one of twelve lattice orientations; T4c/d are held out from
+Every completed diagnostic run exits 2: exit 0 is unreachable because the literal
+DRA and mirror gates have no passing state here. This is a closed integration
+boundary, not a new anatomical finding. T4a/b choose one orientation; T4c/d hold out
 that choice. All four unordered T4 populations contribute to the neighbour graph.
 """
 
@@ -16,6 +17,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import sys
 from pathlib import Path
@@ -319,7 +321,7 @@ def orient(c, male, side, table):
     }
 
 
-def dra_check(c, side, table):
+def dra_check(c, side, table, *, min_synapses=0):
     """A held-out connectivity proxy, NOT invented DRA photoreceptor labels.
 
     Use only the literature pairs R7->Dm-DRA1 and R8->Dm-DRA2. The rim and
@@ -338,7 +340,8 @@ def dra_check(c, side, table):
     for pre_type, post_type in (("R7_unclear", "Dm-DRA1"), ("R8_unclear", "Dm-DRA2")):
         pre, post = selected(c, pre_type, side), selected(c, post_type, side)
         counts = np.asarray(abs(c.W[post][:, pre]).sum(axis=0)).ravel()
-        for index, count in zip(pre[counts > 0], counts[counts > 0]):
+        selected_counts = (counts > 0) & (counts >= min_synapses)
+        for index, count in zip(pre[selected_counts], counts[selected_counts]):
             body = int(c.neurons.bodyId.iloc[index])
             h = coordinates.reindex([body])[["hex1", "hex2"]].to_numpy()[0]
             mapped = bool(np.isfinite(h).all())
@@ -368,6 +371,7 @@ def dra_check(c, side, table):
         else "unavailable",
         "source": "same-animal R7->Dm-DRA1 and R8->Dm-DRA2 connectivity proxy; not direct DRA labels",
         "n_candidates": len(records),
+        "min_synapses": min_synapses,
         "mapped": mapped,
         "within_two_rows": rim,
         "in_dorsal_band": sum(row["in_dorsal_band"] for row in records),
@@ -434,9 +438,9 @@ def gate(checks):
     return all(checks.get(name, {}).get("status") == "pass" for name in required)
 
 
-def recover_eye(c, male, side):
+def recover_eye(c, male, side, *, partners=T4):
     seed = selected(c, "Mi1", side)
-    post = selected(c, list(T4), side)
+    post = selected(c, list(partners), side)
     fit = reconstruct(
         abs(c.W[post][:, seed]).toarray(), neighbours=PARAMETERS["neighbours"]
     )
@@ -444,11 +448,15 @@ def recover_eye(c, male, side):
     table, orientation = orient(c, male, side, table)
     report = {
         "side": side,
+        "neighbour_partners": list(partners),
         "reconstruction": fit["diagnostics"],
         "type_assignments": assignment,
         "orientation": orientation,
         "dra": dra_check(c, side, table),
     }
+    report["orientation"]["cd_excluded_from_neighbour_graph"] = not bool(
+        set(partners) & set(T4[2:])
+    )
     report["unassigned_seed_body_ids"] = [
         str(int(b))
         for b in c.neurons.bodyId.to_numpy()[
@@ -485,9 +493,15 @@ def direct_dra_labels():
     path = cn.data_directory("banc") / "neurons.csv.gz"
     if not path.exists():
         return {"status": "unavailable", "reason": "raw BANC neuron table is absent"}
-    raw = pd.read_csv(
-        path, usecols=["Root ID", "Primary Cell Type", "Class", "Community labels"]
-    )
+    try:
+        raw = pd.read_csv(
+            path, usecols=["Root ID", "Primary Cell Type", "Class", "Community labels"]
+        )
+    except ValueError as error:
+        return {
+            "status": "unavailable",
+            "reason": f"BANC label columns unavailable: {error}",
+        }
     photoreceptor = raw.Class.eq("photoreceptor_neuron") | raw[
         "Primary Cell Type"
     ].isin(["R7", "R8", "R7d", "R8d", "R7_DRA", "R8_DRA"])
@@ -524,22 +538,101 @@ def plot_candidate(path, table, fit):
     for ax in axes:
         ax.set_aspect("equal")
         ax.set_xlabel("lattice units (arbitrary origin)")
-    fig.suptitle("DIAGNOSTIC ONLY — anatomical gate has not passed")
+    fig.suptitle("DIAGNOSTIC ONLY -- anatomical gate remains closed")
     fig.tight_layout()
     fig.savefig(path, dpi=170, bbox_inches="tight")
     plt.close(fig)
+
+
+def review_controls(banc, fafb, male, banc_table):
+    """Calibrate the proxy and expose a genuinely independent c/d check."""
+    published = fafb.neurons[fafb.neurons.somaSide.eq("R")][
+        ["bodyId", "type", "hex1", "hex2"]
+    ].copy()
+    proxy = dra_check(fafb, "R", published)
+    path = cn.data_directory("fafb") / "labels.csv.gz"
+    labels = pd.read_csv(path, usecols=["root_id", "label"])
+    labelled = labels[
+        labels.label.str.contains("DRA|dorsal rim", case=False, na=False)
+        & ~labels.label.str.contains("putative|or |difficult", case=False, na=False)
+    ]
+    real = set(
+        published.loc[
+            published.type.isin(["R7_unclear", "R8_unclear"])
+            & published.bodyId.isin(labelled.root_id),
+            "bodyId",
+        ].astype(str)
+    )
+    predicted = {cell["bodyId"] for cell in proxy["cells"]}
+    overlap = len(real & predicted)
+    controls = {
+        "fafb_published_proxy": proxy,
+        "proxy_labels": {
+            "source": path.name,
+            "sha256": file_hash(path),
+            "real_labels": len(real),
+            "overlap": overlap,
+            "precision": overlap / len(predicted) if predicted else None,
+            "recall": overlap / len(real) if real else None,
+        },
+        "independent_cd": {},
+        "scaled_thresholds": {},
+    }
+    for dataset, c in (("fafb", fafb), ("banc", banc)):
+        controls["independent_cd"][dataset] = {}
+        for partners in (("Tm3",), ("T4a", "T4b")):
+            table, eye, _ = recover_eye(c, male, "R", partners=partners)
+            item = {"partners": list(partners), "orientation": eye["orientation"]}
+            if dataset == "fafb":
+                item["truth"] = compare_truth(table, c)[0]
+            controls["independent_cd"][dataset]["+".join(partners)] = item
+    budgets = {}
+    for c in (fafb, banc):
+        raw, available = common.raw_counts(c, dtype=np.float64, build=False)
+        if not available:
+            raise ValueError("scaled DRA threshold needs complete raw-count budgets")
+        budgets[c.dataset] = float(raw[c.select(type="DNa02")].sum())
+    if min(budgets.values()) <= 0:
+        raise ValueError("scaled DRA threshold needs nonempty DNa02 input budgets")
+    for c, table in ((fafb, published), (banc, banc_table)):
+        scale = budgets[c.dataset] / budgets["fafb"]
+        rows = []
+        for threshold in (5.0, 10.0):
+            value = dra_check(c, "R", table, min_synapses=threshold * scale)
+            rows.append(
+                {
+                    "fafb_equivalent_synapses": threshold,
+                    "raw_threshold": threshold * scale,
+                    **{
+                        k: value[k]
+                        for k in ("n_candidates", "mapped", "within_two_rows")
+                    },
+                }
+            )
+        controls["scaled_thresholds"][c.dataset] = {
+            "scale": scale,
+            "dn_input_budgets": budgets,
+            "assumption": "global DNa02 input-budget ratio; not a calibrated local DRA detection model",
+            "rows": rows,
+        }
+    return controls
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--fafb-control", action="store_true")
+    parser.add_argument(
+        "--review-controls",
+        action="store_true",
+        help="proxy calibration, independent T4c/d, scaled DRA sensitivity (needs FAFB)",
+    )
     parser.add_argument("--plot", action="store_true")
     args = parser.parse_args()
     # Decline accidental overwrites of previous evidence, including cache paths.
-    args.out.mkdir(parents=True, exist_ok=True)
-    if any(args.out.iterdir()):
+    if args.out.exists() and (not args.out.is_dir() or any(args.out.iterdir())):
         parser.error("--out must be an empty directory for a new diagnostic run")
+    args.out.mkdir(parents=True, exist_ok=True)
     male, banc = cn.load(verbose=False), cn.load(dataset="banc", verbose=False)
     snapshots = {
         name: common.connectome_fingerprint(c)
@@ -565,12 +658,17 @@ def main():
             "scipy": scipy.__version__,
             "pandas": pd.__version__,
         },
+        "thread_environment": {
+            key: os.environ.get(key)
+            for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+        },
         "parameters": PARAMETERS,
         "reference_provenance": common.provenance(male, device="cpu"),
         "direct_dra_labels": direct_dra_labels(),
         "eyes": {},
     }
     artifacts = []
+    banc_right = None
     for side in ("R", "L"):
         try:
             table, eye, fit = recover_eye(banc, male, side)
@@ -578,6 +676,8 @@ def main():
             report["eyes"][side] = {"status": "unavailable", "reason": str(error)}
             continue
         report["eyes"][side] = eye
+        if side == "R":
+            banc_right = table
         path = args.out / f"banc_{side}_candidate.csv"
         table.to_csv(path, index=False, float_format="%.9g")
         artifacts.append(path)
@@ -620,7 +720,7 @@ def main():
         synthetic_nodes_added=0,
         synthetic_edges_added=0,
     )
-    if args.fafb_control:
+    if args.fafb_control or args.review_controls:
         fafb = cn.load(dataset="fafb", verbose=False)
         table, eye, fit = recover_eye(fafb, male, "R")
         control, table = compare_truth(table, fafb)
@@ -632,11 +732,16 @@ def main():
         path = args.out / "fafb_R_control.csv"
         table.to_csv(path, index=False, float_format="%.9g")
         artifacts.append(path)
+        if args.review_controls:
+            if banc_right is None:
+                raise ValueError("review controls require a right-eye candidate")
+            report["review_controls"] = review_controls(banc, fafb, male, banc_right)
     report["unchanged_fingerprints"] = {
         name: common.connectome_fingerprint(c) == snapshots[name]
         for name, c in (("malecns", male), ("banc", banc))
     }
-    assert all(report["unchanged_fingerprints"].values())
+    if not all(report["unchanged_fingerprints"].values()):
+        raise RuntimeError("diagnostic changed a source connectome fingerprint")
     report["malecns_cache_md5"] = {
         name: file_hash(male.cache_dir / name, "md5")
         for name in ("neurons.parquet", "W_post_pre.npz", "sign0_counts.npz")

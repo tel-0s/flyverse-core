@@ -1,0 +1,3941 @@
+{
+  "mode": "candidate",
+  "candidate_id": "banc-v888-right-k6-v1",
+  "release": "v888",
+  "qualification": "synthetic input layer on a candidate lattice",
+  "eye": "R",
+  "anatomically_validated": false,
+  "functional_gate": "recorded engineering acceptance below; anatomical gates remain closed",
+  "columns_sha256": "60181451e52435ff31ca950d63d71833eb43740c470ab32d78721c2c74716e3d",
+  "base_csr_md5": "27e330891b62641686f64fd7a1b66138",
+  "base_annotations_sha256": "21a1fad1b4dac8531df6d02b77d359e11becdaac5401a5f9d96f16be889d0884",
+  "base_manifest": {
+    "dataset": "banc",
+    "release": "v888",
+    "sources": [
+      {
+        "path": "neurons.csv.gz",
+        "sha256": "40a2201554a8c34d2c4b07c8322543a07c1b3faf5acafbac363fd1a3d0fa617f"
+      },
+      {
+        "path": "connections_princeton.csv.gz",
+        "sha256": "8772298eb69455759c7b4a23ee1d1843f5b389965e312524e652415f8a09b312"
+      }
+    ],
+    "alias_sha256": "d1c57fe8bd1f0cf5fda8ed5776fc71802b0e566959b40ab1d5d1e363ddd25732",
+    "aliases": {
+      "changed_cells": 17552,
+      "matched_cells": 82684,
+      "ambiguous": {
+        "AN_GNG_69": [
+          "AN05B036",
+          "AN05B049_a",
+          "AN05B049_b",
+          "AN05B054_a",
+          "AN05B054_b"
+        ],
+        "AN_multi_124": [
+          "AN09A005",
+          "AN27X013",
+          "ANXXX169"
+        ],
+        "AVLP454_a": [
+          "AVLP454_a1",
+          "AVLP454_a2",
+          "AVLP454_a3",
+          "AVLP454_b3"
+        ],
+        "AVLP454_b": [
+          "AVLP454_b1",
+          "AVLP454_b2",
+          "AVLP454_b4",
+          "AVLP454_b5",
+          "AVLP454_b6"
+        ],
+        "AVLP548_f": [
+          "AVLP548_f1",
+          "AVLP548_f2"
+        ],
+        "CB0007": [
+          "AOTU016_b",
+          "AOTU016_c"
+        ],
+        "CB0050": [
+          "PVLP073",
+          "PVLP075"
+        ],
+        "CB0064": [
+          "PVLP073",
+          "PVLP075"
+        ],
+        "CB0096": [
+          "AVLP599",
+          "AVLP601"
+        ],
+        "CB0220": [
+          "LAL179",
+          "LAL180"
+        ],
+        "CB0398": [
+          "WED077",
+          "WED078"
+        ],
+        "CB0719": [
+          "CL054",
+          "CL056"
+        ],
+        "CB0722": [
+          "GNG627",
+          "GNG628"
+        ],
+        "CB0739": [
+          "AOTU016_b",
+          "AOTU016_c"
+        ],
+        "CB0806": [
+          "GNG180",
+          "GNG184"
+        ],
+        "CB0950": [
+          "SMP130",
+          "SMP132"
+        ],
+        "CB1006": [
+          "LHPD2a5_b",
+          "SIP042_a"
+        ],
+        "CB1021": [
+          "GNG624",
+          "GNG625",
+          "GNG626"
+        ],
+        "CB1080": [
+          "AOTU002_b",
+          "AOTU002_c"
+        ],
+        "CB1083": [
+          "SMP488",
+          "SMP489"
+        ],
+        "CB1126": [
+          "SIP042_a",
+          "SIP042_b"
+        ],
+        "CB1134": [
+          "LHPD4a2",
+          "LHPD4d2_b"
+        ],
+        "CB1169": [
+          "SAD117",
+          "SMP209"
+        ],
+        "CB1221": [
+          "AVLP412",
+          "AVLP413"
+        ],
+        "CB1296": [
+          "CB1296_a",
+          "M_vPNml88"
+        ],
+        "CB1305": [
+          "LHAV2k5",
+          "LHAV2k9"
+        ],
+        "CB1342": [
+          "PS324",
+          "PS331"
+        ],
+        "CB1394_d": [
+          "SAD078",
+          "SAD079"
+        ],
+        "CB1395": [
+          "AVLP480",
+          "PVLP110"
+        ],
+        "CB1466": [
+          "AVLP138",
+          "CB1302"
+        ],
+        "CB1470": [
+          "GNG620",
+          "GNG621",
+          "GNG623"
+        ],
+        "CB1482": [
+          "GNG617",
+          "GNG618",
+          "GNG619"
+        ],
+        "CB1488": [
+          "GNG319",
+          "GNG320"
+        ],
+        "CB1495": [
+          "SMP236",
+          "SMP242"
+        ],
+        "CB1546": [
+          "lLN13",
+          "lLN15"
+        ],
+        "CB1558": [
+          "AOTU054",
+          "AOTU055"
+        ],
+        "CB1609": [
+          "GNG615",
+          "GNG616"
+        ],
+        "CB1622": [
+          "SAD078",
+          "SAD079"
+        ],
+        "CB1660": [
+          "AVLP484",
+          "AVLP485"
+        ],
+        "CB1708": [
+          "GNG613",
+          "GNG614"
+        ],
+        "CB1750": [
+          "LAL060_a",
+          "LAL060_b"
+        ],
+        "CB1827": [
+          "WED009",
+          "WED022"
+        ],
+        "CB1943": [
+          "LHAV4g12",
+          "LHAV4g13"
+        ],
+        "CB1967": [
+          "SMP117_a",
+          "SMP117_b"
+        ],
+        "CB1993": [
+          "AVLP330",
+          "AVLP333"
+        ],
+        "CB2030": [
+          "CRE085",
+          "CRE086"
+        ],
+        "CB2054": [
+          "GNG319",
+          "GNG320"
+        ],
+        "CB2057": [
+          "AVLP168",
+          "AVLP188"
+        ],
+        "CB2081": [
+          "CB2081_a",
+          "CB2081_b"
+        ],
+        "CB2100": [
+          "AVLP329",
+          "AVLP332"
+        ],
+        "CB2115": [
+          "GNG611",
+          "GNG612"
+        ],
+        "CB2120": [
+          "LAL032",
+          "LAL034"
+        ],
+        "CB2122": [
+          "SLP461",
+          "SLP473"
+        ],
+        "CB2160": [
+          "PS353",
+          "PS354"
+        ],
+        "CB2195": [
+          "GNG309",
+          "GNG310"
+        ],
+        "CB2198": [
+          "GNG402",
+          "GNG408"
+        ],
+        "CB2214": [
+          "SIP074_a",
+          "SIP074_b",
+          "SIP075"
+        ],
+        "CB2220": [
+          "SMP488",
+          "SMP489"
+        ],
+        "CB2237": [
+          "IB096",
+          "PS312"
+        ],
+        "CB2242": [
+          "GNG392",
+          "GNG398",
+          "GNG401"
+        ],
+        "CB2267_b": [
+          "LAL061",
+          "WEDPN17_a1",
+          "WEDPN17_b"
+        ],
+        "CB2276": [
+          "CL054",
+          "CL056"
+        ],
+        "CB2334": [
+          "AVLP480",
+          "PVLP110"
+        ],
+        "CB2353": [
+          "GNG609",
+          "GNG610"
+        ],
+        "CB2392": [
+          "PS340",
+          "PS341",
+          "PS342"
+        ],
+        "CB2402": [
+          "AVLP062",
+          "AVLP067"
+        ],
+        "CB2417": [
+          "WED077",
+          "WED078"
+        ],
+        "CB2419": [
+          "LHAV3e4_b",
+          "LHAV3e5"
+        ],
+        "CB2426": [
+          "AVLP203_a",
+          "AVLP203_b"
+        ],
+        "CB2449": [
+          "WED063_a",
+          "WED063_b",
+          "WED066"
+        ],
+        "CB2473": [
+          "PS070",
+          "PS072"
+        ],
+        "CB2532": [
+          "SLP112",
+          "SLP113"
+        ],
+        "CB2556": [
+          "AMMC034_a",
+          "AMMC034_b"
+        ],
+        "CB2574": [
+          "AVLP225_b1",
+          "AVLP225_b2"
+        ],
+        "CB2602": [
+          "SLP360_b",
+          "SLP360_c"
+        ],
+        "CB2663": [
+          "PS101",
+          "VES103"
+        ],
+        "CB2697": [
+          "PS074",
+          "PS077"
+        ],
+        "CB2778": [
+          "WEDPN18",
+          "WEDPN7C"
+        ],
+        "CB2796": [
+          "LHPV3a3_b",
+          "LHPV3b1_a"
+        ],
+        "CB2825": [
+          "PS316",
+          "PS328"
+        ],
+        "CB2932": [
+          "LHPD2a5_b",
+          "SIP042_a"
+        ],
+        "CB2977": [
+          "LHPD2a1",
+          "LHPD2b1"
+        ],
+        "CB3017": [
+          "SMP467",
+          "SMP468"
+        ],
+        "CB3072": [
+          "SIP075",
+          "SMP382"
+        ],
+        "CB3083": [
+          "SMP488",
+          "SMP489"
+        ],
+        "CB3125": [
+          "aIPg10",
+          "aIPg8"
+        ],
+        "CB3150": [
+          "GNG338",
+          "GNG339"
+        ],
+        "CB3198": [
+          "LHPD2a1",
+          "LHPD2b1"
+        ],
+        "CB3200": [
+          "AMMC030",
+          "AMMC031"
+        ],
+        "CB3231": [
+          "LHPD2a4_a",
+          "SIP049"
+        ],
+        "CB3254": [
+          "GNG367_a",
+          "GNG368"
+        ],
+        "CB3325": [
+          "GNG354",
+          "GNG364"
+        ],
+        "CB3379": [
+          "CRE045",
+          "CRE046"
+        ],
+        "CB3390": [
+          "AVLP511",
+          "PVLP125"
+        ],
+        "CB3392": [
+          "SMP002",
+          "SMP004"
+        ],
+        "CB3401": [
+          "GNG255",
+          "GNG256"
+        ],
+        "CB3438": [
+          "GNG388",
+          "PRW024"
+        ],
+        "CB3452": [
+          "SIP069",
+          "SMP377"
+        ],
+        "CB3557": [
+          "SLP421",
+          "SLP424"
+        ],
+        "CB3587": [
+          "PS101",
+          "VES103"
+        ],
+        "CB3612": [
+          "SMP222",
+          "SMP223"
+        ],
+        "CB3623": [
+          "VP2+Z_lvPN",
+          "Z_lvPNm1"
+        ],
+        "CB3628": [
+          "AVLP412",
+          "AVLP413"
+        ],
+        "CB3632": [
+          "GNG356",
+          "PRW015"
+        ],
+        "CB3794": [
+          "PS337",
+          "PS338",
+          "PS339"
+        ],
+        "CB3809": [
+          "GNG255",
+          "GNG256"
+        ],
+        "CB3859": [
+          "AVLP551",
+          "AVLP552"
+        ],
+        "CB3861": [
+          "AVLP551",
+          "AVLP552"
+        ],
+        "CB3877": [
+          "SAD091",
+          "SAD092"
+        ],
+        "CB3905": [
+          "GNG340",
+          "GNG342"
+        ],
+        "CB3915": [
+          "WED187",
+          "WED188"
+        ],
+        "CB3917": [
+          "GNG346",
+          "GNG348",
+          "GNG349"
+        ],
+        "CB3921": [
+          "AVLP605",
+          "AVLP606"
+        ],
+        "CB3922": [
+          "AVLP603",
+          "AVLP607"
+        ],
+        "CB3923": [
+          "GNG602",
+          "GNG603"
+        ],
+        "CB3941": [
+          "PS268",
+          "PS269"
+        ],
+        "CB3966": [
+          "SLP016",
+          "SLP022"
+        ],
+        "CB3978": [
+          "CL121_b",
+          "CL122_b"
+        ],
+        "CB3983": [
+          "AVLP038",
+          "WED034",
+          "WED035"
+        ],
+        "CB4068": [
+          "PS323",
+          "PS329",
+          "PS330"
+        ],
+        "CB4186": [
+          "SMP391",
+          "SMP394"
+        ],
+        "CB4187": [
+          "SMP459",
+          "SMP460"
+        ],
+        "CB4230": [
+          "PS142",
+          "PS148"
+        ],
+        "CL024b": [
+          "CL024_b",
+          "CL024_c",
+          "CL024_d"
+        ],
+        "CL062_a": [
+          "CL062_a1",
+          "CL062_a2"
+        ],
+        "CL062_b": [
+          "CL062_b1",
+          "CL062_b2",
+          "CL062_b3"
+        ],
+        "CL085_b": [
+          "CL085_c",
+          "CL088_b"
+        ],
+        "CL089_a": [
+          "CL089_a1",
+          "CL089_a2"
+        ],
+        "CL128b": [
+          "CL128_a",
+          "CL128_d",
+          "CL128_e"
+        ],
+        "CL128c": [
+          "CL128_b",
+          "CL128_c",
+          "CL128_f"
+        ],
+        "CL266_a": [
+          "CL266_a1",
+          "CL266_a2",
+          "CL266_a3"
+        ],
+        "CL266_b": [
+          "CL266_b1",
+          "CL266_b2"
+        ],
+        "CL272_a": [
+          "CL272_a1",
+          "CL272_a2",
+          "CL272_b3"
+        ],
+        "CL272_b": [
+          "CL272_b1",
+          "CL272_b2"
+        ],
+        "CL344": [
+          "CL344_a",
+          "CL344_b"
+        ],
+        "CRE080a": [
+          "CRE080_a",
+          "CRE080_b"
+        ],
+        "CRE080b": [
+          "CRE080_a",
+          "CRE080_b"
+        ],
+        "CRE080c": [
+          "CRE080_c",
+          "CRE080_d"
+        ],
+        "CREa1A_T01": [
+          "ATL005",
+          "ATL007"
+        ],
+        "DNg01": [
+          "DNg01_a",
+          "DNg01_b",
+          "DNg01_c",
+          "DNg01_d",
+          "DNg01_unclear"
+        ],
+        "DNg09": [
+          "DNg09_a",
+          "DNg09_b"
+        ],
+        "DNp16": [
+          "DNp16_a",
+          "DNp16_b"
+        ],
+        "DNpe012": [
+          "DNpe012_a",
+          "DNpe012_b"
+        ],
+        "ER1": [
+          "ER1_a",
+          "ER1_b",
+          "ER1_c"
+        ],
+        "FB2M": [
+          "FB2M_a",
+          "FB2M_b"
+        ],
+        "FB4A": [
+          "FB4A_a",
+          "FB4A_b"
+        ],
+        "FB4D": [
+          "FB4D_a",
+          "FB4D_b",
+          "FB4D_c"
+        ],
+        "FB4E": [
+          "FB4E_a",
+          "FB4E_b",
+          "FB4E_c"
+        ],
+        "FB4Z": [
+          "FB4Z_a",
+          "FB4Z_b",
+          "FB4Z_c"
+        ],
+        "FB5V": [
+          "FB5V_a",
+          "FB5V_b",
+          "FB5V_c"
+        ],
+        "FB5W": [
+          "FB5W_a",
+          "FB5W_b"
+        ],
+        "FB6A": [
+          "FB6A_a",
+          "FB6A_b",
+          "FB6A_c"
+        ],
+        "FB7D": [
+          "FB7D_a",
+          "FB7D_b"
+        ],
+        "FC3": [
+          "FC3_a",
+          "FC3_b",
+          "FC3_c"
+        ],
+        "KCab": [
+          "KCab-c",
+          "KCab-m",
+          "KCab-s"
+        ],
+        "LAL026": [
+          "LAL026_a",
+          "LAL026_b"
+        ],
+        "LAL043a": [
+          "LAL043_a",
+          "LAL043_b"
+        ],
+        "LAL043c": [
+          "LAL043_c",
+          "LAL043_d"
+        ],
+        "LAL133a": [
+          "LAL133_a",
+          "LAL133_b",
+          "LAL133_e"
+        ],
+        "LAL133b": [
+          "LAL133_c",
+          "LAL133_d"
+        ],
+        "LAL147a": [
+          "LAL147_a",
+          "LAL147_c"
+        ],
+        "LAL147b": [
+          "LAL147_a",
+          "LAL147_c"
+        ],
+        "LC10c": [
+          "LC10c-1",
+          "LC10c-2"
+        ],
+        "LC28b": [
+          "LoVP4",
+          "LoVP5",
+          "LoVP6"
+        ],
+        "LC35": [
+          "LC35a",
+          "LC35b"
+        ],
+        "LC39": [
+          "LC39a",
+          "LC39b"
+        ],
+        "LC45": [
+          "LoVP10",
+          "LoVP11"
+        ],
+        "LHAD1a4b": [
+          "LHAD1a4_a",
+          "LHAD1a4_b"
+        ],
+        "LHAD1f3c": [
+          "LHAD1f3_a",
+          "LHAD1f3_b"
+        ],
+        "LHAV2b2a": [
+          "LHAV2b2_a",
+          "LHAV2b2_b",
+          "LHAV2b2_d"
+        ],
+        "LT57": [
+          "LoVP14",
+          "LoVP52"
+        ],
+        "LTe43": [
+          "LoVP77",
+          "LoVP83"
+        ],
+        "LTe68": [
+          "LoVP80",
+          "LoVP84"
+        ],
+        "Lat": [
+          "Lat1",
+          "Lat2",
+          "Lat5"
+        ],
+        "Li11": [
+          "Li11a",
+          "Li11b",
+          "Li34a"
+        ],
+        "MTe01b": [
+          "MeVP59",
+          "MeVP7",
+          "MeVP8",
+          "MeVP9"
+        ],
+        "MTe04": [
+          "MeVP12",
+          "MeVP20"
+        ],
+        "MTe10": [
+          "MeVP54",
+          "MeVP55"
+        ],
+        "MTe17": [
+          "MeVP40",
+          "MeVP42"
+        ],
+        "PFNm": [
+          "PFNm_a",
+          "PFNm_b",
+          "PFNp_b"
+        ],
+        "PFNp": [
+          "PFNp_a",
+          "PFNp_b",
+          "PFNp_c",
+          "PFNp_d",
+          "PFNp_e"
+        ],
+        "PLP037a": [
+          "PLP037",
+          "WED038"
+        ],
+        "PLP042b": [
+          "PLP042_a",
+          "PLP042_c"
+        ],
+        "PLP042c": [
+          "PLP042_a",
+          "PLP042_b"
+        ],
+        "SA1": [
+          "SA1_a",
+          "SA1_b",
+          "SA1_c"
+        ],
+        "SA2": [
+          "SA2_a",
+          "SA2_b",
+          "SA2_c"
+        ],
+        "SMP248b": [
+          "SMP248_a",
+          "SMP248_b",
+          "SMP248_c"
+        ],
+        "SMP328b": [
+          "SMP328_a",
+          "SMP328_b"
+        ],
+        "SMP371": [
+          "SMP371_a",
+          "SMP371_b"
+        ],
+        "SMP381": [
+          "SMP381_a",
+          "SMP381_b",
+          "SMP381_c"
+        ],
+        "SMP398": [
+          "SMP398_a",
+          "SMP398_b"
+        ],
+        "SMP399a": [
+          "SMP399_a",
+          "SMP399_c"
+        ],
+        "SMP428": [
+          "SMP428_a",
+          "SMP428_b"
+        ],
+        "SMP530": [
+          "SMP530_a",
+          "SMP530_b"
+        ],
+        "SMP568": [
+          "SMP568_a",
+          "SMP568_b",
+          "SMP568_c",
+          "SMP568_d"
+        ],
+        "WED040": [
+          "WED040_a",
+          "WED040_b",
+          "WED040_c"
+        ],
+        "cL02c": [
+          "LoVC28",
+          "LoVC29"
+        ],
+        "cLP01": [
+          "LPT112",
+          "LPT113"
+        ],
+        "cLP03": [
+          "LPT114",
+          "LPT115",
+          "LPT116"
+        ],
+        "cM08c": [
+          "MeVC20",
+          "MeVC24"
+        ],
+        "pC1a": [
+          "pC1x_a",
+          "pC1x_c",
+          "pC1x_d"
+        ],
+        "pC1c": [
+          "pC1x_a",
+          "pC1x_c",
+          "pC1x_d"
+        ]
+      }
+    },
+    "pair_threshold": 3,
+    "edges": "threshold",
+    "nt_rule": "verified-first; first classical else first monoamine; unsupported verified NT -> unknown; photoreceptors histamine",
+    "excluded_rows": 473,
+    "unclassified_rows": 11499,
+    "n_neurons": 157789,
+    "nnz": 3036600,
+    "raw_synapses": 23553107,
+    "nt_counts": {
+      "acetylcholine": 89248,
+      "glutamate": 24443,
+      "gaba": 21178,
+      "dopamine": 7601,
+      "histamine": 6092,
+      "unknown": 6021,
+      "octopamine": 1537,
+      "serotonin": 1496,
+      "tyramine": 173
+    },
+    "min_weight": 1,
+    "compile_date": "2026-09-15T02:01:11.104387+00:00",
+    "type_nt_override": {},
+    "unknown_nt_override_regex": {}
+  },
+  "reconstruction": {
+    "generator": {
+      "path": "scripts/recover_banc_columns.py",
+      "sha256": "c276340359926369823c90ee642315e6ac0f7ff56fe29d43d4596b50793b7ded"
+    },
+    "versions": {
+      "python": "3.13.2",
+      "numpy": "2.3.5",
+      "scipy": "1.17.0",
+      "pandas": "3.0.1"
+    },
+    "thread_environment": {
+      "OMP_NUM_THREADS": null,
+      "OPENBLAS_NUM_THREADS": null,
+      "MKL_NUM_THREADS": null
+    },
+    "parameters": {
+      "neighbours": 6,
+      "shared_partner_weight": "raw count dot product",
+      "embedding": "classical MDS of unweighted graph distances",
+      "robust_iterations": 12,
+      "residual_floor": 0.01,
+      "assignment_radius": 2,
+      "rim_depth_rows": 2,
+      "t4_cosine_min": 0.95,
+      "right_column_range": [
+        750,
+        950
+      ]
+    }
+  },
+  "source_commit": {
+    "commit": "3deec1ba9f68e42dd683c75adab3b092208f15ae",
+    "dirty": false,
+    "modified_files": []
+  },
+  "checks": {
+    "i_dra_rim": {
+      "status": "fail",
+      "proxy": {
+        "status": "fail",
+        "source": "same-animal R7->Dm-DRA1 and R8->Dm-DRA2 connectivity proxy; not direct DRA labels",
+        "n_candidates": 28,
+        "min_synapses": 0,
+        "mapped": 11,
+        "within_two_rows": 7,
+        "in_dorsal_band": 5,
+        "dorsal_boundary_q80": 16.0,
+        "cells": [
+          {
+            "bodyId": "720575941417291804",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 3.0,
+            "mapped": true,
+            "hex": [
+              15.0,
+              6.0
+            ],
+            "depth_rows": 3.0,
+            "in_dorsal_band": true,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941444620970",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 3.0,
+            "mapped": true,
+            "hex": [
+              7.0,
+              -9.0
+            ],
+            "depth_rows": 5.0,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941464412429",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 14.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941491250997",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 10.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941491402441",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 15.0,
+            "mapped": true,
+            "hex": [
+              15.0,
+              14.0
+            ],
+            "depth_rows": 2.0,
+            "in_dorsal_band": true,
+            "within_two_rows": true
+          },
+          {
+            "bodyId": "720575941504444503",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 20.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941516470019",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 8.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941526417886",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 9.0,
+            "mapped": true,
+            "hex": [
+              10.0,
+              -6.0
+            ],
+            "depth_rows": 2.0,
+            "in_dorsal_band": false,
+            "within_two_rows": true
+          },
+          {
+            "bodyId": "720575941529642168",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 6.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941531890891",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 9.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941539357411",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 12.0,
+            "mapped": true,
+            "hex": [
+              15.0,
+              5.0
+            ],
+            "depth_rows": 2.0,
+            "in_dorsal_band": true,
+            "within_two_rows": true
+          },
+          {
+            "bodyId": "720575941546584409",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 4.0,
+            "mapped": true,
+            "hex": [
+              5.0,
+              -10.0
+            ],
+            "depth_rows": 9.0,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941548144820",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 3.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941551744884",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 10.0,
+            "mapped": true,
+            "hex": [
+              14.0,
+              2.0
+            ],
+            "depth_rows": 1.0,
+            "in_dorsal_band": true,
+            "within_two_rows": true
+          },
+          {
+            "bodyId": "720575941560607726",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 7.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941586720390",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 5.0,
+            "mapped": true,
+            "hex": [
+              14.0,
+              15.0
+            ],
+            "depth_rows": 1.0,
+            "in_dorsal_band": true,
+            "within_two_rows": true
+          },
+          {
+            "bodyId": "720575941604361401",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 6.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941617485013",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 9.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941626886282",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 4.0,
+            "mapped": true,
+            "hex": [
+              13.0,
+              -1.0
+            ],
+            "depth_rows": 2.0,
+            "in_dorsal_band": false,
+            "within_two_rows": true
+          },
+          {
+            "bodyId": "720575941630433318",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 5.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941659865424",
+            "type": "R7_unclear",
+            "target": "Dm-DRA1",
+            "synapses": 3.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941353632048",
+            "type": "R8_unclear",
+            "target": "Dm-DRA2",
+            "synapses": 3.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941500593058",
+            "type": "R8_unclear",
+            "target": "Dm-DRA2",
+            "synapses": 12.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941526410206",
+            "type": "R8_unclear",
+            "target": "Dm-DRA2",
+            "synapses": 13.0,
+            "mapped": true,
+            "hex": [
+              10.0,
+              -5.0
+            ],
+            "depth_rows": 4.0,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941560793871",
+            "type": "R8_unclear",
+            "target": "Dm-DRA2",
+            "synapses": 10.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941567097142",
+            "type": "R8_unclear",
+            "target": "Dm-DRA2",
+            "synapses": 9.0,
+            "mapped": true,
+            "hex": [
+              10.0,
+              -6.0
+            ],
+            "depth_rows": 2.0,
+            "in_dorsal_band": false,
+            "within_two_rows": true
+          },
+          {
+            "bodyId": "720575941576322664",
+            "type": "R8_unclear",
+            "target": "Dm-DRA2",
+            "synapses": 10.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          },
+          {
+            "bodyId": "720575941613127900",
+            "type": "R8_unclear",
+            "target": "Dm-DRA2",
+            "synapses": 7.0,
+            "mapped": false,
+            "hex": null,
+            "depth_rows": null,
+            "in_dorsal_band": false,
+            "within_two_rows": false
+          }
+        ]
+      },
+      "reason": "DRA connectivity proxy is diagnostic; direct photoreceptor DRA labels have not been validated"
+    },
+    "ii_lr_mirror": {
+      "status": "unavailable",
+      "reason": "independent left candidate has no validated column correspondence/origin; reflecting an eye by construction is not an anatomical mirror test"
+    },
+    "iii_t4_direction": {
+      "status": "pass",
+      "matrix": [
+        [
+          -1,
+          0
+        ],
+        [
+          0,
+          -1
+        ]
+      ],
+      "offsets": {
+        "T4a": {
+          "n": 345,
+          "offset": [
+            -0.2884114543128503,
+            0.46973154718284965
+          ],
+          "reference_offset": [
+            -0.2953153869138662,
+            0.4750442541102446
+          ],
+          "cosine": 0.9999846063453275,
+          "role": "orientation_fit"
+        },
+        "T4b": {
+          "n": 391,
+          "offset": [
+            0.31322153310526596,
+            -0.49005909100160233
+          ],
+          "reference_offset": [
+            0.3726001086616781,
+            -0.5491181829842304
+          ],
+          "cosine": 0.9996227479007531,
+          "role": "orientation_fit"
+        },
+        "T4c": {
+          "n": 286,
+          "offset": [
+            0.6687385175894441,
+            0.4943066374832106
+          ],
+          "reference_offset": [
+            0.7854973669810659,
+            0.5508855889667815
+          ],
+          "cosine": 0.9996895792450537,
+          "role": "held_out_from_orientation"
+        },
+        "T4d": {
+          "n": 218,
+          "offset": [
+            -0.6797822064869481,
+            -0.7181020656813151
+          ],
+          "reference_offset": [
+            -0.7430275508281641,
+            -0.8291854151236927
+          ],
+          "cosine": 0.9996262929158514,
+          "role": "held_out_from_orientation"
+        }
+      },
+      "caveat": "T4a/b fit orientation; c/d hold out subtype direction, but all T4s contributed unordered shared partners",
+      "cd_excluded_from_neighbour_graph": false
+    },
+    "iv_column_count": {
+      "status": "pass",
+      "right_columns": 877,
+      "interval": [
+        750,
+        950
+      ],
+      "caveat": "population sanity check, not validation of individual positions"
+    }
+  },
+  "right_eye": {
+    "side": "R",
+    "neighbour_partners": [
+      "T4a",
+      "T4b",
+      "T4c",
+      "T4d"
+    ],
+    "reconstruction": {
+      "n_seed_cells": 878,
+      "n_columns": 877,
+      "component_sizes": [
+        877,
+        1
+      ],
+      "n_neighbour_edges": 2374,
+      "rounded_collisions": 64,
+      "injectivity_displacements": 136,
+      "max_assignment_distance": 1.3232148507355654,
+      "edge_step_agreement": 0.8239258635214828,
+      "caveat": "injective coordinates are a candidate, not validated column annotations"
+    },
+    "type_assignments": [
+      {
+        "type": "L1",
+        "n": 874,
+        "positive_matches": 865,
+        "with_coordinates": 865,
+        "matched_synapse_fraction": 0.9895237275738932
+      },
+      {
+        "type": "L5",
+        "n": 878,
+        "positive_matches": 850,
+        "with_coordinates": 850,
+        "matched_synapse_fraction": 0.9568026064487136
+      },
+      {
+        "type": "L2",
+        "n": 810,
+        "positive_matches": 687,
+        "with_coordinates": 687,
+        "matched_synapse_fraction": 0.9887023886378309
+      },
+      {
+        "type": "L3",
+        "n": 699,
+        "positive_matches": 575,
+        "with_coordinates": 575,
+        "matched_synapse_fraction": 0.9651070578905631
+      },
+      {
+        "type": "Mi4",
+        "n": 830,
+        "positive_matches": 767,
+        "with_coordinates": 767,
+        "matched_synapse_fraction": 0.7156810701773012
+      },
+      {
+        "type": "Mi9",
+        "n": 796,
+        "positive_matches": 670,
+        "with_coordinates": 670,
+        "matched_synapse_fraction": 0.9531281164816169
+      },
+      {
+        "type": "R8_unclear",
+        "n": 797,
+        "positive_matches": 709,
+        "with_coordinates": 709,
+        "matched_synapse_fraction": 0.9882111183214363
+      },
+      {
+        "type": "R7_unclear",
+        "n": 799,
+        "positive_matches": 708,
+        "with_coordinates": 708,
+        "matched_synapse_fraction": 0.9986421558387298
+      },
+      {
+        "type": "T4a",
+        "n": 811,
+        "positive_matches": 784,
+        "with_coordinates": 784,
+        "matched_synapse_fraction": 0.4954268292682927
+      },
+      {
+        "type": "T4b",
+        "n": 816,
+        "positive_matches": 786,
+        "with_coordinates": 786,
+        "matched_synapse_fraction": 0.5089483125443244
+      },
+      {
+        "type": "T4c",
+        "n": 807,
+        "positive_matches": 743,
+        "with_coordinates": 743,
+        "matched_synapse_fraction": 0.4711461179874618
+      },
+      {
+        "type": "T4d",
+        "n": 804,
+        "positive_matches": 762,
+        "with_coordinates": 762,
+        "matched_synapse_fraction": 0.5328539199097575
+      }
+    ],
+    "orientation": {
+      "status": "pass",
+      "matrix": [
+        [
+          -1,
+          0
+        ],
+        [
+          0,
+          -1
+        ]
+      ],
+      "offsets": {
+        "T4a": {
+          "n": 345,
+          "offset": [
+            -0.2884114543128503,
+            0.46973154718284965
+          ],
+          "reference_offset": [
+            -0.2953153869138662,
+            0.4750442541102446
+          ],
+          "cosine": 0.9999846063453275,
+          "role": "orientation_fit"
+        },
+        "T4b": {
+          "n": 391,
+          "offset": [
+            0.31322153310526596,
+            -0.49005909100160233
+          ],
+          "reference_offset": [
+            0.3726001086616781,
+            -0.5491181829842304
+          ],
+          "cosine": 0.9996227479007531,
+          "role": "orientation_fit"
+        },
+        "T4c": {
+          "n": 286,
+          "offset": [
+            0.6687385175894441,
+            0.4943066374832106
+          ],
+          "reference_offset": [
+            0.7854973669810659,
+            0.5508855889667815
+          ],
+          "cosine": 0.9996895792450537,
+          "role": "held_out_from_orientation"
+        },
+        "T4d": {
+          "n": 218,
+          "offset": [
+            -0.6797822064869481,
+            -0.7181020656813151
+          ],
+          "reference_offset": [
+            -0.7430275508281641,
+            -0.8291854151236927
+          ],
+          "cosine": 0.9996262929158514,
+          "role": "held_out_from_orientation"
+        }
+      },
+      "caveat": "T4a/b fit orientation; c/d hold out subtype direction, but all T4s contributed unordered shared partners",
+      "cd_excluded_from_neighbour_graph": false
+    },
+    "dra": {
+      "status": "fail",
+      "source": "same-animal R7->Dm-DRA1 and R8->Dm-DRA2 connectivity proxy; not direct DRA labels",
+      "n_candidates": 28,
+      "min_synapses": 0,
+      "mapped": 11,
+      "within_two_rows": 7,
+      "in_dorsal_band": 5,
+      "dorsal_boundary_q80": 16.0,
+      "cells": [
+        {
+          "bodyId": "720575941417291804",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 3.0,
+          "mapped": true,
+          "hex": [
+            15.0,
+            6.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": true,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941444620970",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 3.0,
+          "mapped": true,
+          "hex": [
+            7.0,
+            -9.0
+          ],
+          "depth_rows": 5.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941464412429",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 14.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941491250997",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 10.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941491402441",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 15.0,
+          "mapped": true,
+          "hex": [
+            15.0,
+            14.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575941504444503",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 20.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941516470019",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 8.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941526417886",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 9.0,
+          "mapped": true,
+          "hex": [
+            10.0,
+            -6.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575941529642168",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 6.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941531890891",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 9.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941539357411",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 12.0,
+          "mapped": true,
+          "hex": [
+            15.0,
+            5.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575941546584409",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 4.0,
+          "mapped": true,
+          "hex": [
+            5.0,
+            -10.0
+          ],
+          "depth_rows": 9.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941548144820",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 3.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941551744884",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 10.0,
+          "mapped": true,
+          "hex": [
+            14.0,
+            2.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575941560607726",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 7.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941586720390",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 5.0,
+          "mapped": true,
+          "hex": [
+            14.0,
+            15.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575941604361401",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 6.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941617485013",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 9.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941626886282",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 4.0,
+          "mapped": true,
+          "hex": [
+            13.0,
+            -1.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575941630433318",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 5.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941659865424",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 3.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941353632048",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 3.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941500593058",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 12.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941526410206",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 13.0,
+          "mapped": true,
+          "hex": [
+            10.0,
+            -5.0
+          ],
+          "depth_rows": 4.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941560793871",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 10.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941567097142",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 9.0,
+          "mapped": true,
+          "hex": [
+            10.0,
+            -6.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575941576322664",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 10.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575941613127900",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 7.0,
+          "mapped": false,
+          "hex": null,
+          "depth_rows": null,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        }
+      ]
+    },
+    "unassigned_seed_body_ids": [
+      "720575941689026011"
+    ]
+  },
+  "review_controls": {
+    "fafb_published_proxy": {
+      "status": "fail",
+      "source": "same-animal R7->Dm-DRA1 and R8->Dm-DRA2 connectivity proxy; not direct DRA labels",
+      "n_candidates": 90,
+      "min_synapses": 0,
+      "mapped": 90,
+      "within_two_rows": 80,
+      "in_dorsal_band": 62,
+      "dorsal_boundary_q80": 54.0,
+      "cells": [
+        {
+          "bodyId": "720575940606040492",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 18.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            33.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940608368050",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 31.0,
+          "mapped": true,
+          "hex": [
+            29.0,
+            36.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940609781769",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 75.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            22.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940611044164",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 28.0,
+          "mapped": true,
+          "hex": [
+            14.0,
+            32.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940611818594",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 89.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            32.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940611892946",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 85.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            31.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940612468942",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 13.0,
+          "mapped": true,
+          "hex": [
+            26.0,
+            13.0
+          ],
+          "depth_rows": 4.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940613045234",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 7.0,
+          "mapped": true,
+          "hex": [
+            29.0,
+            35.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940613201075",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 69.0,
+          "mapped": true,
+          "hex": [
+            16.0,
+            33.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940613636266",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 62.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            24.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940614307811",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 38.0,
+          "mapped": true,
+          "hex": [
+            13.0,
+            32.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940614449448",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 60.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            35.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940614944209",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 96.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            27.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940615386530",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 32.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            33.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940615613855",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 91.0,
+          "mapped": true,
+          "hex": [
+            29.0,
+            17.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940616093855",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 13.0,
+          "mapped": true,
+          "hex": [
+            28.0,
+            17.0
+          ],
+          "depth_rows": 5.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940616946630",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 63.0,
+          "mapped": true,
+          "hex": [
+            30.0,
+            18.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940617281622",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 76.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            30.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940619028737",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 41.0,
+          "mapped": true,
+          "hex": [
+            27.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940619144000",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 30.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            19.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940619880758",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 33.0,
+          "mapped": true,
+          "hex": [
+            28.0,
+            15.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940621555565",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 76.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            25.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940622819617",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 100.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            33.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940622829812",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 9.0,
+          "mapped": true,
+          "hex": [
+            12.0,
+            30.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940623930665",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 111.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            29.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624191379",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 12.0,
+          "mapped": true,
+          "hex": [
+            11.0,
+            30.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624267667",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 62.0,
+          "mapped": true,
+          "hex": [
+            29.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624989960",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 53.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            21.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940625906190",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 53.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            23.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940625930995",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 89.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            34.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940625979836",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 62.0,
+          "mapped": true,
+          "hex": [
+            28.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940627301404",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 5.0,
+          "mapped": true,
+          "hex": [
+            24.0,
+            36.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940627307097",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 24.0,
+          "mapped": true,
+          "hex": [
+            30.0,
+            19.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940628037016",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 69.0,
+          "mapped": true,
+          "hex": [
+            20.0,
+            35.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940628640252",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 41.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            26.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940629065034",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 48.0,
+          "mapped": true,
+          "hex": [
+            22.0,
+            36.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940629894555",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 44.0,
+          "mapped": true,
+          "hex": [
+            30.0,
+            37.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940631939013",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 78.0,
+          "mapped": true,
+          "hex": [
+            21.0,
+            35.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940632021867",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 94.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            26.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940632459587",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 16.0,
+          "mapped": true,
+          "hex": [
+            12.0,
+            31.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940632832583",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 96.0,
+          "mapped": true,
+          "hex": [
+            26.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940633839021",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 54.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            27.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940633849901",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 15.0,
+          "mapped": true,
+          "hex": [
+            26.0,
+            36.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940634012243",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 88.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            35.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940634173153",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 20.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            28.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940635080985",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 27.0,
+          "mapped": true,
+          "hex": [
+            27.0,
+            14.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940635323031",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 53.0,
+          "mapped": true,
+          "hex": [
+            18.0,
+            34.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940635654039",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 86.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            28.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940638106736",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 67.0,
+          "mapped": true,
+          "hex": [
+            25.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940641982427",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 53.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            34.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940645689892",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 63.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            20.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940653311478",
+          "type": "R7_unclear",
+          "target": "Dm-DRA1",
+          "synapses": 17.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            32.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940606723430",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 49.0,
+          "mapped": true,
+          "hex": [
+            27.0,
+            14.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940609378571",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 35.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            25.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940614346979",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 5.0,
+          "mapped": true,
+          "hex": [
+            30.0,
+            37.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940614925054",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 61.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            28.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940615145011",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 46.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            31.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940616137322",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 61.0,
+          "mapped": true,
+          "hex": [
+            16.0,
+            33.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940618606676",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 44.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            26.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940621000468",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 32.0,
+          "mapped": true,
+          "hex": [
+            26.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940621246123",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 50.0,
+          "mapped": true,
+          "hex": [
+            22.0,
+            36.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940622105697",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 32.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            33.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940622659422",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 30.0,
+          "mapped": true,
+          "hex": [
+            12.0,
+            31.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940623043196",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 14.0,
+          "mapped": true,
+          "hex": [
+            21.0,
+            35.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624504516",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 24.0,
+          "mapped": true,
+          "hex": [
+            27.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624536467",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 44.0,
+          "mapped": true,
+          "hex": [
+            20.0,
+            35.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624604855",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 40.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            30.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624717565",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 48.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            26.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624871677",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 49.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            27.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940624978357",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 41.0,
+          "mapped": true,
+          "hex": [
+            28.0,
+            15.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940625447655",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 63.0,
+          "mapped": true,
+          "hex": [
+            34.0,
+            29.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940625588460",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 33.0,
+          "mapped": true,
+          "hex": [
+            25.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940626044348",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 39.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            20.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940626264880",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 30.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            31.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940626995033",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 34.0,
+          "mapped": true,
+          "hex": [
+            29.0,
+            17.0
+          ],
+          "depth_rows": 3.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940627519613",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 28.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            33.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940627603230",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 19.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            24.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940628028029",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 33.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            34.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940628230223",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 32.0,
+          "mapped": true,
+          "hex": [
+            29.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940628296872",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 36.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            19.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940628302858",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 9.0,
+          "mapped": true,
+          "hex": [
+            9.0,
+            28.0
+          ],
+          "depth_rows": 4.0,
+          "in_dorsal_band": false,
+          "within_two_rows": false
+        },
+        {
+          "bodyId": "720575940628320017",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 23.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            23.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940628826116",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 38.0,
+          "mapped": true,
+          "hex": [
+            30.0,
+            18.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940628946152",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 36.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            22.0
+          ],
+          "depth_rows": 2.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940632671628",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 31.0,
+          "mapped": true,
+          "hex": [
+            32.0,
+            35.0
+          ],
+          "depth_rows": 0.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940633161799",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 29.0,
+          "mapped": true,
+          "hex": [
+            14.0,
+            32.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940633163404",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 30.0,
+          "mapped": true,
+          "hex": [
+            28.0,
+            37.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940634698009",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 52.0,
+          "mapped": true,
+          "hex": [
+            18.0,
+            34.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": false,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940635936703",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 37.0,
+          "mapped": true,
+          "hex": [
+            33.0,
+            32.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        },
+        {
+          "bodyId": "720575940636661871",
+          "type": "R8_unclear",
+          "target": "Dm-DRA2",
+          "synapses": 35.0,
+          "mapped": true,
+          "hex": [
+            31.0,
+            35.0
+          ],
+          "depth_rows": 1.0,
+          "in_dorsal_band": true,
+          "within_two_rows": true
+        }
+      ]
+    },
+    "proxy_labels": {
+      "source": "labels.csv.gz",
+      "sha256": "bdd4eafab2bfe30540256c84ea1513e4b1877c0c4cf03f919204b4eafae5868e",
+      "real_labels": 64,
+      "overlap": 61,
+      "precision": 0.6777777777777778,
+      "recall": 0.953125
+    },
+    "independent_cd": {
+      "fafb": {
+        "Tm3": {
+          "partners": [
+            "Tm3"
+          ],
+          "orientation": {
+            "status": "pass",
+            "matrix": [
+              [
+                1,
+                0
+              ],
+              [
+                -1,
+                -1
+              ]
+            ],
+            "offsets": {
+              "T4a": {
+                "n": 490,
+                "offset": [
+                  -0.3937757639963597,
+                  0.4842289600707069
+                ],
+                "reference_offset": [
+                  -0.2953153869138662,
+                  0.4750442541102446
+                ],
+                "cosine": 0.9920037274432306,
+                "role": "orientation_fit"
+              },
+              "T4b": {
+                "n": 501,
+                "offset": [
+                  0.2894272184521119,
+                  -0.6241257202535061
+                ],
+                "reference_offset": [
+                  0.3726001086616781,
+                  -0.5491181829842304
+                ],
+                "cosine": 0.9869123749405774,
+                "role": "orientation_fit"
+              },
+              "T4c": {
+                "n": 438,
+                "offset": [
+                  0.7640783854563438,
+                  0.5371718844347853
+                ],
+                "reference_offset": [
+                  0.7854973669810659,
+                  0.5508855889667815
+                ],
+                "cosine": 0.9999993428351228,
+                "role": "held_out_from_orientation"
+              },
+              "T4d": {
+                "n": 359,
+                "offset": [
+                  -0.7646424422738597,
+                  -0.8019973946123231
+                ],
+                "reference_offset": [
+                  -0.7430275508281641,
+                  -0.8291854151236927
+                ],
+                "cosine": 0.9995224432121835,
+                "role": "held_out_from_orientation"
+              }
+            },
+            "caveat": "T4a/b fit orientation; c/d hold out subtype direction, but all T4s contributed unordered shared partners",
+            "cd_excluded_from_neighbour_graph": true
+          },
+          "truth": {
+            "status": "measured",
+            "alignment_matrix": [
+              [
+                1,
+                0
+              ],
+              [
+                0,
+                1
+              ]
+            ],
+            "alignment_translation": [
+              19.0,
+              21.0
+            ],
+            "caveat": "control annotations enter only this evaluation, never reconstruction or same-animal assignment",
+            "by_type": [
+              {
+                "type": "Mi1",
+                "n": 796,
+                "evaluated": 765,
+                "exact": 576,
+                "within_one_column": 731,
+                "max_error_columns": 6.557438524302
+              },
+              {
+                "type": "L1",
+                "n": 793,
+                "evaluated": 753,
+                "exact": 574,
+                "within_one_column": 722,
+                "max_error_columns": 6.557438524302
+              },
+              {
+                "type": "L5",
+                "n": 785,
+                "evaluated": 723,
+                "exact": 554,
+                "within_one_column": 694,
+                "max_error_columns": 3.4641016151377544
+              },
+              {
+                "type": "L2",
+                "n": 791,
+                "evaluated": 715,
+                "exact": 551,
+                "within_one_column": 690,
+                "max_error_columns": 3.4641016151377544
+              },
+              {
+                "type": "L3",
+                "n": 738,
+                "evaluated": 664,
+                "exact": 512,
+                "within_one_column": 638,
+                "max_error_columns": 3.4641016151377544
+              },
+              {
+                "type": "Mi4",
+                "n": 766,
+                "evaluated": 736,
+                "exact": 562,
+                "within_one_column": 705,
+                "max_error_columns": 6.557438524302
+              },
+              {
+                "type": "Mi9",
+                "n": 770,
+                "evaluated": 713,
+                "exact": 556,
+                "within_one_column": 687,
+                "max_error_columns": 3.4641016151377544
+              },
+              {
+                "type": "R8_unclear",
+                "n": 661,
+                "evaluated": 630,
+                "exact": 508,
+                "within_one_column": 610,
+                "max_error_columns": 3.4641016151377544
+              },
+              {
+                "type": "R7_unclear",
+                "n": 669,
+                "evaluated": 631,
+                "exact": 513,
+                "within_one_column": 612,
+                "max_error_columns": 3.4641016151377544
+              },
+              {
+                "type": "T4a",
+                "n": 737,
+                "evaluated": 697,
+                "exact": 477,
+                "within_one_column": 660,
+                "max_error_columns": 6.557438524302
+              },
+              {
+                "type": "T4b",
+                "n": 748,
+                "evaluated": 714,
+                "exact": 537,
+                "within_one_column": 676,
+                "max_error_columns": 4.358898943540674
+              },
+              {
+                "type": "T4c",
+                "n": 842,
+                "evaluated": 710,
+                "exact": 462,
+                "within_one_column": 646,
+                "max_error_columns": 6.557438524302
+              },
+              {
+                "type": "T4d",
+                "n": 777,
+                "evaluated": 702,
+                "exact": 509,
+                "within_one_column": 660,
+                "max_error_columns": 3.4641016151377544
+              }
+            ]
+          }
+        },
+        "T4a+T4b": {
+          "partners": [
+            "T4a",
+            "T4b"
+          ],
+          "orientation": {
+            "status": "pass",
+            "matrix": [
+              [
+                1,
+                1
+              ],
+              [
+                0,
+                -1
+              ]
+            ],
+            "offsets": {
+              "T4a": {
+                "n": 494,
+                "offset": [
+                  -0.39347352053375256,
+                  0.489417770198187
+                ],
+                "reference_offset": [
+                  -0.2953153869138662,
+                  0.4750442541102446
+                ],
+                "cosine": 0.9926933205267722,
+                "role": "orientation_fit"
+              },
+              "T4b": {
+                "n": 506,
+                "offset": [
+                  0.26375937331703797,
+                  -0.6379030713518072
+                ],
+                "reference_offset": [
+                  0.3726001086616781,
+                  -0.5491181829842304
+                ],
+                "cosine": 0.9792422358889912,
+                "role": "orientation_fit"
+              },
+              "T4c": {
+                "n": 445,
+                "offset": [
+                  0.7596816607380876,
+                  0.5222946752739821
+                ],
+                "reference_offset": [
+                  0.7854973669810659,
+                  0.5508855889667815
+                ],
+                "cosine": 0.9999566402025585,
+                "role": "held_out_from_orientation"
+              },
+              "T4d": {
+                "n": 363,
+                "offset": [
+                  -0.7967711903892317,
+                  -0.7950872325429754
+                ],
+                "reference_offset": [
+                  -0.7430275508281641,
+                  -0.8291854151236927
+                ],
+                "cosine": 0.9984433900525814,
+                "role": "held_out_from_orientation"
+              }
+            },
+            "caveat": "T4a/b fit orientation; c/d hold out subtype direction, but all T4s contributed unordered shared partners",
+            "cd_excluded_from_neighbour_graph": true
+          },
+          "truth": {
+            "status": "measured",
+            "alignment_matrix": [
+              [
+                1,
+                0
+              ],
+              [
+                0,
+                1
+              ]
+            ],
+            "alignment_translation": [
+              19.0,
+              21.0
+            ],
+            "caveat": "control annotations enter only this evaluation, never reconstruction or same-animal assignment",
+            "by_type": [
+              {
+                "type": "Mi1",
+                "n": 796,
+                "evaluated": 782,
+                "exact": 585,
+                "within_one_column": 757,
+                "max_error_columns": 5.196152422706632
+              },
+              {
+                "type": "L1",
+                "n": 793,
+                "evaluated": 765,
+                "exact": 576,
+                "within_one_column": 741,
+                "max_error_columns": 5.196152422706632
+              },
+              {
+                "type": "L5",
+                "n": 785,
+                "evaluated": 733,
+                "exact": 561,
+                "within_one_column": 713,
+                "max_error_columns": 5.196152422706632
+              },
+              {
+                "type": "L2",
+                "n": 791,
+                "evaluated": 722,
+                "exact": 554,
+                "within_one_column": 700,
+                "max_error_columns": 5.196152422706632
+              },
+              {
+                "type": "L3",
+                "n": 738,
+                "evaluated": 670,
+                "exact": 506,
+                "within_one_column": 652,
+                "max_error_columns": 3.4641016151377544
+              },
+              {
+                "type": "Mi4",
+                "n": 766,
+                "evaluated": 743,
+                "exact": 559,
+                "within_one_column": 720,
+                "max_error_columns": 5.196152422706632
+              },
+              {
+                "type": "Mi9",
+                "n": 770,
+                "evaluated": 721,
+                "exact": 546,
+                "within_one_column": 703,
+                "max_error_columns": 2.0
+              },
+              {
+                "type": "R8_unclear",
+                "n": 661,
+                "evaluated": 640,
+                "exact": 507,
+                "within_one_column": 630,
+                "max_error_columns": 4.358898943540674
+              },
+              {
+                "type": "R7_unclear",
+                "n": 669,
+                "evaluated": 640,
+                "exact": 509,
+                "within_one_column": 629,
+                "max_error_columns": 4.358898943540674
+              },
+              {
+                "type": "T4a",
+                "n": 737,
+                "evaluated": 714,
+                "exact": 521,
+                "within_one_column": 678,
+                "max_error_columns": 2.6457513110645907
+              },
+              {
+                "type": "T4b",
+                "n": 748,
+                "evaluated": 729,
+                "exact": 542,
+                "within_one_column": 699,
+                "max_error_columns": 4.358898943540674
+              },
+              {
+                "type": "T4c",
+                "n": 842,
+                "evaluated": 724,
+                "exact": 476,
+                "within_one_column": 672,
+                "max_error_columns": 6.082762530298219
+              },
+              {
+                "type": "T4d",
+                "n": 777,
+                "evaluated": 717,
+                "exact": 519,
+                "within_one_column": 677,
+                "max_error_columns": 2.6457513110645907
+              }
+            ]
+          }
+        }
+      },
+      "banc": {
+        "Tm3": {
+          "partners": [
+            "Tm3"
+          ],
+          "orientation": {
+            "status": "pass",
+            "matrix": [
+              [
+                1,
+                1
+              ],
+              [
+                0,
+                -1
+              ]
+            ],
+            "offsets": {
+              "T4a": {
+                "n": 322,
+                "offset": [
+                  -0.31161009969029463,
+                  0.4723070719908086
+                ],
+                "reference_offset": [
+                  -0.2953153869138662,
+                  0.4750442541102446
+                ],
+                "cosine": 0.9996351439152562,
+                "role": "orientation_fit"
+              },
+              "T4b": {
+                "n": 344,
+                "offset": [
+                  0.26098115943780315,
+                  -0.44094603027505763
+                ],
+                "reference_offset": [
+                  0.3726001086616781,
+                  -0.5491181829842304
+                ],
+                "cosine": 0.9980933364682056,
+                "role": "orientation_fit"
+              },
+              "T4c": {
+                "n": 264,
+                "offset": [
+                  0.7138142160985541,
+                  0.44188350111326696
+                ],
+                "reference_offset": [
+                  0.7854973669810659,
+                  0.5508855889667815
+                ],
+                "cosine": 0.9983584705112456,
+                "role": "held_out_from_orientation"
+              },
+              "T4d": {
+                "n": 198,
+                "offset": [
+                  -0.7572292200039625,
+                  -0.716219481844168
+                ],
+                "reference_offset": [
+                  -0.7430275508281641,
+                  -0.8291854151236927
+                ],
+                "cosine": 0.9965929579443886,
+                "role": "held_out_from_orientation"
+              }
+            },
+            "caveat": "T4a/b fit orientation; c/d hold out subtype direction, but all T4s contributed unordered shared partners",
+            "cd_excluded_from_neighbour_graph": true
+          }
+        },
+        "T4a+T4b": {
+          "partners": [
+            "T4a",
+            "T4b"
+          ],
+          "orientation": {
+            "status": "pass",
+            "matrix": [
+              [
+                -1,
+                -1
+              ],
+              [
+                1,
+                0
+              ]
+            ],
+            "offsets": {
+              "T4a": {
+                "n": 345,
+                "offset": [
+                  -0.33142378457350624,
+                  0.47590823877368515
+                ],
+                "reference_offset": [
+                  -0.2953153869138662,
+                  0.4750442541102446
+                ],
+                "cosine": 0.9986423402016393,
+                "role": "orientation_fit"
+              },
+              "T4b": {
+                "n": 391,
+                "offset": [
+                  0.35171926825582345,
+                  -0.48210510549630553
+                ],
+                "reference_offset": [
+                  0.3726001086616781,
+                  -0.5491181829842304
+                ],
+                "cosine": 0.999418514859278,
+                "role": "orientation_fit"
+              },
+              "T4c": {
+                "n": 286,
+                "offset": [
+                  0.669682227442578,
+                  0.47572437454226185
+                ],
+                "reference_offset": [
+                  0.7854973669810659,
+                  0.5508855889667815
+                ],
+                "cosine": 0.9999817458160478,
+                "role": "held_out_from_orientation"
+              },
+              "T4d": {
+                "n": 216,
+                "offset": [
+                  -0.6296498152806598,
+                  -0.6358506215352293
+                ],
+                "reference_offset": [
+                  -0.7430275508281641,
+                  -0.8291854151236927
+                ],
+                "cosine": 0.998757956598406,
+                "role": "held_out_from_orientation"
+              }
+            },
+            "caveat": "T4a/b fit orientation; c/d hold out subtype direction, but all T4s contributed unordered shared partners",
+            "cd_excluded_from_neighbour_graph": true
+          }
+        }
+      }
+    },
+    "scaled_thresholds": {
+      "fafb": {
+        "scale": 1.0,
+        "dn_input_budgets": {
+          "fafb": 28497.0,
+          "banc": 13536.0
+        },
+        "assumption": "global DNa02 input-budget ratio; not a calibrated local DRA detection model",
+        "rows": [
+          {
+            "fafb_equivalent_synapses": 5.0,
+            "raw_threshold": 5.0,
+            "n_candidates": 90,
+            "mapped": 90,
+            "within_two_rows": 80
+          },
+          {
+            "fafb_equivalent_synapses": 10.0,
+            "raw_threshold": 10.0,
+            "n_candidates": 85,
+            "mapped": 85,
+            "within_two_rows": 77
+          }
+        ]
+      },
+      "banc": {
+        "scale": 0.47499736814401516,
+        "dn_input_budgets": {
+          "fafb": 28497.0,
+          "banc": 13536.0
+        },
+        "assumption": "global DNa02 input-budget ratio; not a calibrated local DRA detection model",
+        "rows": [
+          {
+            "fafb_equivalent_synapses": 5.0,
+            "raw_threshold": 2.3749868407200756,
+            "n_candidates": 28,
+            "mapped": 11,
+            "within_two_rows": 7
+          },
+          {
+            "fafb_equivalent_synapses": 10.0,
+            "raw_threshold": 4.749973681440151,
+            "n_candidates": 21,
+            "mapped": 7,
+            "within_two_rows": 6
+          }
+        ]
+      }
+    }
+  },
+  "accuracy_estimate": {
+    "exact_fraction": [
+      0.8,
+      0.85
+    ],
+    "within_one_column_fraction": [
+      0.97,
+      0.98
+    ],
+    "method": "label-free split-half self-consistency calibrated on FAFB, from independent review",
+    "source": "docs/audits/banc_column_reconstruction_review.md",
+    "assumptions": "approximate transfer of FAFB split-half calibration to BANC; not biological ground truth",
+    "errors": "about one cell in six misplaced; concentrated at the rim and T4 home columns",
+    "fafb_tuned_optimum": {
+      "neighbours": 6,
+      "exact_percent": 94.38,
+      "k5_percent": 78.54,
+      "k7_percent": 67.82
+    }
+  },
+  "dra_interpretation": "gate retained but intrinsically closed: FAFB published proxy 80/90; proxy precision 68%, recall 95%; BANC mapping 11/28 reflects annotation incompleteness",
+  "input_layer": {
+    "cells_per_cartridge": 6,
+    "transmitter": "histamine",
+    "targets": [
+      "L1",
+      "L2",
+      "L3"
+    ],
+    "wiring": "neural-superposition cartridge: six distinct receptors sharing a viewing direction, each wired only to mapped native lamina cells in that column",
+    "weight_by_target": {
+      "L1": 8.438025974025972,
+      "L2": 8.438025974025972,
+      "L3": 1.4063376623376622
+    },
+    "male_right_native_pair_counts": {
+      "L1": {
+        "pairs": 2180,
+        "median": 30.0,
+        "quartiles": [
+          22.0,
+          38.0
+        ]
+      },
+      "L2": {
+        "pairs": 2167,
+        "median": 30.0,
+        "quartiles": [
+          23.0,
+          40.0
+        ]
+      },
+      "L3": {
+        "pairs": 2004,
+        "median": 5.0,
+        "quartiles": [
+          3.0,
+          10.0
+        ]
+      }
+    },
+    "dn_raw_input_counts": {
+      "banc": 13536.0,
+      "malecns": 48125.0
+    },
+    "banc_to_male_sampling_scale": 0.28126753246753244,
+    "reference_csr_md5": "ef23cc27bea13be7f6a96f3c04fd3737",
+    "assumption": "unmeasured synthetic weights: MaleCNS per-edge median times global DNa02 input-yield ratio; not a local lamina calibration",
+    "native_synapses_modified": 0,
+    "missing_targets": "left missing; no borrowed FAFB graph or imputed biological edges"
+  },
+  "functional_validation": {
+    "status": "pass",
+    "summary": {
+      "status": "functional gates passed",
+      "qualification": "synthetic input layer on a candidate lattice",
+      "motion_pass": true,
+      "loom_pass": true,
+      "measurements": {
+        "malecns_motion": {
+          "correct_subtypes": 8,
+          "all_eight_correct": true
+        },
+        "malecns_loom": {
+          "walk_gf_max_hz": 0.0,
+          "loom_gf_peak_hz": 44.096458435058594,
+          "loom_ttm_peak_hz": 38.3608283996582,
+          "gf_threshold_hz": 33.0,
+          "escape": true,
+          "first_escape": {
+            "t_s": 0.5300000000000002,
+            "distance_m": 0.034999999999999996,
+            "gf_hz": 35.530277252197266,
+            "ttm_hz": 30.35202407836914
+          },
+          "gf_gate_pass": true
+        },
+        "banc_motion": {
+          "correct_subtypes": 8,
+          "all_eight_correct": true
+        },
+        "banc_loom": {
+          "walk_gf_max_hz": 0.0,
+          "loom_gf_peak_hz": 53.29866409301758,
+          "loom_ttm_peak_hz": 0.0,
+          "gf_threshold_hz": 33.0,
+          "escape": true,
+          "first_escape": {
+            "t_s": 0.46000000000000024,
+            "distance_m": 0.04999999999999977,
+            "gf_hz": 33.86454772949219,
+            "ttm_hz": 0.0
+          },
+          "gf_gate_pass": true
+        }
+      },
+      "anatomically_validated": false
+    },
+    "result_run_id": "ledger-20260915T052149Z-8463cebe",
+    "result_sha256": "f1201775d7a5e0e7bec15fa100010fc2474bff047ce3e082fdecbec22e829f18",
+    "source": "docs/audits/banc_candidate_experiment.md",
+    "scope": "one fixed right-eye motion/loom protocol; not a replicated behavioural claim or anatomical validation"
+  }
+}
