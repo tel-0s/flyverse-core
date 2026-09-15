@@ -2803,3 +2803,341 @@ DNa02 ... the amplitude law contributes no extra drive to DNa02 beyond its own l
 Section 7 says the DNa02 fit "is not robust" (dropping U flips C's R residual to -0.176) and section 9 lists it among
 what the batch does not show. A claim cannot rest on a model the same document declares uninterpretable. (Combined
 with R2, the DNa02 residuals in fact separate M from C at z +4.0 on the L side.)
+
+## Compass round 5A, the ring mechanism (2026-09-15)
+
+`docs/audits/compass_ring_mechanism.md` (thread 5A, whether a data-implied type-level change to the shipped rules lets
+the correct-sign compass ring hold a bump at the shipped gains; a CPU structure pass plus ONE house submission
+`cx5-5cde5e` after a cancelled `cx5-fd8b02`, 8 jobs, 0 failed, 48 runs, twelve arms x four seeds on B200), checked by an
+independent Opus skeptic pass whose fourteen corrections were applied to that audit. Verdict **mostly sound**, with no
+INTEGRITY finding: every measurement in the batch is exactly reproducible -- the skeptic's own re-implementation of
+`bump_frames` and of the survival / rate / width / confinement rules recovers all 48 runs' four primaries and ten
+secondaries with max |diff| = 0, and its own weight-shaping pipeline recovers every wedge matrix, every lambda_k, every
+unitary weight and the Delta7-cap result to the printed digit (M16 blocks to 7.5e-4 mV^2). The Answer -- no type-level,
+data-implied change makes the shipped compass hold a bump at the shipped gains, and the binding constraint is a DC
+balance on the relays, not a missing ring mode -- survives intact, and no verdict in `decision.csv` moves. What did not
+survive is the argument around it: the headline "the wiring is a ring attractor's" is a property of the WEIGHT matrix
+asserted at a state where every compass gain is zero (true Jacobian leading eigenvalue +0.045, not +3.55); the "LIF
+slope of 5-8" it was compared against is a secant artefact and is 2.3-3.2 Hz/mV at the rates that matter; the stated
+reason the rate model missed the F-family bump was wrong, and the right reason -- a reduction that dropped the one-step
+EPG -> EPG term and a forced drive entered as a rate instead of a current -- is a defect in that thread's own structure
+tool, now owned in the audit and in `scripts/cx_ring_structure.py`'s module docstring; the ExR6 / ER6 rates that carried
+the mechanistic story are rate-model outputs the batch's own 308-cell ring population contradicts by ~2x; "the relays
+never fire" is contradicted by arm C's measured 4.4-6.4 Hz; and "cancelled before any result was read" is contradicted
+by 21 result lines in the repository's own archived console, written after the resubmission stamp. Nothing is adopted.
+The skeptic's Verdict section, including its "What the compass now needs" paragraph, and its Refuted list verbatim
+(heading levels demoted to fit this document); the full pass, including its Confirmed list and its fourteen
+corrections, is in `docs/audits/compass_ring_mechanism.md` under `## Skeptic pass (independent, 2026-09-15)`.
+
+### Verdict
+
+**Mostly sound.** Every measurement in the batch is exactly reproducible: my own re-implementation of the bump rule
+recovers all 48 runs' four primaries and ten secondaries with zero difference; my own weight-shaping pipeline recovers
+every wedge matrix, every lambda_k, every unitary weight and the Delta7-cap result to the printed digit; the decision
+rule is applied verbatim; the references reproduce `cx_glno.md` exactly (and one row more than claimed); the stamps
+order correctly, the arms provably did not change between the two submissions, and the reducer's hashes match at
+stamp, at analysis and now. The Answer -- no type-level, data-implied change makes the shipped compass hold a bump at
+the shipped gains, and the binding constraint is a DC balance on the relays, not a missing ring mode -- survives the
+pass intact. What fails is the argument around it: the headline "the wiring is a ring attractor's" is a property of the
+weight matrix asserted at a state where every compass gain is zero (true Jacobian leading eigenvalue 0.045, not 3.55);
+the "LIF slope of 5-8" it is compared against is a secant artefact and is 2.4-3.2 at the rates that matter; the stated
+reason the rate model missed the F bump is wrong, and the right reason -- a reduction that dropped the one-step
+EPG -> EPG term whose undamped k=1 coefficient predicts 145 Hz against the observed 151-156, and a forced drive entered
+as a rate instead of a current -- is a defect in this thread's own tool that the audit should own; the ExR6 / ER6
+rates that carry the mechanistic story are rate-model outputs the batch's own ring population contradicts by 2x; "the
+relays never fire" is contradicted by arm C's measured 4.4-6.4 Hz; and "cancelled before any result was read" is
+contradicted by 21 result lines sitting in the repository's own archived console. None of these changes a verdict in
+`decision.csv`; all of them change what a reader would believe about why. With corrections 1-14 the audit is sound.
+
+**What the compass now needs.** The shipped-gain question is closed as a *null*, not as a *result*: every gE 1 / gD 1
+arm is a structural zero-SD comparison against a reference that is also zero, read as magnitudes, and the two arms that
+carry a bump are a labelled global INSTRUMENT (`same_type_gain` 1) and a labelled reference (gE 2 / gD 15) -- neither is
+a mechanism the data imply, and both fail `compass.EPG.bump_rate_hz` 3x, so `compass.EPG.bump_survival_s` stays FAIL and
+the rate and width rows stay NOT_APPLICABLE. Nothing here licenses an adoption. What it licenses is one more
+**measurement** and one more **counterfactual arm**, in that order: first fix the structure tool (forced drive as a
+current, the one-step term kept, per-cell gamma at the realised fixed point) and re-derive the ranking, because the
+present ranking is computed at a state with zero gain everywhere and its miss on the F family shows it; then run the
+single `edges`-kind arm the audit's own decomposition names -- ExR6 / ER6 / ER4m held at 0 onto PEN and EPG -- which
+the fixed point predicts puts the driven PEN at +9.1 mV and ~30 Hz during the pulse, and which is the only thing that
+turns "the DC inhibition keeps the relays silent" from a decomposition into a tested attribution. Alongside it, the
+data question is a **relabel with sources**, not a gain: ExR6's transmitter confidence and whether it has any fast
+receptor on E-PG at all (it has no receptor-table row; the -1 rides on the E-PG GluClalpha profile), reported as
+`unknown` where it is unknown. The GLNO relabel is a `null` at these gains and should be handed to `glno_relabel.md`
+saying exactly that -- a silent neuron's sign is untested, not confirmed harmless. And the F-family bump should not be
+brought back as a candidate until it is run in the room with a world: at 151-158 Hz it is a KNOWN GAP swap, and the
+rest-of-brain 0.04 Hz in this world-less protocol is no evidence at all about the runaway cliques the x0.1 was adopted
+against.
+
+### Refuted
+
+**R1. "The LIF slope is 5-8 Hz/mV anywhere in its firing range" (section 1.2; Report `summary`, `key_claims`).**
+Computed analytically from `brain.LIFParams()` (theta 7, tau_m 20, t_ref 2.2), f'(u) = f(u)^2 tau_m theta / (1000 u (u-theta)):
+
+| u (mV) | 7.1 | 8 | 9 | 10 | 12 | 15 | 20 | 30 | 40 | 50 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| f (Hz) | 11.4 | 22.8 | 31.0 | 38.1 | 50.7 | 67.7 | 92.5 | 133.1 | 165.4 | 191.7 |
+| f'(u) (Hz/mV) | **25.8** | 9.13 | 7.46 | 6.76 | 6.01 | 5.35 | 4.60 | 3.59 | **2.90** | **2.39** |
+
+The 5-8 band holds only for u in roughly 9-16 mV (31-70 Hz). The audit's "5-8" is the set of secant slopes between its
+own four sample points (f(8)->f(9) 8.2, f(9)->f(12) 6.6, f(12)->f(20) 5.2), not the derivative. Over the rates the
+bumps in this batch actually run at (139-203 Hz) the slope is **2.3-3.2 Hz/mV**, not 5-8. `gamma_crit(k1)` 1.69-2.00
+is still below 2.3, so the sign of the comparison survives -- but by a factor of ~1.4, not the factor of 3-5 the
+wording implies. (This number appears in the Report and is in no named file.)
+
+**R2. "The k=1 bump mode exists in every configuration ... the wiring is a ring attractor's under the shipped rules"
+(section 1.2; Report `summary` and `key_claims` line 1).** A positive k=1 eigenvalue of the *weight* matrix is not the
+attractor criterion; the criterion is on `diag(gamma_i) tau A` with `gamma_i = f'(u_i)` at a state the system occupies.
+At the structure pass's **own** fixed point (`structure.json` `rate_model`) I get:
+
+| config / state | u_EPG(driven) | gamma_EPG | u_PEN(driven) | gamma_PEN | gamma_Delta7 | leading eig of `diag(gamma) tau A` | same with the audit's uniform gamma 6 |
+|---|---|---|---|---|---|---|---|
+| shipped, background | -22.0 | **0.00** | -11.1 | **0.00** | 3.56 | **+0.045** | +3.55 |
+| shipped, pulse | -45.0 | **0.00** | -15.8 | **0.00** | 6.21 | **+0.079** | +3.55 |
+| c (sign+gain), pulse | -68.0 | 0.00 | -17.6 | 0.00 | 7.78 | +0.023 | +4.45 |
+| f (damping off), pulse | -21.6 | 0.00 | -15.6 | 0.00 | 0.18 | +0.149 | +4.39 |
+
+Every compass cell in the rate model has gamma = 0 except Delta7 (the inhibitory one, 3.6-7.8). The linearisation at
+the model's actual operating point is **stable in every mode**, spectral radius 0.16-1.01, leading real part 0.023-0.15
+-- 7-40x below the instability threshold. The +10,019 / gamma_crit 1.69-2.00 numbers describe a uniform-gain
+linearisation at a state that never exists in this model, and the "vs an LIF slope of 5-8" comparison is against a
+slope that **no cell in the loop has** (the only cell with a slope in that band is the inhibition). The audit does
+qualify this in the body ("strongly unstable-from-uniform *as soon as the relays fire*"); the Answer, the summary and
+`key_claims` state it flatly and are what a reader will carry away.
+
+**R3. "The rate-model structure pass missed the F-family bump: its 2 mV noise term understates the fluctuations ...
+a fluctuation-driven regime the fixed-2-mV noise term of `cx_wedge.lif_fi` does not model" (section 3.3; Report
+`open_questions` 1).** Refuted as the explanation. The same **deterministic** mean-field with the **same** sigma = 2 mV
+separates F from S, if two analysis choices are undone.
+
+*(a) The two-step reduction drops the one-step EPG -> EPG term.* `M16['net'] = PEN + PEG + Delta7 + Ring`; `direct` is
+computed, printed in mV in the same table row as the mV^2 lambdas, and then never used. Its ring-Fourier coefficients
+(my own rebuild, matching `matrices.npz` to 2e-7):
+
+| configuration | pairs | mV/pair | d_0 | d_1 | gamma_crit(k1) = 1/(tau d_1) | predicted saturation rate where f'(u) = gamma_crit | observed bump |
+|---|---|---|---|---|---|---|---|
+| shipped (x0.1) | 842 | +0.366 | +6.77 | **+6.00** | **33.4 Hz/mV** (never reached) | -- | none |
+| f: undamped | 842 | +3.653 | +67.50 | **+59.76** | **3.35 Hz/mV** | **145 Hz** | F 151-156 Hz |
+| cf: sign+gain, undamped | 842 | +4.164 | +76.05 | **+66.51** | **3.01 Hz/mV** | **161 Hz** | CFG 156-158, CF 142-150 |
+
+The undamped EPG -> EPG ring is supercritical on its own at any operating point below ~34 mV, and the rate at which
+its gain falls back to 1 predicts the observed bump to 4-7 %. Nothing about fluctuations is needed.
+
+*(b) The forced background enters `rate_fixed_point` as an added **rate**, not as a current* (`r = f(tau A r) + forced`),
+so the driven EPG sits at u = -22 to -68 mV while "firing" at 10-50 Hz, and gamma_EPG = 0 **by construction** -- no
+recurrent EPG term, direct or two-step, can ever engage in that model. Put the same drive in as a current (10 Hz <->
+u 6.63 mV, 50 Hz <-> u 11.99 mV) in an EPG-only 16-wedge model, same sigma, no noise change:
+
+| | background | pulse | after release |
+|---|---|---|---|
+| shipped (x0.1) | 14.3 / 15.3 | 60.1 / 16.3 | **14.3 / 15.3 Hz** (no bump) |
+| f: undamped | 264 / 272 | 273 / 272 | **264 / 272 Hz** (runaway) |
+
+So: the structure pass missed F because of a reduction that dropped the term and a drive that zeroed the gain -- an
+analysis choice, not a fluctuation regime. The correct `open_question` is not "a diffusion approximation would be the
+next tool"; it is "put the forced drive in as a current and keep the one-step term".
+
+**R4. "G = S to the printed digit on every ring metric" (section 0, 3.1, 4; Report `key_claims`).** Not exact.
+Per seed, 12-17 of the recorded metrics differ. The largest relative differences: `GLNO_mean_post` s1 0.1115 -> 0.1470
+(+32 %), s3 0.0881 -> 0.0618 (-30 %); `PEN_mean_during` s1 0.6614 -> 0.5003 (-24 %), s2 0.3370 -> 0.2766 (-18 %);
+`PEG_mean_post` s3 0.1273 -> 0.1710 (+34 %); `epg_in_mean_post` s2 10.7638 -> 10.7984. What *is* exactly equal in 4/4
+seeds: all four primaries (0.00 / nan / nan / 0.00) and the t5.0 EPG in/out row.
+**More important: the batch does not test the GLNO sign at the shipped gains in any informative sense.** Measured GLNO
+rate in S: 0.000 Hz before the pulse, **1.42-3.00 Hz during it**, 0.081-0.335 Hz after. At 3 Hz its -33 mV per PEN per
+volley contributes tau x 3 x (-33) = -0.5 mV to a PEN sitting 7 mV below threshold. G vs S is a null by construction,
+not a finding about the relabel. (The sign *is* tested where GLNO fires: F vs FG at 87-91 Hz and R vs RG at 115-137 Hz;
+those are the informative comparisons and the audit reads them correctly.) Also, "GLNO fires 0.1 Hz while PEN is
+silent" (section 0) understates the pulse value 10-20x -- the 0.03-0.23 Hz figures are the *rate model's*, the LIF's
+are 1.2-3.0 Hz.
+
+**R5. "The relays never fire" / "PEN is silent" / "no data-implied per-type change moves that balance"
+(section 0, 1.2; Report `recommendations` 1).** Measured PEN population mean (42 cells), from the shipped `.npz`:
+
+| arm | pre | during pulse | post |
+|---|---|---|---|
+| S | 0.00-0.024 | **0.29-0.66** | 0.020-0.062 |
+| G | 0.00-0.024 | 0.25-0.50 | 0.025-0.076 |
+| **C** (sign+gain) | 0.061-0.135 | **4.43-6.36** | 0.31-0.72 |
+| CG | 0.061-0.135 | 2.89-3.99 | 0.25-0.46 |
+
+The project's own definition of silent is `silent_frac` = max rate < 0.5 Hz per cell (`INTERP.md` 10 / health). A
+population mean of 4.4-6.4 Hz does not meet it, and neither does S's 0.66 Hz mean over 42 cells. The **data-implied**
+tier C raises the PEN relay ~15x over S (and GLNO from 1.4 to 15-22 Hz during the pulse) -- it moves the DC balance by
+an order of magnitude and still does not reach a bump. "Nothing moves that balance" should be "nothing moves it far
+enough".
+
+**R6. "ExR6 -14.8 mV at 183 Hz, ER6 -9.8 at 116 Hz" presented unqualified in the Report `summary` / `key_claims`.**
+These are rate-model outputs the batch's own data contradict. `structure.json`'s shipped fixed point puts 2 ExR6 +
+4 ER6 + 11 ER4m at a summed **484 Hz** at background and **1,075 Hz** during the pulse. In the same protocol the LIF's
+*entire* 308-cell ER/ExR population sums to:
+
+| arm S, seed 0 | pre | end of pulse | peak during pulse | post |
+|---|---|---|---|---|
+| Ring mean (308 cells) | 0.807 Hz | 2.044 | 2.599 | 0.792 |
+| **summed over 308 cells** | **249 Hz** | **630 Hz** | **800 Hz** | **244 Hz** |
+
+So the rate model's 6-17 cells alone exceed what the whole ring population does in the simulation the audit ran: the
+DC term is overstated by ~2x at background. (The *conclusion* survives independently -- PEN is measured at 0.29-0.66 Hz
+-- but no arm of this batch reports a per-type ring rate, and "183 Hz" is not a measured quantity of this model, let
+alone of the animal.)
+
+**R7. "The first submission (cx5-fd8b02) was cancelled 8/8 within two minutes and before any result was read"
+(section 2; `predeclared.json` `submission_history`; Report `validation` line 4).** False as written. The archived
+console `out/cx5/client_console_fd8b02_cancelled.txt` carries **21 of 48 completed run results**, 7 of them with a
+surviving bump, every one identical to the second batch's:
+
+| from the cancelled console | final batch |
+|---|---|
+| F s3 `survival 5.00 s, bump 151.1 Hz, width 3.0` | 5.00 / 151.083 / 3.0 |
+| CFG s2 `156.3` / CFG s3 `156.4` | 156.335 / 156.365 |
+| CF s3 `survival 4.92 s, bump 144.4 Hz, width 2.1` | 4.92 / 144.436 / 2.093 |
+| R s3 `5.00 s, 200.8 Hz, 3.0` | 5.00 / 200.838 / 3.0 |
+
+The client ran **3.7 min**, not two, and reported `8 job(s), 8 failed`; `FETCH FAILED`, so no artefact was retrieved.
+What *is* verifiable and should be the claim instead: the results appear only inside the client's cancellation log
+dump, and that file was written at **05:43:46Z -- after the resubmission stamp 05:42:48Z**. So the resubmission
+decision demonstrably preceded the results; "no result was read" does not, and 21 of them are in the repo.
+
+**R8. "The ER/ExR feedback is a pure k = 0 term" (section 1.2; Report `summary`).** Ring two-step lambda_k =
+**-47,650** (k=0), -206 (k=1), -73 (k=2), -39 (k=3), -51 (k=4), **-3,080 (k=8)**. The k=8 (L/R alternation) component
+is 6.5 % of k=0 and 15x the k=1 one. "Carries no k=1 content (2.5 % of PEN's)" is right; "a pure k=0 term" is not.
+
+
+## Compass round 5B, the GLNO relabel (2026-09-15)
+
+Batch `cx5b-d08be3` (house B200, 22 jobs, 0 failed): the 29-check suite x 3 draws under the shipped and the
+GLNO-glutamate caches, and the efferent compass under the leg cycle at gE 2 / gD 15 and at the shipped gains, 4 seeds.
+Independent Opus skeptic, verdict **mostly sound**: all five headline claims reproduced (the 213-entry cache diff and
+its bit-identity with the round-3/4 gaba cache; 174 suite status rows re-evaluated with 0 mismatches and no status
+change; all 15 predeclared compass rows null; the report stops at AN04B003); eight secondary items refuted (an
+off-by-one count, a table that did not sum, a receptor-model gloss that holds only under the shipped mode, ExR8 as the
+one type the relabel silences, an unsourced submission timestamp). GLNO -> glutamate NOT adopted. The full pass is
+appended to `docs/audits/glno_relabel.md`; the verdict and the refuted list verbatim:
+
+### Verdict
+
+**Mostly sound.** Claims (1)-(5) all hold. The entry-by-entry cache comparison reproduces exactly under an independent
+implementation, including the bit-identity with the round-3/4 gaba cache (which is in fact byte-identical at the npz
+level and is the same file thread 5A used); the -16.50 mV per PEN edge and -33.00 mV per volley are exact, not
+rounded; every source number in the evidence case matches its primary file, and the "the name is not a source"
+finding survives an independent web check. The suite's 174 status rows re-evaluate from the raw measurements with zero
+mismatches, `changed_pooled` / `changed_matched` / `unstable_shipped` are all genuinely empty, and "underpowered" is
+the tool's own verdict at a p-floor of 0.10, used correctly. All 15 predeclared compass members reproduce to three
+decimals under my own flip statistic and all 15 are null; AN04B003 is `result` at the exact-U floor in 4/4 arms and
+nothing downstream of it is, so "the report still stops at AN04B003" is exactly right; the GLNO L-R reading -- a
+standing asymmetry of the pinned protocol's bump position, not a turn signal -- is correct and I confirmed its wiring
+premise (GLNO_L reads and writes only the somaSide-R PENs, which fire 61.8 against 39.6 Hz under the wedge-0-3 pulse).
+The provenance chain holds: the predeclaration precedes every run, the reducer is unchanged from stamp to analysis,
+arm C of family `level` is byte-equivalent under the shipped working tree and HEAD, and no other thread's opt-in token
+was active in any of the 16 runs. What comes off is secondary: one off-by-one bit-identical count, a summary table
+that does not sum to its own totals, one mislabelled "deterministic" row, a receptor-model gloss that is false outside
+the shipped mode, a "never silent" hedge that hides ExR8's silencing, an unsourced submission timestamp, and one
+reading-list gloss that overstates `cx_glno.md`. None of these touches the adoption question, and the adoption wording
+itself -- suite half met under the round-2 rule, rate half not run, source standard not met, "sign GLNO -1" being the
+real decision -- is the most careful part of the document.
+
+**What rounds 5A and 5B jointly say about the compass and GLNO.** Taken together the two threads turn the GLNO sign
+from an open question into a `null` with a known mechanism, and leave the compass's real failure where 5A found it.
+5A establishes that at the shipped gains no type-level change reachable from the data -- the GLNO relabel included --
+makes the ring hold a bump, because PEN sits 11-16 mV below threshold under ExR6 / ER6 and the relabel is therefore
+inert (`bump_survival_s` 0.00 in 4/4 seeds, a structural zero-SD null); the only configuration that carries a bump at
+those gains is the removal of a global hand rule, which is a labelled instrument, not a mechanism, and which the
+correct GLNO sign then destroys. 5B runs the same candidate on the one instrument where a signed GLNO can act (gE 2 /
+gD 15, body attached, leg cycle on, DNa02 driven) and finds the effect is entirely on rates -- ring -5 to -17 %, FB4Y
+-31 %, FB1C -68 %, ExR8 silenced, GLNO's standing L-R compressed 86-88 % -- with every predeclared flip and the bump
+drift `null` at 4 v 4, and with the signed self-turn report still terminating at AN04B003 (`result`, -11 Hz, p at the
+0.0286 floor, 4/4 arms) and `null` at PS196_b, GLNO, PEN and EPG. The joint reading is therefore: GLNO's transmitter is
+a **rate** parameter of the ring, not a **signal** parameter, and it is a parameter the fast model cannot even name,
+since glutamate and gaba produce a bit-identical W and, under the shipped receptor model, an identical model
+everywhere. The compass gap (`compass.wedge_cells_persisting` 0, KNOWN GAP in all six draws of both arms) is untouched
+by it in both threads, and the self-turn report's break is upstream, at a PS196_b whose input to GLNO is symmetric in
+both turn directions -- which is a body-model question, not a transmitter one. On the decision itself the two threads
+now agree with one correction: the adoption is **adoptable by the suite half of the round-2 rule and by nothing else**,
+the room rate-half is unrun, the source standard of the three existing `TYPE_NT_OVERRIDE` entries is unmet, and the
+"hemibrain name" 5A counted as one of three sources is not a source at all -- leaving two low-confidence EM classifiers
+calling glutamate and a third calling GABA, all three agreeing only that GLNO is inhibitory.
+
+### Refuted
+
+**R1. "17 of the 29 checks are bit-identical between the arms in every draw" (4.1; Report `key_claims`) -- it is 16.**
+Recomputed from the six suite JSONs: exactly 16 checks have identical `measured` in all six draws -- `rest.spikes_per_step`,
+`taste.MN9_hz`, `smell.PN_hz`, `smell.KC_active`, `dn.DNa02_L_leg_asym_hz`, `dn.MDN_top_hz`, `dn.DNp09_top_hz`,
+`walk.GF_max_hz`, `walk.power_max_hz`, `walk.power_sustained_hz`, `loom.escape_cm`, `motion.correct_directions`,
+`loom_escape.escapes`, `bitter.calibrated_sugar_MN9_hz`, `bitter.calibrated_sugar_bitter_MN9_hz`,
+`compass.wedge_cells_persisting`. The audit's own parenthetical ("rest, taste, smell, dn, the walk triple, loom.escape,
+motion.correct_directions, loom_escape.escapes, calibrated bitter, compass") enumerates exactly those 16, so the count
+contradicts its own list. The partition is 16 bit-identical + 2 deterministic-and-moved + 11 with run scatter = 29.
+*Second point on the same sentence:* `guard_suites_r3.md` caveat 1 says in terms that **"bit-identical" is a CPU claim
+under the project rule** and that nothing from a GPU batch is a bit-identity claim. These six draws are B200.
+(files: `out/cx5b/fam_suite/suite_{shipped,glu}_{1,2,3}.json`)
+
+**R2. "three deterministic sections move" (4.1, twice; Report `key_claims`) -- only two of the three are deterministic.**
+`motion.min_dsi` is *not* constant within either arm: shipped 0.241096598 / 0.241096418 / 0.241096508, glutamate
+0.240637408 / 0.240637263 / 0.240637408. The other two are exactly constant in both arms (139.89849777 x3 -> 135.15008698
+x3; 0.81783977 x3 -> 0.98794834 x3). The min_dsi *shift* is real and large against its own scatter (-4.59e-4 against a
+within-arm SD of ~1.8e-7, a factor ~2,500), so the finding stands; the word "deterministic" does not.
+(file: same six JSONs)
+
+**R3. The tail row of the section 1.3 by-post-type table does not sum, under any reading.**
+The row reads `| FB1H 2 / 21, LNO2 3 / 11, AN27X013 2 / 8, PFNa 6 / 8, PVLP060 1 / 6, PFNd 4 / 6, LCNOpm 3 / 6,
+DNpe023 2 / 5, and 44 further types at 1-4 synapses (...) | 62 | 96 | 0.5 % |`. Recomputed: GLNO's output reaches **58**
+postsynaptic types. The seven rows named above it are 137 entries / 17,559 synapses. The whole tail is therefore
+**51 types, 76 entries, 139 raw synapses, 0.79 %** of GLNO's output -- not 62 / 96 / 0.5 %. Splitting it the other way:
+the 8 explicitly listed types are 23 entries / 71 synapses, leaving **43** further types (not 44) at 53 entries /
+68 synapses, max 4 synapses each. As printed the table's entries column sums to 199 (not 213) and its synapse column to
+17,655 (not 17,698). The generated file `out/cx5b/entry_compare.{json,md}` has all 58 rows correctly; the defect is in
+the hand-rolled summary row only.
+
+**R4. `key_claims` "53 further types at <= 21 syn" -- it is 51.** 58 post types minus the 7 named ahead of it
+(`PEN_a`, `PEN_b`, `ExR8`, `GLNO`, `FB4Y`, `FB1C`, `FB4M`). The "<= 21 syn" bound is right (FB1H 21 is the largest).
+
+**R5. Section 1.4's gloss "the glutamate / gaba choice is invisible to the present receptor table (it would become
+visible only if a PEN or FB row with an excitatory glutamate call were added)" is false as stated.**
+What is true -- and *stronger* than the audit claims -- is that `receptor_signs(...).fast_sign` is identical between the
+glutamate and the gaba cache on **all 25,578,600 entries**, under both `abs` and `class`, so under the shipped
+`receptor_model='sign'` the two labels are the same model everywhere, not merely on the 213. But the table is not blind
+to the difference on those same 213 entries:
+
+| resolved field | entries of the 213 that differ glutamate vs gaba | which |
+|---|---|---|
+| `fast_sign` | 0 | -- |
+| `fast_gain` | **35** | FB1C 14, FB4M 11, FB2A 4, ExR2 2, FB1H 2, ER4m 1, OA-VUMa1 1 (glutamate `high` = x1.5 vs gaba `mid` = x1.0 under `brain.DEFAULT_RECEPTOR_GAIN`) |
+| `slow_sign` | 3 | EPG x2 and ER4m x1 (glutamate 0 vs gaba -1) |
+| `slow_gain` | 57 | FB4Y 16, FB1C 14, FB4M 11, PFNd 4, FB2A 4, EPG 2, ExR2 2, FB1H 2, ER4m 1, OA-VUMa1 1 |
+
+So under `receptor_model='sign+gain'` or `'full'` the candidate is **not** the gaba cache's model. Two further errors in
+the same parenthetical: FB rows with a non-inhibitory glutamate net already exist (`FB4Y`, `FB1C`, `FB4M`, `FB1H` all
+carry `fast_net = mixed` for glutamate), and the table already holds **160 of 613** types whose glutamate `fast_sign` is
++1 under the class rule (14 under `abs`) -- nothing would need to be "added". The reason the 213 come out -1 is not that
+the table cannot express the distinction; it is that no GLNO target happens to be one of those 160. *Onto PEN
+specifically* the claim does hold under every mode: the `PEN_a(PEN1)` and `PEN_b(PEN2)` glutamate and gaba rows carry the
+same `fast_sign` -1, the same `fast_gain_class` `high`, the same `fast_sign_abs` and the same slow columns (they differ
+only in the lead gene, `GluClalpha` vs `Rdl`), so all 84 PEN edges are identical under `sign`, `sign+gain` and `full`.
+This matters for the 5A cross-check: thread 5A ran `sign+gain` arms (C / CF / CFG) with the same relabel, and the
+"indistinguishable" statement does not carry into them.
+(files: `flyverse/data/receptors_by_type.csv`, `flyverse/brain.py` `DEFAULT_RECEPTOR_GAIN`, both caches)
+
+**R6. "never silent for a firing cell" (4.2 rates paragraph) conceals the one type the relabel silences.**
+`ExR8` at the experiment gains: shipped L 0.86 / R 0.00 Hz, max single cell 2.14 Hz; glutamate **L 0.00 / R 0.00 Hz,
+max single cell 0.00 Hz in all four runs**. ExR8 is GLNO's third-largest target (8 entries, 435 synapses, 2.5 % of its
+output). The audit prints "ExR8 0.4 -> 0.0" in the same sentence as the hedge, so the number is on record, but the
+parenthetical reads as a denial of exactly the event that occurred. (`analysis.md` 2.2's "never 'silent' for a cell with
+nonzero firing" is a tautology and should not be carried into the prose.)
+(files: `out/cx5b/fam_c*/compass_{shipped,glu}_exp_r*_rest.npz`)
+
+**R7. "stamped 2026-09-15T05:35:08Z, before the 05:35:20Z submission" (section 2) -- 05:35:20Z is in no file.**
+`predeclared.json.stamped_utc`, `tree_state.json.when`, `jobs.json.written_utc` and `submit_tree.txt` all read
+**05:35:08Z**, and `submit_tree.txt`'s own first line is `submitted 2026-09-15T05:35:08Z` -- the same second as the
+stamp, not 12 s after it. `out/cx5b_cluster.log` carries elapsed seconds only, no wall clock, and there is no
+`scheduler_receipt.json` in `out/cx5b/` (thread 5A's batch has one; this one does not). The ordering that *is* in the
+record is: stamp 05:35:08Z < earliest `glno_relabel.started_utc` **05:35:33Z** (six suite jobs and four compass jobs at
+05:35:33-36Z). That is a real precedence and it should be the one quoted. (Note this also means the predeclaration and
+the submission share a timestamp to the second: they were written by the same `plan` invocation seconds apart, which is
+fine, but it is not what "before the 05:35:20Z submission" says.)
+
+**R8. The "Read first" gloss "cx_glno.md ... section 3 for the round-2 finding that a glutamatergic / GABAergic GLNO
+abolishes the bump at gE 1.75 in 6/6 seeds" overstates its source.** `cx_glno.md`'s gE 1.75 / gD 15 rows are **three**
+seeds (0, 1, 2), `glu` 0/3 persisting; the only six-seed row at gE 1.75 in that audit is gD **8**, where `gaba` is
+confined in 4/6 seeds and persists in 3/6 (bump 148-155 Hz in three of them). The audit's own section 1.3 phrasing
+("lost at gE 1.75 / gD >= 15") is accurate; the header line is not.
+
+---

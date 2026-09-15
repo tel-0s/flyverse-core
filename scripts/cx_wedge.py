@@ -508,12 +508,22 @@ def rate_grid(c, cells, gEs, gDs, delta7_pen, log=print, **kw):
 
 def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, pulse_hz=40.0, start_wedge=0, width=4, seed=0,
              thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, gR=1.0, verbose=True,
-             receptor_model=None, receptor_net_rule="class", nt_override=None):
+             receptor_model=None, receptor_net_rule="class", nt_override=None,
+             lif_overrides=None, ledger=False, arm=None, block=None, device=None, ledger_npz=None):
     """FlyBrain on the full connectome; drive `width` contiguous wedges (of 16) of the EPG ring from `start_wedge`;
     report persistence and confinement after the pulse. receptor_model / receptor_net_rule thread
     LIFParams.receptor_model (the optional receptor-expression sign stage); nt_override is recorded in the row (the
     connectome `c` must already carry it, see load_connectome). GLNO (the 4 LAL-NO1 cells, 19 % of PEN's raw input,
-    transmitter unknown) is reported alongside PEN / Delta7."""
+    transmitter unknown) is reported alongside PEN / Delta7.
+
+    Thread 5A additions (docs/audits/compass_ring_mechanism.md; every default keeps the previous behaviour):
+    lif_overrides = extra LIFParams fields ({'conn_cap': 0, 'same_type_gain': 1, ...}; `--lif KEY=VALUE`), recorded in
+    the row; ledger = record the EPG per 10 ms frame (probe_unitary's loop) and score it with
+    probe_compass_room.bump_frames into the ledger rows compass.EPG.bump_survival_s / bump_rate_hz / bump_width_wedges
+    (+ frac_confined_post), with `common.provenance` and the realised device in the row and the per-frame record in
+    `ledger_npz` (survival = end of the last confined post-pulse frame minus the pulse end, so a bump confined through
+    the whole free period scores exactly `seconds`); arm / block are labels carried into the row; device is passed to
+    FlyBrain."""
     from flyverse.fly import FlyBrain
     log = print if verbose else (lambda *a, **k: None)
     epg = cells["EPG"]
@@ -530,9 +540,9 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                                                     (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD),
                                                     (RING_RE, r"^(EPG$|PEN_|PEG$)", gR)]
         params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=tpg,
-                                 receptor_model=receptor_model, receptor_net_rule=receptor_net_rule)
+                                 receptor_model=receptor_model, receptor_net_rule=receptor_net_rule, **(lif_overrides or {}))
         t0 = time.time()
-        fb = FlyBrain(c, lif_params=params, seed=seed, cuda_graphs=cuda_graphs)
+        fb = FlyBrain(c, lif_params=params, seed=seed, cuda_graphs=cuda_graphs, device=device)
         # background: FlyBrain.stimulate pulses expire, so hold the background as a long pulse (as the grid did)
         total_ms = (1.0 + pulse_s + seconds) * 1000
         fb.stimulate(idx_epg, background_hz, total_ms + 100)
@@ -556,26 +566,103 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                    width=width, seed=seed, n_in=int(inside.sum()), n_out=int((~inside).sum()),
                    receptor_model=receptor_model, receptor_net_rule=receptor_net_rule if receptor_model else None,
                    nt_override=dict(nt_override or {}), n_glno=int(len(glno_idx)),
-                   glno_nt=sorted(set(c.neurons.nt.to_numpy()[glno_idx].tolist())))
-        fb.step(1000.0)                                             # 1 s settle on background
-        row.update(sample("pre"))
-        fb.stimulate(idx_epg[inside], background_hz + pulse_hz, pulse_s * 1000)
-        fb.step(pulse_s * 1000)
-        row.update(sample("during"))
-        t = 0.0
+                   glno_nt=sorted(set(c.neurons.nt.to_numpy()[glno_idx].tolist())),
+                   lif_overrides=dict(lif_overrides or {}), arm=arm, block=block, device=str(fb.brain.device))
         marks = (0.5, 1.0, 2.0, 3.0, 5.0)
-        for mark in marks:
-            fb.step((mark - t) * 1000); t = mark
-            row.update(sample(f"t{mark}"))
+        if not ledger:
+            fb.step(1000.0)                                             # 1 s settle on background
+            row.update(sample("pre"))
+            fb.stimulate(idx_epg[inside], background_hz + pulse_hz, pulse_s * 1000)
+            fb.step(pulse_s * 1000)
+            row.update(sample("during"))
+            t = 0.0
+            for mark in marks:
+                fb.step((mark - t) * 1000); t = mark
+                row.update(sample(f"t{mark}"))
+        else:
+            # per-10-ms-frame record of the EPG (probe_unitary's loop), the same samples at the same instants
+            import probe_compass_room as pcr
+            from flyverse.interp import common
+            settle_s = 1.0
+            frames = int(round(total_ms / 10.0))
+            rec_epg = np.zeros((frames, len(idx_epg)), np.float32)
+            grp = {"PEN": pen_idx, "Delta7": d7_idx, "PEG": peg_idx, "Ring": ring_idx, "GLNO": glno_idx, "rest": others}
+            rec_grp = {k: np.zeros(frames, np.float32) for k in grp}
+            tt = np.arange(frames) * 0.01                                 # frame start; rates are read at the frame end
+            t_end = tt + 0.01
+            sample_at = {int(round(settle_s / 0.01)) - 1: "pre", int(round((settle_s + pulse_s) / 0.01)) - 1: "during"}
+            for mark in marks:
+                k = int(round((settle_s + pulse_s + mark) / 0.01)) - 1
+                if 0 <= k < frames:
+                    sample_at[k] = f"t{mark}"
+            pulsed = False
+            for k in range(frames):
+                if not pulsed and tt[k] >= settle_s - 1e-9:
+                    fb.stimulate(idx_epg[inside], background_hz + pulse_hz, pulse_s * 1000)
+                    pulsed = True
+                fb.step(10.0)
+                rec_epg[k] = fb.brain.rates(idx_epg)
+                for g, gi in grp.items():
+                    rec_grp[g][k] = fb.brain.mean_rate(gi)
+                if k in sample_at:
+                    row.update(sample(sample_at[k]))
+            for mark in marks:                                            # a free period shorter than 5 s: fill the missing marks
+                for key in ("in_mean", "out_mean", "in_above", "out_above", "pen", "delta7", "peg", "rest", "ring", "glno", "glno_cells",
+                            "wedge_profile", "vector_strength", "centre_wedge"):
+                    row.setdefault(f"t{mark}_{key}", None)
+            b = pcr.bump_frames(rec_epg, wedge_of)
+            pre = tt < settle_s; during = (tt >= settle_s) & (tt < settle_s + pulse_s); post = tt >= settle_s + pulse_s
+            conf = b["confined"]
+
+            def mean_if(x, m):
+                mm = m & np.isfinite(x)
+                return float(np.mean(x[mm])) if mm.any() else float("nan")
+            last = np.flatnonzero(conf & post)
+            survival = float(t_end[last[-1]] - (settle_s + pulse_s)) if len(last) else 0.0
+            m = {"frac_confined_pre": float(conf[pre].mean()), "frac_confined_during": float(conf[during].mean()),
+                 "frac_confined_post": float(conf[post].mean()), "survival_s": survival,
+                 "bump_hz_post": mean_if(b["bump_hz"], post & conf), "out_hz_post": mean_if(b["out_hz"], post & conf),
+                 "width_half_post": mean_if(b["width_half"], post & conf), "width_22_post": mean_if(b["width_22"], post & conf),
+                 "vs_post_all": mean_if(b["vs"], post), "vs_post_confined": mean_if(b["vs"], post & conf),
+                 "epg_in_mean_post": float(rec_epg[post][:, inside].mean()), "epg_out_mean_post": float(rec_epg[post][:, ~inside].mean()),
+                 "epg_in_mean_during": float(rec_epg[during][:, inside].mean()), "epg_out_mean_during": float(rec_epg[during][:, ~inside].mean()),
+                 "epg_max_post": float(rec_epg[post].max()), "epg_mean_pre": float(rec_epg[pre].mean()),
+                 **{f"{g}_mean_post": float(v[post].mean()) for g, v in rec_grp.items()},
+                 **{f"{g}_mean_during": float(v[during].mean()) for g, v in rec_grp.items()},
+                 **{f"{g}_mean_pre": float(v[pre].mean()) for g, v in rec_grp.items()},
+                 "in_above_end": int((rec_epg[-1][inside] > thresh_hz).sum()), "out_above_end": int((rec_epg[-1][~inside] > thresh_hz).sum()),
+                 "frames": int(frames), "frame_s": 0.01}
+            led = {"compass.EPG.bump_survival_s": {"value": survival, "op": ">=", "bound": 5.0, "status": "PASS" if survival >= 5.0 else "FAIL"}}
+            for key, val, lo, hi in (("compass.EPG.bump_rate_hz", m["bump_hz_post"], 5.0, 60.0), ("compass.EPG.bump_width_wedges", m["width_half_post"], 2.5, 5.0)):
+                st = "NOT_APPLICABLE" if survival < 5.0 else ("PASS" if (np.isfinite(val) and lo <= val <= hi) else "FAIL")
+                led[key] = {"value": val, "op": "range", "bound": [lo, hi], "status": st, "requires": "compass.EPG.bump_survival_s"}
+            row["metrics"] = m; row["ledger"] = led
+            row["wedge_profile_post"] = [float(rec_epg[post][:, wedge_of == w].mean()) for w in range(16)]
+            row["wedge_profile_end"] = [float(rec_epg[-1][wedge_of == w].mean()) for w in range(16)]
+            row["provenance"] = common.to_jsonable(common.provenance(
+                c, fb.brain.p, getattr(fb.optic, "p", None), fb=fb, device=device, seeds=[seed],
+                stimulus={"protocol": "cx_wedge.simulate (ledger)", "params": {"gE": gE, "gD": gD, "gR": gR, "delta7_pen": delta7_pen,
+                          "background_hz": background_hz, "pulse_hz": pulse_hz, "pulse_s": pulse_s, "seconds_after": seconds, "width": width,
+                          "start_wedge": start_wedge, "settle_s": settle_s, "nt_override": dict(nt_override or {}),
+                          "lif_overrides": dict(lif_overrides or {}), "receptor_model": receptor_model, "receptor_net_rule": receptor_net_rule},
+                          "control": "arm shipped (gE 1 / gD 1, LIFParams() on the shipped cache)"}))
+            if ledger_npz:
+                Path(ledger_npz).parent.mkdir(parents=True, exist_ok=True)
+                np.savez_compressed(ledger_npz, t=tt, epg=rec_epg, wedge_of=wedge_of, inside=inside, **{f"g__{k}": v for k, v in rec_grp.items()})
+                row["ledger_npz"] = str(ledger_npz)
+            log(f"ledger: confined pre {m['frac_confined_pre']:.2f} post {m['frac_confined_post']:.2f}, survival {survival:.2f} s, bump {m['bump_hz_post']:.1f} Hz, "
+                f"width {m['width_half_post']:.1f}; {[(k, v['status']) for k, v in led.items()]}; device {row['device']}")
         row["wall_s"] = round(time.time() - t0, 1)
 
         def fmt(tag):
             return (f"in {row[f'{tag}_in_mean']:.1f} ({row[f'{tag}_in_above']}/{row['n_in']}) out {row[f'{tag}_out_mean']:.1f} "
                     f"({row[f'{tag}_out_above']}/{row['n_out']}) PEN {row[f'{tag}_pen']:.1f} D7 {row[f'{tag}_delta7']:.1f} GLNO {row[f'{tag}_glno']:.1f} R {row[f'{tag}_ring']:.1f} vs {row[f'{tag}_vector_strength']:.2f}")
+        have = [m for m in marks if row.get(f"t{m}_in_mean") is not None]
         log(f"gE {gE} gD {gD} gR {gR} (D7->PEN {'x gD' if delta7_pen else 'x1'}, bg {background_hz} Hz, width {width}, seed {seed}, "
-            f"receptor {receptor_model or 'off'}{'/' + receptor_net_rule if receptor_model else ''}, GLNO nt {row['glno_nt']}): pre {fmt('pre')}; "
-            f"during {fmt('during')}; " + "; ".join(f"{m}s {fmt(f't{m}')}" for m in marks)
-            + f"; PEG {row['t5.0_peg']:.1f} rest {row['t5.0_rest']:.2f} Hz; {row['wall_s']} s")
+            f"receptor {receptor_model or 'off'}{'/' + receptor_net_rule if receptor_model else ''}, GLNO nt {row['glno_nt']}, "
+            f"lif {row['lif_overrides']}, arm {arm}): pre {fmt('pre')}; "
+            f"during {fmt('during')}; " + "; ".join(f"{m}s {fmt(f't{m}')}" for m in have)
+            + (f"; PEG {row['t5.0_peg']:.1f} rest {row['t5.0_rest']:.2f} Hz" if row.get("t5.0_peg") is not None else "") + f"; {row['wall_s']} s")
         out.append(row)
         del fb
         import torch; torch.cuda.empty_cache()
@@ -631,9 +718,20 @@ def main():
                          "type's sign-0 cells) into the scratch cache out/cache_<hash>/, e.g. --nt-override GLNO=glutamate")
     ap.add_argument("--scratch-cache", action="store_true",
                     help="compile into out/cache_<hash>/ even without --nt-override (a cluster whose shared cache predates TYPE_NT_OVERRIDE)")
-    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full"],
-                    help="LIFParams.receptor_model for the simulation (default off = the presynaptic NT_SIGN rule)")
+    ap.add_argument("--receptor-model", default="off", choices=["off", "sign", "sign+gain", "full", "shipped"],
+                    help="LIFParams.receptor_model for the simulation (default off = the presynaptic NT_SIGN rule; 'shipped' = LIFParams()'s "
+                         "receptor_model AND receptor_net_rule, i.e. the shipped default)")
     ap.add_argument("--receptor-net-rule", default="class", choices=list(connectome.RECEPTOR_NET_RULES))
+    # thread 5A (docs/audits/compass_ring_mechanism.md): new flags only, every default unchanged
+    ap.add_argument("--lif", action="append", default=None, metavar="KEY=VALUE",
+                    help="repeatable LIFParams override for the simulation (JSON / literal values), e.g. --lif conn_cap=0 --lif same_type_gain=1")
+    ap.add_argument("--ledger", action="store_true",
+                    help="record the EPG per 10 ms frame and score the ledger rows compass.EPG.* (probe_compass_room.bump_frames) with provenance")
+    ap.add_argument("--ledger-npz", default=None, help="--ledger: per-frame record path (default <sim-out stem>_gE<gE>_gD<gD>_s<seed>.npz)")
+    ap.add_argument("--arm", default=None, help="label recorded in every row")
+    ap.add_argument("--block", default=None, help="scheduling-block token recorded in every row (cluster_run --arm-block fam reads fam_<x> from the command)")
+    ap.add_argument("--device", default=None, help="FlyBrain device (default: auto)")
+    ap.add_argument("--pulse-s", type=float, default=2.0, help="pulse duration (s)")
     a = ap.parse_args()
     out_dir = Path(a.out)
     if (a.nt_override or (a.receptor_model and a.receptor_model != 'off')) and Path(a.out).resolve() == AUDIT_DIR.resolve() and not a.no_structure:
@@ -650,6 +748,16 @@ def main():
         m = c.neurons.type.fillna("") == t
         print(f"  {t}: {int(m.sum())} cells, nt {c.neurons.nt[m].value_counts().to_dict()}, sign {c.neurons.sign[m].value_counts().to_dict()}")
     receptor_model = None if a.receptor_model == "off" else a.receptor_model
+    receptor_net_rule = a.receptor_net_rule
+    if a.receptor_model == "shipped":
+        receptor_model, receptor_net_rule = brain.LIFParams().receptor_model, brain.LIFParams().receptor_net_rule
+    lif_overrides = None
+    if a.lif:
+        from flyverse.interp import common
+        lif_overrides = common.parse_kv(a.lif)
+        bad = sorted(set(lif_overrides) - set(brain.LIFParams.__dataclass_fields__))
+        if bad:
+            raise SystemExit(f"--lif: unknown LIFParams fields {bad}")
     if a.no_structure:
         cells = compass_cells(c)
     else:
@@ -663,9 +771,15 @@ def main():
                 json.dump(rows, f, indent=1)
     if a.sim is not None:
         gains = [tuple(float(x) for x in g.split(":")) for g in a.sim] or [(1.0, 1.0)]
-        rows = simulate(c, cells, gains, seconds=a.seconds, background_hz=a.background, pulse_hz=a.pulse_hz, start_wedge=a.start_wedge, width=a.width,
-                        seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen, gR=a.ring_gain,
-                        receptor_model=receptor_model, receptor_net_rule=a.receptor_net_rule, nt_override=nt_override)
+        rows = []
+        for gE, gD in gains:
+            npz = None
+            if a.ledger:
+                npz = a.ledger_npz or (str(Path(a.sim_out).with_suffix("")) + f"_gE{gE:g}_gD{gD:g}_s{a.seed}.npz" if a.sim_out else None)
+            rows += simulate(c, cells, [(gE, gD)], seconds=a.seconds, pulse_s=a.pulse_s, background_hz=a.background, pulse_hz=a.pulse_hz,
+                             start_wedge=a.start_wedge, width=a.width, seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen,
+                             gR=a.ring_gain, receptor_model=receptor_model, receptor_net_rule=receptor_net_rule, nt_override=nt_override,
+                             lif_overrides=lif_overrides, ledger=a.ledger, arm=a.arm, block=a.block, device=a.device, ledger_npz=npz)
         if a.sim_out:
             path = Path(a.sim_out)
             old = json.load(open(path)) if path.exists() else []
