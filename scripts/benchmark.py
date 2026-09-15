@@ -164,6 +164,27 @@ class Context:
         self.checks = []
         self.results = {}
         self.runtime = {}
+        self.controllers = []
+
+    def new_brain(self, c, p, **kwargs):
+        """Keep the plain path unchanged; instrumented legacy probes use the real module scheduler."""
+        instruments = getattr(self.args, 'instrument', [])
+        draw_seed = getattr(self.args, 'draw_seed', None)
+        if draw_seed is not None:
+            kwargs['seed'] = draw_seed
+        from flyverse.interp.common import provenance
+        if not instruments:
+            b = brain.Brain(c, p, **kwargs)
+            record = provenance(c, lif=p, device=b.device, seeds=[kwargs.get('seed', 0)],
+                                stimulus={'name':'benchmark legacy Brain probe', 'motion_input':'zero'})
+            record['preset'] = getattr(self.args, 'preset', 'raw')
+            self.controllers.append(record)
+            return b
+        from instrumented_benchmark import InstrumentedBenchmarkBrain
+        b = InstrumentedBenchmarkBrain(c, p, preset=self.args.preset, instruments=instruments, **kwargs)
+        self.controllers.append(provenance(c, fb=b.fb, seeds=[kwargs.get('seed', 0)],
+                                           stimulus={'name':'benchmark legacy Brain probe', 'motion_input':'zero'}))
+        return b
 
     # ---- parameters (CLI overrides reach every section, the demo Sims through the patched factories)
     @property
@@ -278,7 +299,15 @@ class Context:
         import room_demo as rd
         flags = dict(cuda_kernels=True, cuda_graphs=True, event_driven=True, cuda_sparse="warp") if self.native else {}
         with self.patched_params():
-            return rd.Sim(seed, trail_seconds=0.0, **flags, **kw)
+            draw_seed = getattr(self.args, 'draw_seed', None)
+            seed = seed if draw_seed is None else draw_seed
+            sim = rd.Sim(seed, trail_seconds=0.0, preset=getattr(self.args, 'preset', 'raw'),
+                         instruments=getattr(self.args, 'instrument', []), **flags, **kw)
+            if getattr(self.args, 'instrument', []):
+                from flyverse.interp.common import provenance
+                self.controllers.append(provenance(sim.c, fb=sim.fb, seeds=[seed],
+                                                   stimulus={'name':'benchmark room probe','motion_input':'body yaw_rate'}))
+            return sim
 
     def free(self, *objs):
         del objs
@@ -320,7 +349,7 @@ def lr_flip(rec, runs, t, a, b, skip_s=3.0):
 
 # ------------------------------------------------------------------------------------------------ legacy sections
 def sec_rest(ctx):
-    b = brain.Brain(ctx.c, ctx.lif()); b.run_ms(500)
+    b = ctx.new_brain(ctx.c, ctx.lif()); b.run_ms(500)
     res = {"spikes_per_step": float(b.total_spikes())}
     ctx.report("rest.spikes_per_step", res["spikes_per_step"])
     print(f"rest      spikes/step {res['spikes_per_step']:.0f}")
@@ -333,7 +362,7 @@ def sec_taste(ctx):
     taste = pd.read_csv(os.path.join(os.path.dirname(__file__), "..", "flyverse", "data", "taste_grns.csv"))
     sweet = c.index_of(taste.bodyId[taste.taste == "sweet"].to_numpy())
     sweet = sweet[np.isin(n.subclass.to_numpy()[sweet], ["labellar bristle", "taste peg"])]
-    b = brain.Brain(c, ctx.lif()); b.set_poisson(sweet, 100.0); b.run_ms(600); rt = b.rate_np()
+    b = ctx.new_brain(c, ctx.lif()); b.set_poisson(sweet, 100.0); b.run_ms(600); rt = b.rate_np()
     res = {"MN9_hz": float(rt[c.select(type="MN9")].mean()), "GNG175_hz": float(rt[c.select(type="GNG175")].mean()),
            "frac_active": float((rt > 1).mean()), "top": top_types(c, rt)}
     ctx.report("taste.MN9_hz", res["MN9_hz"])
@@ -345,7 +374,7 @@ def sec_taste(ctx):
 def sec_smell(ctx):
     c = ctx.c
     olf = olfaction.Olfaction(c, [("apple", (0.25, 0.15, 0.79), 1.0)])
-    b = brain.Brain(c, ctx.lif()); olf.apply(b, (0.19, 0.15, 0.75)); b.run_ms(800); rt = b.rate_np()
+    b = ctx.new_brain(c, ctx.lif()); olf.apply(b, (0.19, 0.15, 0.75)); b.run_ms(800); rt = b.rate_np()
     pn = c.select(type="~_l2PN|_adPN|_lPN|_lvPN|_ilPN"); kc = c.select(type="~^KC"); ln = c.select(type="~^(lLN|v2LN)")
     res = {"PN_hz": float(rt[pn].mean()), "PN_max_hz": float(rt[pn].max()), "KC_hz": float(rt[kc].mean()),
            "KC_active": int((rt[kc] > 1).sum()), "LN_hz": float(rt[ln].mean()), "frac_active": float((rt > 1).mean()), "top": top_types(c, rt)}
@@ -362,7 +391,7 @@ def sec_dn(ctx):
     wg = motor.wing_groups(c)
     res = {}
     for name, idx in [("DNa02_L", c.select(type="DNa02", somaSide="L")), ("DNp09", c.select(type="DNp09")), ("MDN", c.select(type="MDN"))]:
-        b = brain.Brain(c, ctx.lif()); b.set_poisson(idx, 150.0); b.run_ms(400); rt = b.rate_np()
+        b = ctx.new_brain(c, ctx.lif()); b.set_poisson(idx, 150.0); b.run_ms(400); rt = b.rate_np()
         res[name] = {"legL": float(rt[legL].mean()), "legR": float(rt[legR].mean()), "power": float(rt[wg.power].mean()),
                      "frac": float((rt > 1).mean()), "top": top_types(c, rt)}
         d = res[name]
@@ -385,7 +414,7 @@ def sec_walk(ctx):
     lif = ctx.lif(); rs = brain._receptor(c, lif, with_counts=lif.receptor_model == "full")   # the receptor lookup reaches the rate lobe too
                                                                                      # (with_counts: the "full" slow term needs the per-edge counts)
     ol = optic.OpticLobe(c, r, ctx.optic_params(), receptor=rs, receptor_gain=brain._receptor_gain(lif)); ol.relax()
-    b = brain.Brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
+    b = ctx.new_brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
     fly = body.FlyState(x=-0.3, y=0.0, z=info["table_top_z"], heading=0.0)
 
     def col_rad():
@@ -463,7 +492,7 @@ def sec_motion(ctx):
     r = retina.build_retina(c)
     lif = ctx.lif(); rs = brain._receptor(c, lif, with_counts=lif.receptor_model == "full")
     ol = optic.OpticLobe(c, r, ctx.optic_params(), receptor=rs, receptor_gain=brain._receptor_gain(lif)); ol.relax(); rt = types[ol.rate_idx]
-    b = brain.Brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
+    b = ctx.new_brain(c, lif, receptor=rs); b.freeze(ol.rate_idx)
     if b.p.prune_frozen:
         b.prune(ol.rate_idx)
     subtypes = optic.T4T5
@@ -630,7 +659,7 @@ def sec_bitter(ctx):
     steps = int(ms / 0.5)
     for label, p in settings.items():
         for cond, drive in [("sugar", {"sweet": 100.0}), ("sugar_bitter", {"sweet": 100.0, "bitter": 100.0})]:
-            b = brain.Brain(c, p, seed=0)
+            b = ctx.new_brain(c, p, seed=0)
             for k, hz in drive.items():
                 b.set_poisson(sweet if k == "sweet" else bitter, hz)
             b.step(steps // 3)                                        # settle, then measure the last two thirds
@@ -703,7 +732,7 @@ def sec_compass(ctx):
     wedge = epg[pd.Series(inst[epg]).str.contains(r"_(?:L3|L4|R5|R6)$", regex=True).to_numpy()]   # 12 cells: two PB glomeruli per side
     rest = np.setdiff1d(epg, wedge)
     pen = c.select(type="~^PEN"); d7 = c.select(type="Delta7"); pfl3 = c.select(type="PFL3")
-    b = brain.Brain(c, ctx.lif())
+    b = ctx.new_brain(c, ctx.lif())
     b.set_poisson(wedge, 60.0); b.run_ms(2000); rt = b.rate_np()
     during = {"wedge_hz": float(rt[wedge].mean()), "rest_EPG_hz": float(rt[rest].mean()), "PEN_hz": float(rt[pen].mean()),
               "Delta7_hz": float(rt[d7].mean()), "PFL3_hz": float(rt[pfl3].mean())}
@@ -735,7 +764,12 @@ def sec_hops(ctx):
         raise ValueError("--hops-batch must be >= 1 and --hops-minutes > 0")
     flags = dict(cuda_kernels=True, cuda_graphs=True, event_driven=True, cuda_sparse="torch") if ctx.native else {}   # batches need the torch CSR path
     with ctx.patched_params():
-        sim = BatchSim(B, c=ctx.c, seed=0, seeds=range(B), start=(-0.15, 0.15, 0.75), program="cx", fruit_set="apple", fence=True, **flags)
+        sim = BatchSim(B, c=ctx.c, seed=getattr(ctx.args,'draw_seed',None) or 0, seeds=range(B), start=(-0.15, 0.15, 0.75), program="cx", fruit_set="apple", fence=True,
+                       preset=getattr(ctx.args,'preset','raw'), instruments=getattr(ctx.args,'instrument',[]), **flags)
+    from flyverse.interp.common import provenance
+    draw_seed = getattr(ctx.args, 'draw_seed', None) or 0
+    ctx.controllers.append(provenance(sim.c, fb=sim.fb, seeds=[draw_seed], env_seeds=list(sim.seeds), batch=B,
+                                       stimulus={'name':'benchmark hops', 'program':'cx'}))
     for seed, fly, m in zip(sim.seeds, sim.flies, sim.metabolisms):          # batch_sustain.py's initial headings and energy
         fly.heading = np.random.default_rng(seed).uniform(-np.pi, np.pi); m.energy = 0.9
     flight = sim.flights[0]
@@ -753,7 +787,7 @@ def sec_hops(ctx):
             launches.append([int(i), round((k + 1) * sim.FRAME_MS / 1000, 2), "voluntary"])
     fly_s = B * n * sim.FRAME_MS / 1000
     esc, vol = sim.hops_escape.copy(), sim.hops_voluntary.copy()
-    res = {"batch": B, "minutes": minutes, "frames": n, "fly_s": fly_s, "environment_seeds": list(sim.seeds), "brain_seed": 0,
+    res = {"batch": B, "minutes": minutes, "frames": n, "fly_s": fly_s, "environment_seeds": list(sim.seeds), "brain_seed": draw_seed,
            "protocol": "batch_sustain.py --program cx --fruit apple --fence --energy 0.9 --seed 0 --seeds 0..B-1",
            "flight": {"gf_hz": float(flight.gf_hz), "takeoff_power_hz": float(flight.takeoff_power_hz), "takeoff_hold_s": float(flight.takeoff_hold_s),
                       "landing_refractory_s": float(flight.landing_refractory_s)},
@@ -838,6 +872,9 @@ def main():
     ap.add_argument("--json", type=str, default="", help="write every measured number and the check table to this file")
     ap.add_argument("--fast", action="store_true", help="shorter recordings and one seed (~half the runtime)")
     ap.add_argument("--eager", action="store_true", help="demo sections on the torch path (default: cuda_kernels + cuda_graphs + event_driven + warp CSR)")
+    ap.add_argument('--preset', choices=['raw','instrumented'], default='raw')
+    ap.add_argument('--instrument', action='append', choices=['compass'], default=[])
+    ap.add_argument('--draw-seed', type=int, default=None, help='override every neural seed in this suite draw; omitted preserves original section seeds')
     ap.add_argument("--deterministic", action="store_true",
                     help="torch.use_deterministic_algorithms(True) + cudnn.benchmark off: every op must have a deterministic "
                          "implementation or it raises (the section then reports MISSING with the op in the traceback). "
@@ -879,6 +916,8 @@ def main():
     ap.add_argument("--receptor-gain", default=None,
                     help="gain-class factors of 'sign+gain' / 'full' as low,mid,high (default 0.5,1,1.5); '1,1,1' = the 'sign' fast weights under 'full'")
     args = ap.parse_args()
+    if args.instrument and args.preset != 'instrumented':
+        ap.error('--instrument requires --preset instrumented')
     t_all = time.time()
     det_cfg = {"flag": bool(args.deterministic), "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG")}
     if args.deterministic:
@@ -930,6 +969,7 @@ def main():
               "gf_hz": float(body.Flight().gf_hz), "neurons": int(ctx.c.n),
               "cache_dir": str(ctx.cache_dir or connectome.CACHE_DIR),
               "nt_counts": {k: int(v) for k, v in ctx.c.neurons.nt.value_counts().items()}}
+    config.update(preset=args.preset,instruments=args.instrument,draw_seed=args.draw_seed)
     print("LIF:", config["lif"], " gain_out", op.gain_out_mv, " backend:", config["backend"], " fast:", ctx.fast, flush=True)
     for letter, name, fn in select_sections(args.sections, ctx.fast):
         print(f"\n=== [{letter or '-'}] {name}", flush=True)
@@ -955,6 +995,7 @@ def main():
         os.makedirs(os.path.dirname(args.json) or ".", exist_ok=True)
         with open(args.json, "w") as f:
             json.dump({"config": config, "sections": ctx.results, "checks": ctx.checks, "runtime_s": ctx.runtime, "total_runtime_s": total,
+                       "controllers": ctx.controllers,
                        "date": time.strftime("%Y-%m-%d %H:%M")}, f, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o))
         print("wrote", args.json)
 

@@ -40,6 +40,25 @@ in the round-7 audit; the generated wrapper's draft comment describes its status
 
 ## The inventory
 
+The explicit `compass` candidate adds a continuous heading-memory input through an ordinary module:
+
+```sh
+python scripts/room_demo.py --preset instrumented --instrument compass --cuda-graphs --brain-map
+```
+
+In Python, use `FlyBrain(..., preset="instrumented", instruments=["compass"])` or the same arguments on
+`BatchSim`. Both room implementations feed realized yaw velocity; callers stepping FlyBrain directly must
+call `fb.proprioception(0, 0, 0, False, yaw_rate=rad_per_s)` as motion changes. No other proprioceptive sense
+is required. The input is held until updated; call it with zero on stopping. Full and partial resets and
+checkpoints include the driver. Manual room pose teleports do not constitute sensed turns; phase is arbitrary.
+
+The program holds phase and writes a 50 Hz, 35 degree Gaussian Poisson profile on the 46 biological EPGs.
+These constants and the angular-velocity law are **unverified engineering choices**. It neither changes
+synapses nor sets motor commands; it lacks visual anchoring, tilt compensation and steering/goal memory.
+It is retired when a native circuit passes the same sustained-turn, reversal and stationary-memory checks.
+See [the audit](audits/compass_standin.md) for source reading, validation and candidate/admission status.
+The UI names the preset and instrument; provenance includes its complete law and target IDs. `raw` rejects it.
+
 | instrument | kind | class | stands in for | law | retired by |
 |---|---|---|---|---|---|
 | `sided_turn_afferent` | stop-gap | `instruments.SidedTurnAfferent` | PS196_b's signed turn input: Poisson spikes on its named ascending afferents (AN07B037_a / _b by default; `cells=` CB0675 / GNG580 / PS047_b / all) at `k * max(0, +-yaw_deg_s)` on the side the graph implies. In the shipped body the report reaching PS196_b is unsigned (`audits/vnc_drive.md` 6, NOTES compass round 2); Wang 2026 finding 3 makes PS196_b GLNO's largest non-ring input. | **unverified**: no PS196_b / AN07B037 recording exists (searched 2026-09-15: Wang's audit, Hulse 2021, the two Rockefeller theses). `k` is a declared level, `sign` the HGV- control. | a recording of PS196_b / AN07B037 during turning (then a `mechanism` with a source, or dropped); a sided ascending report that reaches PS196_b on its own; a round-7 `null` on measure 3 at every declared `k` |
@@ -54,7 +73,8 @@ It is a **body-derived** signal (the realised yaw rate), so it lives where the `
 `senses.Proprioception` transducer, as the extra channel `'turn_afferent'` (never part of `'all'`), fed through
 `FlyBrain.proprioception(..., yaw_rate=)` and injected through `FlyBrain._input` like every other sense. A
 `flyverse.modules` module sees neural quantities only, and no neural quantity in this model carries the fly's own turn
-with a sign, so a module would have needed a body -> module channel that does not exist; none was invented.
+with a sign, so this instrument stays in the transducer. The later compass candidate has an explicit held-yaw
+receiver authorized by PRESETS_SPEC section 5; that does not change the afferent's implementation.
 
 **The side, from the graph** (`describe()['routing']`, read from `W[post, pre]` with `somaSide`; raw counts through
 `common.raw_counts` so the sign-0 GLNO -> PEN block counts too). On the shipped cache every hop of the route is

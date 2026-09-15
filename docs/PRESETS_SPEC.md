@@ -69,3 +69,20 @@ Not a licence to tune. An instrument's gain is a declared parameter with a sourc
 as a labelled arm; it never becomes a fitted constant hidden in a default. Not a change to `raw`. Not a way to move a
 suite row: the `raw` column is the one the README reports as the model's own behaviour, and the `instrumented` column
 is reported beside it with the instrument list in the caption.
+
+## 5. Owner extension: imposed compass memory (2026-09-15)
+
+After round 7 and its direct-GLNO follow-up failed to recover heading integration, the owner explicitly
+authorized a simplified program/control arm under `instrumented`. `CompassDriver` is this larger stand-in:
+it supplies angular memory and a continuous EPG Poisson representation, rather than claiming to repair
+a discovered physiological mechanism. Its exact law is **unverified**. The source graph and raw default stay
+unchanged. It is selectable by `instruments=["compass"]`; `instrumented` alone remains empty.
+
+The existing proprioception entry point may forward its held `yaw_rate` to an explicitly named instrument's
+`observe_turn` receiver. The compass receives no body object, absolute heading, visual landmark, goal or
+motor command. Its neural output, stepping, checkpoint and reset use the ordinary module interface. This
+extends the earlier round-7 clarification; `SidedTurnAfferent` still lives in its original sense transducer.
+
+Admission checks and the distinction between an experimental option and default adoption are recorded in
+[audits/compass_standin.md](audits/compass_standin.md). A functional phase-tracking pass does not establish
+food finding, circuit recovery, or permission to change the raw model's constants.

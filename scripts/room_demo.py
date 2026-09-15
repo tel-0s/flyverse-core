@@ -89,7 +89,8 @@ class Sim:
                  wind_speed=0.3, wind_dir=180.0, cuda_graphs=False, weight_dtype="float32",
                  sensory_cuda_graphs=None, program="none", escape_gating=False, dt_by_module=None, prune_frozen=True,
                  fruit_set="all", fence=False,
-                 cuda_kernels=None, event_driven=None, cuda_sparse="torch", cuda_compact=True, receptor_model="default"):
+                 cuda_kernels=None, event_driven=None, cuda_sparse="torch", cuda_compact=True, receptor_model="default",
+                 preset="raw", instruments=None):
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
@@ -101,7 +102,7 @@ class Sim:
             lif_kw["receptor_model"] = None if receptor_model == "off" else receptor_model
         self.fb = FlyBrain(seed=seed, lif_params=brain.LIFParams(**lif_kw),
                            optic_params=optic.OpticParams(dt_ms=optic_dt), cuda_graphs=cuda_graphs, cuda_kernels=cuda_kernels,
-                           cuda_sparse=cuda_sparse, cuda_compact=cuda_compact)
+                           cuda_sparse=cuda_sparse, cuda_compact=cuda_compact, preset=preset, instruments=instruments)
         self.c, self.r, self.optic, self.brain = self.fb.c, self.fb.retina, self.fb.optic, self.fb.brain
         if self.brain.cuda and self.optic is not None:
             self.optic.diagnostics = False  # the UI samples contrast only when drawing
@@ -296,6 +297,8 @@ class Sim:
         self.fb.smell(*self.smell_values)
         self.fb.wind(*self.air.deflections(self.fly.forward, self.fly.left))
         self.fb.taste(self.tasting)
+        if 'proprioception' in self.fb.available_senses:
+            self.fb.proprioception(0., 0., 0., self.fly.airborne, yaw_rate=self.fly.yaw_rate)
         self.fb.step(FRAME_MS)
         motor = self.fb.motor()
         self.cmd = self.loco.readout(motor, dt_s=FRAME_MS / 1000)
@@ -376,6 +379,8 @@ def main():
     ap.add_argument("--fence", action="store_true", help="test fixture: the fly cannot leave the table top by walking or hopping (scores foraging without the escape problem)")
     ap.add_argument("--program", default="none",
                     help="hand-designed behaviour program between the brain and the body (flyverse/programs.py): none | anemotaxis | klinotaxis | cx, or a+b to compose; default none, the plain model")
+    ap.add_argument('--preset', choices=['raw', 'instrumented'], default='raw', help='raw brain or explicitly named experimental instruments')
+    ap.add_argument('--instrument', action='append', choices=['compass'], default=[], help='opt-in stand-in; requires --preset instrumented; repeatable')
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
     ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames and sensory ray tracing on CUDA")
     ap.add_argument("--cuda-kernels", action=argparse.BooleanOptionalAction, default=None,
@@ -403,6 +408,8 @@ def main():
     ap.add_argument("--wind-speed", type=float, default=0.3, help="m/s (0 = still air: no plume, no wind cue)")
     ap.add_argument("--wind-dir", type=float, default=180.0, help="direction the wind blows towards, deg (180 = from the door at +x)")
     args = ap.parse_args()
+    if args.instrument and args.preset != 'instrumented':
+        ap.error('--instrument requires --preset instrumented')
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
     import pygame
@@ -439,7 +446,7 @@ def main():
               dt_by_module=parse_dt_by_module(args.dt_by_module), prune_frozen=not args.no_prune, fruit_set=args.fruit, fence=args.fence,
               cuda_kernels=args.cuda_kernels, event_driven=args.event_driven, cuda_sparse=args.cuda_sparse,
               cuda_compact=args.cuda_compact, receptor_model=args.receptor_model,
-              sensory_cuda_graphs=args.sensory_cuda_graphs, **fast)
+              sensory_cuda_graphs=args.sensory_cuda_graphs, preset=args.preset, instruments=args.instrument, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)
     if args.teleport:

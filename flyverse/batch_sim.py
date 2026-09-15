@@ -217,8 +217,11 @@ class BatchSim:
         if "proprioception" in available:
             # the sided extras (leg-cycle state, side-split haltere MN rates) ride on the sense, since FlyBrain.proprioception's
             # signature is the round-2 one; take_body returns the five base arguments and holds the rest for rates()
-            sense = self.fb.proprioception_sense
-            self.fb.proprioception(**sense.take_body(self.body.proprio_state(self.motor,haltere_sides=sense.haltere_sides(self.brain))))
+            sense = getattr(self.fb, 'proprioception_sense', None)
+            if sense is not None:
+                self.fb.proprioception(**sense.take_body(self.body.proprio_state(self.motor,haltere_sides=sense.haltere_sides(self.brain))))
+            else:  # an instrument-only angular-motion input, no other proprioceptive channels
+                self.fb.proprioception(0., 0., 0., False, yaw_rate=np.array([f.yaw_rate for f in self.flies]))
         self.fb.step(self.FRAME_MS)
         self.motor = self.fb.motor()
         self.commands,self.wcommands = self.body.readout(self.motor,dt)
