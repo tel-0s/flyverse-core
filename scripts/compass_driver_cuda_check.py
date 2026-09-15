@@ -36,6 +36,7 @@ def run(out):
         assert ai.keys()==bi.keys()
         for key in ai:torch.testing.assert_close(ai[key],bi[key],rtol=0,atol=0)
         checks.append(label)
+        print('exact:',label,flush=True)
     for frame in range(80):
         yaw=np.array([1.,-2.,.5])*(1 if frame<40 else -1)
         for fb in (a,b):
@@ -44,6 +45,7 @@ def run(out):
             if frame==30:fb.brain.set_drive([0],.25)
             if frame==45:fb.step(5.);fb.step(5.)
             else:fb.step(10.)
+            torch.cuda.synchronize()  # correctness fixture: attribute a device error to its actual controller
         if frame==0:assert any(isinstance(g,tuple) for g in a._graphs.values()),'module frame was not captured'
         if frame in (0,20,21,30,40,45,46,79):equal(f'frame {frame}')
     for fb in (a,b):fb.reset(rows=[1])

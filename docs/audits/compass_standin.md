@@ -167,3 +167,10 @@ missed per-frame host synchronization. This is an input-binding optimization; th
 math are unchanged. The identical sequential declaration is retried under `out/compass_standin_r4/`.
 The wrapper now uses `&& tail`, because the nested launch path reported r3 as completed despite the
 Python error. Artifact and console checks caught it; a scheduler completion label is not validation.
+
+Attempt r4 also stopped in the first fixture, now with an illegal-address error. The captured ownership
+clone read a warmup input tensor whose storage was not retained after capture. The graph cache now
+retains that external input storage alongside its output bindings. The retry is `out/compass_standin_r5/`,
+with the same scientific/engineering commands and thresholds. The correctness fixture synchronizes each
+controller separately to identify any device error at its source. Neither failed capture attempt has
+timing or behavioural results, and neither is counted as passing validation.
