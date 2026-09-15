@@ -2290,3 +2290,172 @@ Confirmed) -- but the sentence claims more than its own checker did.
 `git diff --numstat` now: brain.py 30+1 = 31 (ok), senses.py 157+12 = 169 (ok), body.py **134+0 = 134**, not 132.
 `out/objr3rf/tree_state.json` records no per-file counts, so the figure cannot be reconstructed from the stamp.
 Incidental context about another task's files; refuted only in the literal sense.
+
+## Column ground truth (2026-09-15)
+
+`docs/audits/column_ground_truth.md` (TODO.md F.4, `column_of_cells` against the two releases' column
+annotations), checked by an independent Opus skeptic pass whose corrections were applied to that audit, to
+`object_baseline_r2.md` and to `object_rectangles_r3.md` by a separate pass. Verdict **mostly sound**. The
+skeptic's Verdict paragraphs and Refuted list verbatim (heading levels demoted to fit this document); the full
+pass, including its Confirmed list and its ten corrections, is in `docs/audits/column_ground_truth.md` under
+`## Skeptic pass (independent, 2026-09-15)`.
+
+### Verdict
+
+**Mostly sound.**
+
+Sections 1-3 are a genuine, well-designed and independently reproducible ground-truth check. I rebuilt the
+propagation, the distance, the permutation and the LC statistics from scratch and matched the audit to the
+third decimal on every headline number, with a different RNG. The two central *measurement* claims survive
+intact and are strengthened by checks the audit did not run: the propagation recovers columnar types to one
+ommatidium three orders of magnitude above chance; the LC11 / LC4 single column really is at or near the
+permutation distance from the cell's input field (half the input weight lies >73 deg away, against 75 deg
+for a uniformly random column), it is inherited from an unannotated wide-field partner carrying ~2 % of the
+input, it is shared by up to 50 cells at a time, and it is not even stable under the propagation's sweep
+order. The input-weighted centroid is validated as a truth proxy for the first time here (0.2-7.4 deg from
+the true column for FAFB columnar types).
+
+What fails is section 4 -- the consequential part. The load-bearing sentence about box/input overlap is
+false on its own terms (R1), its operational restatement is false for this stimulus (R2), and the conclusion
+that follows from them -- that the round-2 LC11 null is uninformative rather than negative, which is the
+claim that would change the reading of two published rounds and the Neurome delivery -- does not survive a
+direct test on the runs themselves (R3): the null is reproduced under the audit's own recommended window,
+and the audit's recommended window is in fact entered by *fewer* LC11 bodies than the one that was used (R4).
+Add one inferential overstatement (R5, an untested "indistinguishable" that is false for FAFB LC11 and whose
+"same eye" is wrong for 64 % of MaleCNS LC11 cells), one self-contradicting sentence (R6) and one
+floating-point defect that corrupts every row of a shipped table (R7).
+
+The recommendations themselves are right and should stand: do not window a `visual_projection` cell on the
+single column, use the centroid with a box >= r50 or a fitted RF, and restrict the strongest-partner vote to
+columnar partners for T5 / L3 / Mi4. It is the retro-active re-reading of round 2 that must be withdrawn and
+replaced with Correction 9.
+
+### Refuted
+
+#### R1. "no box of 15-30 deg placed at that centre overlaps the cell's inputs for most LC11 cells" (section 4 item 4)
+
+FALSE, and it is in no file of `out/colgt` -- nothing in the audit measures box-vs-input-field overlap.
+Share of a cell's |W| rate-input weight inside a box centred on the shipped round-2 anatomical column,
+against the same box on the input-weighted centroid (MaleCNS, the shipped lobe):
+
+| type | n | 15-deg box on the anat column | 15-deg box on the centroid | 30-deg anat | 30-deg centroid | cells with ZERO weight in the 15-deg anat box | ... in the 15-deg centroid box |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| LC11 | 143 | **0.152** | 0.078 | 0.158 | 0.292 | **0 %** | 8.4 % |
+| LC10a | 275 | **0.182** | 0.008 | 0.238 | 0.120 | **0 %** | 39.3 % |
+
+Every one of the 143 LC11 bodies has non-zero input weight inside its shipped 15-deg box, with a median
+15 % of its whole rate-input weight there. At matched box size the "wrong" centre holds *more* of the
+cell's input weight than the "right" one for both LC types. (The centroid is a resultant-vector mean of a
+broad, partly bimodal field, so it falls in a low-density place between the modes; the inherited column is
+the strongest partner's column and sits on a local weight spike.)
+File: `scratchpad/box_input_overlap.csv`.
+
+#### R2. "the round-2 LC11 windowed statistics measured the drive of LC11 cells while the object was over a patch of eye those cells do not read" (section 4 item 4)
+
+FALSE for this stimulus. Per frame I computed the input-weight-weighted coverage of the sphere (a column
+counts as covered when its direction is within diam/2 of the disc centre; weights = the cell's |W| rate-input
+weight on that column), then averaged it over the frames each window selects (ship lobe, seed 0, MaleCNS):
+
+| type | rung | anat window | centroid window | whole run | per-cell peak |
+|---|---:|---:|---:|---:|---:|
+| LC11 | 15 deg | **0.0459** | 0.0273 | 0.0226 | 0.175 |
+| LC11 | 30 deg | **0.1215** | 0.0877 | 0.0625 | 0.204 |
+| LC10a | 15 deg | **0.1209** | 0.0112 | 0.0197 | 0.146 |
+| LC10a | 30 deg | **0.1779** | 0.0621 | 0.0601 | 0.191 |
+
+The mis-centred window selects frames in which *more* of the cell's input field is lit than the run average,
+and more than a centroid window would select. File: `scratchpad/input_weight_coverage.csv`.
+
+#### R3. "the round-2 LC11 numbers are uninformative rather than negative" (section 4 item 4; Report `recommendations`)
+
+NOT SUPPORTED. I rebuilt the predeclared window rule from `out/objr2/rfmap_{ship,fb0}.csv` (it reproduces
+`object_baseline_r2.md`'s window sources exactly: LC11 143/143 `anat`, LC10a 262 `anat` + 7 `rf_ship` +
+6 `rf_fb0` = 405 of 418; and its per-rung windowed-body counts 55/99/99/99/103/103 and 73/76/76/76/79/90),
+then re-windowed the **same 84 fetched runs** four ways and recomputed the primary statistic (population
+median over windowed bodies of the windowed time-mean A-B drive; six object runs vs six nulls; exact
+two-sided Mann-Whitney):
+
+Shipped lobe, smallest p over the six rungs (Holm threshold for a 12-member family = 0.00417):
+
+| type | anat (as shipped) | centroid, same box | centroid, box = 2 x r50 | whole window |
+|---|---:|---:|---:|---:|
+| LC11 | 0.180 | 0.394 | 0.240 | 0.041 |
+| LC10a | 0.0087 | 0.026 | 0.132 | 0.065 |
+
+Not one member of any windowing reaches Holm. The `gain_fb = 0` lobe is deterministic (all six seeds give
+byte-identical medians; null SD ~1e-9), so no test is meaningful there, and its magnitudes show no ordering
+by window quality and no size trend either (LC11 |effect| anat 0.015-0.125 mV, centroid 0.020-0.136,
+r50 0.017-0.082, whole 0.010-0.042 mV). **Correcting the window to the audit's own recommended centre, and
+to its own recommended box size, reproduces the LC11 null.** The window defect is real; the inference drawn
+from it is not. Files: `scratchpad/rewindow_runs.csv`, `scratchpad/rewindow_compare.csv`.
+
+#### R4. The geometric premise ("a window that misses the RF cannot show an effect") is backwards for this ladder
+
+The sphere track is at elevation **exactly 0** across az +-50 deg (`geometry.elevation_deg` 0,
+`track_check.realised_el_deg_maxdev` 0.0, `track_el_deg` a constant 0 in every npz). The round-2 anatomical
+columns sit at a median |el| of **10.7 deg**; the input centroids the audit prefers sit at a median |el| of
+**24.3 deg**. So the correct window is crossed by the stimulus *less* often:
+
+| type | rung | bodies with >=1 frame: anat | centroid (same box) | centroid (2 x r50) | mean fraction of the 1200-frame track: anat / centroid / r50 |
+|---|---:|---:|---:|---:|---|
+| LC11 | 4.5 deg | **55** / 143 | **17** / 143 | 61 / 143 | 7.0 % / 1.9 % / 15.7 % |
+| LC11 | 30 deg | 103 | 50 | 99 | 25.8 % / 11.4 % / 32.0 % |
+| LC10a | 4.5 deg | 73 / 275 | 78 / 275 | 217 / 275 | 5.8 % / 6.1 % / 48.2 % |
+| LC10a | 30 deg | 90 | 164 | 256 | 13.9 % / 23.7 % / 65.6 % |
+
+The anat-to-centroid offset for LC11 decomposes as |d az| median 67.2 deg, |d el| median 21.6 deg -- and it
+is the elevation half, not the azimuth half, that decides whether an elevation-0 sweep ever enters the box.
+File: `scratchpad/window_geometry.csv`.
+
+#### R5. "indistinguishable from a random column of the same eye" (section 3)
+
+Two defects. **(a) No test is reported anywhere in the audit** -- the claim rests on comparing two medians.
+On a paired, cell-by-cell Wilcoxon against the same permutation (my seed, 20 draws):
+
+| dataset | type | median real | median permuted | cells closer than their permuted column | Wilcoxon p |
+|---|---|---:|---:|---:|---:|
+| MaleCNS | LC11 | 66.9 | 71.9 | 49.7 % | 0.958 |
+| MaleCNS | LC4 | 61.4 | 65.4 | 50.0 % | 0.535 |
+| FAFB | LC4 | 62.8 | 63.4 | 48.1 % | 0.935 |
+| FAFB | **LC11** | 53.7 | 61.9 | **56.7 %** | **3.6e-4** |
+| MaleCNS | LPLC2 | 30.8 | 62.1 | 67.0 % | 2.3e-4 |
+| FAFB | LC10a | 12.2 | 52.4 | 91.3 % | 7.1e-36 |
+
+Three of the four "chance" cases are confirmed indistinguishable; **FAFB LC11 is not** -- it is weakly but
+significantly better than chance. The audit's phrase "the FAFB replicate says the same" is wrong for LC11.
+
+**(b) "of the same eye" is false.** 64.3 % of MaleCNS LC11 cells and 42.1 % of MaleCNS LC4 cells are given a
+column in the eye **contralateral** to their soma side (MaleCNS LC10a 30.2 %, LPLC2 36.8 %; FAFB LC11 18.9 %,
+LC4 19.2 %; FAFB T2/T3 0.0 %). `hex_side` is `somaSide` for MaleCNS and equals `somaSide` for 100 % of FAFB's
+45,528 annotated cells, so the comparison is like-for-like. The permutation control permutes within soma side
+over a pool that is itself 64 % contralateral, so its draw is not "a column of the same eye" either.
+Files: `scratchpad/lc_recheck.csv`, `scratchpad/eye_mixing.csv`.
+
+#### R6. "the numbers are the same to the third decimal for every type" (section 2, `loo_malecns_set`)
+
+False, and the sentence is contradicted by the numbers it itself then quotes. From `out/colgt/loo_per_type.csv`:
+T2 exact 0.494 -> 0.477 (delta 0.017, second decimal), T4b 0.829 -> 0.821, T4a 0.784 -> 0.777, Tm6 0.534 -> 0.529;
+T5a p90 61.95 -> 59.91 deg, T5b 67.34 -> 65.32 deg. Maximum deltas: 0.017 in the exact fraction, 0.005 in the
+4.6-deg fraction, 2.0 deg in p90.
+
+#### R7. `frac_same_column` is wrong in every row of `tables.fafb_annotation_depth`
+
+A floating-point defect, not a science error. `full_vs_malecns_set_deg` is an `arccos` of a dot product and
+returns up to **1.207e-6 deg for two IDENTICAL columns** -- the identity shortcut that `score_cells` applies
+(`np.where(ic == tc, 0.0, deg)`, script line 117) was not applied at script line 395. `frac_same_column` then
+tests `d < 1e-9` and drops those cells. Recomputed by integer column identity on the audit's own
+`out/colgt/lc_per_cell.csv`:
+
+| type | true identical | audit reports | true <= 4.6 deg | audit reports |
+|---|---:|---:|---:|---:|
+| LC11 | **0.701** | 0.630 | 0.717 | 0.717 |
+| LC10a | **0.797** | 0.662 | 0.835 | 0.814 |
+| LC4 | **0.942** | 0.923 | 0.971 | 0.942 |
+| LPLC2 | **0.824** | 0.681 | 0.867 | 0.857 |
+| T2 | **0.482** | 0.379 | 0.919 | 0.846 |
+| T3 | **0.832** | 0.673 | 0.973 | 0.942 |
+| Tm5Y | **0.954** | 0.753 | 0.966 | 0.961 |
+| TmY21 | **0.879** | 0.677 | 0.901 | 0.883 |
+
+The error direction *strengthens* the audit's own conclusion ("annotation depth is not the cause"). The same
+table also prints `p90_full_vs_malecns_set_deg = 8.5e-7` for Tm5Y, which is this noise, not a distance.

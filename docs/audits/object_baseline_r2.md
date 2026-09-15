@@ -122,3 +122,20 @@ here; and the specificity battery is **not in this batch** by design (it belongs
   file: `sphere_per_run.n_bodies_windowed` gives LC11 **55 / 99 / 99 / 99 / 103 / 103** of 143 and LC10a
   **73 / 76 / 76 / 76 / 79 / 90** of 275 across 4.5 -> 30 deg. The 4.5-deg rung -- the biologically decisive one --
   is a median over **55 anatomically-placed boxes**.
+
+## 0c. Window caveat (added 2026-09-15, `docs/audits/column_ground_truth.md`)
+
+**Window caveat (from `docs/audits/column_ground_truth.md`).** The 405 anatomical LC boxes of this ladder
+(LC11 143/143, LC10a 262/275) were centred on `trace.column_of_cells`'s single column, which for LC11 and
+LC4 is inherited from a wide-field Li / TmY19b partner carrying ~2 % of the cell's input and lies a median
+67 deg (MaleCNS) / 54 deg (FAFB) from the cell's input-weighted centroid, against 71 / 62 deg for a
+permuted column -- i.e. the box centre is not the cell's receptive-field centre, and it is not
+cell-specific (13 distinct columns for 143 LC11 bodies). The primary LC11 family was re-windowed on the
+input-weighted centroid and on a box of twice the cell's r50 about it, on these same 84 runs: the result is
+unchanged (smallest exact-U p 0.394 and 0.240 against 0.180 as shipped; Holm needs 0.00417), and so is
+LC10a's (0.026 and 0.132 against 0.0087). The sphere sweeps elevation 0 while the LC11 centroids sit at a
+median |el| of 24 deg, so the corrected window is entered by fewer bodies, not more (17 of 143 at the
+4.5-deg rung against 55). **The null stands under the corrected window; the caveat is about per-cell
+interpretability and coverage, not about the family call.** Future rounds should place LC windows on the
+input-weighted centroid with a box no smaller than r50, or on a fitted RF, and should never use the single
+`column_of_cells` column for a `visual_projection` cell.
