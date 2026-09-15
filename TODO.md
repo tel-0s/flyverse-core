@@ -169,13 +169,11 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           **Outcome** (round 4c): **6 runs per arm** at m = 7, floor `2/C(12, 6)` = 0.0021645 and 0.0021645 x 7 =
           **0.0152 <= 0.05** -- rows were CALLED for the first time in this thread (F2 four of seven, F3 four,
           F4 all seven; F1 calls none, which is the answer).
-    - [ ] **derive `mn_ref_hz`, `hair_plate_max_hz` and `campaniform_load_hz` together as one fixed point**
-          (`level_controls.md` 10, `level_controls_r2.md` 9 item 2): the structure term over the level control
-          (**+4.60 +- 0.31 Hz** without the amplitude law, **+4.72 +- 0.32** with it) still carries a -9.5 Hz
-          hair-plate and -24.7 Hz campaniform mismatch, corrected at cross-batch slopes extrapolated about 9.5 Hz off
-          their calibration manifold; a within-batch calibration is not available while L is the only steady-input arm
-          in the batch (two arm-side means against the model's four parameters). One three-parameter fixed point turns
-          the correction into a matched pair, and C v K from an upper bound into a measurement.
+    - [x] **derive the three-channel matched fixed point** -- round 4d (`level_fixed_point.md`), L3 at
+          8.23 / 81.09 / 25.10 matches C on both sides; direct C-L3 relay +2.6687 / +3.8782 Hz, pooled
+          +3.2734. M2-L3 +2.8521 / +4.0290; M2-C null on all seven primaries. The older level model
+          leaves +1.2028 / +1.2344 Hz in modulation-free L3: its extrapolation overestimated the size.
+          Nothing adopted; independent skeptic pending (Fable, when accounts reset).
     - [ ] **more runs of the REFERENCE arm for DNa02_R / the clean yaw SD** (`level_controls_r2.md` 9 item 6): both
           rows reproduce as DIFFERENCES in all three batches (DNa02_R +0.103 / +0.107 / +0.094 Hz; clean yaw SD
           +0.572 / +0.490 / +0.588 deg/s) and as verdicts only sometimes (DNa02_R `result` in rounds 4 and 4b at

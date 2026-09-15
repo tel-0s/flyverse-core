@@ -3515,3 +3515,14 @@ rest-of-ring inhibition inference is explicitly withdrawn in both audit and NOTE
 rates and never-spiked membrane sigma close 6A's measurement gaps; EPG spiking sigma, the unproven
 11.8 mV bound, windows, Holm counts and source-stamp limits are corrected. Nothing adopted.
 Closeout CPU suite: 441 passed / 19 skipped, 215 subtests; bit-identity gate and cache MD5s unchanged.
+
+## Round 4d, three-channel matched level control (2026-09-15)
+
+**Independent skeptic pending (Fable, when accounts reset).** Astra's self-review is labelled in
+`level_fixed_point.md` section 11 and does not replace the independent pass. All 24 CUDA runs and
+the predeclared channel matches checked; primary families re-emitted with Holm m=7, six runs per arm.
+C-L3 relay +2.6687 / +3.8782 Hz and DNa02-left are results; DNa02-right and the behavioural/sided
+primaries are null. M2-C is null on all seven. The direct pooled matched structure term is +3.2734 Hz;
+the old level model's residual on L3 reveals its extrapolation limit. Source-stamp differences and
+an unused descriptive rate-column defect are recorded. Nothing adopted; CPU suite 441 passed /
+19 skipped, 215 subtests, including the golden gate; cache MD5s unchanged.
