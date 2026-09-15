@@ -43,7 +43,7 @@ in the round-7 audit; the generated wrapper's draft comment describes its status
 The explicit `compass` candidate adds a continuous heading-memory input through an ordinary module:
 
 ```sh
-python scripts/room_demo.py --preset instrumented --instrument compass --cuda-graphs --brain-map
+python scripts/room_demo.py --preset instrumented --instrument compass --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp --brain-map
 ```
 
 In Python, use `FlyBrain(..., preset="instrumented", instruments=["compass"])` or the same arguments on
@@ -61,6 +61,7 @@ The UI names the preset and instrument; provenance includes its complete law and
 
 | instrument | kind | class | stands in for | law | retired by |
 |---|---|---|---|---|---|
+| `compass` | stop-gap | `compass.CompassDriver` | imposed angular memory and continuous EPG Poisson representation; experimental, fails strict suite admission | **unverified**: integrated realized yaw; 50 Hz peak, 35 degree Gaussian width | native circuit passes the same sustained-turn, reversal and stationary-memory contract |
 | `sided_turn_afferent` | stop-gap | `instruments.SidedTurnAfferent` | PS196_b's signed turn input: Poisson spikes on its named ascending afferents (AN07B037_a / _b by default; `cells=` CB0675 / GNG580 / PS047_b / all) at `k * max(0, +-yaw_deg_s)` on the side the graph implies. In the shipped body the report reaching PS196_b is unsigned (`audits/vnc_drive.md` 6, NOTES compass round 2); Wang 2026 finding 3 makes PS196_b GLNO's largest non-ring input. | **unverified**: no PS196_b / AN07B037 recording exists (searched 2026-09-15: Wang's audit, Hulse 2021, the two Rockefeller theses). `k` is a declared level, `sign` the HGV- control. | a recording of PS196_b / AN07B037 during turning (then a `mechanism` with a source, or dropped); a sided ascending report that reaches PS196_b on its own; a round-7 `null` on measure 3 at every declared `k` |
 | `ring_dc_hold` | edges | `instruments.EdgeHold` | the ExR6 / ER6 / ER4m DC term on PEN / EPG held at 0 (6A's `--hold-edges '^(ExR6\|ER6\|ER4m)$:^(PEN_\|EPG$)'`: 17 pre cells onto 88, 1,149 entries, 37,256 synapses) | a counterfactual: no transfer claimed | sourced receptor placement / kinetics at the EB / GA contacts and a physiological operating state. ExR6 glutamate and ER6 GABA already have type-level support (`audits/exr6_evidence.md`); neither label is changed here |
 | `ring_dc_hold_pen` | edges | `instruments.EdgeHold` | the same 17 pre cells held only onto 42 PEN cells: `^(ExR6\|ER6\|ER4m)$:^PEN_`, 402 entries, 7,893 synapses; EPG keeps its ring input | a counterfactual: no transfer claimed | the same receptor / operating-state evidence as the full hold; round 7 tests whether retaining EPG's DC input changes confinement |

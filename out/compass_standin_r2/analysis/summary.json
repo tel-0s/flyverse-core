@@ -1,0 +1,533 @@
+{
+  "exact": [
+    {
+      "run": "instrumented_s10",
+      "arrays": {
+        "rates": true,
+        "wedges": true,
+        "t": true,
+        "expected": true,
+        "yaw_deg_s": true
+      },
+      "passed": true
+    },
+    {
+      "run": "instrumented_s11",
+      "arrays": {
+        "rates": true,
+        "wedges": true,
+        "t": true,
+        "expected": true,
+        "yaw_deg_s": true
+      },
+      "passed": true
+    },
+    {
+      "run": "instrumented_s12",
+      "arrays": {
+        "rates": true,
+        "wedges": true,
+        "t": true,
+        "expected": true,
+        "yaw_deg_s": true
+      },
+      "passed": true
+    },
+    {
+      "run": "instrumented_s13",
+      "arrays": {
+        "rates": true,
+        "wedges": true,
+        "t": true,
+        "expected": true,
+        "yaw_deg_s": true
+      },
+      "passed": true
+    },
+    {
+      "run": "instrumented_s14",
+      "arrays": {
+        "rates": true,
+        "wedges": true,
+        "t": true,
+        "expected": true,
+        "yaw_deg_s": true
+      },
+      "passed": true
+    },
+    {
+      "run": "instrumented_s15",
+      "arrays": {
+        "rates": true,
+        "wedges": true,
+        "t": true,
+        "expected": true,
+        "yaw_deg_s": true
+      },
+      "passed": true
+    },
+    {
+      "run": "room_instrumented",
+      "arrays": {
+        "body": false,
+        "epg": false,
+        "wedges": true,
+        "dt_record_s": true
+      },
+      "passed": false
+    }
+  ],
+  "exact_pass": false,
+  "timings": {
+    "profile": [
+      {
+        "batch": 1,
+        "raw_ms": 40.50505769555457,
+        "instrumented_ms": 77.71423442522064,
+        "overhead_percent": 91.8630384613667,
+        "target_pass": false,
+        "module_cuda_us": 278.886474609375,
+        "raw_repeats_ms": [
+          40.499020870774984,
+          40.511094520334154,
+          40.52185621811077,
+          40.47143835807219
+        ],
+        "instrumented_repeats_ms": [
+          77.7215960714966,
+          77.6739528006874,
+          77.72839918034151,
+          77.70687277894467
+        ]
+      },
+      {
+        "batch": 8,
+        "raw_ms": 179.61039781570435,
+        "instrumented_ms": 167.65117576927878,
+        "overhead_percent": -6.6584241179047705,
+        "target_pass": true,
+        "module_cuda_us": 77.62044525146484,
+        "raw_repeats_ms": [
+          185.56959166191518,
+          185.63725844025612,
+          173.6512039694935,
+          23.289768788963556
+        ],
+        "instrumented_repeats_ms": [
+          222.8328940202482,
+          222.84073849907145,
+          112.46945751830935,
+          23.723844240885228
+        ]
+      },
+      {
+        "batch": 32,
+        "raw_ms": 27.91973259532824,
+        "instrumented_ms": 28.318761293776333,
+        "overhead_percent": 1.4291995708972438,
+        "target_pass": true,
+        "module_cuda_us": 79.2573471069336,
+        "raw_repeats_ms": [
+          27.91973255109042,
+          27.91933658067137,
+          27.919732639566064,
+          27.920484400819987
+        ],
+        "instrumented_repeats_ms": [
+          28.316803639754653,
+          28.31849936861545,
+          28.319588880985975,
+          28.319023218937218
+        ]
+      }
+    ],
+    "profile_native": [
+      {
+        "batch": 1,
+        "raw_ms": 0.5775735841598362,
+        "instrumented_ms": 0.9371270646806806,
+        "overhead_percent": 62.25241084109945,
+        "target_pass": false,
+        "module_cuda_us": 78.3089599609375,
+        "raw_repeats_ms": [
+          0.5785008100792766,
+          0.5776262492872775,
+          0.576805779710412,
+          0.5775209190323949
+        ],
+        "instrumented_repeats_ms": [
+          0.9396352991461754,
+          0.9366471786051989,
+          0.9376069507561624,
+          0.9357659704983234
+        ]
+      },
+      {
+        "batch": 8,
+        "raw_ms": 3.0920036148745567,
+        "instrumented_ms": 3.4978000493720174,
+        "overhead_percent": 13.124060804628911,
+        "target_pass": false,
+        "module_cuda_us": 81.1909408569336,
+        "raw_repeats_ms": [
+          3.0928332102485,
+          3.092375989072025,
+          3.091083571780473,
+          3.0916312406770885
+        ],
+        "instrumented_repeats_ms": [
+          3.497724060434848,
+          3.4978760383091867,
+          3.502185579854995,
+          3.4950361493974924
+        ]
+      },
+      {
+        "batch": 32,
+        "raw_ms": 12.783839005278423,
+        "instrumented_ms": 13.181009601103142,
+        "overhead_percent": 3.106817878891688,
+        "target_pass": true,
+        "module_cuda_us": 79.54390716552734,
+        "raw_repeats_ms": [
+          12.784885840956122,
+          12.782227501738816,
+          12.784123308956623,
+          12.783554701600224
+        ],
+        "instrumented_repeats_ms": [
+          13.181352170649916,
+          13.180667031556368,
+          13.185228570364416,
+          13.177718939259648
+        ]
+      }
+    ]
+  },
+  "matched_input_identity": {
+    "profile": [
+      {
+        "batch": 1,
+        "tensors": {
+          "v": false,
+          "g": true,
+          "g_slow": true,
+          "g_slow_cls": true,
+          "refrac": true,
+          "drive": true,
+          "poisson_p": true,
+          "rate": true,
+          "spikes": true,
+          "adapt": true,
+          "res": true,
+          "spike_buf": true,
+          "spike_counts": true
+        }
+      },
+      {
+        "batch": 8,
+        "tensors": {
+          "v": false,
+          "g": false,
+          "g_slow": true,
+          "g_slow_cls": true,
+          "refrac": true,
+          "drive": true,
+          "poisson_p": true,
+          "rate": true,
+          "spikes": true,
+          "adapt": true,
+          "res": true,
+          "spike_buf": true,
+          "spike_counts": true
+        }
+      },
+      {
+        "batch": 32,
+        "tensors": {
+          "v": false,
+          "g": false,
+          "g_slow": true,
+          "g_slow_cls": true,
+          "refrac": true,
+          "drive": true,
+          "poisson_p": true,
+          "rate": true,
+          "spikes": true,
+          "adapt": true,
+          "res": true,
+          "spike_buf": true,
+          "spike_counts": true
+        }
+      }
+    ],
+    "profile_native": [
+      {
+        "batch": 1,
+        "tensors": {
+          "v": false,
+          "g": false,
+          "g_slow": true,
+          "g_slow_cls": true,
+          "refrac": true,
+          "drive": true,
+          "poisson_p": true,
+          "rate": true,
+          "spikes": true,
+          "adapt": true,
+          "res": true,
+          "spike_buf": true,
+          "spike_counts": true
+        }
+      },
+      {
+        "batch": 8,
+        "tensors": {
+          "v": false,
+          "g": false,
+          "g_slow": true,
+          "g_slow_cls": true,
+          "refrac": true,
+          "drive": true,
+          "poisson_p": true,
+          "rate": true,
+          "spikes": true,
+          "adapt": true,
+          "res": true,
+          "spike_buf": true,
+          "spike_counts": true
+        }
+      },
+      {
+        "batch": 32,
+        "tensors": {
+          "v": false,
+          "g": false,
+          "g_slow": true,
+          "g_slow_cls": true,
+          "refrac": false,
+          "drive": true,
+          "poisson_p": true,
+          "rate": false,
+          "spikes": true,
+          "adapt": false,
+          "res": true,
+          "spike_buf": false,
+          "spike_counts": false
+        }
+      }
+    ]
+  },
+  "performance_pass": false,
+  "native_rooms": {
+    "raw": {
+      "frame_ms_median": 39.386729476973414,
+      "frame_ms_p95": 43.29667390557007,
+      "rows": [
+        {
+          "row": 0,
+          "env_seed": 10,
+          "hops": 0,
+          "distance_m": 0.5294442329273428,
+          "mean_abs_yaw_deg_s": 1.143076056994355,
+          "mean_epg_hz": 0.013189639896154404
+        },
+        {
+          "row": 1,
+          "env_seed": 11,
+          "hops": 0,
+          "distance_m": 0.5278518718669104,
+          "mean_abs_yaw_deg_s": 1.3037937025739619,
+          "mean_epg_hz": 0.016871243715286255
+        },
+        {
+          "row": 2,
+          "env_seed": 12,
+          "hops": 1,
+          "distance_m": 0.5441123274811555,
+          "mean_abs_yaw_deg_s": 1.1182053751346857,
+          "mean_epg_hz": 0.04837280884385109
+        },
+        {
+          "row": 3,
+          "env_seed": 13,
+          "hops": 1,
+          "distance_m": 0.5949364118923982,
+          "mean_abs_yaw_deg_s": 1.6742085527327661,
+          "mean_epg_hz": 0.01326123345643282
+        },
+        {
+          "row": 4,
+          "env_seed": 14,
+          "hops": 1,
+          "distance_m": 0.6295731685534266,
+          "mean_abs_yaw_deg_s": 1.4586993471537624,
+          "mean_epg_hz": 0.03108259104192257
+        },
+        {
+          "row": 5,
+          "env_seed": 15,
+          "hops": 0,
+          "distance_m": 0.5304000414622866,
+          "mean_abs_yaw_deg_s": 1.4047453048904914,
+          "mean_epg_hz": 0.09116050601005554
+        }
+      ]
+    },
+    "instrumented": {
+      "frame_ms_median": 36.923493491485715,
+      "frame_ms_p95": 46.018728089984506,
+      "rows": [
+        {
+          "row": 0,
+          "env_seed": 10,
+          "hops": 0,
+          "distance_m": 0.5272694125496009,
+          "mean_abs_yaw_deg_s": 0.9955053435832597,
+          "mean_epg_hz": 11.610747337341309
+        },
+        {
+          "row": 1,
+          "env_seed": 11,
+          "hops": 0,
+          "distance_m": 0.5229287228137492,
+          "mean_abs_yaw_deg_s": 1.3770457787222328,
+          "mean_epg_hz": 11.731304168701172
+        },
+        {
+          "row": 2,
+          "env_seed": 12,
+          "hops": 0,
+          "distance_m": 0.5328692697547665,
+          "mean_abs_yaw_deg_s": 1.2533508205014476,
+          "mean_epg_hz": 11.514150619506836
+        },
+        {
+          "row": 3,
+          "env_seed": 13,
+          "hops": 0,
+          "distance_m": 0.5308822956729115,
+          "mean_abs_yaw_deg_s": 1.131794415619619,
+          "mean_epg_hz": 11.548314094543457
+        },
+        {
+          "row": 4,
+          "env_seed": 14,
+          "hops": 0,
+          "distance_m": 0.5305923911390382,
+          "mean_abs_yaw_deg_s": 1.030827783376023,
+          "mean_epg_hz": 11.457036018371582
+        },
+        {
+          "row": 5,
+          "env_seed": 15,
+          "hops": 0,
+          "distance_m": 0.5283193648877846,
+          "mean_abs_yaw_deg_s": 0.9044107160003525,
+          "mean_epg_hz": 11.700361251831055
+        }
+      ]
+    }
+  },
+  "cuda_checks": [
+    "frame 0",
+    "frame 20",
+    "frame 40",
+    "frame 79",
+    "partial reset",
+    "checkpoint replay",
+    "checkpoint paired reference",
+    "partial reset of all rows disables zero Poisson",
+    "detach"
+  ],
+  "source_checks": [
+    {
+      "record": "instrumented_s10",
+      "matched_files": 51
+    },
+    {
+      "record": "instrumented_s11",
+      "matched_files": 51
+    },
+    {
+      "record": "instrumented_s12",
+      "matched_files": 51
+    },
+    {
+      "record": "instrumented_s13",
+      "matched_files": 51
+    },
+    {
+      "record": "instrumented_s14",
+      "matched_files": 51
+    },
+    {
+      "record": "instrumented_s15",
+      "matched_files": 51
+    },
+    {
+      "record": "room_instrumented",
+      "matched_files": 51
+    },
+    {
+      "record": "profile:0",
+      "matched_files": 51
+    },
+    {
+      "record": "profile:1",
+      "matched_files": 51
+    },
+    {
+      "record": "profile:2",
+      "matched_files": 51
+    },
+    {
+      "record": "profile:3",
+      "matched_files": 51
+    },
+    {
+      "record": "profile:4",
+      "matched_files": 51
+    },
+    {
+      "record": "profile:5",
+      "matched_files": 51
+    },
+    {
+      "record": "profile_native:0",
+      "matched_files": 51
+    },
+    {
+      "record": "profile_native:1",
+      "matched_files": 51
+    },
+    {
+      "record": "profile_native:2",
+      "matched_files": 51
+    },
+    {
+      "record": "profile_native:3",
+      "matched_files": 51
+    },
+    {
+      "record": "profile_native:4",
+      "matched_files": 51
+    },
+    {
+      "record": "profile_native:5",
+      "matched_files": 51
+    },
+    {
+      "record": "cuda_checks",
+      "matched_files": 51
+    },
+    {
+      "record": "native room raw",
+      "matched_files": 51
+    },
+    {
+      "record": "native room instrumented",
+      "matched_files": 51
+    }
+  ]
+}

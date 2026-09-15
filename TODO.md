@@ -89,6 +89,17 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
 
 Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, skeptic-corrected):
 
+- [x] **Experimental imposed compass memory** (owner-authorized control arm, 2026-09-15):
+      `--preset instrumented --instrument compass` uses an ordinary module with held realized yaw,
+      supplies a continuous EPG Poisson bump and passes all 48 controlled turn/reversal/hold trajectories.
+      Final native overhead 54.22 us/frame at B=1 (11.01%, misses <=10% target), 3.19% at B=8, 1.22% at B=32.
+      This does not close the biological compass or steering items below. One taste status changes in
+      the three-draw suite, rejecting strict admission; the full room rate-half is not run. Raw remains
+      default, no food-finding claim. See `docs/audits/compass_standin.md`; independent skeptic pending.
+- [ ] **Review the compass experiment before any adoption**: independent skeptic (Fable), account for
+      the taste-row change, then the full room gate if an admissible candidate exists. Do not retune
+      gains to pass the suite or treat short room rollouts as evidence of food finding.
+
 - [ ] **Spontaneous turning / the straight walker.** DNa02 sits under tonic sign-correct inhibition
       (−1.6 / −2.0 mV steady vs a 7 mV gap) while every lateralised excitatory route is silent at source: PFL3
       (compass at 0 Hz by default), AOTU015 (object route), most LLPC1; the VNC runs open-loop — every

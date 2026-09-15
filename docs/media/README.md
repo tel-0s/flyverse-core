@@ -137,3 +137,14 @@ libx264 crf 23, preset slow, yuv420p, 1360x820, 12.5 fps. GIF: the same frames a
 15 MB. The MP4s are encoded from the 256-colour raw GIF frames (the record loop stores what `room_demo.py --gif`
 stores), so they carry that quantisation; the console is flat-coloured and it is not visible at this size. Durations
 checked with ffprobe: 25.0 s each (312 frames in the MP4s, 250 in the GIFs).
+
+
+## Imposed compass memory figure (2026-09-15)
+
+`compass_standin.png` shows actual EPG spike rates and decoded phase, raw versus the explicit
+instrumented compass, seed 10 row 6 (+180 deg/s, stop, reverse). Sources are
+`out/compass_standin/{raw,instrumented}_s10.npz`, submitted code `61d9415`, house CUDA; this is
+an imposed angular-memory experiment, not a recovered biological compass. Recreate with
+`python scripts/compass_driver_analyse.py`, then copy `out/compass_standin/analysis/turn_trace.png`
+here. The plot uses unwrapped headings and masks phase when vector strength is below 0.6.
+No trajectory was selected by outcome. See `docs/audits/compass_standin.md` for all 48 rows.

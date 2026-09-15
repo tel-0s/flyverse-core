@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import subprocess
 
 import numpy as np
 
@@ -23,6 +24,13 @@ def read(path):
 def csv_write(path, rows):
     with path.open('w',newline='',encoding='utf-8') as f:
         writer=csv.DictWriter(f,list(rows[0]));writer.writeheader();writer.writerows(rows)
+
+
+def input_hashes(root):
+    paths=[p for p in root.rglob('*') if p.is_file() and p.suffix in ('.npz','.json','.png')
+           and 'analysis' not in p.relative_to(root).parts]
+    hashes={p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
+    (root/'analysis/input_sha256.json').write_text(json.dumps(hashes,indent=2)+'\n',encoding='utf-8')
 
 
 def profile(path):
@@ -121,8 +129,7 @@ def analyse(root):
                     'first_slope_deg_s','reverse_slope_deg_s','mean_peak_hz','mean_width_wedges','failed_gates'):
             lines.append(f'  {key}: '+json.dumps([r[key] if not isinstance(r[key],float) else round(r[key],4) for r in subset]))
     (out/'per_seed_lists.txt').write_text('\n'.join(lines)+'\n',encoding='utf-8')
-    hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.glob('*')) if p.suffix in ('.npz','.json','.png')}
-    (out/'input_sha256.json').write_text(json.dumps(hashes,indent=2)+'\n',encoding='utf-8')
+    input_hashes(root)
     print(json.dumps(summary,indent=2))
     plot(root,out)
 
@@ -241,6 +248,69 @@ def captured(original,updated):
               rooms=rooms,room_comparisons=room_compare,verified_records=len(checks))
     csv_write(out/'contract_rows.csv',rows);csv_write(out/'source_checks.csv',checks)
     (out/'summary.json').write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
+    input_hashes(updated)
+    print(json.dumps(data,indent=2))
+
+
+def publication(root, capture_dir, lifetime_dir):
+    """Emit the exact tables pasted into the audit; verify the complete frozen source snapshots."""
+    root,capture_dir,lifetime_dir=map(Path,(root,capture_dir,lifetime_dir))
+    out=root/'analysis';capture=read(capture_dir/'analysis/summary.json')
+    final=read(lifetime_dir/'profile_native.json');fixture=read(lifetime_dir/'cuda_checks.json')
+    assert len(fixture['checks'])==15
+    frozen=read(lifetime_dir/'predeclared.json');verified=[]
+    for i,p in enumerate([fixture['provenance'],*final['controllers']]):
+        assert p['execution']['device']=='cuda'
+        files=p['source_fingerprint']['files_lf'];shared=set(files)&set(frozen['source_sha256_lf'])
+        assert 'flyverse/compass.py' in shared and len(shared)==51
+        assert all(files[k]==frozen['source_sha256_lf'][k] for k in shared)
+        verified.append(dict(record=i,matched_files=len(shared)))
+    revisions=('61d9415','efdfbb7','f7bcd48','ac7ebc3','8ba1818','45eb6b6')
+    snapshots=[]
+    for n,commit in enumerate(revisions,1):
+        folder=root if n==1 else root.with_name(root.name+f'_r{n}')
+        wanted=read(folder/'predeclared.json')['source_sha256_lf']
+        for path,h in wanted.items():
+            data=subprocess.check_output(['git','show',f'{commit}:{path}'],cwd=ROOT)
+            assert hashlib.sha256(data.replace(b'\r\n',b'\n')).hexdigest()==h,(commit,path)
+        snapshots.append(dict(batch=folder.name,archive_commit=commit,matched_files=len(wanted)))
+    data=dict(source_snapshots=snapshots,final_provenance=verified,final_cuda_checks=fixture['checks'],
+              final_profile=profile(lifetime_dir/'profile_native.json'),final_matched_input_identity=final['identity'])
+    (out/'final_checks.json').write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
+    (lifetime_dir/'analysis').mkdir(exist_ok=True)
+    input_hashes(lifetime_dir)
+    input_hashes(root.with_name(root.name+'_r2'))
+    with (out/'suite_rows.csv').open() as f:suite=list(csv.DictReader(f))
+    lines=['### Suite values by draw', '',
+           'Source: `out/compass_standin/analysis/suite_rows.csv`, columns `raw_value` and `instrumented_value`.',
+           'Each list is ordered by draw seed [0,1,2], unsorted by outcome. P=PASS, F=FAIL, G=KNOWN GAP.', '',
+           '| check | raw [0,1,2] | instrumented [0,1,2] | raw / instrumented status |',
+           '|---|---|---|---|']
+    fmt=lambda v: str(v) if not isinstance(v,(float,int)) else f'{v:.6g}'
+    for key in dict.fromkeys(r['key'] for r in suite):
+        rows=[r for r in suite if r['key']==key];assert [int(r['seed']) for r in rows]==[0,1,2]
+        values=['['+', '.join(fmt(float(r[k+'_value'])) for r in rows)+']' for k in ('raw','instrumented')]
+        status=[''.join({'PASS':'P','FAIL':'F','KNOWN GAP':'G'}[r[k+'_status']] for r in rows) for k in ('raw','instrumented')]
+        lines.append(f'| {key} | {values[0]} | {values[1]} | {status[0]} / {status[1]} |')
+    lines+=['','### Room values by row','',
+            'Sources: initial `room_rows.csv`; r5 `summary.json:rooms`. Lists follow environment seeds [10,11,12,13,14,15],',
+            'all rows retained. Distance is XY path length between 0.1 s samples, not displacement toward fruit.', '', '```text']
+    rooms={}
+    with (out/'room_rows.csv').open() as f:initial=list(csv.DictReader(f))
+    for mode in ('raw','instrumented'):rooms['initial '+mode]=[r for r in initial if r['mode']==mode]
+    rooms.update({k:v['rows'] for k,v in capture['rooms'].items()})
+    for name,rows in rooms.items():
+        lines.append(name+':')
+        for key in ('hops','distance_m','mean_abs_yaw_deg_s','mean_epg_hz'):
+            lines.append('  '+key+': ['+', '.join(fmt(float(r[key])) for r in rows)+']')
+    lines+=['```','','### Performance repeats','',
+            'Sources: r5 and r6 `profile_native.json:records`, synchronized wall ms per 10 ms frame.',
+            'Four alternating repeats in recorded order; repetitions on one device are not independent animals.', '', '```text']
+    for folder in (capture_dir,lifetime_dir):
+        for row in profile(folder/'profile_native.json'):
+            lines.append(f'{folder.name} B={row["batch"]}: raw {row["raw_repeats_ms"]}; instrumented {row["instrumented_repeats_ms"]}')
+    lines+=['```','']
+    (out/'report_tables.md').write_text('\n'.join(lines),encoding='utf-8')
     print(json.dumps(data,indent=2))
 
 
@@ -248,8 +318,10 @@ if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--runs',default='out/compass_standin')
     ap.add_argument('--profile-only',action='store_true');ap.add_argument('--scheduler',help='directory of scheduler rerun')
     ap.add_argument('--captured',help='directory of successful capture validation')
+    ap.add_argument('--publication',action='store_true',help='verify final r6 and emit audit tables after both batches finish')
     a=ap.parse_args()
-    if a.captured:captured(a.runs,a.captured)
+    if a.publication:publication(a.runs,'out/compass_standin_r5','out/compass_standin_r6')
+    elif a.captured:captured(a.runs,a.captured)
     elif a.scheduler:scheduler(a.runs,a.scheduler)
     elif a.profile_only:print(json.dumps(profile(Path(a.runs)/'profile.json'),indent=2))
     else:analyse(a.runs)

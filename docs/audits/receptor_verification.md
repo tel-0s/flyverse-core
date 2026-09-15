@@ -3561,3 +3561,16 @@ operating state, not an isolated path effect at matched rates. No extra interact
 No joint ledger success; DNa02 side rates are zero in every challenge-window mean. Nothing adopted,
 the one authorized follow-up is complete, and the conditional suite and odour room remain gated.
 Submitted-tree and final closeout CPU suites each have 473 passed / 19 skipped, 220 subtests; golden and cache unchanged.
+
+
+## Imposed compass memory experiment (2026-09-15)
+
+**Independent skeptic pending (Fable, when accounts reset).** `compass_standin.md`; Astra's labelled
+self-review does not replace it. This is an owner-authorized program memory under instrumented,
+not a receptor-row proposal or recovered compass mechanism. All 48 controlled trajectories pass,
+with exact trace reproduction after capture. Strict preset admission fails because taste changes
+status outside the gap; no default adoption and no food-finding claim. Final native overhead is
+54.22 us/frame (11.01%) at B=1, 3.19% at B=8, 1.22% at B=32; B=1 misses its declared target.
+GPU full-brain equality and room-repeat equality fail where recorded, including a same-code eager
+control. CPU 482 passed / 19 skipped / 220 subtests, 15 exact house lifecycle checks, 8 CUDA tests /
+2 skipped / 3 subtests; golden/cache unchanged. Failed capture attempts are retained in the audit.
