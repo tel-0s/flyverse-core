@@ -159,3 +159,11 @@ FAIL to PASS. That passes the initial declaration's narrower screen but **fails 
 no-status-change-outside-the-gap rule**. This is an author self-review correction of the acceptance
 interpretation, not a retroactive change to data or thresholds. The driver remains experimental and
 the raw default remains unchanged regardless of the timing outcome.
+
+Capture attempt r3 stopped at the **first** CUDA fixture: the module scheduler uploaded its resolved
+CPU target indices inside capture. No profile or trajectory from that attempt is used. Caching these
+fixed read/write index tensors at attachment fixes both the unsupported transfer and a previously
+missed per-frame host synchronization. This is an input-binding optimization; the cell selections and
+math are unchanged. The identical sequential declaration is retried under `out/compass_standin_r4/`.
+The wrapper now uses `&& tail`, because the nested launch path reported r3 as completed despite the
+Python error. Artifact and console checks caught it; a scheduler completion label is not validation.

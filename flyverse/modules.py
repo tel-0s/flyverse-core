@@ -332,6 +332,7 @@ class ExtensionRuntime:
     def __init__(self, fb):
         self.fb = fb
         self.hooks, self.modules, self.bindings = {}, {}, {}
+        self.device_bindings = {}  # fixed selections uploaded once, never in a captured frame
         self.origin = None
         self.drives, self.poisson = {}, {}
         self._positive_poisson = set()  # ephemeral activity proofs; rebuilt by full module writes
@@ -429,7 +430,9 @@ class ExtensionRuntime:
         module.reset(self.fb.B, self.fb.device)
         if isinstance(module, ReadoutModule):
             module.time_ms = self.fb.t
+        device_bindings = tuple({k:self.fb.brain._idx(idx) for k,idx in group.items()} for group in (reads,writes))
         self.modules[name], self.bindings[name] = module, (reads, writes)
+        self.device_bindings[name] = device_bindings
 
     def records(self):
         ids = self.fb.c.neurons.bodyId.to_numpy()
@@ -465,7 +468,7 @@ class ExtensionRuntime:
                 pos = {int(v): i for i, v in enumerate(o.rate_idx)}
                 inputs[name] = {k: o.rates()[:, [pos[int(i)] for i in idx]].clone() for k, idx in reads.items()}
             else:
-                inputs[name] = {k: source[:, b._idx(idx)].clone() for k, idx in reads.items()}
+                inputs[name] = {k: source[:, idx].clone() for k, idx in self.device_bindings[name][0].items()}
         for name, m in self.modules.items():
             try:
                 boundary = getattr(m, "boundary", None)
@@ -501,7 +504,7 @@ class ExtensionRuntime:
                     values[k] = v
                 self.origin = "module:" + name
                 for k, idx in writes.items():
-                    self.input(m.channel_out, idx, values[k])
+                    self.input(m.channel_out, self.device_bindings[name][1][k], values[k])
                 if m.channel_out == 'poisson_hz' and getattr(m, 'poisson_always_on', False):
                     self._positive_poisson.add(self.origin)
                 else:
@@ -549,6 +552,7 @@ class ExtensionRuntime:
         del collection[name]
         if not hook:
             del self.bindings[name]
+            del self.device_bindings[name]
         key = ("hook:" if hook else "module:") + name
         self._positive_poisson.discard(key)
         self.drives.pop(key, None); self.poisson.pop(key, None)
