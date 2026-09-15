@@ -364,6 +364,7 @@ class ExtensionRuntime:
             if channel == "drive_mv":
                 self.base_drive = self.base_drive.clone(); self.base_drive[:, idx] = v
                 b.drive[:, idx] = v
+                self.fb._graphs.clear()  # a captured module frame binds the previous base tensor
             else:
                 self.external_poisson[:, idx] = v * (b.p.dt / 1000)
                 self.refresh_poisson()
@@ -439,6 +440,16 @@ class ExtensionRuntime:
                  "n_reads": {k: int(len(v)) for k, v in self.bindings[name][0].items()},
                  "n_writes": {k: int(len(v)) for k, v in self.bindings[name][1].items()}}
                 for name, m in self.modules.items()]
+
+    def can_capture_frame(self):
+        # Start with one explicit, read-free Poisson generator. Hooks, changing RNG activation,
+        # boundary adapters and arbitrary user modules retain the eager scheduler around the core graph.
+        if self.hooks or len(self.modules) != 1:
+            return False
+        m = next(iter(self.modules.values()))
+        return (getattr(m, 'cuda_graph_safe', False) and getattr(m, 'cuda_async_validation', False)
+                and getattr(m, 'poisson_always_on', False) and not m.reads
+                and m.channel_out == 'poisson_hz' and getattr(m, 'boundary', None) is None)
 
     def run_modules(self, dt_ms):
         b = self.fb.brain

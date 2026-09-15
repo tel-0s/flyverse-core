@@ -7,8 +7,9 @@ body that walks, jumps and flies, and a room with a table with fruit on it. Two 
 releases load through the same API -- FAFB v783 (brain, complete optic lobe) and BANC v888 (brain +
 VNC) -- as `connectome.load(dataset="fafb" | "banc")`.
 
-The connectome is never trained or edited. Everything the fly does comes from the wiring plus a
-small, documented set of physiological assumptions, each one named below.
+The default `raw` brain uses the unchanged connectome plus the documented physiological assumptions
+below. Explicit programs and `instrumented` experiments add labelled computations; their output is
+not attributed to the wiring alone.
 
 ![The flyverse room console](docs/demo_ui.png)
 *The room console: body camera, small orbit view, both retinal mosaics, antennal inputs, and
@@ -41,6 +42,11 @@ teleports it to the apple, `?` lists the rest.
 
 Install details (CUDA wheels, extras, the female releases, the cluster runner): **`docs/INSTALL.md`**.
 Controls, flags, speed numbers, the batched simulator and the file-by-file map: **`docs/OVERVIEW.md`**.
+
+An experimental heading-memory stand-in is available with `--preset instrumented --instrument compass`.
+It integrates realized yaw and continuously drives the biological EPG cells; it supplies angular memory,
+not a recovered neural attractor or a food-seeking policy. The UI and saved provenance label it. `raw`
+remains the default. See [instruments](docs/INSTRUMENTS.md) and the [validation audit](docs/audits/compass_standin.md).
 
 ## What is simulated
 

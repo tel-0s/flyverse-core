@@ -91,6 +91,14 @@ See [the backend audit](audits/connectome_backends.md) for mapping coverage and 
 
 ## A controller without a room
 
+The optional heading stand-in is `FlyBrain(..., preset="instrumented", instruments=["compass"])`.
+It uses the ordinary extension scheduler and writes only EPG Poisson input. Feed realized angular velocity
+in rad/s through `fb.proprioception(0, 0, 0, False, yaw_rate=...)` before advancing; zero it on stopping.
+This can be used without enabling other proprioceptive channels. `BatchSim` and `room_demo.py` feed the
+body channel automatically. Initial phase is arbitrary; there is no absolute-heading or goal input.
+`raw` rejects this instrument and is still the default. [INSTRUMENTS.md](INSTRUMENTS.md) describes the
+candidate's validation limits, reset/checkpoint behavior and removal condition.
+
 ```python
 from flyverse import FlyBrain
 

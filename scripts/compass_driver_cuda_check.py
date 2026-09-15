@@ -32,14 +32,20 @@ def run(out):
         for name in FlyBrain.BRAIN_TENSORS:
             torch.testing.assert_close(getattr(a.brain,name),getattr(b.brain,name),rtol=0,atol=0,msg=label+':'+name)
         torch.testing.assert_close(a.instruments['compass'].phase,b.instruments['compass'].phase,rtol=0,atol=0)
+        ai,bi=a.module_inputs(),b.module_inputs()
+        assert ai.keys()==bi.keys()
+        for key in ai:torch.testing.assert_close(ai[key],bi[key],rtol=0,atol=0)
         checks.append(label)
     for frame in range(80):
         yaw=np.array([1.,-2.,.5])*(1 if frame<40 else -1)
         for fb in (a,b):
             fb.proprioception(0,0,0,False,yaw_rate=yaw)
             if frame==20:fb.stimulate(np.arange(8),100.,3.)
-            fb.step(10.)
-        if frame in (0,20,40,79):equal(f'frame {frame}')
+            if frame==30:fb.brain.set_drive([0],.25)
+            if frame==45:fb.step(5.);fb.step(5.)
+            else:fb.step(10.)
+        if frame==0:assert any(isinstance(g,tuple) for g in a._graphs.values()),'module frame was not captured'
+        if frame in (0,20,21,30,40,45,46,79):equal(f'frame {frame}')
     for fb in (a,b):fb.reset(rows=[1])
     for fb in (a,b):fb.step(10.)
     equal('partial reset')

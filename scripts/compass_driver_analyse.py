@@ -105,6 +105,7 @@ def analyse(root):
     summary=dict(functional_rows=len(driven),functional_pass=sum(not r['failed_gates'] for r in driven),
                  functional_failures=[r for r in driven if r['failed_gates']],
                  suite_pairs=len(suite_rows),suite_regressions=[r for r in suite_rows if r['regressed']],
+                 suite_status_changes=[r for r in suite_rows if r['raw_status']!=r['instrumented_status']],
                  suite_missing=[r for r in suite_rows if 'MISSING' in (r['raw_status'],r['instrumented_status'])],
                  profile=timing,verified_records=len(verified),
                  ui_screenshot_exists=(root/'ui.png').exists())
@@ -135,22 +136,62 @@ def plot(root,out):
         z=np.load(root/f'{mode}_s10.npz');r=z['rates'][:,6];w=z['wedges'];t=z['t']
         p=np.stack([r[:,w==i].mean(1) for i in range(16)],axis=1)
         moment=p@np.exp(1j*np.arange(16)*2*np.pi/16);strength=abs(moment)/np.maximum(p.sum(1),1e-9)
-        phase=np.angle(moment)*180/np.pi;phase[strength<.6]=np.nan
-        expected=np.angle(np.exp(1j*z['expected'][:,6]))*180/np.pi
+        phase=np.unwrap(np.angle(moment))*180/np.pi;phase[strength<.6]=np.nan
+        expected=np.unwrap(z['expected'][:,6])*180/np.pi
         image=axes[0,col].imshow(p.T,origin='lower',aspect='auto',extent=(t[0],t[-1],-.5,15.5),vmin=0,vmax=70,cmap='magma')
         axes[0,col].set_title(mode+(' / imposed angular memory' if col else ' / plain brain'))
         axes[0,col].set_ylabel('EPG wedge');axes[1,col].plot(t,expected,'k--',label='imposed heading')
         axes[1,col].plot(t,phase,color='#168c9b',label='neural phase (strength >=0.6)')
-        axes[1,col].set_xlabel('Time (s)');axes[1,col].set_ylabel('Wrapped heading (deg)')
-        axes[1,col].set_ylim(-190,190);axes[1,col].legend(fontsize=8,loc='lower right')
-    fig.colorbar(image,ax=list(axes[0]),label='Actual EPG spike rate (Hz)',fraction=.025,pad=.02)
+        axes[1,col].set_xlabel('Time (s)');axes[1,col].set_ylabel('Unwrapped heading (deg)')
+        axes[1,col].set_ylim(-20,560);axes[1,col].legend(fontsize=8,loc='lower right')
     fig.suptitle('Full brain, seed 10 row 6: stationary / +180 deg/s / stationary / reverse / stationary')
-    fig.subplots_adjust(top=.88,hspace=.22,bottom=.09)
+    fig.subplots_adjust(top=.88,hspace=.22,bottom=.09,right=.87)
+    fig.colorbar(image,cax=fig.add_axes((.89,.535,.015,.345)),label='Actual EPG spike rate (Hz)')
     fig.savefig(out/'turn_trace.png',dpi=160);plt.close(fig)
+
+
+def scheduler(original, updated):
+    original=Path(original);updated=Path(updated);out=updated/'analysis';out.mkdir(exist_ok=True)
+    frozen=read(updated/'predeclared.json');exact=[];source_checks=[]
+    def verify(p,label):
+        assert p['execution']['device']=='cuda',label
+        fp=p['source_fingerprint'];assert fp['computed'],label
+        files=fp['files_lf'];want=frozen['source_sha256_lf']
+        matched=[k for k in want if k in files]
+        assert len(matched)>30 and all(files[k]==want[k] for k in matched),label
+        source_checks.append(dict(record=label,matched_files=len(matched)))
+    def compare(stem):
+        old=np.load(original/(stem+'.npz'));new=np.load(updated/(stem+'.npz'))
+        assert old.files==new.files,stem
+        arrays={k:np.array_equal(old[k],new[k]) for k in old.files}
+        exact.append(dict(run=stem,arrays=arrays,passed=all(arrays.values())))
+        verify(read(updated/(stem+'.json'))['provenance'],stem)
+    for seed in range(10,16):compare(f'instrumented_s{seed}')
+    compare('room_instrumented')
+    timings={};identities={}
+    for label in ('profile','profile_native'):
+        p=read(updated/(label+'.json'))
+        identities[label]=p['identity']
+        timings[label]=profile(updated/(label+'.json'))
+        for i,c in enumerate(p['controllers']):verify(c,f'{label}:{i}')
+    check=read(updated/'cuda_checks.json');assert len(check['checks'])==9
+    verify(check['provenance'],'cuda_checks')
+    rooms={}
+    for mode in ('raw','instrumented'):
+        r=read(updated/f'room_native_{mode}.json');verify(r['provenance'],'native room '+mode)
+        rooms[mode]={k:r[k] for k in ('frame_ms_median','frame_ms_p95','rows')}
+    data=dict(exact=exact,exact_pass=all(r['passed'] for r in exact),timings=timings,
+              matched_input_identity=identities,
+              performance_pass=all(r['target_pass'] for rows in timings.values() for r in rows),
+              native_rooms=rooms,cuda_checks=check['checks'],source_checks=source_checks)
+    (out/'summary.json').write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
+    print(json.dumps(data,indent=2))
 
 
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--runs',default='out/compass_standin')
-    ap.add_argument('--profile-only',action='store_true');a=ap.parse_args()
-    if a.profile_only:print(json.dumps(profile(Path(a.runs)/'profile.json'),indent=2))
+    ap.add_argument('--profile-only',action='store_true');ap.add_argument('--scheduler',help='directory of scheduler rerun')
+    a=ap.parse_args()
+    if a.scheduler:scheduler(a.runs,a.scheduler)
+    elif a.profile_only:print(json.dumps(profile(Path(a.runs)/'profile.json'),indent=2))
     else:analyse(a.runs)

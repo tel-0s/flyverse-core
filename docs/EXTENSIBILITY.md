@@ -5,6 +5,18 @@ synthetic cells and follows the existing numerical path. Anatomical `modules=`
 still selects a connectome subset; `attach()` registers an executable extension.
 The shipped connectome, physiological defaults, and body readout are unchanged.
 
+`CompassDriver` is a concrete example: `FlyBrain(preset="instrumented", instruments=["compass"])`
+attaches a batched heading-memory module that writes only EPG Poisson Hz. The explicitly named instrument
+can receive held yaw velocity through the existing proprioception call (PRESETS_SPEC section 5). It has
+no body object, absolute heading or motor-command access. Ordinary modules still read selected neural
+quantities. Reset, per-row reset, checkpoint and detach use the same extension lifecycle.
+
+Its CUDA scheduler uses an asynchronous finite-output invariant assertion and a proven positive Poisson
+lower bound to avoid host readbacks. Invalid caller inputs are checked before stepping. An internal
+nonfinite CUDA output may abort the CUDA context at a later launch; modules without this explicit opt-in
+keep synchronous validation. Activity proofs are cleared on reset, load and detach. These are internal
+performance hints, not a relaxation of the module output contract or a change to raw stepping.
+
 `tests/test_bit_identity.py` holds that last sentence to the byte: one deterministic
 CPU scenario over a synthetic graph (all four senses, `stimulate`, `set_drive`,
 fractional-ms carry-over, a `state_dict` round trip, per-row and full `reset`) hashed
