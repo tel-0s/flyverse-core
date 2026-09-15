@@ -1,9 +1,14 @@
 """CPU, synthetic anatomy: reconstruction correctness and fail-closed reporting."""
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 import scipy.sparse as sp
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from flyverse import connectome as cn
 from scripts.recover_banc_columns import (
