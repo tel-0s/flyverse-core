@@ -96,4 +96,11 @@ of equivalence or a unique receptor mechanism.
 
 ## 5. Results
 
-(empty until `cx8` returns)
+Initial attempt `cx8`, source `a20d0ed`, is **invalidated before inference**: the added frozen LIF record
+incorrectly declared `sign/class`, whereas `--receptor-model shipped` actually runs the shipped `sign/abs`.
+This reviewer-introduced declaration error is recorded in `instruments_review.md` section 5. Original records
+and declaration remain unchanged under `out/cx8/`; no statistical or functional decision uses that attempt.
+The replacement `cx8r` repeats all 48 original arm/seed commands and the six contrasts, with the declaration
+corrected to the actual shipped rule and frozen again before submission. No gain, gate or outcome rule changes.
+
+(valid results pending `cx8r`)

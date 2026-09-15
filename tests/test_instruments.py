@@ -348,6 +348,11 @@ class CxWedgeVArmSmoke(unittest.TestCase):
             self.assertEqual(row["preset"], "instrumented"); self.assertEqual(row["instruments"], ["sided_turn_afferent"])
             self.assertEqual(row["device"], "cpu"); self.assertEqual(row["arm"], "V")
             prov = row["provenance"]
+            import cx_velocity_route as cvr
+            # --receptor-model shipped resolves BOTH fields from LIFParams(), overriding the separate
+            # CLI net-rule default. The frozen protocol must match the actual simulation path.
+            self.assertEqual(row["receptor_net_rule"], cvr.PROTOCOL["receptor_net_rule"])
+            self.assertEqual(prov["model"]["lif"], cvr.resolved_lif_by_arm()["V"])
             self.assertEqual(prov["preset"], "instrumented")
             self.assertEqual(prov["instruments"][0]["law"], "unverified")
             self.assertEqual(prov["instruments"][0]["chain_for_positive_yaw"][0], "AN07B037_a_L -> PS196_b_R -> GLNO_L -> PEN_R")

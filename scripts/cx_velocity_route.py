@@ -153,7 +153,7 @@ def plan_batch(out_dir: Path, seeds, minutes=30, name="cx8"):
 # Fixed protocol values are checked independently in each run header and stimulus record.
 PROTOCOL = {"gE": 1.0, "gD": 1.0, "gR": 1.0, "delta7_pen": True, "background_hz": 10.0,
             "pulse_hz": 40.0, "pulse_s": 2.0, "seconds_after": 5.0, "width": 4, "start_wedge": 0,
-            "settle_s": 1.0, "receptor_model": "sign", "receptor_net_rule": "class"}
+            "settle_s": 1.0, "receptor_model": "sign", "receptor_net_rule": "abs"}
 HOLD_COUNTS = {HOLD: (1149, 37256.0, 88), HOLD_PEN: (402, 7893.0, 42)}
 CACHE_MD5 = {False: "ef23cc27bea13be7f6a96f3c04fd3737", True: "7a10d93ba2086f2c76bcdabdca79b4ec"}
 KEYS = list(dict.fromkeys(KEYS + [f"{g}_{side}_hz_turn" for g in ("GLNO", "PEN", "DNa02", "PS196b", "AFF")
@@ -182,7 +182,7 @@ def resolved_lif_by_arm():
         if hold:
             gains.append((*hold.split(":", 1), 0.0))
         params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=gains,
-                                 receptor_model="sign", receptor_net_rule="class")
+                                 receptor_model=PROTOCOL["receptor_model"], receptor_net_rule=PROTOCOL["receptor_net_rule"])
         result[name] = common.to_jsonable(common.model_record(params)["lif"])
     return result
 
@@ -356,6 +356,14 @@ def load_runs(runs_dir: Path, alias: dict) -> tuple[list, list]:
                 fp = prov.get("source_fingerprint", {}).get("files", {})
                 if not fp:
                     bad.append("missing source fingerprint")
+                if frozen:
+                    loaded = prov.get("source_fingerprint", {}).get("files_loaded", {})
+                    if not all(f in loaded for f in ("scripts/cx_wedge.py", "scripts/probe_compass_room.py")):
+                        bad.append("missing loaded probe source hashes")
+                    for file, h in loaded.items():
+                        wanted_hash = frozen.get("source_sha256_lf", {}).get(file)
+                        if wanted_hash and h != wanted_hash:
+                            bad.append(f"loaded simulation source differs from predeclaration: {file}")
                 fingerprints.add(json.dumps(fp, sort_keys=True))
             row["checks"] = "; ".join(bad)
             problems.extend(f"{run_id}: {item}" for item in bad)

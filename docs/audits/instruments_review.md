@@ -8,6 +8,8 @@ could bypass the preset/provenance contract. Both are corrected before any cx8 s
 
 This is Astra's implementation review and self-review of the fixes, not an independent Opus pass. No GPU jobs
 were submitted during review. The scientific result and independent skeptic pass remain pending.
+**Post-merge correction:** the first cx8 attempt exposed a reviewer error in the new frozen LIF record;
+see section 5. That attempt is invalidated.
 
 ## 1. Coverage against the handoff and spec
 
@@ -105,3 +107,29 @@ modified configuration. Generic caller-supplied resolved-count fields are not a 
 its exact counts and model independently. Physiology and transfer-law claims remain unverified until sourced.
 The preset remains raw. Round 7 is an experiment, and a functional result still requires the authorized suite and
 room comparisons before any adoption. Independent scientific skeptic: pending, Fable when accounts reset.
+
+## 5. Post-merge protocol correction before the valid experiment
+
+At `a20d0ed`, the reviewed declaration and its synthetic fixtures incorrectly named `receptor_net_rule="class"`.
+`cx_wedge.py --receptor-model shipped` actually resolves both receptor fields from `LIFParams()`: `sign` and
+`abs`. Its separate CLI default of `class` is overridden by `shipped`. The simulation commands therefore ran
+the intended shipped setting, but not the frozen model record. This is Astra's review error, not a GPU discrepancy.
+The actual V CPU smoke passed, but the test had not compared its full resolved LIF to the new declaration.
+
+The complete initial cx8 attempt is retained as invalid, with its declaration unchanged. No scientific decision
+uses those measurements. Corrected the declaration builder to `abs` and added that comparison to the existing
+actual-CLI CPU smoke. A fresh complete batch, cx8r, repeats the same arm commands, seeds and primary family;
+its own declaration is frozen before submission. This is an operational replacement, not the one permitted
+scientific follow-up. The raw defaults and physical experiment settings are unchanged by this correction.
+
+Both initial client calls completed and fetched 24 jobs with zero scheduler failures. The original strict
+reducer emits 144 issues, exactly the same mismatch in the top-level protocol, stimulus and full resolved LIF
+for each of 48 runs. Separate `scripts/cx8_verify.py` reproduces 972 trace measurements within 5e-5 Hz absolute /
+1e-6 relative tolerance and matches 52 source hashes (including `files_loaded` for the two probe scripts).
+It retains the 48 model mismatches. These are validation diagnostics only; none of the invalid attempt's
+scientific verdicts is used. The primary checker also now verifies the loaded probe hashes against the freeze.
+
+Post-correction full CPU suite: **469 passed, 19 skipped, 220 subtests passed**, 176.98 s,
+`out/compass7/cx8_protocol_cpu_final.log`, including the actual-CLI full-LIF comparison and unchanged golden.
+All three main/worktree cache MD5s above remain unchanged. All 48 replacement commands compare equal to the
+initial commands after replacing only the output directory (`out/compass7/cx8r_commands_check.json`).
