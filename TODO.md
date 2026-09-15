@@ -197,6 +197,13 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
         untuned ring feedback by the same factor and cannot set the Delta7 : ring ratio. `LIFParams.w_syn_by_nt`
         is **kept as an opt-in instrument** (owner decision, session 11) and no bracket of it is adoptable.
         Owed: a type-level ring mechanism the data imply, and 4 seeds per compass arm so the rows are callable.
+        **Round 5: answered NO on the type level, and nothing adopted** (`compass_ring_mechanism.md`, batch `cx5-5cde5e`,
+        8 jobs / 0 failed / 48 runs; `glno_relabel.md`, batch `cx5b-d08be3`, 22 jobs / 0 failed; both skeptic passes
+        mostly sound): at gE 1 / gD 1 no arm meets the "working compass" rule and every surviving bump fails on rate,
+        the binding constraint being the ExR6 / ER6 / ER4m DC balance on PEN, not a missing ring mode. **GLNO ->
+        glutamate is NOT adopted**: the suite half of the round-2 rule is met (27/0/2 in all six draws, no status
+        change), the rate half is unrun, the source standard is unmet, every compass row is null and the signed
+        self-turn report still stops at AN04B003. Nothing adopted, no default moved.
     - [ ] **the ACh-only unitary family** (next-round item 3; ONE submission, `--arm-block-map` so the family is
           ONE block): `w_syn_by_nt` acetylcholine x0.8 and x0.5 with inhibition x1, through the suite x 4 draws,
           the wedge compass x 4 seeds and the room x 4 runs with the transducer OFF **and** ON; `taste.MN9_hz`
@@ -209,6 +216,38 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           exists, park the compass at "no attractor at shipped gains" and run the free-walking compass room under
           the transducer at the experiment gains once (4 seeds, one block, bump metrics + `circ_corr_heading`) to
           close `body_sided_state.md` 8 item 5 -- expected negative: the report is gone by GLNO.
+    - [ ] **the ExR6 / ER6 / ER4m -> PEN, EPG hold arm** (`compass_ring_mechanism.md` 4 and the 5A skeptic's closing
+          paragraph; the one arm round 5 named and did not run): an `edges`-kind hold of those three types at 0 onto PEN
+          and EPG -- with the ER/ExR term removed the decomposition puts the driven PEN at +9.7 - 0.6 = **+9.1 mV**
+          during the pulse, above the 7 mV gap (f ~ 30 Hz) -- which turns "the DC inhibition keeps the relays below
+          threshold" from a decomposition into a tested attribution. **First fix `scripts/cx_ring_structure.py`'s two
+          owned defects**: enter the forced drive as a **current**, not as a rate (today `rate_fixed_point` adds it as a
+          rate, so gamma_EPG = 0 by construction), and **keep the one-step EPG -> EPG term** the two-step reduction
+          computes and drops (undamped k = 1 coefficient +59.76 mV, gamma_crit 3.35 Hz/mV, predicting 145 Hz against the
+          observed 151-156). Then re-derive the section 1.3 ranking, which is presently computed at a zero-gain state.
+    - [ ] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate,
+          sign -1, no `receptors_by_type.csv` row (tier fallback = NT_SIGN), and the -1 onto EPG rides on the E-PG row's
+          GluClalpha (Davis 2020 PB_2, tier alias). **No published transmitter or function for ExR6 could be verified**
+          (Hulse et al. 2021 defines ExR1-ExR8 morphologically and by connectivity; ExR2 is the dopaminergic PPM3 class;
+          the classical ER ring neurons are the GABAergic E-PG inhibitors of Omoto 2017 / Fisher 2019 / Kim 2019), so it
+          is **unknown** in the literature and is to be stated as unknown, never as "the ring neurons inhibit EPG".
+    - [ ] **the room rate-half for GLNO, if adoption is ever wanted** (`glno_relabel.md` 4.3(b);
+          `guard_suites_r3.md` 4): the room take-off protocol on `out/cache_glno_glu` at **>= 6 runs per arm** in ONE
+          submission (`guard_suites.sh`'s room jobs with `FLYVERSE_CACHE` / `--cache-dir`). The suite half is already met
+          (27/0/2 x 6, no status change); this is the only half still runnable, and the source standard of the three
+          existing `TYPE_NT_OVERRIDE` entries (a transcriptome or EASI-FISH profile) would remain unmet either way.
+    - [ ] **the `struct.GLNO_PEN.sign` ledger row's polarity** (`flyverse/data/expected_responses.csv`;
+          `glno_relabel.md` 4.6 item 1): the row is written `expected 0`, `op ==`, `bound 0`, `gap 1` with the note
+          "known gap: the largest single input of PEN carries no sign and is silent in the model", so meeting `== 0`
+          prints "PASS (gap closed)" for what IS the gap -- the polarity is inverted. It also has no `check_key` (the
+          29-check suite cannot see it), and its companion `struct.GLNO_PEN.synaptic_pair_count` row is still MISSING a
+          `model_reference` until `scripts/interp_paths.py` emits a per-type row for the GLNO -> PEN block; any GLNO
+          adoption must re-score the sign row.
+    - [ ] **the body-model question at PS196_b** (`vnc_drive.md` 6, `body_sided_state.md` 6; `glno_relabel.md` 4.2): the
+          signed self-turn report's break is **AN04B003 -> PS196_b** -- AN04B003 is `result` (-11.2 / -11.8 / -11.5 /
+          -11.5 Hz, p 0.0286 = the exact-U floor) in 4/4 arms and PS196_b is `null` in 4/4, its L-R the same sign in both
+          turn directions. A **sided PS196_b** is what a signed GLNO needs to carry anything; until then the GLNO sign
+          changes rates, not reports.
   - [ ] **saccade generator / signed steering command**: named missing by round 3
         (`round3_integration.md` 9): nothing in the wired graph produces a clean frame above 100 deg/s or a
         DNa02 sided rate that leads the yaw. Round 3's largest yaw numbers (12.8-13.4 deg/s under transducer +

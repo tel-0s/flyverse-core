@@ -2591,6 +2591,125 @@ measurement), the suite under `all+leg_cycle`, ledger values for `lit.walk.outer
 to which this round adds the cycle's realised per-leg amplitude (0.948) as a second unmeasured quantity of the same
 kind.
 
+## Session 12, compass round 5: the ring mechanism and the GLNO sign (2026-09-15)
+
+Two threads, one house submission each, one independent skeptic pass each; **nothing adopted and no default moved.**
+
+**5A -- is there a type-level ring mechanism, or none? (`docs/audits/compass_ring_mechanism.md`, batch `cx5-5cde5e`.)** ONE
+`cluster_run.py` call, **8 job(s), 0 failed** (4 seeds x {GLNO silent, GLNO = glutamate}, six arms per job), **48 runs**
+(12 arms x 4 seeds) on the house B200s with 0 provenance problems; a new CPU structure pass
+(`scripts/cx_ring_structure.py`, `tests/test_cx_ring_structure.py` 5 passed) ranked the candidates first. **The answer is
+no.** At the shipped gains (gE 1 / gD 1) the shipped path, the GLNO relabel, the receptor `sign+gain` tier and their pair
+all score `bump_survival_s` 0.00 in 4/4 seeds, and **no arm meets the predeclared "working compass" rule** (survival >= 5 s
+AND width 2.5-5 wedges AND rate 5-60 Hz in >= 3 of 4 seeds): **every surviving bump fails on rate** -- F (same-type damping
+off, a labelled global INSTRUMENT) 151-156 Hz in 4/4, CFG 156-158, and the labelled references R 201-203 and RG 181-184, all
+about 3x above the 5-60 Hz ledger row. The binding constraint is a **DC balance on the relays**, not a missing ring mode:
+the EPG drives 2 ExR6 + 4 ER6 (+ 11 ER4m onto EPG) harder than it drives PEN (EPG -> ExR6 +11.4 mV per pair against
+EPG -> PEN +5.05), so u_PEN sits at -11.1 mV at background and -15.8 mV *during* the pulse, and the measured PEN population
+mean is 0.29-0.66 Hz during the pulse (0.02-0.06 after). The caveat the skeptic forced into the audit: **the per-type
+ExR6 -14.8 mV at 183 Hz / ER6 -9.8 at 116 Hz figures are rate-model outputs, not measured**, and they overstate the DC term
+by roughly 2x against this batch's own 308-cell ring population (244 Hz after release, 630 at the end of the pulse, peak
+800); the conclusion rests on the measured PEN rate. The ER/ExR feedback carries no k = 1 content (-206, 2.5 % of PEN's
++8,327), so it is untuned in the bump mode rather than a flattened cosine.
+
+**The structure pass's two defects, owned by that thread.** It missed the F-family bump, and not because of a
+fluctuation regime: (i) the EPG-only reduction computes the one-step EPG -> EPG term and then drops it (its undamped k = 1
+ring-Fourier coefficient is +59.76 mV, gamma_crit 3.35 Hz/mV, predicting saturation at 145 Hz against the observed
+151-156), and (ii) `rate_fixed_point` enters the forced background as a **rate** rather than as a **current**, so the driven
+EPG sits at u -22 to -68 mV while "firing" at 10-50 Hz and gamma_EPG = 0 by construction. The section 1.3 ranking is
+therefore computed at a zero-gain state and is not to be trusted until both are fixed; the defects are named in the module
+docstring of `scripts/cx_ring_structure.py`. **The next arm**, which the audit's own decomposition names and this batch did
+not run: an `edges`-kind hold of **ExR6 / ER6 / ER4m at 0 onto PEN and EPG** -- with the ER/ExR term removed, u_PEN during
+the pulse is +9.7 - 0.6 = **+9.1 mV**, above the 7 mV gap (f ~ 30 Hz) -- the one arm that turns "the DC inhibition keeps the
+relays below threshold" from a decomposition into a tested attribution. Its data half is a **relabel with sources, not a
+gain: ExR6's transmitter and receptor are unknown.** ExR6 is 2 cells, MaleCNS `nt` glutamate, sign -1, with no
+receptor-table row (tier fallback = NT_SIGN), and its -1 onto EPG rides on the E-PG row's GluClalpha (Davis 2020 PB_2, tier
+alias); no published transmitter or function for ExR6 could be verified (Hulse et al. 2021 defines ExR1-ExR8
+morphologically and by connectivity, ExR2 is the dopaminergic PPM3 class, and the classical ER ring neurons are the
+GABAergic E-PG inhibitors of Omoto 2017 / Fisher 2019 / Kim 2019), so it is to be stated as **unknown** rather than as "the
+ring neurons inhibit EPG".
+
+The independent 5A pass (Opus, verdict **mostly sound**, 14 corrections, all applied) closes with this, quoted verbatim:
+
+**What the compass now needs.** The shipped-gain question is closed as a *null*, not as a *result*: every gE 1 / gD 1
+arm is a structural zero-SD comparison against a reference that is also zero, read as magnitudes, and the two arms that
+carry a bump are a labelled global INSTRUMENT (`same_type_gain` 1) and a labelled reference (gE 2 / gD 15) -- neither is
+a mechanism the data imply, and both fail `compass.EPG.bump_rate_hz` 3x, so `compass.EPG.bump_survival_s` stays FAIL and
+the rate and width rows stay NOT_APPLICABLE. Nothing here licenses an adoption. What it licenses is one more
+**measurement** and one more **counterfactual arm**, in that order: first fix the structure tool (forced drive as a
+current, the one-step term kept, per-cell gamma at the realised fixed point) and re-derive the ranking, because the
+present ranking is computed at a state with zero gain everywhere and its miss on the F family shows it; then run the
+single `edges`-kind arm the audit's own decomposition names -- ExR6 / ER6 / ER4m held at 0 onto PEN and EPG -- which
+the fixed point predicts puts the driven PEN at +9.1 mV and ~30 Hz during the pulse, and which is the only thing that
+turns "the DC inhibition keeps the relays silent" from a decomposition into a tested attribution. Alongside it, the
+data question is a **relabel with sources**, not a gain: ExR6's transmitter confidence and whether it has any fast
+receptor on E-PG at all (it has no receptor-table row; the -1 rides on the E-PG GluClalpha profile), reported as
+`unknown` where it is unknown. The GLNO relabel is a `null` at these gains and should be handed to `glno_relabel.md`
+saying exactly that -- a silent neuron's sign is untested, not confirmed harmless. And the F-family bump should not be
+brought back as a candidate until it is run in the room with a world: at 151-158 Hz it is a KNOWN GAP swap, and the
+rest-of-brain 0.04 Hz in this world-less protocol is no evidence at all about the runaway cliques the x0.1 was adopted
+against.
+
+**5B -- is GLNO = glutamate adoptable? (`docs/audits/glno_relabel.md`, batch `cx5b-d08be3`.)** ONE submission, **22 job(s),
+0 failed (18.5 min)** on a B200, every one of the 22 JSONs carrying `problems []` and the md5 of the cache it was asked for:
+the 29-check suite at 3 draws x {shipped, glutamate}, and the efferent compass (family `level`, arm C = `all+leg_cycle`) at
+4 seeds x {shipped, glutamate} x {gE 2 / gD 15, shipped gains}. Structure, entry by entry on the CPU: the candidate cache
+differs from the shipped one in **exactly 4 cells and 213 W entries** -- all with a GLNO presynaptic cell, all 0 ->
+negative, |value| equal to the shipped sign-0 count on every one; 17,698 raw synapses; the 84 GLNO -> PEN edges at -16.50 mV
+per GLNO spike (-33.0 per PEN per volley), all 84 above the connection cap -- plus a <= 1.2 % fan-in-scale shift on 20 minor
+targets. **Under the shipped receptor model that W is bit-identical to the round-3/4 `gaba` cache** (md5 `7a10d93b`;
+`fast_sign` identical between the two labels on all 25,578,600 entries), which is why the decision is about a sign and not
+about a transmitter name. Suite: **27 PASS / 0 FAIL / 2 KNOWN GAP in all six draws, no check changing status**, with
+`changed_pooled`, `changed_matched` and `unstable_shipped` all empty over 174 check rows. Compass: **every predeclared
+member `null`** at 4 v 4 (all 15 members of F1-F5: the GLNO / PEN_a / PEN_b flips and the bump drift), and **the signed
+self-turn report still stops at AN04B003** (`result`, -11.2 / -11.8 / -11.5 / -11.5 Hz, p 0.0286 = the exact-U floor, in
+4/4 arms) and is **`null` at PS196_b**, GLNO, PEN and EPG at both gain settings. What the relabel moves is rates, not
+reports: the ring -5..-15 %, FB4Y -31 %, FB1C -68 %, ExR8 silenced outright, and GLNO's standing L-R +27 -> +3..+4 Hz.
+
+The independent 5B pass (Opus, verdict **mostly sound**, corrections C1-C14, all applied) closes with this, quoted verbatim:
+
+**What rounds 5A and 5B jointly say about the compass and GLNO.** Taken together the two threads turn the GLNO sign
+from an open question into a `null` with a known mechanism, and leave the compass's real failure where 5A found it.
+5A establishes that at the shipped gains no type-level change reachable from the data -- the GLNO relabel included --
+makes the ring hold a bump, because PEN sits 11-16 mV below threshold under ExR6 / ER6 and the relabel is therefore
+inert (`bump_survival_s` 0.00 in 4/4 seeds, a structural zero-SD null); the only configuration that carries a bump at
+those gains is the removal of a global hand rule, which is a labelled instrument, not a mechanism, and which the
+correct GLNO sign then destroys. 5B runs the same candidate on the one instrument where a signed GLNO can act (gE 2 /
+gD 15, body attached, leg cycle on, DNa02 driven) and finds the effect is entirely on rates -- ring -5 to -17 %, FB4Y
+-31 %, FB1C -68 %, ExR8 silenced, GLNO's standing L-R compressed 86-88 % -- with every predeclared flip and the bump
+drift `null` at 4 v 4, and with the signed self-turn report still terminating at AN04B003 (`result`, -11 Hz, p at the
+0.0286 floor, 4/4 arms) and `null` at PS196_b, GLNO, PEN and EPG. The joint reading is therefore: GLNO's transmitter is
+a **rate** parameter of the ring, not a **signal** parameter, and it is a parameter the fast model cannot even name,
+since glutamate and gaba produce a bit-identical W and, under the shipped receptor model, an identical model
+everywhere. The compass gap (`compass.wedge_cells_persisting` 0, KNOWN GAP in all six draws of both arms) is untouched
+by it in both threads, and the self-turn report's break is upstream, at a PS196_b whose input to GLNO is symmetric in
+both turn directions -- which is a body-model question, not a transmitter one. On the decision itself the two threads
+now agree with one correction: the adoption is **adoptable by the suite half of the round-2 rule and by nothing else**,
+the room rate-half is unrun, the source standard of the three existing `TYPE_NT_OVERRIDE` entries is unmet, and the
+"hemibrain name" 5A counted as one of three sources is not a source at all -- leaving two low-confidence EM classifiers
+calling glutamate and a third calling GABA, all three agreeing only that GLNO is inhibitory.
+
+**The owner decision: GLNO -> glutamate is NOT adopted.** The suite half of the round-2 rule is met and nothing else is.
+The **rate half was not run** (the room take-off protocol at >= 6 runs per arm, `guard_suites_r3.md` 4), and the **source
+standard of the three existing `TYPE_NT_OVERRIDE` entries -- each names a transcriptome or an EASI-FISH source -- is not
+met**: what exists for GLNO is two low-confidence EM classifiers calling glutamate (MaleCNS v1.0 T-bars 51 % glutamate /
+37 % ACh over 783 T-bars, every consensus column `unclear` at conf 0.48; BANC v888 `Predicted NT type` GLUT on 4/4 at conf
+0.47-0.50, unverified, taken by the backend without a threshold) and a third calling GABA (FlyWire v783 `top_nt` gaba 3/4
+at conf 0.30-0.33, glutamate 1/4 at 0.30), all three agreeing only that GLNO is **inhibitory**. **The "hemibrain name"
+cited to the owner as the third source is withdrawn.** No accessible text defines the "G" or attaches a transmitter
+prediction to GLNO: Scheffer et al. 2020 says only that "the nodulus neurons are now 'LNO' and 'GLNO' instead of 'LN' and
+'GLN'", Hulse et al. 2021's accessible text lists GLNO with no transmitter statement, and Wolff & Rubin 2018 is the source
+of the light-level `LAL-NO1` name and its abbreviation table. The expansion "GLutamatergic LAL-NOduli neuron" was asserted
+as a fact with no citation in `out/cx5/structure/evidence_glno.json` and repeated in `compass_ring_mechanism.md` 1.3(a);
+both threads and both skeptic passes failed to verify it, and it is not to be cited again without a page reference. Because
+the candidate's W is bit-identical to the gaba cache under the shipped model, **the decision actually on the table is "sign
+GLNO -1", not "GLNO is glutamatergic"** -- the transmitter name is a tie-break the data do not make. **Nothing was adopted
+and no default moved**: `cache/`, `connectome.TYPE_NT_OVERRIDE`, the receptor table and every gain are untouched, the
+candidate stays in the scratch cache `out/cache_glno_glu/`, and `same_type_gain` keeps its x0.1. What the round leaves on
+the list is in `TODO.md` B: the ExR6 / ER6 / ER4m hold arm (after the structure tool's two defects are fixed), ExR6's
+transmitter as a relabel-with-sources question, the room rate-half if adoption is ever wanted, the inverted
+`struct.GLNO_PEN.sign` ledger row, and the body-model question at PS196_b, where the self-turn report actually breaks.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
