@@ -24,7 +24,8 @@ def run(a):
     if dest.with_suffix('.json').exists():raise FileExistsError(dest)
     sim=BatchSim(a.batch,seed=a.seed,seeds=range(a.seed,a.seed+a.batch),device=a.device,
                  cuda_graphs=a.device=='cuda',program='none',fruit_set='apple',fence=True,
-                 start=(-.15,.15,.75),preset=a.mode,instruments=['compass'] if a.mode=='instrumented' else [])
+                 start=(-.15,.15,.75),preset=a.mode,instruments=['compass'] if a.mode=='instrumented' else [],
+                 cuda_kernels=True if a.native else None,event_driven=True if a.native else None)
     idx,w=epg_columns(sim.c);rec=[];rates=[];timings=[]
     hops=np.zeros(a.batch,int);previous=np.array([f.airborne for f in sim.flies])
     for frame in range(round(a.seconds*100)):
@@ -55,6 +56,7 @@ if __name__=='__main__':
     ap.add_argument('--mode',choices=['raw','instrumented'],default='instrumented')
     ap.add_argument('--seed',type=int,default=0);ap.add_argument('--batch',type=int,default=6)
     ap.add_argument('--seconds',type=float,default=60.);ap.add_argument('--device',choices=['cpu','cuda'],default='cuda')
+    ap.add_argument('--native',action='store_true')
     ap.add_argument('--out',required=True);a=ap.parse_args()
     if a.seconds<2:ap.error('seconds must be >=2')
     run(a)
