@@ -90,7 +90,7 @@ def _run(arm, seed, follow, glno_lr, pen_lr, dna_lr, confined=1.0, preset=None, 
             d.update(kind="relabel",parameters={"type":"GLNO","nt":"glutamate"})
         records.append(d)
     protocol = dict(gE=1.0,gD=1.0,gR=1.0,delta7_pen=True,background_hz=10.0,pulse_hz=40.0,pulse_s=2.0,
-                    seconds_after=5.0,width=4,start_wedge=0,settle_s=1.0,receptor_model="sign",receptor_net_rule="class")
+                    seconds_after=5.0,width=4,start_wedge=0,settle_s=1.0,receptor_model="sign",receptor_net_rule="abs")
     return {**protocol, "arm": arm, "seed": seed, "device": "cuda", "preset": exp["preset"] if preset is None else preset,
             "instruments": inst, "instrument_specs": [exp["spec"]] if exp["spec"] else [],
             "nt_override": ({"GLNO": "glutamate"} if (exp["glutamate"] if glu is None else glu) else {}),
@@ -231,6 +231,23 @@ def test_predeclaration_is_immutable_and_records_the_job_hash(tmp_path):
     assert len(frozen["family"])==6 and frozen["protocol"]["seconds_after"]==5.0
     with pytest.raises(FileExistsError): cvr.predeclare(tmp_path)
     with pytest.raises(ValueError): cvr.plan_batch(tmp_path,range(6))
+
+
+def test_frozen_protocol_checks_the_probe_actually_loaded(tmp_path):
+    cvr.plan_batch(tmp_path, range(6))
+    frozen = cvr.predeclare(tmp_path)
+    row = _run("V", 0, 0, 0, 0, 0)
+    row["provenance"]["model"]["lif"] = frozen["resolved_lif_by_arm"]["V"]
+    loaded = {p: frozen["source_sha256_lf"][p] for p in
+              ("scripts/cx_wedge.py", "scripts/probe_compass_room.py")}
+    row["provenance"]["source_fingerprint"]["files_loaded"] = loaded
+    _save_run(tmp_path, "V", row)
+    _, problems = cvr.load_runs(tmp_path, {})
+    assert not any("loaded" in p for p in problems)  # batch is incomplete, but its probe hashes match
+    loaded["scripts/cx_wedge.py"] = "different-code"
+    _save_run(tmp_path, "V", row)
+    _, problems = cvr.load_runs(tmp_path, {})
+    assert any("loaded simulation source differs" in p for p in problems)
 
 
 @pytest.mark.skipif(BASH is None, reason="bash is needed to exercise submission wrappers")

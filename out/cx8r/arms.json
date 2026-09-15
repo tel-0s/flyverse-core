@@ -1,0 +1,172 @@
+{
+ "batch": "cx8r",
+ "seeds": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "turn_deg_s": 90.0,
+ "turn_window_s": "0.5:3.5",
+ "holds": {
+  "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)": "ring_dc_hold",
+  "^(ExR6|ER6|ER4m)$:^PEN_": "ring_dc_hold_pen"
+ },
+ "arms": {
+  "S": {
+   "glutamate": false,
+   "hold": null,
+   "instrument": null,
+   "role": "raw reference",
+   "preset": "raw",
+   "instruments": []
+  },
+  "V": {
+   "glutamate": false,
+   "hold": null,
+   "instrument": "sided_turn_afferent:k=0.5",
+   "role": "the afferent alone",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent"
+   ]
+  },
+  "HG": {
+   "glutamate": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+   "instrument": null,
+   "role": "ring_dc_hold + glno_sign (6A's H3G)",
+   "preset": "instrumented",
+   "instruments": [
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGV": {
+   "glutamate": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+   "instrument": "sided_turn_afferent:k=0.5",
+   "role": "the arm",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGV-": {
+   "glutamate": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+   "instrument": "sided_turn_afferent:k=0.5:sign=-1",
+   "role": "the sign control",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGVp": {
+   "glutamate": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^PEN_",
+   "instrument": "sided_turn_afferent:k=0.5",
+   "role": "HGV with the hold on the PEN side only (6B: test the EPG hold separately; the earlier rest-of-ring inhibition inference was withdrawn)",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold_pen",
+    "glno_sign"
+   ]
+  },
+  "HGVk025": {
+   "glutamate": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+   "instrument": "sided_turn_afferent:k=0.25",
+   "role": "descriptive: k 0.25 on HGV",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGVk1": {
+   "glutamate": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+   "instrument": "sided_turn_afferent:k=1.0",
+   "role": "descriptive: k 1.0 on HGV",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  }
+ },
+ "family": [
+  [
+   "1_bump_follow_HGV_vs_HG",
+   "bump_follow_wedges_per_s",
+   "HGV",
+   "HG"
+  ],
+  [
+   "2_bump_follow_HGV_vs_HGV-",
+   "bump_follow_wedges_per_s",
+   "HGV",
+   "HGV-"
+  ],
+  [
+   "3_GLNO_LR_V_vs_S",
+   "GLNO_LR_hz",
+   "V",
+   "S"
+  ],
+  [
+   "4_PEN_LR_HGV_vs_HG",
+   "PEN_LR_hz",
+   "HGV",
+   "HG"
+  ],
+  [
+   "5_DNa02_LR_HGV_vs_HG",
+   "DNa02_LR_hz",
+   "HGV",
+   "HG"
+  ],
+  [
+   "6_frac_confined_post_HGVp_vs_HGV",
+   "frac_confined_post",
+   "HGVp",
+   "HGV"
+  ]
+ ],
+ "primary_arms": [
+  "S",
+  "V",
+  "HG",
+  "HGV",
+  "HGV-",
+  "HGVp"
+ ],
+ "follow_gate_confined_frac": 0.5,
+ "generated_utc": "2026-09-15T21:06:07Z",
+ "status": "DRAFT, not submitted",
+ "protocol": {
+  "gE": 1.0,
+  "gD": 1.0,
+  "gR": 1.0,
+  "delta7_pen": true,
+  "background_hz": 10.0,
+  "pulse_hz": 40.0,
+  "pulse_s": 2.0,
+  "seconds_after": 5.0,
+  "width": 4,
+  "start_wedge": 0,
+  "settle_s": 1.0,
+  "receptor_model": "sign",
+  "receptor_net_rule": "abs"
+ }
+}
