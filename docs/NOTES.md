@@ -2354,6 +2354,27 @@ vs MaleCNS 1,630). For the NT thread: about 400 of the 2,361 `unknown` cells Mal
 classical-transmitter prediction in BANC, and MaleCNS's `serotonin` class splits SER / DA / tyramine across
 sources. Ranked uses are in `TODO.md` section F; nothing here changed a model.
 
+### Session 11 addendum: connectome backends merged (2026-09-14)
+
+Astra implemented `docs/CONNECTOME_BACKENDS_SPEC.md` on `feat/connectome-backends` (d9f8cf2) and an independent Opus
+review (`docs/audits/connectome_backends_review.md`) verified it with its own harness: a full MaleCNS recompile with the
+branch code reproduces the shipped cache byte for byte, file for file (neurons.parquet c50c598a..., W_post_pre.npz
+ac131529..., sign0_counts.npz bf01d724...; fingerprint md5 ef23cc27... unchanged, key set unchanged); the FAFB column map
+hex1 = q + 18, hex2 = p + 20 passes the mirror (max 1.583 deg over 772 shared coordinates) and T4-offset (min cosine
+0.9818; the axis-swapped control gives -0.949) validations and the column count (1,581), and fails the strict DRA-on-rim
+check (100/126 on the flat dorsal band; 118/126 within two rows of the curved envelope) -- recorded as an expected failure
+in the acceptance gate, not hidden. Verdict merge with fixes; B1-B4 (BANC wing MNs silently empty through a naming gap,
+`$FLYVERSE_CACHE` moving the MaleCNS default, a FAFB cache built by an earlier compiler, the gate omitting the failing
+validation) fixed in 34c2eb0 and merged fast-forward. CPU suite 360 passed / 19 skipped. `docs/audits/connectome_backends.md`
+carries the numbers; the walking replicate (BANC, 5 seeds x 16 flies, house B200, one submission) is the first
+cross-connectome behavioural result: the female CNS walks straighter than the male at the shipped defaults (clean yaw SD
+0.275 +/- 0.004 vs 2.641 +/- 0.146 deg/s; DNa02 silent bilaterally) and the leg-cycle yaw increase replicates
+qualitatively (0.381 -> 2.651 deg/s, `result` within-dataset at 5 v 5) while the MaleCNS neural pattern does not
+(BANC DNa02_L silent under C, DNa02_R 0.0985 Hz vs 0.54/0.38; PS059 0.00087/0 Hz vs 20.06/16.77). Descriptive across
+reconstructions, not a sex test: animal, lab, synapse threshold and yield, optic capability and GPU all differ. A
+pre-existing bug in `probe_walk_straightness.py`'s table-exit counter (bounds tuple read as half-extents) was fixed as a
+reporter-only change (`metrics_version` 2).
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
