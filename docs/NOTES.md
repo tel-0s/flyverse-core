@@ -2375,6 +2375,114 @@ reconstructions, not a sex test: animal, lab, synapse threshold and yield, optic
 pre-existing bug in `probe_walk_straightness.py`'s table-exit counter (bounds tuple read as half-extents) was fixed as a
 reporter-only change (`metrics_version` 2).
 
+## Session 12, the level-matched control (2026-09-15)
+
+**What ran.** ONE house submission, `vncd4-8dd183`: **24 job(s), 0 failed (32.3 min)** on 8 x B200 -- the
+`probe_vnc_drive` room at four arms x five brain seeds (16 flies x 60 s, 5-60 s window, blocks `fam_r<seed>`) plus
+the same four arms on the efferent compass at four seeds (`fam_c<seed>`). Arms: **A** shipped (no sense), **L** the
+round-2 transducer (`all`) at `mn_ref_hz` **8.84** -- a LABELLED control, ONE hand-set parameter, the sense's default
+30 untouched -- **C** `all+leg_cycle`, **D** `all+leg_cycle+haltere_sided`. Predeclared families (`predeclared.json`,
+Holm m 5), decision pair **C v L**, precondition |L - C| <= 10 Hz on the commanded chordotonal rate.
+`docs/audits/level_matched_control.md`.
+
+**The `mn_ref_hz` derivation** (`out/vncd4/mn_ref_derivation.json`, CPU). `mn_ref` sets the afferent level through a
+closed loop -- afferents -> VNC -> leg MNs -> afferents -- so the open-loop solve depends on which arm's MN
+distribution it is done over: 4.16 / 4.99 / **8.45** Hz over the recorded round-3 A / B / C distributions. Two CPU
+calibration runs give the loop slope k = 0.032 Hz/Hz (loop gain 0.53, stable), and the fixed point of the loop is
+**8.8396 -> 8.84 Hz** (9.263 without the loop correction); d(level)/d(mn_ref) = -17.7 Hz per Hz, which is what the
+10 Hz tolerance is. The critique's **~3.5 Hz** estimate ignored both the clip and the loop: recomputed on the round-3
+C leg-MN distribution, mn_ref 3.0 / 3.5 / 4.0 gives **143-150 Hz** open loop (149-150 self-consistent) against the
+88 Hz it was meant to hit -- the 150 Hz clip makes the lower end unreachable.
+
+**The level match.** Realised window-mean commanded chordotonal rate **L 86.2 +- 0.5 Hz** against **C 87.4 +- 1.0**
+(C v L +1.2 Hz, z +2.4, p 0.15, **`null`**), measured rates of the same 615 cells identical to 0.03 Hz: the
+precondition is met with 1.2 Hz of a 10 Hz tolerance. Hair plate and campaniform were NOT matched, by construction
+and as predeclared: L 56.8 / 49.7 vs C 47.1 / 24.9 Hz (-9.7 / -24.8, `result`).
+
+**The family calls.** C v L is `result` on **DNa02_L +0.127 Hz** (0.431 +- 0.014 -> 0.558 +- 0.005; z +9.2, p 0.0079,
+Holm 0.040), **DNa02_R +0.103** (z +16.7), **clean yaw SD +0.57 deg/s** (7.30 +- 0.08 -> 7.87 +- 0.16; z +7.1) and
+**straightness +0.336** (z +15.3); DNa02 L-R +0.024 `null`. L v A is `result` on all five primaries; D v C on
+DNa02_L only (-0.036, z -6.8, called; round 3 had this row `null`). Per seed (same seed, same block) the level
+control reaches 0.794 0.716 0.765 0.759 0.791 of the cycle's DNa02_L rise, 0.597 0.640 0.668 0.727 0.715 of its
+DNa02_R rise and 0.874 0.846 0.899 0.888 0.938 of its yaw-SD rise -- **76 / 67 / 89 %** with a scatter <= +-0.07 --
+and 73 % of its DNa02-active fraction (0.0440 of 0.0605). On straightness the same fraction is **3.08**: the level
+control overshoots the cycle by 3.1x, in the opposite direction (L's fly is the crooked one, 0.50 vs 0.83).
+
+**The skeptic pass (independent Opus, verdict mostly sound; sixteen corrections applied).** Every one of the fifteen
+family comparisons reproduced from the npz with the skeptic's own clean-frame rule, own exact Mann-Whitney (full
+enumeration of the 252 / 70 rank splits), own z and own Holm -- **not one verdict flips** -- and so do the `mn_ref`
+derivation (to four decimals), the level match, the decomposition magnitudes and both reducer fixes. What did not
+survive is the **attribution**. The audit had dismissed the two unmatched channels with "L has more hair-plate and
+campaniform drive than C and still less DNa02, so neither can account for the excess"; that needs the hair-plate ->
+DNa02 transfer to be net positive, and the audit's own paths output says it is **negative**: the strongest three-step
+afferent walk is `SNpp45 -> IN13B001 -| AN04B003 -> DNa02`, signs `+,-,+`, `gain_if_signed` -3.0e+04, and **SNpp45 is
+a hair-plate afferent** (53 of the channel's 113 cells; the direct SNpp45 -> DNa02 link is only +2.0 mV/volley). The
+intermediate moves exactly as that route predicts -- IN13B001 **76.4 Hz (L) vs 65.2 (C)** while AN04B003 runs
+17.8 vs 23.4 -- and an additive LEVEL model with an inhibitory hair plate (w_chordotonal +0.53, w_hair_plate -0.51
+Hz/Hz) reproduces BOTH the within-L left-vs-right side contrast AND the whole C-over-L AN04B003 difference with a
+**zero structure term**. So L differs from C in three ways at once: per-phase modulation, the +9.7 / -24.8 Hz channel
+mismatch, and the +13.6 Hz DC chordotonal L-R -- and no arm in this batch separates them. Two more rows were
+re-read: **straightness is a sidedness row** (a per-fly regression inside L, straightness = 0.987 - 0.1424 x |signed
+yaw|, r -0.78, predicts 0.806 at C's own drift against C's observed 0.833 -- 92 % of the gap; the reverse fit inside
+C gives 82 %), and **DNa02_R is partly a per-side level deficit** (L's right side sees 79.28 Hz chordotonal against
+C's 87.58, an 8.3 Hz deficit the whole-channel match hides, and AN04B003 is 94 % of that row's gap). **DNa02_L is the
+row that survives every confound**: arm L's LEFT side carries more chordotonal (92.90 vs 87.24), hair-plate (61.25 vs
+46.97) and campaniform (49.67 vs 24.88) drive than arm C's and still fires AN04B003_L lower (19.10 vs 23.13) and
+DNa02_L lower (0.431 vs 0.558). Six further numbers did not match their own named files and are corrected in the
+audit (the DNa02-active fraction 73 not 76 %; the 5-12 Hz band fraction 0.81 not 0.29, with the estimator now named;
+two of the four compass drift ranges and the global bound, now -0.0087 .. +0.0094 w/s; the |DNa02 L-R| per-frame
+levels; an incoherent `rate_hz` row that mixed AN04B003 with DNa02; the "whole difference is AN04B003" claim, true on
+DNa02_R and a cancellation on DNa02_L). Two provenance corrections: the 16 compass run JSONs record `mn_ref_hz` null
+(the flag is verifiable only from the job line and the realised pinned level), and the predeclaration's ordering
+rests on local file mtimes, not on any absolute timestamp in the log.
+
+The skeptic's closing paragraph, verbatim, is the reading this session adopts:
+
+**What the round can now say.** With the CHORDOTONAL channel matched to 1.2 Hz (precondition met, `null`), **C v L is
+`result` on DNa02_L (+0.127 Hz, z +9.2), DNa02_R (+0.103, z +16.7) and the clean yaw SD (+0.57 deg/s, z +7.1),
+Holm-called at m 5** -- so **something other than the chordotonal mean separates the leg cycle from the round-2
+transducer**, in the direction "more DNa02". The DNa02_L row is the robust one: arm L's left side carries *more*
+chordotonal, hair-plate and campaniform drive than arm C's and still fires DNa02_L less, so no under-drive or
+sidedness account of it survives. But **"the per-leg / per-phase STRUCTURE contributes beyond the LEVEL" is not yet
+supported**: L differs from C in three ways at once -- per-phase modulation, a +9.7 / -24.8 Hz mismatch on the two
+unmatched leg channels whose dominant route into DNa02 is sign-negative, and a +13.6 Hz DC chordotonal L-R -- and no
+arm in this batch separates them. The straightness row is `result` but reads as the DC sidedness, not as structure;
+the DNa02_R row is `result` but is partly a per-side level deficit; the DNa02 L-R row is `null`. `L v A` is `result`
+on all five primaries and the afferent level (as delivered by the round-2 law, sidedness included) reaches 76 % / 67 %
+/ 89 % of the cycle's DNa02_L / DNa02_R / yaw-SD rise over the shipped path, with tight per-seed scatter -- that part
+of the framing is fair, and it is the round's solid finding. **D v C** stands as reported (DNa02_L -0.036 called, no
+behavioural row). The compass answer stands at 4 v 4: no arm moves the bump, and AN04B003's signed report of the turn
+(-10.5 Hz) exists under the cycle and not under the level control. Nothing is adopted, and adoption now needs three
+controls, not two: the unsided level control, the modulation-only arm, **and a channel-matched level control**.
+
+**Two reducer defects closed before the analysis** (both from the round-3 skeptic). The `sided_frames` recorder rows
+now pair sample s with body frame k (lag 0) instead of k - 1: on `out/vncd3/room_C_r0` corr(AN04B003 L-R, chordotonal
+cmd L-R) is **-0.339** at lag 0 against -0.294 at the old alignment, the tripod-conditioned swing -3.49 vs -3.37 Hz,
+and the round-3 alignment is kept as labelled `<key>_lagm1` secondaries. And `summarise_room`'s watch loop no longer
+overwrites the command-derived `DNa02_L_hz` / `DNa02_R_hz` with an all-window (airborne-inclusive) mean -- it stores
+that under `DNa02_{L,R}_allwin_hz` -- so DNa02_L, DNa02_R and DNa02 L-R are on ONE mask and subtract exactly
+(identity holds to < 1e-6 in all 20 runs).
+
+**Four `lit.walk.*` ledger rows** were added to `flyverse/data/expected_responses.csv`, all `op report`, none scored:
+`step_frequency_hz_at_speed` (7.1 Hz at 8 mm/s, 16.5 at 28), `stance_fraction_at_speed` (0.79 at 8, 0.51 at 28),
+`swing_duration_ms` (30, bracket 30-50, **UNCERTAIN**) and `outer_leg_step_ratio_in_turn` -- the last with an **empty
+value** and a note that DeAngelis 2019 Fig 6C gives the direction only and no ratio was read off the figure. All four
+carry the caveat that the numbers are the *fit's* values, not tabulated ones (DeAngelis, Zavatone-Veth & Clark 2019,
+eLife 8:e46409; Mendes, Bartos, Akay, Marka & Mann 2013, eLife 2:e00231). Nothing was invented to fill the blank.
+
+**Next, and nothing adopted.** Adoption of the leg cycle now needs **three** controls, not two: (a) an **unsided**
+level control (the round-2 law on the side-MEAN leg-MN rate at mn_ref 8.84 -- removes the +13.6 Hz DC L-R and the
++9.2 Hz hair-plate L-R at the same means), (b) a **modulation-only** cycle arm (per-leg amplitude held at 1 --
+separates the temporal modulation from the turn kinematics but not from the channel mismatch), and (c) a
+**channel-matched** level control (`hair_plate_max_hz` / `campaniform_load_hz` set so the realised hair-plate and
+campaniform means match C's 47.1 / 24.9 Hz at the same chordotonal 86-88 Hz) -- the only one of the three that
+addresses the hair-plate alternative. Beside them, a single-cell CPU check of **AN04B003** under (i) steady vs
+8 Hz-modulated chordotonal input at the same mean with IN13B001's rate clamped and (ii) the hair-plate level varied
+alone at a fixed chordotonal level; the two together settle whether the C-over-L AN04B003 difference is modulation or
+hair-plate disinhibition. **Nothing is adopted and no default changed**: `senses.py`, `body.py`, `brain.py` are
+untouched, the bit-identity golden passes, and the leg cycle and the level control both remain opt-in labelled
+mechanisms.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

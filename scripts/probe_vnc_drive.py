@@ -34,6 +34,12 @@ attached):
                     flip table, chain rates and bump drift per arm; the benchmark checks A vs B.
     plan     (CPU)  writes the ONE cluster submission (out/vncd/batch.sh).
 
+Families (--family): 'vncd' (round 2, ARMS), 'body' (round 3, ARMS_BODY; docs/audits/body_sided_state.md) and 'level'
+(round 4, ARMS_LEVEL; docs/audits/level_matched_control.md): A shipped / L the round-2 transducer at the LEVEL-MATCHED
+mn_ref_hz (LEVEL_MN_REF_HZ, a labelled control passed as --mn-ref-hz; the sense's default is untouched) / C all+leg_cycle /
+D all+leg_cycle+haltere_sided. `pairs` reads the pair set from PAIRS_BY_FAMILY; the recorder-based sidedness keys are at
+lag 0 (the round-3 alignment kept as *_lagm1) and DNa02_L / _R share DNa02_LR_hz's frame mask.
+
     PYTHONIOENCODING=utf-8 python scripts/probe_vnc_drive.py plan --runs 5 --compass-seeds 3 --draws 2
     bash out/vncd/batch.sh                       # one cluster_run.py call, --fetch out/vncd/
     PYTHONIOENCODING=utf-8 python scripts/probe_vnc_drive.py analyse --dir out/vncd --out out/vncd/analysis
@@ -73,7 +79,32 @@ ARMS_BODY = {"A": None, "B": "all", "C": "all+leg_cycle", "D": "all+leg_cycle+ha
 ARM_LABEL_BODY = {"A": "shipped (sense off)", "B": "proprioception all (round-2 form: leg channels on the side's MN rate, one bilateral haltere)",
                   "C": "all + leg cycle (per-leg, per-phase leg channels)", "D": "all + leg cycle + side-split haltere",
                   "E": "all + leg cycle + side-split haltere + haltere_coriolis (labelled stop-gap, positive control)"}
-FAMILIES = {"vncd": (ARMS, ARM_LABEL, "ABE"), "body": (ARMS_BODY, ARM_LABEL_BODY, "ADE")}     # arms, labels, compass arms
+# Round 4 (thread level-matched control, docs/audits/level_matched_control.md): the one experiment round 3 could not run.
+#   L = the round-2 transducer ('all') with `mn_ref_hz` set so its window-mean commanded chordotonal rate equals the leg-cycle
+#   arm's 88.1 Hz -- a LABELLED CONTROL (a hand-set parameter that exists only to match the afferent LEVEL; never a default;
+#   the sense's default 30 Hz is untouched). C = 'all+leg_cycle' (the per-leg / per-phase structure at the same level);
+#   D = C + the side-split haltere. If C v L is null on DNa02 and the clean yaw SD, the cycle's contribution is its level.
+#   LEVEL_MN_REF_HZ is derived on CPU from the law the sense uses and the recorded per-frame leg-MN rates (the derivation
+#   is in the audit; the value is a fixed point of the afferent -> VNC -> leg-MN loop, not a tuned number).
+LEVEL_MN_REF_HZ = 8.84
+ARMS_LEVEL = {"A": None, "L": "all", "C": "all+leg_cycle", "D": "all+leg_cycle+haltere_sided"}
+ARM_LABEL_LEVEL = {"A": "shipped (sense off)",
+                   "L": f"proprioception all, mn_ref_hz {LEVEL_MN_REF_HZ} (LEVEL-MATCHED LABELLED CONTROL: the round-2 law at the leg-cycle arm's chordotonal level)",
+                   "C": "all + leg cycle (per-leg, per-phase leg channels)", "D": "all + leg cycle + side-split haltere"}
+ARM_MN_REF = {"level": {"L": LEVEL_MN_REF_HZ}}      # per family, per arm: the sense's mn_ref_hz when it is not the default (None = the default)
+FAMILIES = {"vncd": (ARMS, ARM_LABEL, "ABE"), "body": (ARMS_BODY, ARM_LABEL_BODY, "ADE"), "level": (ARMS_LEVEL, ARM_LABEL_LEVEL, "ALCD")}     # arms, labels, compass arms
+ARM_ORDER = "ABLCDE"                 # table order across families (L sits between the round-2 transducer and the cycle)
+# adjacent-arm pairs `pairs` calls, per family: (treatment, reference)
+PAIRS_BY_FAMILY = {"vncd": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
+                   "body": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
+                   "level": (("L", "A"), ("C", "L"), ("D", "C"), ("C", "A"), ("D", "L"))}
+
+
+def mn_ref_of(arm, family, override=None):
+    """The sense's mn_ref_hz for an arm: an explicit --mn-ref-hz, else the family table, else None (= the sense's default)."""
+    if override is not None:
+        return float(override)
+    return ARM_MN_REF.get(family, {}).get(arm)
 WATCH = ["AN04B003", "AN07B035", "AN07B037_a", "AN06A026", "PS196_b", "LAL139", "GLNO", "IN12B014", "IN19A003", "DNa02"]
 WATCH_BODY = WATCH + ["PS059"]
 CHAIN = WATCH_BODY + ["PS047_b", "PS239", "LAL184", "WED040_a", "PEN_a(PEN1)", "PEN_b(PEN2)", "EPG", "Delta7", "PEG", "HSN", "Nod1", "PLP078", "LPsP"]
@@ -102,7 +133,9 @@ def spec_of(arm, family="vncd"):
 
 
 def watch_of(family):
-    return WATCH_BODY if family == "body" else WATCH
+    # NOTE: the vncd4 (level family) batch ran with the round-2 watch list (PS059 not recorded per frame; its window mean is
+    # in the decomposition); the level family records PS059 from here on.
+    return WATCH_BODY if family in ("body", "level") else WATCH
 
 
 def afferent_groups(sense):
@@ -184,6 +217,11 @@ def cmd_room(args) -> int:
                    cuda_sparse=args.cuda_sparse, device=args.device, proprioception=spec)
     c, fb, brain = sim.fb.c, sim.fb, sim.fb.brain
     lp, op = brain.p, (sim.optic.p if sim.optic is not None else None)
+    mn_ref = mn_ref_of(args.arm, fam, args.mn_ref_hz)
+    if spec is not None and mn_ref is not None:
+        # the level-matched labelled control: the same spec, the sense rebuilt with its mn_ref_hz parameter (the constructor's
+        # own keyword; senses.py and its default are untouched). Replaced before the first step, so every frame reads it.
+        fb.proprioception_sense = senses.Proprioception(c, spec, mn_ref_hz=mn_ref)
     sense = fb.proprioception_sense if spec is not None else senses.Proprioception(c, "all")   # A: the same cells, recorded
     cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.body)
     counts = sense.counts()
@@ -387,7 +425,14 @@ def summarise_room(c, recording, heading, pos, airborne, on_top, yaw_cmd, speed_
                 sel = idx[side[idx] == s]
                 if len(sel):
                     cols = [pos_of[int(j)] for j in sel]
-                    row[f"{t}_{s}_hz"] = float(rate[wmask][:, i, cols].mean())
+                    if f"{t}_{s}_hz" in row:
+                        # DNa02_L / DNa02_R: the command readout above already holds the side's rate on the SAME mask as
+                        # DNa02_LR_hz (post-skip, non-airborne); the recorder's all-window-frames mean (airborne frames
+                        # included: round 3's 'frame-mask caveat', docs/audits/round3_integration.md 4) is kept under
+                        # a labelled key and no longer overwrites it.
+                        row[f"{t}_{s}_allwin_hz"] = float(rate[wmask][:, i, cols].mean())
+                    else:
+                        row[f"{t}_{s}_hz"] = float(rate[wmask][:, i, cols].mean())
         rows.append(row)
     df = pd.DataFrame(rows)
     run = {}
@@ -432,8 +477,9 @@ def cmd_compass(args) -> int:
     c, cdir = rot.load_condition_connectome("default", args.cache_dir, verbose=False)
     sim = rot.build_sim(c, gains, seed, args.device, cpu, sparse=args.sparse)
     fb = sim.fb
+    mn_ref = mn_ref_of(args.arm, fam, args.mn_ref_hz)
     if spec is not None:
-        fb.proprioception_sense = senses.Proprioception(c, spec)
+        fb.proprioception_sense = senses.Proprioception(c, spec, **({"mn_ref_hz": mn_ref} if mn_ref is not None else {}))
     sense = fb.proprioception_sense if spec is not None else senses.Proprioception(c, "all")
     cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.loco)     # scalar body: Locomotion.cycle
     groups = afferent_groups(sense)
@@ -631,9 +677,15 @@ def cmd_plan(args) -> int:
         from replicate_connectome_walk import write_plan
         return write_plan(args)
     d = args.dir.rstrip("/")
-    name = args.name or ("vncd" if fam == "vncd" else "vncd3")
+    name = args.name or {"vncd": "vncd", "body": "vncd3", "level": "vncd4"}[fam]
     pre = f"mkdir -p {d} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && "
     fam_flag = f" --family {fam}" if fam != "vncd" else ""
+    room_arms = list(arms)
+
+    def arm_flags(arm):
+        # the level-matched labelled control carries its mn_ref_hz explicitly on the job line (self-describing batch.sh)
+        mr = mn_ref_of(arm, fam)
+        return f" --mn-ref-hz {mr}" if mr is not None else ""
     cmds = []
 
     # The job strings are written into batch.sh inside DOUBLE quotes, so every `$` below is escaped as `\$` there: the
@@ -645,14 +697,14 @@ def cmd_plan(args) -> int:
     room_seeds = [int(x) for x in args.only_seeds.split(",")] if args.only_seeds else list(range(args.runs))
     compass_seeds = [int(x) for x in args.only_compass_seeds.split(",")] if args.only_compass_seeds else list(range(args.compass_seeds))
     for s in room_seeds:
-        for arm in "ABCDE":
+        for arm in room_arms:
             stem = f"{d}/room_{arm}_r{s}"
-            cmds.append(pre + job(f"python scripts/probe_vnc_drive.py room{fam_flag} --arm {arm} --seed {s} --batch 16 --seconds 60 --block fam_r{s} --out {stem}", f"{stem}.txt"))
+            cmds.append(pre + job(f"python scripts/probe_vnc_drive.py room{fam_flag} --arm {arm}{arm_flags(arm)} --seed {s} --batch 16 --seconds 60 --block fam_r{s} --out {stem}", f"{stem}.txt"))
     for s in compass_seeds:
         parts = []; sts = []
         for j, arm in enumerate(compass_arms):
             stem = f"{d}/compass_{arm}_r{s}"
-            parts.append(f"python scripts/probe_vnc_drive.py compass{fam_flag} --arm {arm} --seed {s} --block fam_c{s} --out {stem} > {stem}.txt 2>&1; s{j}=$?; tail -4 {stem}.txt")
+            parts.append(f"python scripts/probe_vnc_drive.py compass{fam_flag} --arm {arm}{arm_flags(arm)} --seed {s} --block fam_c{s} --out {stem} > {stem}.txt 2>&1; s{j}=$?; tail -4 {stem}.txt")
             sts.append(f"s{j}")
         cmds.append(pre + "; ".join(parts) + f"; exit $(({' | '.join(sts)}))")
     if args.draws:
@@ -672,7 +724,7 @@ def cmd_plan(args) -> int:
             + f" --fetch {d}/ 2>&1 | tee out/{name}_cluster.log")
     Path(d).mkdir(parents=True, exist_ok=True)
     script = args.script or "batch.sh"
-    Path(d, script).write_text("#!/bin/bash\n# ONE submission: " + f"{len(cmds)} jobs = {5 * len(room_seeds)} room (seeds {room_seeds}; blocks fam_r<seed>: the five arms of one seed on one box) + "
+    Path(d, script).write_text("#!/bin/bash\n# ONE submission: " + f"{len(cmds)} jobs = {len(room_arms) * len(room_seeds)} room (arms {room_arms}, seeds {room_seeds}; blocks fam_r<seed>: the arms of one seed on one box) + "
                                f"{len(compass_seeds)} compass (seeds {compass_seeds}; {len(compass_arms)} arms {compass_arms} each, sequential, blocks fam_c<seed>)"
                                + (f" + 2 bench ({args.draws} draws each, sequential)" if args.draws else "") + f"; family {fam}; targets {args.targets or 'default'}\n" + line + "\n", encoding="utf-8")
     _log(f"wrote {d}/{script} ({len(cmds)} jobs, family {fam}, name {name}, targets {args.targets or 'default'})")
@@ -739,6 +791,14 @@ def robust_room(body_npz, skip_f=500, guard=50):
     for k, _ in ROBUST_KEYS:
         v = np.array([r[k] for r in rows if r.get(k) is not None], float)
         out[k] = (float(v.sum()) if k.endswith("_flies") else float(v.mean())) if len(v) else None
+    # DNa02_L / DNa02_R on the SAME mask as DNa02_LR_hz (post-skip, non-airborne), recomputed from the body arrays so that a
+    # run JSON written by the round-3 reducer (whose watch loop overwrote the keys with the all-window-frames recorder mean,
+    # airborne frames included -- docs/audits/round3_integration.md 4, 'frame-mask caveat') tabulates on the L-R mask too.
+    okf = np.zeros((T + 1, B), bool); okf[skip_f:] = True; okf &= ~air
+    out["DNa02_L_hz"] = float(np.mean([tL[okf[:, i], i].mean() for i in range(B) if okf[:, i].any()]))
+    out["DNa02_R_hz"] = float(np.mean([tR[okf[:, i], i].mean() for i in range(B) if okf[:, i].any()]))
+    out["DNa02_LR_hz"] = float(np.mean([(tL[okf[:, i], i] - tR[okf[:, i], i]).mean() for i in range(B) if okf[:, i].any()]))
+    out["DNa02_mask"] = "post-skip non-airborne frames (the DNa02_LR_hz mask; recomputed by robust_room)"
     return out
 
 
@@ -746,7 +806,7 @@ def load_room(d, only_seeds=None):
     runs = {}
     import re
     for p in sorted(glob.glob(os.path.join(d, "room_*_r*.json"))):
-        m = re.fullmatch(r"room_[A-E]_r(\d+)\.json", Path(p).name)
+        m = re.fullmatch(r"room_[A-Z]_r(\d+)\.json", Path(p).name)
         if not m or (only_seeds is not None and int(m.group(1)) not in only_seeds):
             continue
         j = json.loads(Path(p).read_text(encoding="utf-8"))
@@ -776,7 +836,7 @@ CYCLE_KEYS = [("haltere_L_hz", "haltere MN L (Hz; side-split readout, every arm)
 
 def room_tables(runs, out):
     rows = []
-    arms = [a for a in "ABCDE" if a in runs]
+    arms = [a for a in ARM_ORDER if a in runs]
     keys = list(ROOM_KEYS) + list(ROBUST_KEYS) + list(CYCLE_KEYS)
     j0 = runs[arms[0]][0][1]
     for ch in j0["channels"]:
@@ -1069,7 +1129,7 @@ def cmd_analyse(args) -> int:
     if runs and not args.skip_trace:
         analyse_trace(c, lp, runs, out, arms=tuple(a.strip() for a in args.trace_arms.split(",") if a.strip()))
     if runs and not args.skip_decompose:
-        analyse_decompose(c, lp, runs, out, arms=tuple(a for a in "BCDE" if a in runs))
+        analyse_decompose(c, lp, runs, out, arms=tuple(a for a in ARM_ORDER if a != "A" and a in runs))
     if runs and not args.skip_paths:
         summary["paths"] = common.to_jsonable(analyse_paths(c, lp, runs, out).to_dict("records"))
     cr = load_compass(args.dir, only)
@@ -1098,6 +1158,11 @@ SIDED_KEYS = [("yaw_signed_mean_deg_s", "mean SIGNED yaw rate on clean frames pe
               ("corr_ps196LR_yaw", "corr(PS196_b L-R rate, realised yaw)"),
               ("dna02LR_given_chordLR_pos_minus_neg", "E[DNa02 L-R | chordotonal L-R > 0] - E[. | < 0] (Hz; the tripod alternation seen by DNa02)"),
               ("an04LR_given_chordLR_pos_minus_neg", "E[AN04B003 L-R | chordotonal L-R > 0] - E[. | < 0] (Hz)")]
+# The recorder-based keys above pair rec sample s (captured after the step of frame k = every * s) with body frame k (lag 0).
+# Round 3's reducer paired it with frame k - 1 (a one-frame lag; docs/audits/body_sided_state.md 4.3 caveat (i)); those
+# values are kept as LABELLED SECONDARIES under `<key>_lagm1`.
+REC_LAG_KEYS = ("corr_an04LR_chordLR", "corr_an04LR_yaw", "corr_ps059LR_haltLR", "corr_ps196LR_haltLR", "corr_ps196LR_yaw", "an04LR_given_chordLR_pos_minus_neg")
+SIDED_KEYS += [(k + "_lagm1", f"{dict(SIDED_KEYS)[k]} -- SECONDARY, the round-3 alignment (rec sample paired with the body frame one EARLIER)") for k in REC_LAG_KEYS]
 
 
 def _clean_frames(z, skip_f=500, guard=50):
@@ -1131,7 +1196,9 @@ def sided_frames(run_json, c):
     dh, clean = _clean_frames(z, skip_f)
     T, B = dh.shape
     side = c.neurons.somaSide.fillna("?").to_numpy()[rec["idx"]]; types = rec["types"]; q = rec["q__rate_hz"]
-    fr = np.clip(np.round(rec["t_ms"] / 10.0).astype(int) - 2, 0, T - 1)                   # rec sample (frame k, t = (k+1) dt) -> dh row k-1
+    kf = np.round(rec["t_ms"] / 10.0).astype(int)                                            # rec sample s was captured after the step of frame kf
+    fr = np.clip(kf - 1, 0, T - 1)                                                            # lag 0: body row kf - 1 IS frame kf (the [1:] slices below)
+    fr_m1 = np.clip(kf - 2, 0, T - 1)                                                         # the round-3 alignment (frame kf - 1): labelled secondary
     def lr(t):
         L = q[:, :, (types == t) & (side == "L")].mean(2); R = q[:, :, (types == t) & (side == "R")].mean(2)
         return L - R                                                                          # (S, B)
@@ -1154,12 +1221,13 @@ def sided_frames(run_json, c):
             row["corr_dna02LR_chordLR"] = _corr(dna[m], cl[m]); row["corr_dna02LR_haltLR"] = _corr(dna[m], tl[m])
             pos = m & (cl > 0); neg = m & (cl < 0)
             row["dna02LR_given_chordLR_pos_minus_neg"] = float(dna[pos].mean() - dna[neg].mean()) if pos.sum() > 10 and neg.sum() > 10 else np.nan
-            ms = m[fr]                                                                        # the rec samples that fall on clean frames
-            row["corr_an04LR_chordLR"] = _corr(an04[ms, i], cl[fr][ms]); row["corr_an04LR_yaw"] = _corr(an04[ms, i], dh[fr, i][ms])
-            row["corr_ps059LR_haltLR"] = _corr(ps059[ms, i], tl[fr][ms]); row["corr_ps196LR_haltLR"] = _corr(ps196[ms, i], tl[fr][ms])
-            row["corr_ps196LR_yaw"] = _corr(ps196[ms, i], dh[fr, i][ms])
-            posS = ms & (cl[fr] > 0); negS = ms & (cl[fr] < 0)
-            row["an04LR_given_chordLR_pos_minus_neg"] = float(an04[posS, i].mean() - an04[negS, i].mean()) if posS.sum() > 10 and negS.sum() > 10 else np.nan
+            for f_, suf in ((fr, ""), (fr_m1, "_lagm1")):
+                ms = m[f_]                                                                    # the rec samples that fall on clean frames
+                row["corr_an04LR_chordLR" + suf] = _corr(an04[ms, i], cl[f_][ms]); row["corr_an04LR_yaw" + suf] = _corr(an04[ms, i], dh[f_, i][ms])
+                row["corr_ps059LR_haltLR" + suf] = _corr(ps059[ms, i], tl[f_][ms]); row["corr_ps196LR_haltLR" + suf] = _corr(ps196[ms, i], tl[f_][ms])
+                row["corr_ps196LR_yaw" + suf] = _corr(ps196[ms, i], dh[f_, i][ms])
+                posS = ms & (cl[f_] > 0); negS = ms & (cl[f_] < 0)
+                row["an04LR_given_chordLR_pos_minus_neg" + suf] = float(an04[posS, i].mean() - an04[negS, i].mean()) if posS.sum() > 10 and negS.sum() > 10 else np.nan
         rows.append(row)
     out = {}
     for k, _ in SIDED_KEYS:
@@ -1168,7 +1236,7 @@ def sided_frames(run_json, c):
     return out
 
 
-def decompose_summary(analysis_dir, target="DNa02", arms="ABCDE", top=12):
+def decompose_summary(analysis_dir, target="DNa02", arms=ARM_ORDER, top=12):
     """Per arm and side of `target`: the rate-weighted input totals (E, I, net; mV/s per post cell) from the analyse
     step's decompose_<target>_<side>_per_type.csv, plus the named rows (the PS059 cancellation, the AN04B003 term)."""
     named = ("PS059/L", "PS059/R", "AN04B003/L", "AN04B003/R", "AN06A026/L", "AN06A026/R", "AN07B035/L", "AN07B035/R", "IN12B014/L", "IN12B014/R",
@@ -1207,6 +1275,11 @@ def cmd_pairs(args) -> int:
     only = set(int(x) for x in args.only_seeds.split(",")) if args.only_seeds else None
     runs = load_room(args.dir, only)
     print(f"room runs per arm: {[(a, len(v)) for a, v in runs.items()]}" + (f"  (seeds restricted to {sorted(only)})" if only else ""))
+    fams = sorted({str(j.get("family", "vncd")) for items in runs.values() for _, j in items})
+    fam = args.family or (fams[0] if len(fams) == 1 else "vncd")
+    PAIRS = PAIRS_BY_FAMILY[fam]
+    arm_order = [a for a in ARM_ORDER if a in runs]
+    print(f"family {fam} (run JSONs: {fams}); pairs {PAIRS}; arms {arm_order}")
     c = connectome.load(cache_dir=Path(args.cache_dir), verbose=False) if args.cache_dir else connectome.load(verbose=False)
     # per-frame sidedness per run (attached to the run dicts so the pairwise table can compare them too)
     sided = {}
@@ -1216,15 +1289,15 @@ def cmd_pairs(args) -> int:
     sd_rows = []
     for k, label in SIDED_KEYS:
         row = {"key": k, "label": label}
-        for arm in "ABCDE":
+        for arm in arm_order:
             v = np.array([s[k] for _, s in sided.get(arm, []) if s.get(k) is not None], float)
             row[f"{arm}_mean"] = float(v.mean()) if len(v) else np.nan; row[f"{arm}_sd"] = float(v.std(ddof=1)) if len(v) > 1 else np.nan
             row[f"{arm}_runs"] = [round(float(x), 4) for x in v]
         sd_rows.append(row)
     sdf = pd.DataFrame(sd_rows); sdf.to_csv(Path(out, "sided_frames.csv"), index=False)
-    print("\n== per-frame sidedness on clean walking frames (run mean +- SD over runs; per-run values in sided_frames.csv)")
+    print("\n== per-frame sidedness on clean walking frames (run mean +- SD over runs; per-run values in sided_frames.csv; rec-based keys at lag 0, `_lagm1` = the round-3 alignment)")
     for _, r in sdf.iterrows():
-        print(f"  {r.key:40s} " + " | ".join(f"{a}: {r[f'{a}_mean']:+.3f} +- {r[f'{a}_sd']:.3f}" if np.isfinite(r[f"{a}_mean"]) else f"{a}: --" for a in "ABCDE"))
+        print(f"  {r.key:46s} " + " | ".join(f"{a}: {r[f'{a}_mean']:+.3f} +- {r[f'{a}_sd']:.3f}" if np.isfinite(r[f"{a}_mean"]) else f"{a}: --" for a in arm_order))
     # pairwise verdicts on every tabulated key
     keys = [k for k, _ in ROOM_KEYS + ROBUST_KEYS + CYCLE_KEYS + SIDED_KEYS]
     j0 = next(iter(runs.values()))[0][1]
@@ -1253,7 +1326,7 @@ def cmd_pairs(args) -> int:
                 cells.append(f"{t}v{ref} {r[f'{t}v{ref}_diff']:+.3f} z{r[f'{t}v{ref}_z']:+.1f} p{r[f'{t}v{ref}_p']:.3f} {r[f'{t}v{ref}_verdict']}")
         print(f"  {r.key:36s} " + " | ".join(cells))
     # DNa02 decomposition summary
-    dd = decompose_summary(args.analysis or out, "DNa02", "ABCDE")
+    dd = decompose_summary(args.analysis or out, "DNa02", "".join(arm_order))
     if len(dd):
         dd.to_csv(Path(out, "dna02_decompose_summary.csv"), index=False)
         print(f"\n== DNa02 rate-weighted input per arm (mV/s per post cell; decompose_DNa02_*_per_type.csv) -> {out}/dna02_decompose_summary.csv")
@@ -1263,7 +1336,7 @@ def cmd_pairs(args) -> int:
             print(f"  {r.post} {r.arm}: top E {r.top_E}\n      top I {r.top_I}")
     # compass flip rows of the chain types
     fl = []
-    for arm in "ABCDE":
+    for arm in ARM_ORDER:
         f = Path(args.analysis or out, f"compass_flip_{arm}.csv")
         if f.exists():
             ft = pd.read_csv(f); ft = ft[ft.type.isin(CHAIN)].copy(); ft.insert(0, "arm", arm); fl.append(ft)
@@ -1282,16 +1355,21 @@ def cmd_pairs(args) -> int:
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    fam_help = "arm family: 'vncd' (round 2: B all / C legs / D haltere / E coriolis) or 'body' (round 3: C + leg cycle / D + side-split haltere / E + coriolis; docs/audits/body_sided_state.md)"
+    fam_help = ("arm family: 'vncd' (round 2: B all / C legs / D haltere / E coriolis), 'body' (round 3: C + leg cycle / D + side-split haltere / E + coriolis; "
+                "docs/audits/body_sided_state.md) or 'level' (round 4: L = 'all' at the level-matched mn_ref_hz, a labelled control / C + leg cycle / D + side-split haltere; docs/audits/level_matched_control.md)")
+    all_arms = sorted({a for arms_, _, _ in FAMILIES.values() for a in arms_})
+    mn_help = "the sense's mn_ref_hz for this arm (default: the family table -- the level family's L arm -- else the sense's own default 30 Hz; a LABELLED CONTROL parameter, never a default)"
     r = sub.add_parser("room", help="one plain-fly room run (GPU)")
     r.add_argument("--dataset", choices=["malecns", "banc"], default=None)
-    r.add_argument("--arm", required=True, choices=sorted(ARMS)); r.add_argument("--seed", type=int, default=0); r.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
+    r.add_argument("--arm", required=True, choices=all_arms); r.add_argument("--seed", type=int, default=0); r.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
+    r.add_argument("--mn-ref-hz", type=float, default=None, help=mn_help)
     r.add_argument("--batch", type=int, default=16); r.add_argument("--seconds", type=float, default=60.0); r.add_argument("--skip", type=float, default=5.0)
     r.add_argument("--every", type=int, default=2, help="capture the watch / afferent Recorder every N frames"); r.add_argument("--mean-every", type=int, default=5)
     r.add_argument("--device", default=None); r.add_argument("--cuda-sparse", default="torch"); r.add_argument("--out", required=True)
     r.add_argument("--block", default=None, help="inert: the cluster_run --arm-block key this job was scheduled under (recorded in the JSON)")
     k = sub.add_parser("compass", help="the efferent rotation arm under one vnc arm (GPU)")
-    k.add_argument("--arm", required=True, choices=sorted(ARMS)); k.add_argument("--seed", type=int, default=0); k.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
+    k.add_argument("--arm", required=True, choices=all_arms); k.add_argument("--seed", type=int, default=0); k.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
+    k.add_argument("--mn-ref-hz", type=float, default=None, help=mn_help)
     k.add_argument("--gains", default="2:15"); k.add_argument("--seconds", type=float, default=10.0); k.add_argument("--skip", type=float, default=3.0)
     k.add_argument("--rate", type=float, default=90.0); k.add_argument("--dna02-hz", type=float, default=20.0); k.add_argument("--sparse", default="warp", choices=["warp", "torch"])
     k.add_argument("--quick", action="store_true"); k.add_argument("--device", default=None); k.add_argument("--cache-dir", default=None); k.add_argument("--out", required=True)
@@ -1315,6 +1393,7 @@ def main(argv=None):
     q = sub.add_parser("pairs", help="adjacent-arm verdicts, per-frame sidedness, DNa02 decomposition summary, compass flips of the chain (CPU; after analyse)")
     q.add_argument("--dir", default="out/vncd3"); q.add_argument("--out", default="out/vncd3/analysis"); q.add_argument("--analysis", default=None, help="where analyse wrote decompose_* / compass_flip_* (default --out)")
     q.add_argument("--cache-dir", default=None); q.add_argument("--only-seeds", default=None, help="comma list: only these run seeds (e.g. the runs of one submission)")
+    q.add_argument("--family", default=None, choices=sorted(FAMILIES), help="the pair set (PAIRS_BY_FAMILY); default: the family the run JSONs record")
     args = ap.parse_args(argv)
     return {"room": cmd_room, "compass": cmd_compass, "bench": cmd_bench, "plan": cmd_plan, "analyse": cmd_analyse, "pairs": cmd_pairs}[args.cmd](args)
 

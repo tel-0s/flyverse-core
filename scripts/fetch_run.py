@@ -11,7 +11,7 @@ def main():
     a = ap.parse_args()
     t = json.load(open(".cluster.json"))["targets"][a.target]
     src = f"{t['runs']}/{a.run}/out/{a.src_sub or a.out}"
-    ssh = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-o", "StrictHostKeyChecking=no", "-p", str(t["port"]), t["ssh"]]
+    ssh = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-o", "StrictHostKeyChecking=no", "-p", str(t.get("port", 22)), t["ssh"]]
     r = subprocess.run(ssh + [f"cd {src} && find . -type f | sed 's#^[.]/##'"], capture_output=True, text=True, timeout=300)
     if r.returncode != 0: print("remote listing failed:", r.stderr.strip()[-300:]); sys.exit(2)
     there = sorted(l.strip().replace("\r", "") for l in r.stdout.splitlines() if l.strip())
