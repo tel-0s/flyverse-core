@@ -19,14 +19,27 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
 - [x] **CI** (2026-09-13: `.github/workflows/ci.yml`, data-free subset via `tests/conftest.py` markers — 236 passed locally, first GitHub run green in 1m43s; `ruff --select F821` reports 12 undefined names in `scripts/cx_shift.py` / `cx_wedge.py` nested closures — verify whether those paths are dead or rely on an enclosing scope, then fix). Original item: GitHub Actions running the CPU test subset (`tests/test_control.py`, `test_world.py`,
       `test_nt_readout.py`, `test_interp.py -k "not cluster"`, `test_receptor_model.py`) on a synthetic /
       subset connectome so it needs no 3 GB download; lint.
-- [ ] **README pass**: one page a newcomer can follow — run it, what is simulated, what emerges unprompted,
+- [x] **README pass** (2026-09-14, at `4db2e8c`): one page a newcomer can follow — run it, what is simulated, what emerges unprompted,
       what we added and why (every stop-gap named), the benchmark table with statuses, the three localized
       deficits stated plainly (straight walking, small object, compass rotation input), how to embed the brain,
       how to run the toolkit when a behaviour fails. Move the long form to `docs/`.
+      DONE: README rewritten as 12 sections (run it / what is simulated / what emerges unprompted / where the
+      model stands with the assay statuses and the 27 PASS / 0 FAIL / 2 KNOWN GAP suite tally / what we added
+      with every stop-gap named in a table / the three localized deficits with round 3's state / the two female
+      connectomes in one paragraph / embed the brain / run the toolkit / reproducibility / map / licence).
+      Long form moved, not deleted, to **`docs/OVERVIEW.md`** (controls, flags, speed, backends, BatchSim, the
+      per-stage table, the full "what we added" argument, food-finding and programs, RL, the file-by-file map).
+      Every CPU command in the README was run and passes: `fetch_data.py --list`, `python -m flyverse.connectome`
+      (cache md5s unchanged), five `room_demo.py` forms headless, the embedding snippet, the three CPU toolkit
+      commands, and `pytest -m "not gpu and not data and not cluster"` (**364 passed, 7 skipped, 29 deselected**).
+      Four corrections made in passing: the optomotor readout is DNp20 + HSN/HSE, not DNp04 + LPT27/30
+      (`motor.py:52`); the LIF partition is **71,618**, not 71,625; the taste/bitter numbers are now the round-3
+      suite's (Shiu 139.9 -> 0.8 Hz, calibrated 5.5 -> 0), not the superseded 2026-09-11 run's; `CITATION.cff`
+      gained the two FlyWire releases. `docs/INSTALL.md` made ASCII and its `data` marker row completed.
 - [ ] **Demo media**: a 20-30 s GIF/MP4 of the room (observatory UI, loom escape, wind orientation, feeding
       approach) and one figure of the toolkit output (a `trace` stage map or the atlas), committed under
       `docs/media/` (git-ignore rule currently excludes `*.gif`/`*.mp4` — carve out `docs/media/`).
-- [ ] **Reproducibility statement**: the shipped default model (LIFParams / OpticParams / gains) with the cache
+- [x] **Reproducibility statement** (2026-09-14, `docs/REPRODUCIBILITY.md`, linked from the README): the shipped default model (LIFParams / OpticParams / gains) with the cache
       fingerprint (sum|W| 121,460,584; W md5) and the exact commit the benchmark table was produced at; note
       that the GPU rollout is not seed-reproducible (round-1 finding) and that runs are the replicate unit,
       and that a bit-identity claim about the shipped output is a CPU claim only: two identical runs of one
@@ -38,6 +51,20 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       (`scratchpad/r3_results/critique.json`, owner notes 0(d)). Every number in
       `docs/NOTES.md` "Session 11" is quoted against that tree; **nothing was adopted in round 3 and no default
       moved**, so the shipped model the statement describes is unchanged.
+      DONE: 8 sections. Every fingerprint RECOMPUTED at `4db2e8c`, not copied -- sum|W| **121,460,584**, W md5
+      **ef23cc27bea13be7f6a96f3c04fd3737**, cache md5s neurons.parquet `c50c598a...` / W_post_pre.npz
+      `ac131529...` / sign0_counts.npz `bf01d724...`, receptor table `0381a446...`; the **44 files** of the
+      round-3 `source_fingerprint` verified by enumerating `eac71e0` against its own `export.SOURCE_PATTERNS`
+      (the current tree is 51, the backends having added six patterns). Carries: LIFParams / OpticParams /
+      every DEFAULT_* gain as field-by-field tables with the stop-gaps marked; the female fingerprints;
+      MaleCNS / FAFB / BANC file names and sha256s; the GPU non-reproducibility with `compare.txt` quoted
+      verbatim; bit-identity as a CPU-only claim; regeneration commands; and a table of which README number
+      was measured at which commit. **The benchmark table predates the anchor and this is stated**: the
+      14-section table in `docs/audits/benchmark_suite.md` is 2026-09-11 on an RTX 4090 at `069deb0`, and its
+      own JSON `config` proves it is not the shipped model (GF x0.3 damping still present, retired at
+      `ec281f2`; `gf_hz` 38 not 33; receptor model not yet default, adopted at `b5e6ae2`). The authoritative
+      per-check numbers are the round-3 guard suite (`guard7-97ce35`, tree `6ec2de1` + inert `LegCycle` =
+      `eac71e0`'s defaults).
 - [x] **Owed bookkeeping before the numbers are quoted publicly** (all four edits made 2026-09-13, in the
       working tree): de-score `walk.power_max` — **decided from the data** (`docs/audits/anti_runaway.md`
       round 6; 12/12 draws at 48.48, margin inside the worst single-arm scatter, non-monotone, Spearman

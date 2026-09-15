@@ -5,8 +5,8 @@ the cluster venvs are 3.12; the development machine runs 3.13). Linux, Windows a
 optional for the demo and effectively required for the benchmark suite and batched sweeps.
 
 The repository ships **no connectome data**: the MaleCNS files are ~3.7 GB and are fetched separately
-(§2), and the third-party expression tables are other people's data and are not redistributed. Everything
-in §1 works before any of that is downloaded, including the test suite.
+(section 2), and the third-party expression tables are other people's data and are not redistributed. Everything
+in section 1 works before any of that is downloaded, including the test suite.
 
 ```
 git clone https://github.com/tel-0s/flyverse
@@ -28,7 +28,7 @@ pip install -e .
 
 ### CUDA
 
-Install the CUDA build of torch **first**, from the PyTorch cu128 index, then the package — `pip install -e .`
+Install the CUDA build of torch **first**, from the PyTorch cu128 index, then the package -- `pip install -e .`
 sees the requirement already satisfied and leaves the wheel alone:
 
 ```
@@ -37,7 +37,7 @@ pip install -e .
 python -c "import torch; print(torch.__version__, torch.cuda.is_available())"   # want True
 ```
 
-Match the index to your driver (`cu126`, `cu128`, … at <https://pytorch.org/get-started/locally/>). cu128 is
+Match the index to your driver (`cu126`, `cu128`, ... at <https://pytorch.org/get-started/locally/>). cu128 is
 what the benchmark numbers in `docs/PERFORMANCE.md` and the cluster runs were produced with.
 
 ### Extras
@@ -51,7 +51,7 @@ pip install -e ".[interp]"  # empty on purpose: the toolkit needs pandas/pyarrow
 
 `cuda` and `interp` install nothing. They exist so the documented commands are honest and so dependencies
 can move into them later without changing anyone's install line. `flyverse.interp` imports **without torch**
-and without reading `cache/` — the interpretability toolkit's import surface is pandas/pyarrow/scipy only.
+and without reading `cache/` -- the interpretability toolkit's import surface is pandas/pyarrow/scipy only.
 
 ### macOS
 
@@ -62,7 +62,7 @@ at first use through `torch.mps.compile_shader`; set `FLYVERSE_METAL=0` for plai
 
 `scripts/fetch_data.py` is driven by `flyverse/data/manifest.json` (URL, SHA-256, size and the citation and
 licence of every file), streams to a `.part` file and renames only after the hash matches. Standard library
-only — it runs before the package is installed if you like.
+only -- it runs before the package is installed if you like.
 
 ```
 python scripts/fetch_data.py --list                 # what the manifest knows, and what is already present
@@ -84,8 +84,8 @@ python scripts/fetch_data.py --malecns
 
 `--external` is only needed to *rebuild* the receptor/transmitter tables under `flyverse/data/` with the
 `scripts/build_*.py` scripts; the built CSVs are committed, so running the model does not need it.
-`data/external/` is git-ignored (Özel 2021, Davis 2020, Kurmangaliyev 2020, Nern 2025 and the typing tables
-are redistributed under their own licences — cite them from the manifest, do not re-host them).
+`data/external/` is git-ignored (Ozel 2021, Davis 2020, Kurmangaliyev 2020, Nern 2025 and the typing tables
+are redistributed under their own licences -- cite them from the manifest, do not re-host them).
 
 Female data paths are `FLYVERSE_DATA_FAFB` and `FLYVERSE_DATA_BANC`; the Windows defaults are
 `D:\Datasets\flywire\Female Adult Fly Brain v783` and `D:\Datasets\flywire\BANC v888`.
@@ -118,7 +118,7 @@ python -m flyverse.connectome            # the same thing, then prints N and nnz
 
 Afterwards `connectome.load()` reads `cache/W_post_pre.npz`, `cache/neurons.parquet` and
 `cache/sign0_counts.npz` in a second or two and the MaleCNS files are not touched again. The shipped
-default cache fingerprint is `sum|W| = 121,460,584` — `scripts/hash_weights.py` prints yours.
+default cache fingerprint is `sum|W| = 121,460,584` -- `scripts/hash_weights.py` prints yours.
 
 ## 4. Run the room demo
 
@@ -136,7 +136,7 @@ lobe and wants a GPU for anything real-time (`docs/PERFORMANCE.md`).
 
 ## 5. Run the tests
 
-The CPU subset needs **no data, no cache and no GPU** — it is what CI runs
+The CPU subset needs **no data, no cache and no GPU** -- it is what CI runs
 (`.github/workflows/ci.yml`):
 
 ```
@@ -149,8 +149,8 @@ python -m pytest -m "not gpu and not data and not cluster" -q
 | marker    | what it means                                       | files |
 |-----------|-----------------------------------------------------|-------|
 | `gpu`     | needs CUDA/MPS or the nvcc-compiled kernels         | `test_cuda.py`, `test_metal.py` |
-| `data`    | needs the MaleCNS download and/or a compiled cache  | `test_integration.py` (also `gpu`) |
-| `cluster` | needs a live cluster                                | none — `test_cluster_run.py` is fully mocked and runs in CI |
+| `data`    | needs the MaleCNS download and/or a compiled cache  | `test_integration.py` (also `gpu`), `test_connectome_data.py` |
+| `cluster` | needs a live cluster                                | none -- `test_cluster_run.py` is fully mocked and runs in CI |
 
 Everything else runs on the synthetic graphs the tests build themselves. Three files
 (`test_receptor_model.py`, `test_optic_hooks.py`, `test_proprioception.py`) have extra classes that pin
@@ -163,7 +163,7 @@ FLYVERSE_CUDA_TESTS=1 python -m pytest tests/test_cuda.py -q
 FLYVERSE_INTEGRATION=1 python -m pytest tests/test_integration.py -q
 ```
 
-Windows note: `PYTHONIOENCODING=utf-8` if your console is not UTF-8 — several tests print the type names
+Windows note: `PYTHONIOENCODING=utf-8` if your console is not UTF-8 -- several tests print the type names
 from the connectome.
 
 Lint the way CI does (syntax errors and undefined names only; style is not gated):
@@ -175,7 +175,7 @@ ruff check flyverse scripts tests --select E9,F63,F7,F82
 ## 6. Optional: the CUDA kernels
 
 `flyverse/cuda.py` compiles `flyverse/kernels/neural.cu` with **nvcc** at first use into a small shared
-library called with raw device pointers (no Torch C++ ABI dependency). It is opt-in and entirely optional —
+library called with raw device pointers (no Torch C++ ABI dependency). It is opt-in and entirely optional --
 everything works on the plain torch path without it. You need a CUDA toolkit on `PATH` (`nvcc --version`),
 not just a CUDA torch wheel:
 
@@ -192,13 +192,13 @@ and nothing is compiled.
 ## 7. Optional: the cluster runner
 
 `scripts/cluster_run.py` ships this checkout's uncommitted diff to one or more GPU targets, submits each
-command as a job through the job manager, waits, prints the logs and copies `--fetch` paths back — e.g.
+command as a job through the job manager, waits, prints the logs and copies `--fetch` paths back -- e.g.
 `python scripts/cluster_run.py --name bench "python scripts/benchmark.py --fast --json out/bench.json"
 --fetch out/bench.json`, with several commands in one call forming a batch that runs concurrently. Addresses,
 filesystem paths and the submitting user come from `.cluster.json` at the repo root or the `FLYVERSE_CLUSTER`
 environment variable (the same JSON); nothing infrastructural is hard-coded. Both `.cluster.json` and the
-operator guide `docs/CLUSTER.md` are **git-ignored on purpose** — they describe private infrastructure, not
-the model — so a public clone has neither and simply does not use this path; write your own `.cluster.json`
+operator guide `docs/CLUSTER.md` are **git-ignored on purpose** -- they describe private infrastructure, not
+the model -- so a public clone has neither and simply does not use this path; write your own `.cluster.json`
 against the schema documented in the `cluster_run.py` docstring, which `tests/test_cluster_run.py` pins
 offline (canned in-process API, `ssh`/`scp` patched out, no job submitted anywhere).
 
@@ -206,12 +206,12 @@ offline (canned in-process API, `ssh`/`scp` patched out, no job submitted anywhe
 
 | symptom | cause |
 |---|---|
-| `FileNotFoundError: ...-male-cns-v1.0-minconf-0.5.feather` | `FLYVERSE_DATA` is unset or points elsewhere; §2 |
-| `connectome.load()` is slow every time | no `cache/`; run §3 once |
+| `FileNotFoundError: ...-male-cns-v1.0-minconf-0.5.feather` | `FLYVERSE_DATA` is unset or points elsewhere; section 2 |
+| `connectome.load()` is slow every time | no `cache/`; run section 3 once |
 | `torch.cuda.is_available()` is `False` on a GPU box | a CPU wheel got installed; reinstall torch from the cu128 index *before* `pip install -e .` |
 | `pip install -e .` fails on the `license` field | setuptools < 77; `pip install -U setuptools` (PEP 639 SPDX metadata) |
 | pygame cannot open a display over SSH | `--headless`, or `SDL_VIDEODRIVER=dummy` |
-| `nvcc: not found` with `FLYVERSE_CUDA_KERNELS=1` | a CUDA *toolkit* is needed, not just the CUDA torch wheel; §6 |
+| `nvcc: not found` with `FLYVERSE_CUDA_KERNELS=1` | a CUDA *toolkit* is needed, not just the CUDA torch wheel; section 6 |
 
 Architecture and what the model actually does: `README.md`, then `docs/ARCHITECTURE.md`,
 `docs/NOTES.md` and `docs/BENCHMARK_BATTERY.md`.
