@@ -56,6 +56,24 @@ def run(out):
     for k,v in expected.items():torch.testing.assert_close(getattr(a.brain,k),v,rtol=0,atol=0)
     checks.append('checkpoint replay')
     b.step(50.);equal('checkpoint paired reference')
+    # Queue work without a per-frame synchronize, then retire the graph/input storage.
+    # Reset and recapture may reuse allocations from the former warmup stream.
+    for fb in (a,b):
+        fb.proprioception(0,0,0,False,yaw_rate=np.array([.3,-.7,1.2]))
+        for _ in range(20):fb.step(10.)
+        fb.reset()
+        fb.step(10.)
+    equal('queued replay then full reset')
+    for fb in (a,b):
+        for _ in range(20):fb.step(10.)
+        fb.detach('compass')
+        fb.step(10.)
+    for k in FlyBrain.BRAIN_TENSORS:torch.testing.assert_close(getattr(a.brain,k),getattr(b.brain,k),rtol=0,atol=0)
+    checks.append('queued replay then detach')
+    from flyverse.compass import CompassDriver
+    for fb in (a,b):fb.attach(CompassDriver(c))
+    b.instruments['compass'].cuda_async_validation=False
+    b.instruments['compass'].poisson_always_on=False
     for fb in (a,b):fb.reset(rows=[0,1,2]);assert not fb.brain._poisson_on
     checks.append('partial reset of all rows disables zero Poisson')
     p=provenance(c,fb=a,seeds=[31],stimulus={'name':'async versus checked compass scheduler','fixture':'EPG subgraph',

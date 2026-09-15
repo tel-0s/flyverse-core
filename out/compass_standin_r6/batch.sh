@@ -1,0 +1,3 @@
+#!/bin/bash
+set -o pipefail
+python scripts/cluster_run.py --target house --name compass-capture-lifetime --minutes 30 --arm-block fam 'mkdir -p out/compass_standin_r6 && source .venv/bin/activate && python -c '"'"'import torch; assert torch.cuda.is_available()'"'"' && ( python scripts/compass_driver_cuda_check.py --out out/compass_standin_r6/cuda_checks.json && FLYVERSE_CUDA_TESTS=1 python -m pytest tests/test_cuda.py -q -p no:cacheprovider && python scripts/compass_driver_profile.py --native --out out/compass_standin_r6/profile_native.json ) > out/compass_standin_r6/run.txt 2>&1 && tail -8 out/compass_standin_r6/run.txt' --fetch out/compass_standin_r6/ 2>&1 | tee out/compass_standin_r6/client_stdout.txt

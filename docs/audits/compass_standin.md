@@ -174,3 +174,10 @@ retains that external input storage alongside its output bindings. The retry is 
 with the same scientific/engineering commands and thresholds. The correctness fixture synchronizes each
 controller separately to identify any device error at its source. Neither failed capture attempt has
 timing or behavioural results, and neither is counted as passing validation.
+
+The successful r5 run is followed by a focused storage-lifetime precaution, frozen under
+`out/compass_standin_r6/` before submission. Warmup input tensors are recorded on the replay stream,
+so an immediate reset/detach cannot return their side-stream allocation to the allocator while a
+replay still uses it. The fixture adds queued, unsynchronized replay followed by reset and detach;
+the existing CUDA tests and native profile are repeated. This changes storage bookkeeping, not
+the law or gains. It supplies no new science draws and does not replace r5's room/turn records.
