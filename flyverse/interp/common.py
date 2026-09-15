@@ -992,7 +992,7 @@ def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, see
     live_retina = getattr(fb, "retina", None)
     if live_retina is not None and hasattr(live_retina, "coverage"):
         coverage = live_retina.coverage()
-        if coverage["without_photoreceptors"]:
+        if coverage["without_photoreceptors"] and isinstance(retina_record, dict):
             retina_record["coverage"] = coverage
     return {"flyverse_commit": git, "source_fingerprint": source_fingerprint(git), "dataset_release": dataset_release(c),
             "compiled_connectome": connectome_fingerprint(c, cache_dir), "model": model,

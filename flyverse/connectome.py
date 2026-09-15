@@ -26,7 +26,7 @@ import pandas as pd
 import pyarrow.feather as pf
 import scipy.sparse as sp
 
-from .backends import RELEASES, NotAvailable, backend, capabilities
+from .backends import CAPABILITIES, RELEASES, NotAvailable, backend, capabilities
 
 DATA_DIR = Path(os.environ.get("FLYVERSE_DATA", r"D:\Datasets\male-cns-connectome-v1.0\flat-connectome"))
 CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
@@ -418,7 +418,7 @@ class Connectome:
         return "optic_columns" in capabilities(self.dataset)
 
     def require(self, capability):
-        if capability not in ("vnc", "optic_columns"):
+        if capability not in set().union(*CAPABILITIES.values()):
             raise ValueError(f"unknown connectome capability {capability!r}")
         if capability == "vnc" and not self.has_vnc:
             raise NotAvailable(f"dataset {self.dataset} has no VNC")

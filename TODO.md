@@ -344,7 +344,7 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
       PS196a -> PS059 loop, the haltere-afferent route, LC11 / LC10a inputs) printed MaleCNS / FAFB / BANC side by
       side with a per-release synapse scale (counts run ~1 : 0.6 : 0.3). CPU, a day. The README's "not a
       reconstruction artefact" table.
-- [x] `Connectome.load(dataset="fafb" | "banc")` (merged 34c2eb0; review `docs/audits/connectome_backends_review.md`, merge with fixes B1-B4 applied; open nits 2/4/5/6/7/8/10/11 listed there): `root_id` -> `bodyId` (int64 fits), alias-normalised types,
+- [x] `Connectome.load(dataset="fafb" | "banc")` (merged 34c2eb0; review `docs/audits/connectome_backends_review.md`, merge with fixes B1-B4 applied; nits 2/4/5/6/7/8/10/11 resolved in Astra's 281a68b, reviewed in `connectome_backends_followups_review.md` and merged 347c800): `root_id` -> `bodyId` (int64 fits), alias-normalised types,
       vocabulary maps for superclass / NT / side / neuropil; the receptor table and ledger transfer by type name.
       BANC = the female CNS as a whole-animal replicate of the walking result (either outcome is a finding);
       FAFB = the complete female optic lobe. ~2 days; the biggest scientific payoff and the best release story.
@@ -359,5 +359,15 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
       LC11 null (caveat added to object_baseline_r2.md and object_rectangles_r3.md). Rule: never window a visual_projection
       cell on that single column. The transform hex1 = q + 18, hex2 = p + 20 is in (1,581 columns; mirror <= 1.6 deg; T4 offsets cos >= 0.98; DRA strict rim check FAILS 100/126 and is recorded as an expected failure) -- still to use it as ground truth for
       `trace.column_of_cells` and the LC anatomical windows; LC11 / LC10a themselves are not column-assigned there.
+- [ ] **A female fly that sees and walks (BANC).** BANC's optic lobes are reconstructed and already simulating as LIF
+      cells (72,574 `ol_intrinsic`, the optic -> central -> VNC chain wired) but it has NO column map and NO R1-R6 at
+      all (its lamina's presynaptic partners are Tm3 / Dm6 / C2 / L5 -- feedback only). Path, in order: (A) recover
+      BANC's own hex lattice from its columnar tiling (Mi1 / L1 / L5 / T4 one-per-column; nearest-neighbour graph via
+      shared partners embedded in 2D), validated against the same four spec-2.5 checks FAFB's map passed (T4a-d
+      offsets, L/R mirror, DRA rim, ~800 columns/side); right eye only (the left is under-reconstructed: Mi1 560 vs
+      878); then (B) add the stereotyped R1-R6 input layer through `Connectome.extend` (negative bodyIds,
+      `dataset=synthetic`, column-local neural-superposition cartridge onto L1/L2/L3) -- the only invented part,
+      auditable. NOT a FAFB chimera: the two animals share zero body IDs and the optic -> central seam would have to
+      be fabricated by type matching, which is the hypothesis a two-connectome comparison exists to test.
 - [ ] Do not: mix counts across releases unscaled; treat BANC's optic lobes as complete (T2 853 vs 1,466);
       prefer BANC predicted monoamine labels to its verified column; assume `fru` / `dsx` circuits are sex-shared.
