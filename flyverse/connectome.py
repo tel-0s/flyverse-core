@@ -26,7 +26,7 @@ import pandas as pd
 import pyarrow.feather as pf
 import scipy.sparse as sp
 
-from .backends import RELEASES, NotAvailable, backend
+from .backends import RELEASES, NotAvailable, backend, capabilities
 
 DATA_DIR = Path(os.environ.get("FLYVERSE_DATA", r"D:\Datasets\male-cns-connectome-v1.0\flat-connectome"))
 CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
@@ -409,19 +409,24 @@ class Connectome:
 
     @property
     def has_vnc(self):
-        return self.dataset != "fafb"
+        """Whether the source release includes VNC, independent of this subset's cells."""
+        return "vnc" in capabilities(self.dataset)
 
     @property
     def has_optic_columns(self):
-        return self.dataset != "banc"
+        """Whether the source release supplies an optic column map."""
+        return "optic_columns" in capabilities(self.dataset)
 
     def require(self, capability):
+        if capability not in ("vnc", "optic_columns"):
+            raise ValueError(f"unknown connectome capability {capability!r}")
         if capability == "vnc" and not self.has_vnc:
             raise NotAvailable(f"dataset {self.dataset} has no VNC")
         if capability == "optic_columns" and not self.has_optic_columns:
             raise NotAvailable(f"dataset {self.dataset} has no optic column map")
 
     def __post_init__(self):
+        capabilities(self.dataset)
         # Fast synapse magnitudes; sign-zero neuromodulatory contacts contribute zero.
         # Old caches acquire these columns in memory without rewriting the cache.
         if "in_syn" not in self.neurons:

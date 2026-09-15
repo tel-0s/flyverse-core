@@ -98,7 +98,7 @@ def columns(c, male):
     dots = [np.dot(eye["L"][key], eye["R"][key] * [1, -1, 1]) for key in shared]
     error = np.degrees(np.arccos(np.clip(dots, -1, 1)))
     all_on_rim = all(not v["dorsal_envelope"]["deeper_cells"] for v in dra.values())
-    return dict(n_columns=r.n_columns, per_side={s: int((r.col_side == s).sum()) for s in ("L", "R")},
+    return dict(n_columns=r.n_columns, coverage=r.coverage(), per_side={s: int((r.col_side == s).sum()) for s in ("L", "R")},
         dra=dict(source=str(labels_path.name), sha256=sha256(labels_path), selection="non-putative DRA community labels on photoreceptors",
                  sides=dra, all_labels_on_rim=all_on_rim),
         mirror=dict(shared_columns=len(shared), max_error_deg=float(error.max()), mean_error_deg=float(error.mean())),
@@ -172,16 +172,74 @@ def gpu():
         finite=bool(torch.isfinite(fb.brain.v).all() and torch.isfinite(fb.optic.v).all()), ms=10)
 
 
+def compare_caches(baseline_root, rebuild=False):
+    """Audit a cache update against a separate retained baseline; never overwrite it."""
+    from flyverse.brain import LIFParams, _shaped_weights
+    baseline_root = Path(baseline_root).resolve()
+    cases = [("malecns", "threshold"), ("fafb", "threshold"), ("banc", "threshold"), ("fafb", "no_threshold")]
+    directories = []
+    for dataset, edges in cases:
+        relative = Path() if dataset == "malecns" else Path(dataset)
+        if edges != "threshold":
+            relative /= edges
+        old_dir = baseline_root / relative
+        new_dir = cn.default_cache_directory(dataset, edges).resolve()
+        if old_dir == new_dir:
+            raise ValueError("comparison requires separate baseline and current caches")
+        if not (old_dir / "W_post_pre.npz").exists():
+            raise ValueError(f"missing baseline cache: {old_dir}")
+        directories.append((dataset, edges, old_dir, new_dir))
+    report = {}
+    for dataset, edges, old_dir, new_dir in directories:
+        old = cn.load(old_dir, verbose=False)
+        new = cn.load(new_dir, dataset=dataset, edges=edges,
+                      rebuild=rebuild and dataset != "malecns", verbose=False)
+        same_matrix = old.W.shape == new.W.shape and all(
+            getattr(old.W, k).dtype == getattr(new.W, k).dtype and np.array_equal(getattr(old.W, k), getattr(new.W, k))
+            for k in ("data", "indices", "indptr"))
+        changed_columns = {k: int((~(old.neurons[k].eq(new.neurons[k]) |
+                                    (old.neurons[k].isna() & new.neurons[k].isna()))).sum())
+                           for k in old.neurons if not old.neurons[k].equals(new.neurons[k])}
+        row = dict(n=new.n, nnz=new.W.nnz, same_matrix=same_matrix, changed_columns=changed_columns,
+            same_column_order=old.neurons.columns.tolist() == new.neurons.columns.tolist(),
+            same_cache_files={name: sha256(old_dir / name) == sha256(new_dir / name)
+                              for name in ("W_post_pre.npz", "sign0_counts.npz")},
+            provenance={label: common.provenance(c, device="cpu", stimulus={"protocol": "cache_update_comparison",
+                         "params": {"edges": edges}, "control": str(baseline_root)}) for label, c in (("before", old), ("after", new))})
+        assert same_matrix and row["same_column_order"] and all(row["same_cache_files"].values())
+        if dataset == "malecns":
+            assert old.neurons.equals(new.neurons)
+            before, after = (common.connectome_fingerprint(c) for c in (old, new))
+            assert {k: v for k, v in before.items() if k != "cache_dir"} == {k: v for k, v in after.items() if k != "cache_dir"}
+        elif edges == "threshold":
+            rs_old, rs_new = (cn.receptor_signs(c) for c in (old, new))
+            row["receptor_changed_entries"] = {k: int(np.count_nonzero(getattr(rs_old, k) != getattr(rs_new, k)))
+                for k in ("fast_sign", "fast_gain", "slow_sign", "slow_gain", "slow_class", "tier")}
+            w_old, w_new = _shaped_weights(old, LIFParams(), rs_old), _shaped_weights(new, LIFParams(), rs_new)
+            assert np.array_equal(w_old.indices, w_new.indices) and np.array_equal(w_old.indptr, w_new.indptr)
+            row["default_shaped_weight_changes"] = int(np.count_nonzero(w_old.data != w_new.data))
+        report[f"{dataset}/{edges}"] = row
+        print(dataset, edges, "changed columns:", changed_columns,
+              "receptor:", row.get("receptor_changed_entries"), "shaped weights:", row.get("default_shaped_weight_changes"))
+    return report
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--gpu", action="store_true")
+    ap.add_argument("--compare-cache", type=Path, help="compare against a separate cache root, including FAFB no_threshold")
+    ap.add_argument("--rebuild", action="store_true", help="recompile current female caches before --compare-cache")
     ap.add_argument("--out", default="out/connectome_backends/acceptance.json")
     args = ap.parse_args()
-    report = gpu() if args.gpu else cpu()
+    if args.gpu and args.compare_cache or args.rebuild and not args.compare_cache:
+        ap.error("--compare-cache is CPU-only; --rebuild requires --compare-cache")
+    report = compare_caches(args.compare_cache, args.rebuild) if args.compare_cache else gpu() if args.gpu else cpu()
     out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(common.to_jsonable(report), indent=2), encoding="utf-8")
     print(f"wrote {out}")
-    if args.gpu:
+    if args.compare_cache:
+        pass  # comparison assertions run before the report is returned
+    elif args.gpu:
         assert report["finite"]
     else:
         assert all(d["cpu_smoke"]["finite"] for d in report["datasets"].values())

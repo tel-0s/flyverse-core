@@ -35,7 +35,8 @@ def read(data_dir, *, edges="threshold", nt_threshold=0.5, log=print):
     d = raw.merge(cls, on="root_id", validate="one_to_one").merge(types, on="root_id", how="left", validate="one_to_one")
     n = pd.DataFrame({"bodyId": d.root_id, "flywireType": d.primary_type, "somaSide": d.side.map(SIDES),
         "superclass": d.super_class.map(SUPERCLASS), "class": d["class"], "subclass": d.sub_class,
-        "entryNerve": d.nerve, "exitNerve": d.nerve.where(d.super_class.isin(["motor", "endocrine"])),
+        "entryNerve": d.nerve.where(d.super_class.isin(["sensory", "sensory_ascending", "sensory_descending"])),
+        "exitNerve": d.nerve.where(d.super_class.isin(["motor", "endocrine"])),
         "nt": d.nt_type.where(d.nt_type_score >= nt_threshold).map(canonical_nt)})
     pr = d.sub_class.eq("photo_receptor") | d.primary_type.isin(["R1-6", "R7", "R8"])
     n.loc[pr | d.sub_class.eq("eye_bristle"), "superclass"] = "ol_sensory"
