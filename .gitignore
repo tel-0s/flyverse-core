@@ -4,6 +4,9 @@ __pycache__/
 out/
 *.gif
 *.mp4
+# the committed demo media (docs/media/README.md); every other .gif / .mp4 stays ignored
+!docs/media/*.gif
+!docs/media/*.mp4
 .venv/
 build/
 *.egg-info/
