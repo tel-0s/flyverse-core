@@ -36,7 +36,10 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       (`motor.py:52`); the LIF partition is **71,618**, not 71,625; the taste/bitter numbers are now the round-3
       suite's (Shiu 139.9 -> 0.8 Hz, calibrated 5.5 -> 0), not the superseded 2026-09-11 run's; `CITATION.cff`
       gained the two FlyWire releases. `docs/INSTALL.md` made ASCII and its `data` marker row completed.
-- [ ] **Demo media**: a 20-30 s GIF/MP4 of the room (observatory UI, loom escape, wind orientation, feeding
+- [x] **Demo media** (2026-09-15, `docs/media/`: `loom.gif` / `loom.mp4` (25 s, loom at 8 s, giant-fibre jump and re-landing),
+      `wind_apple.gif` / `.mp4` (25 s; honestly captioned: no wind orientation and no feeding can be claimed from the clip),
+      `toolkit_loom_gf.png` (`paths` stage map + `atlas` readout); every command line, commit and device in
+      `docs/media/README.md`; generator `scripts/make_demo_media.py`; rendered on the house B200 at 442c420). Original item: a 20-30 s GIF/MP4 of the room (observatory UI, loom escape, wind orientation, feeding
       approach) and one figure of the toolkit output (a `trace` stage map or the atlas), committed under
       `docs/media/` (git-ignore rule currently excludes `*.gif`/`*.mp4` — carve out `docs/media/`).
 - [x] **Reproducibility statement** (2026-09-14, `docs/REPRODUCIBILITY.md`, linked from the README): the shipped default model (LIFParams / OpticParams / gains) with the cache

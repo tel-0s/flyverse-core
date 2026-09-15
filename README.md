@@ -14,6 +14,10 @@ small, documented set of physiological assumptions, each one named below.
 *The room console: body camera, small orbit view, both retinal mosaics, antennal inputs, and
 simultaneous population, motor and body readouts. `--brain-map` opens the soma map.*
 
+Moving: [`docs/media/loom.gif`](docs/media/loom.gif) -- 25 s of the console, a loom at 8 s, the giant-fibre jump and the re-landing.
+[`docs/media/wind_apple.mp4`](docs/media/wind_apple.mp4) -- 25 s with one apple and the default wind (what the fly did, honestly captioned in [`docs/media/README.md`](docs/media/README.md), with every command line).
+Toolkit: [`docs/media/toolkit_loom_gf.png`](docs/media/toolkit_loom_gf.png) -- `interp` on the loom -> giant-fibre path: the `paths` stage map and the `atlas` readout.
+
 ## Run it
 
 ```
