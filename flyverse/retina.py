@@ -4,6 +4,11 @@ Every photoreceptor has been assigned to an optic-lobe hex column (side, hex1, h
 Here each column gets a viewing direction in the fly's body frame, and each photoreceptor gets a
 spectral sensitivity over the world's light channels.
 
+FAFB provides generic R7/R8 identities, mapped to the unclear aggregates below;
+pale/yellow/DRA-specific sensitivity, receptor and tau entries cannot select them.
+Annotated columns without a reconstructed photoreceptor remain in the eye geometry;
+coverage() and summarize() expose their lack of direct photoreceptor input.
+
 Hex axes (from soma-position regressions of L1/Mi1 against assignedOlHex1/2):
     hex1 + hex2  increases towards DORSAL
     hex1 - hex2  increases towards ANTERIOR  (lamina topology; the medulla is chiasm-inverted)
@@ -65,6 +70,17 @@ class Retina:
     @property
     def n_columns(self) -> int:
         return len(self.col_side)
+
+    def coverage(self) -> dict:
+        """Columns with direct photoreceptor input; recurrent optic activity is separate."""
+        present = np.zeros(self.n_columns, dtype=bool)
+        present[np.asarray(self.pr_column, dtype=np.int64)] = True
+        return {"n_columns": self.n_columns, "with_photoreceptors": int(present.sum()),
+                "without_photoreceptors": int((~present).sum()),
+                "without_photoreceptors_indices": np.flatnonzero(~present).tolist(),
+                "by_side": {side: {"n_columns": int((self.col_side == side).sum()),
+                                   "without_photoreceptors": int(((self.col_side == side) & ~present).sum())}
+                            for side in ("L", "R")}}
 
     def ray_directions(self) -> tuple[np.ndarray, np.ndarray]:
         """Per-column sample rays: (n_col, k, 3) unit directions and (k,) weights, body frame."""
@@ -150,8 +166,15 @@ def summarize(r: Retina, c: Connectome) -> str:
     t = c.neurons.type.to_numpy()[r.pr_index]
     lines = [f"retina: {len(r.pr_index)} photoreceptors in {r.n_columns} columns "
              f"(L {int((r.col_side == 'L').sum())}, R {int((r.col_side == 'R').sum())})"]
+    coverage = r.coverage()
+    if coverage["without_photoreceptors"]:
+        lines.append(f"  {coverage['without_photoreceptors']} columns without photoreceptor input "
+                     "(retained in eye centring; recurrent optic activity remains possible)")
     for side in ("L", "R"):
         s = r.col_side == side
+        if not s.any():
+            lines.append(f"  {side}: no columns")
+            continue
         lines.append(f"  {side}: azimuth {r.col_az_el[s, 0].min():.0f}..{r.col_az_el[s, 0].max():.0f} deg, "
                      f"elevation {r.col_az_el[s, 1].min():.0f}..{r.col_az_el[s, 1].max():.0f} deg")
     for fam, pat in [("R1-R6", "R1-R6"), ("R7", "R7"), ("R8", "R8")]:

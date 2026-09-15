@@ -988,11 +988,17 @@ def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, see
         model["optic"] = None
     model["hooks"] = getattr(fb, "hooks", [])
     model["modules"] = fb.module_records() if hasattr(fb, "module_records") else []
+    retina_record = to_jsonable(retina) if retina is not None else {"file": None, "n_columns": None, "column_to_bodies": None}
+    live_retina = getattr(fb, "retina", None)
+    if live_retina is not None and hasattr(live_retina, "coverage"):
+        coverage = live_retina.coverage()
+        if coverage["without_photoreceptors"]:
+            retina_record["coverage"] = coverage
     return {"flyverse_commit": git, "source_fingerprint": source_fingerprint(git), "dataset_release": dataset_release(c),
             "compiled_connectome": connectome_fingerprint(c, cache_dir), "model": model,
             "execution": execution_record(fb, device, seeds, env_seeds, batch, backend, replicate_unit),
             "stimulus": to_jsonable(stimulus) if stimulus is not None else {"protocol": None, "params": {}, "control": None},
-            "retina": to_jsonable(retina) if retina is not None else {"file": None, "n_columns": None, "column_to_bodies": None},
+            "retina": retina_record,
             "units": UNITS if c.dataset == "malecns" else [
                 {"item": "node_set", "rule": f"{c.dataset} {c.release}; retained release neurons; see compiled_connectome.manifest"},
                 {"item": "graded", "rule": "ol_intrinsic rate units where an optic module exists; otherwise LIF"},
