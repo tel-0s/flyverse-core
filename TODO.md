@@ -128,21 +128,41 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           all three channels and still fires less); straightness reads as sidedness (82-92 % of it is the drift);
           DNa02_R is partly an 8.3 Hz per-side level deficit. The level, sidedness included, reaches **76 / 67 /
           89 %** of the cycle's DNa02_L / DNa02_R / yaw-SD rise. **Nothing adopted, no default changed.**
-    - [ ] **the UNSIDED level control** (control (a) of `level_matched_control.md` 7.1): the round-2 law reading the
-          side-MEAN leg-MN rate on every cell at `mn_ref_hz` 8.84. Removes the +13.6 Hz DC chordotonal L-R and the
-          +9.2 Hz hair-plate L-R at the same means; the control that separates the round-2 law's sidedness from its
-          level, and the one that says whether the level alone still makes DNa02_L > DNa02_R and the fly drift left.
-    - [ ] **the MODULATION-ONLY cycle arm** (control (b)): the cycle's per-phase law with the per-leg amplitude held
-          at 1 (no turn kinematics in the afferents). Separates the temporal modulation (the part that raises
-          AN04B003 from 19 to 23 Hz) from the amplitude turn term (|amp L-R| 0.016) -- but it keeps the cycle's own
-          hair-plate / campaniform values, so it does not close the channel confound.
-    - [ ] **the CHANNEL-MATCHED level control** (control (c), added by the skeptic and not in the audit's original
-          list): the round-2 law at `mn_ref_hz` 8.84 with `hair_plate_max_hz` / `campaniform_load_hz` set so the
-          realised hair-plate and campaniform commanded means match C's **47.1 / 24.9 Hz** at the same chordotonal
-          86-88 Hz. The control the C-over-L attribution actually needs; neither (a) nor (b) matches those two
-          channels, so without it the DNa02 excess stays jointly attributable to per-phase modulation and to the
-          unmatched hair plate.
-    - [ ] **the single-cell AN04B003 check** (CPU, `interp_atlas`-style, no room run): AN04B003 under (i) steady vs
+    - [x] **the UNSIDED level control -- RUN** (control (a) of `level_matched_control.md` 7.1): the round-2 law
+          reading the side-MEAN leg-MN rate on every cell at `mn_ref_hz` 8.84. Removes the +13.6 Hz DC chordotonal
+          L-R and the +9.2 Hz hair-plate L-R at the same means; the control that separates the round-2 law's
+          sidedness from its level.
+          **Outcome** (`vncd5-2ffbc3`, `docs/audits/level_controls.md` F1): U v L is `null` on DNa02_L, DNa02_R and
+          the clean yaw SD while straightness goes +0.231 and the drift halves (+3.48 -> +1.74 deg/s) -- the DC bias
+          owns the drift and the straightness and **none of the DNa02 rate**.
+    - [x] **the MODULATION-ONLY cycle arm -- RUN** (control (b)): the cycle's per-phase law with the per-leg
+          amplitude held at 1 (no turn kinematics in the afferents), `body.LegCycle(flat_amplitude=True)` behind the
+          opt-in `leg_cycle_flat` token.
+          **Outcome** (F4, and NOT the clean contrast it was meant to be): amplitude 1.000 is above the law's
+          realised **0.948**, so M bought **+6.0 Hz of chordotonal**; about 60 % of its AN04B003 excess over C is
+          that level and the rest is not -- M's structure residual **exceeds** C's by +0.659 / +0.745 Hz (z +3.8 /
+          +3.5) and on DNa02_L by +0.069 (z +4.0) -- so **"the amplitude law adds no drive" is NOT supported** and
+          F4 stays open. What the turn term does own is the per-frame sided DNa02 signal (-0.334 C vs -0.107 M).
+    - [x] **the CHANNEL-MATCHED level control -- RUN** (control (c), added by the skeptic and not in the audit's
+          original list): the round-2 law at `mn_ref_hz` 8.84 with `hair_plate_max_hz` **86.71** /
+          `campaniform_load_hz` **25.05**, derived on CPU as a fixed point of the afferent -> leg-MN loop; realised
+          hair plate **44.34** and campaniform **24.78** against C's 46.36 / 24.91.
+          **Outcome** (F2, F3): matching the two channels costs K **8.7 Hz of chordotonal** through the same loop
+          (the predeclared side effect P1b), so K v L is `result` NEGATIVE, the pair settles nothing alone and
+          C v K is an **upper bound**; the hair-plate route is sized from the level model (**-0.070 Hz/Hz**) and the
+          single cell (**-0.149**) instead -- it **accounts for +0.72 Hz, 14 %, of the +5.22 Hz pooled C-over-L
+          AN04B003 difference**, and the per-phase modulation owns the remaining ~4.49 Hz.
+    - [ ] **the next-round arm: M at the cycle's own realised amplitude 0.948** (`level_controls.md` 10 item 2):
+          `flat_amplitude` with the per-leg amplitude set to the cycle's realised mean (or an `mn_ref`-style
+          compensation) instead of 1, so that M and C sit at ONE chordotonal level. As run, M buys +6.0 Hz and F4 /
+          F6 cannot be read as level contrasts; at 0.948 they become the clean contrasts they were meant to be and
+          the open question "does the amplitude law add drive?" gets an answer.
+    - [ ] **the next-round predeclaration: a Holm family that can be satisfied** (`level_controls.md` 10 item 1): at
+          n v n the exact-U floor is `p_floor(n, n)` and a family of m members can only be called if
+          `p_floor x m <= alpha` -- **m <= 6 at 5 v 5** (0.0079365 x 6 = 0.0476) and **m <= 23 at 6 v 6**
+          (0.0021645 x 23 = 0.0498). Round 4b declared m = 7 at 5 runs and called nothing, which `docs/INTERP.md`
+          10.2 already forbade. Either size the family to m <= 6, or run **6 runs per arm**.
+    - [x] **the single-cell AN04B003 check** (CPU, `interp_atlas`-style, no room run): AN04B003 under (i) steady vs -- RUN 2026-09-15 (`scripts/probe_an04b003_single_cell.py`, `docs/audits/level_controls.md` section 13): +1.63 Hz at a matched per-cell mean with IN13B001 clamped (z +7.2), hair plate -1.00 Hz per +6.7 Hz (z -5.9), campaniform null; reproduced bit-for-bit on an independent rerun.
           8 Hz-modulated chordotonal input at the same mean with IN13B001's rate clamped, and (ii) the hair-plate
           level varied alone at a fixed chordotonal level. The two together settle whether the C-over-L AN04B003
           difference (19.1 / 16.5 -> 23.1 / 23.6 Hz) is modulation or hair-plate disinhibition.

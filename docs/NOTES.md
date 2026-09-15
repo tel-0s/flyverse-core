@@ -2483,6 +2483,114 @@ hair-plate disinhibition. **Nothing is adopted and no default changed**: `senses
 untouched, the bit-identity golden passes, and the leg cycle and the level control both remain opt-in labelled
 mechanisms.
 
+### Session 12 addendum: the three level controls (2026-09-15)
+
+**What ran.** ONE house submission, `vncd5-2ffbc3`: **30 job(s), 0 failed (22.6 min)** on B200 -- the
+`probe_vnc_drive` room at `--family level2`, **six arms x five brain seeds** (16 flies x 60 s, 5-60 s window, blocks
+`fam_r0..fam_r4`), no compass job (rounds 2-4 settled that question). Arms: **A** shipped (no sense); **L** round
+4's level-matched control (`all`, `mn_ref_hz` 8.84), re-run so every pair is within-batch; **U** the UNSIDED control
+(`all+unsided`: every leg cell reads the side-MEAN leg-MN rate, so L's +13.564 Hz DC chordotonal L-R and +9.204 Hz
+hair-plate L-R become +0.000 at the same channel means); **K** the CHANNEL-MATCHED control (`all` at 8.84 with
+`hair_plate_max_hz` **86.71** and `campaniform_load_hz` **25.05**, derived on CPU as a fixed point of the same
+afferent -> leg-MN loop round 4 solved for `mn_ref_hz` and verified by a fourth CPU run before submission, realising
+hair plate 44.34 / campaniform 24.78 against C's 46.36 / 24.91); **M** the MODULATION-ONLY control
+(`all+leg_cycle+leg_cycle_flat`, per-leg amplitude held at 1.000000, |amp L-R| 0.000000 against C's 0.948 / 0.0170);
+**C** the cycle arm. Two new mechanisms, both **opt-in and default OFF**, both LABELLED CONTROL constructions and
+neither a candidate for a default: the `unsided` token in `senses.Proprioception.FLAGS` (four lines, one of them the
+law; refused with `leg_cycle` and without an MN-rate leg channel) and `body.LegCycle.flat_amplitude` (the `amp` line
+only; phase, stance, frequency, stance fraction and per-side loads bit-identical to the default cycle's). The
+shipped CPU path is bit-identical with both absent -- `pytest tests/test_proprioception.py tests/test_body_cycle.py
+tests/test_bit_identity.py` = **33 passed, 5 subtests**, the golden unchanged, reproduced independently on a second
+machine. Predeclaration stamped **04:54:59Z** against the earliest run's own `started_utc` **04:56:11Z**, an
+absolute timestamp inside the run JSONs, so round 4's "the ordering rests on file mtimes" caveat is closed.
+`docs/audits/level_controls.md`.
+
+**The sanctioned reading is the independent skeptic pass's closing paragraph, verbatim** (verdict **mostly sound**;
+its ten corrections were applied to the audit):
+
+**For NOTES -- what rounds 4 and 4b jointly say about the leg cycle.** Round 4 found the leg-cycle arm above a
+level-matched steady control on DNa02 and the ascending relay but could not say why; round 4b ran the three controls
+that split the difference and, within one 30-job submission whose predeclaration is stamped 72 s before the first run,
+separated them: the round-2 law's DC sidedness owns the level control's drift and straightness and **none** of its
+DNa02 rate (U v L `null` on DNa02_L, DNa02_R and the clean yaw SD while straightness goes +0.231 and the drift halves);
+the unmatched hair plate is a real, sign-negative and **small** route (-0.07 Hz of AN04B003 per Hz in the room, -0.149
+on an isolated cell, accounting for +0.72 Hz -- 14 % -- of the +5.22 Hz pooled C-over-L relay difference, with the
+campaniform contributing nothing measurable); and the remainder, **~+4.5 Hz, is the per-phase modulation** -- a level
+model fitted on three steady arms predicts a held-out steady arm to 0.33 Hz and under-predicts both cycle arms by
++3.9 to +5.7 Hz, a residual that survives every specification I could build and that no admissible hair-plate slope can
+remove, with the single cell naming the mechanism directly (+1.63 Hz at a matched per-cell mean with IN13B001 clamped,
+z +7.2, reproduced bit-for-bit). Against that, four things are **not** established: no row of either round is
+Holm-called in round 4b, because the predeclared family size m = 7 is arithmetically unsatisfiable at 5 runs per arm
+(0.0079 x 7 = 0.0556) -- a failure to apply a rule already in `docs/INTERP.md` 10.2; the DNa02 story rests on pairs and
+on a level model the audit itself disqualifies, so "the structure raises DNa02" remains a `compare`-level pattern of
++0.09 to +0.18 Hz, not a level-controlled measurement; the amplitude-only control M bought 6.0 Hz of chordotonal and
+still carries a structure residual 0.66-0.75 Hz **larger** than C's (z +3.5 to +3.8), so "the amplitude law adds no
+drive" is not supported and F4 stays open; and the clean-yaw-SD row of C v L flipped from `result` to `null` between
+batches only because the control arm's between-run scatter doubled -- the difference itself replicated (+0.57 then
++0.49, complete rank separation in both, pooled p 1.1e-05), so neither batch is an outlier. Nothing is adopted; the
+next round's arms are named in section 10 and the first of them is a family whose Holm denominator can actually be
+satisfied.
+
+**The Holm defect, and the standing rule it violated.** The predeclared family size was **m = 7** at 5 runs per arm,
+where the exact Mann-Whitney floor is `p_floor(5,5) = 2/C(10,5) = 0.0079365`: the smallest attainable adjusted p is
+`0.0079 x 7 = 0.0556 > 0.05`, so the declared decision rule was **unsatisfiable before a single job ran** and no row
+of any family is CALLED. The audit reports this rather than repairing it after the fact, and every table quotes the
+`compare` verdict, the z, the per-run scatter and the Holm-adjusted p side by side. What the audit got wrong is
+calling the fix "the rule for the next round": **`docs/INTERP.md` 10.2 already said it**, from object round 2 --
+*"A family member whose statistic is constant by construction is not a test ... still inflates the Holm denominator
+... Declare such quantities as reported magnitudes outside the family, and size the family (and therefore the arm
+count) from the members that can move"* -- and that rule is recorded there as the reason that round raised its arms
+from 5 to 6 runs. The predeclaration step failed to apply a standing house rule. The arithmetic for next time:
+**m <= 6 at 5 v 5** (0.0079365 x 6 = 0.047619) and **m <= 23 at 6 v 6** (0.0021645 x 23 = 0.04978).
+
+**The integrity defect, and the rule that follows.** The audit's section-5 sentence "Per-seed values behind the arms
+(r0..r4)" printed DNa02_L per-run lists for **U, K, M and C** -- and a clean-yaw-SD list for U -- whose values occur
+**nowhere in `out/vncd5`**. They had been constructed to carry the published means to four decimals rather than
+transcribed from the file: A and L reproduced, the other four did not. The skeptic caught it (R1) while reproducing
+**all 49 rows** of the decision table exactly from the raw recordings, so the table, the means, the SDs, the diffs,
+the z, the p and every verdict were and are correct -- only the prose scatter was invented. The four lists were
+replaced from `analysis/room_table.csv`'s `*_runs` columns (verified against that file before writing: U
+[0.3917 0.3950 0.3720 0.3873 0.3892], K [0.3519 0.3632 0.3529 0.3261 0.3548], M [0.6187 0.6327 0.6227 0.6141
+0.6165], C [0.5155 0.5343 0.5290 0.5144 0.5470]; U's clean yaw SD [6.8111 6.6278 6.9263 6.7598 6.6147]), and the
+audit now says plainly in section 5 that the previous version of that sentence printed values that were in no file.
+**The rule this adds** (`docs/INTERP.md` 10.4, new item): any per-run or per-seed scatter quoted in prose is
+**emitted by the analysis script into a named file and pasted from that file** -- the file is named in the sentence
+that quotes it -- never retyped by hand and never reconstructed from a mean; a quantity no file carries is not
+quoted. A second, related correction in the same pass: `pairwise.csv` carries the run mean, SD and n only (51
+columns, no `*_runs`), so `room_table.csv` and `pairs_console.txt` are where the per-run values live.
+
+**What K and M actually were (the two construction caveats).** Both controls bought a level change with the thing
+they were built to hold. **K** lost **8.7 Hz of chordotonal** because matching the hair plate and campaniform at a
+fixed `mn_ref` 8.84 lowers the leg-MN rate that feeds the chordotonal channel -- the predeclared side effect P1b,
+and exactly the round-2 law (`d(chord)/d(legMN)` = 15.84 Hz/Hz predicts -11.09 / -6.13 against -11.09 / -6.17
+observed). So K v L is `result` **NEGATIVE** on AN04B003 (-0.94 / -0.61), the opposite of the predicted
+disinhibition, the pair settles nothing on its own, and C v K / M v K are **upper bounds** by the predeclared rule
+(the DNa02 one loose by about a sixth: K's deficit is worth only +0.028 Hz of the +0.178 DNa02_L difference).
+**M** *gained* **6.0 Hz of chordotonal**, because the cycle law's realised amplitude is **0.948**, not 1.000, so the
+flat arm sits above the treatment; M v K's realised gap is **+14.74 Hz**, outside the declared 10 Hz tolerance, and
+F6 is VOID as a level contrast. Two further limits on the post-hoc level model that replaced the two-control rule:
+its published slope SEs are **pseudo-replicated** (six distinct (arm, side) level points, 30 rows that are five runs
+of each; on the six arm-side means `b +0.1848 +- 0.0355`, `c -0.0648 +- 0.0285`, so the hair-plate slope is 2.3
+sigma from zero, not 6.8), and the three steady arms lie close to one line in the (chordotonal, hair-plate) plane
+(corr 0.925), with C 9.1 Hz and M 11.8 Hz of hair plate off it -- the cycle predictions are **joint extrapolations**
+even though both marginal ranges contain them. Neither limit removes the residual: a **held-out steady arm** is
+predicted to 0.33 Hz, the residual survives twelve specifications (+2.50 .. +5.02 on C's left side) and **no
+hair-plate slope compatible with the steady arms can eat it** (`c ~ -0.55` would be needed, degrading the steady-arm
+RMSE 9 x). F5 (C v U) additionally leaves a **-24.7 Hz campaniform mismatch** the model cannot correct for, and the
+only evidence it does not matter is the single cell's campaniform null on a 752-cell subset.
+
+**Next, and nothing adopted.** No default moved, no mechanism was adopted, and `unsided`, `leg_cycle_flat` and the
+leg cycle all remain opt-in with their defaults untouched. The arms `docs/audits/level_controls.md` section 10 names
+first are **M at the cycle's own realised amplitude 0.948** (so that M and C sit at one chordotonal level and F4 --
+does the amplitude law add drive? -- becomes answerable) and **a predeclared family whose Holm denominator can be
+satisfied**: m <= 6 at 5 runs per arm, or 6 runs per arm for a family of up to 23. Behind them, unchanged from the
+audit's list: a control that matches all three channels at once (`mn_ref_hz`, `hair_plate_max_hz` and
+`campaniform_load_hz` as one three-parameter fixed point, which would turn C v K from an upper bound into a
+measurement), the suite under `all+leg_cycle`, ledger values for `lit.walk.outer_leg_step_ratio_in_turn` and
+`half_width_m`, a free-walking compass room under the cycle, and the FeCO walking-mean rate as a ledger number --
+to which this round adds the cycle's realised per-leg amplitude (0.948) as a second unmeasured quantity of the same
+kind.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

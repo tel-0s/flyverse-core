@@ -153,10 +153,24 @@ class Proprioception:
       'haltere_sided'  the haltere channel's left cells read the LEFT haltere MN rate and the right cells the right
                        (motor.read_haltere_sides, 8 L / 8 R cells on the shipped cache), unsided cells the mean;
                        without the token every haltere cell reads the one bilateral mean as in round 2.
+
+    Round 5 (docs/audits/level_controls.md), two further opt-in tokens, both OFF unless named and both LABELLED
+    CONTROL constructions (they exist to separate the parts of a comparison, never as candidates for a default):
+
+      'unsided'        the MN-rate law of the leg channels (chordotonal, hair plate) reads the SIDE-MEAN leg-MN rate,
+                       (leg_L + leg_R) / 2, on EVERY cell -- left, right and unsided alike -- so the round-2 law's
+                       fixed L-R (the leg-MN bias x (max - tonic) / mn_ref) is removed at the same channel means.
+                       It addresses the MN-rate law only and is refused together with 'leg_cycle' (the leg channels
+                       do not read the MN rate under the cycle). The campaniform and haltere channels are untouched.
+      'leg_cycle_flat' a marker for the caller that attaches body.LegCycle: build it with `flat_amplitude=True`
+                       (the per-leg stance-path amplitude held at 1 while walking, so the turn kinematics -- the
+                       half_width_m yaw term and the |amp L-R| turn term -- are absent from the afferents and only
+                       the per-leg / per-phase modulation remains). The sense itself reads `legs['amp']` as given;
+                       the token requires 'leg_cycle' and is recorded in `spec` so a run is self-describing.
     """
     CHANNELS = ("chordotonal", "hair_plate", "campaniform", "haltere")
     LEG_NERVES = ("ProLN", "MesoLN", "MetaLN", "ProAN", "VProN", "DProN", "ProCN")
-    FLAGS = ("haltere_coriolis", "leg_cycle", "haltere_sided")
+    FLAGS = ("haltere_coriolis", "leg_cycle", "haltere_sided", "unsided", "leg_cycle_flat")
     SEGMENT_OF_NERVE = {"ProLN": 1, "ProAN": 1, "VProN": 1, "DProN": 1, "ProCN": 1, "MesoLN": 2, "MetaLN": 3}
 
     def __init__(self, c, channels="all", *, side_threshold=0.2, mn_ref_hz=30.0,
@@ -168,6 +182,7 @@ class Proprioception:
         self.c = c
         self.channels, flags = self.parse_flags(channels)
         self.haltere_coriolis, self.leg_cycle, self.haltere_sided = flags["haltere_coriolis"], flags["leg_cycle"], flags["haltere_sided"]
+        self.unsided, self.leg_cycle_flat = flags["unsided"], flags["leg_cycle_flat"]
         self._held = {}
         for name, value in (("mn_ref_hz", mn_ref_hz), ("chordotonal_tonic_hz", chordotonal_tonic_hz),
                             ("chordotonal_max_hz", chordotonal_max_hz), ("hair_plate_tonic_hz", hair_plate_tonic_hz),
@@ -237,6 +252,12 @@ class Proprioception:
             raise ValueError("'haltere_sided' needs the haltere channel")
         if flags["leg_cycle"] and not any(ch in channels for ch in ("chordotonal", "hair_plate", "campaniform")):
             raise ValueError("'leg_cycle' needs a leg channel")
+        if flags["unsided"] and not any(ch in channels for ch in ("chordotonal", "hair_plate")):
+            raise ValueError("'unsided' needs a leg channel that reads the MN rate (chordotonal or hair_plate)")
+        if flags["unsided"] and flags["leg_cycle"]:
+            raise ValueError("'unsided' addresses the MN-rate law; under 'leg_cycle' the leg channels do not read the MN rate")
+        if flags["leg_cycle_flat"] and not flags["leg_cycle"]:
+            raise ValueError("'leg_cycle_flat' needs 'leg_cycle'")
         return channels, flags
 
     @classmethod
@@ -364,6 +385,8 @@ class Proprioception:
         yaw = batch_values(yaw_rate, batch, "yaw_rate")
         if np.any(lL < 0) or np.any(lR < 0) or np.any(h < 0):
             raise ValueError("motor rates must be nonnegative")
+        if self.unsided:                                             # the labelled UNSIDED control: every leg cell reads the side mean
+            lL = lR = 0.5 * (lL + lR)
         ground = (~air).astype(float)
         cyc = None
         if self.leg_cycle:
