@@ -1,0 +1,1563 @@
+{
+  "status": "DRAFT",
+  "batch": "cx8t",
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "arms": {
+    "H0": {
+      "lif": {
+        "v_rest": -52.0,
+        "v_reset": -52.0,
+        "v_th": -45.0,
+        "tau_m": 20.0,
+        "tau_syn": 5.0,
+        "t_ref": 2.2,
+        "delay": 1.8,
+        "w_syn": 0.275,
+        "dt": 0.5,
+        "rate_tau": 100.0,
+        "adapt_jump": 1.5,
+        "adapt_tau": 200.0,
+        "adapt_by_type": {
+          "^(EPG|PEN|PEG|Delta7)": 0.0
+        },
+        "std_u": 0.0,
+        "std_tau": 300.0,
+        "std_u_by_type": {
+          "^ORN_": 0.2,
+          "^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2
+        },
+        "input_norm_alpha": 1.0,
+        "input_norm_ref": 5000.0,
+        "same_type_gain": 0.1,
+        "conn_cap": 60.0,
+        "path_gain": [
+          [
+            "^descending_neuron$",
+            "^vnc_",
+            3.0
+          ],
+          [
+            "^visual_projection$",
+            "^descending_neuron$",
+            2.0
+          ]
+        ],
+        "type_path_gain": [
+          [
+            "^(LC4|LPLC2)$",
+            "^DNp01$",
+            3.0
+          ],
+          [
+            "^EPG$",
+            "^PEN_",
+            1.0
+          ],
+          [
+            "^PEN_",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^EPG$",
+            "^PEG$",
+            1.0
+          ],
+          [
+            "^PEG$",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^Delta7$",
+            "^(EPG$|PEN_)",
+            1.0
+          ],
+          [
+            "^(ER|ExR)",
+            "^(EPG$|PEN_|PEG$)",
+            1.0
+          ],
+          [
+            "^(ExR6|ER6|ER4m)$",
+            "^(PEN_|EPG$)",
+            0.0
+          ]
+        ],
+        "event_driven": null,
+        "weight_dtype": "float32",
+        "dt_by_module": null,
+        "prune_frozen": true,
+        "receptor_model": "sign",
+        "receptor_net_rule": "abs",
+        "receptor_nt_class_fallback": false,
+        "receptor_table": null,
+        "receptor_gain": null,
+        "slow_tau_ms": 200.0,
+        "slow_gain": 0.02,
+        "slow_gain_by_class": null,
+        "slow_tau_by_class": null,
+        "slow_mode": "additive",
+        "slow_gain_clip": [
+          0.0,
+          4.0
+        ],
+        "w_syn_by_nt": null,
+        "surrogate_grad": false,
+        "receptor_gain_resolved": null,
+        "slow_gain_by_class_resolved": null,
+        "slow_tau_by_class_resolved": null
+      },
+      "hold_edges": [
+        [
+          "^(ExR6|ER6|ER4m)$",
+          "^(PEN_|EPG$)",
+          0.0
+        ]
+      ],
+      "hold_edges_resolved": [
+        {
+          "pre": "^(ExR6|ER6|ER4m)$",
+          "post": "^(PEN_|EPG$)",
+          "factor": 0.0,
+          "n_pre_cells": 17,
+          "n_post_cells": 88,
+          "pre_types": [
+            "ER4m",
+            "ER6",
+            "ExR6"
+          ],
+          "post_types": [
+            "EPG",
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 1149,
+          "synapses": 37256.0
+        }
+      ],
+      "instruments": [
+        "ring_dc_hold",
+        "glno_sign"
+      ],
+      "instrument_records": [
+        {
+          "name": "ring_dc_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^(PEN_|EPG$), pre ~ ^(ExR6|ER6|ER4m)$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0,
+            "n_pre_cells": 17,
+            "n_post_cells": 88,
+            "pre_types": [
+              "ER4m",
+              "ER6",
+              "ExR6"
+            ],
+            "post_types": [
+              "EPG",
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 1149,
+            "synapses": 37256.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); receptor placement and kinetics at those contacts are open",
+          "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
+          "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
+          "audits": [
+            "docs/audits/compass_dc_balance.md",
+            "docs/audits/compass_ring_mechanism.md",
+            "docs/audits/exr6_evidence.md"
+          ]
+        },
+        {
+          "name": "glno_sign",
+          "class": "flyverse.instruments:TypeRelabel",
+          "kind": "relabel",
+          "law": "unverified",
+          "law_text": "type GLNO compiled as glutamate (NT_SIGN sign) in a scratch cache",
+          "parameters": {
+            "type": "GLNO",
+            "nt": "glutamate"
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
+          "source": "the stronger of two disagreeing EM predictions (glno_relabel.md); no sourced transmitter call exists",
+          "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
+          "audits": [
+            "docs/audits/glno_relabel.md",
+            "docs/audits/cx_glno.md"
+          ]
+        }
+      ],
+      "neural_stimuli": [],
+      "preset": "instrumented",
+      "nt_override": {
+        "GLNO": "glutamate"
+      },
+      "cache_md5": "7a10d93ba2086f2c76bcdabdca79b4ec"
+    },
+    "HL": {
+      "lif": {
+        "v_rest": -52.0,
+        "v_reset": -52.0,
+        "v_th": -45.0,
+        "tau_m": 20.0,
+        "tau_syn": 5.0,
+        "t_ref": 2.2,
+        "delay": 1.8,
+        "w_syn": 0.275,
+        "dt": 0.5,
+        "rate_tau": 100.0,
+        "adapt_jump": 1.5,
+        "adapt_tau": 200.0,
+        "adapt_by_type": {
+          "^(EPG|PEN|PEG|Delta7)": 0.0
+        },
+        "std_u": 0.0,
+        "std_tau": 300.0,
+        "std_u_by_type": {
+          "^ORN_": 0.2,
+          "^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2
+        },
+        "input_norm_alpha": 1.0,
+        "input_norm_ref": 5000.0,
+        "same_type_gain": 0.1,
+        "conn_cap": 60.0,
+        "path_gain": [
+          [
+            "^descending_neuron$",
+            "^vnc_",
+            3.0
+          ],
+          [
+            "^visual_projection$",
+            "^descending_neuron$",
+            2.0
+          ]
+        ],
+        "type_path_gain": [
+          [
+            "^(LC4|LPLC2)$",
+            "^DNp01$",
+            3.0
+          ],
+          [
+            "^EPG$",
+            "^PEN_",
+            1.0
+          ],
+          [
+            "^PEN_",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^EPG$",
+            "^PEG$",
+            1.0
+          ],
+          [
+            "^PEG$",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^Delta7$",
+            "^(EPG$|PEN_)",
+            1.0
+          ],
+          [
+            "^(ER|ExR)",
+            "^(EPG$|PEN_|PEG$)",
+            1.0
+          ],
+          [
+            "^(ExR6|ER6|ER4m)$",
+            "^(PEN_|EPG$)",
+            0.0
+          ]
+        ],
+        "event_driven": null,
+        "weight_dtype": "float32",
+        "dt_by_module": null,
+        "prune_frozen": true,
+        "receptor_model": "sign",
+        "receptor_net_rule": "abs",
+        "receptor_nt_class_fallback": false,
+        "receptor_table": null,
+        "receptor_gain": null,
+        "slow_tau_ms": 200.0,
+        "slow_gain": 0.02,
+        "slow_gain_by_class": null,
+        "slow_tau_by_class": null,
+        "slow_mode": "additive",
+        "slow_gain_clip": [
+          0.0,
+          4.0
+        ],
+        "w_syn_by_nt": null,
+        "surrogate_grad": false,
+        "receptor_gain_resolved": null,
+        "slow_gain_by_class_resolved": null,
+        "slow_tau_by_class_resolved": null
+      },
+      "hold_edges": [
+        [
+          "^(ExR6|ER6|ER4m)$",
+          "^(PEN_|EPG$)",
+          0.0
+        ]
+      ],
+      "hold_edges_resolved": [
+        {
+          "pre": "^(ExR6|ER6|ER4m)$",
+          "post": "^(PEN_|EPG$)",
+          "factor": 0.0,
+          "n_pre_cells": 17,
+          "n_post_cells": 88,
+          "pre_types": [
+            "ER4m",
+            "ER6",
+            "ExR6"
+          ],
+          "post_types": [
+            "EPG",
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 1149,
+          "synapses": 37256.0
+        }
+      ],
+      "instruments": [
+        "ring_dc_hold",
+        "glno_sign"
+      ],
+      "instrument_records": [
+        {
+          "name": "ring_dc_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^(PEN_|EPG$), pre ~ ^(ExR6|ER6|ER4m)$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0,
+            "n_pre_cells": 17,
+            "n_post_cells": 88,
+            "pre_types": [
+              "ER4m",
+              "ER6",
+              "ExR6"
+            ],
+            "post_types": [
+              "EPG",
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 1149,
+            "synapses": 37256.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); receptor placement and kinetics at those contacts are open",
+          "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
+          "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
+          "audits": [
+            "docs/audits/compass_dc_balance.md",
+            "docs/audits/compass_ring_mechanism.md",
+            "docs/audits/exr6_evidence.md"
+          ]
+        },
+        {
+          "name": "glno_sign",
+          "class": "flyverse.instruments:TypeRelabel",
+          "kind": "relabel",
+          "law": "unverified",
+          "law_text": "type GLNO compiled as glutamate (NT_SIGN sign) in a scratch cache",
+          "parameters": {
+            "type": "GLNO",
+            "nt": "glutamate"
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
+          "source": "the stronger of two disagreeing EM predictions (glno_relabel.md); no sourced transmitter call exists",
+          "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
+          "audits": [
+            "docs/audits/glno_relabel.md",
+            "docs/audits/cx_glno.md"
+          ]
+        }
+      ],
+      "neural_stimuli": [
+        {
+          "name": "direct_GLNO_L",
+          "idx": [
+            1966,
+            12075
+          ],
+          "body_ids": [
+            "12104",
+            "23325"
+          ],
+          "poisson_hz": 90.0,
+          "start_s": 3.5,
+          "duration_s": 3.0,
+          "law": "unverified diagnostic level; a direct neural challenge, not a physiological transfer law"
+        }
+      ],
+      "preset": "instrumented",
+      "nt_override": {
+        "GLNO": "glutamate"
+      },
+      "cache_md5": "7a10d93ba2086f2c76bcdabdca79b4ec"
+    },
+    "HR": {
+      "lif": {
+        "v_rest": -52.0,
+        "v_reset": -52.0,
+        "v_th": -45.0,
+        "tau_m": 20.0,
+        "tau_syn": 5.0,
+        "t_ref": 2.2,
+        "delay": 1.8,
+        "w_syn": 0.275,
+        "dt": 0.5,
+        "rate_tau": 100.0,
+        "adapt_jump": 1.5,
+        "adapt_tau": 200.0,
+        "adapt_by_type": {
+          "^(EPG|PEN|PEG|Delta7)": 0.0
+        },
+        "std_u": 0.0,
+        "std_tau": 300.0,
+        "std_u_by_type": {
+          "^ORN_": 0.2,
+          "^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2
+        },
+        "input_norm_alpha": 1.0,
+        "input_norm_ref": 5000.0,
+        "same_type_gain": 0.1,
+        "conn_cap": 60.0,
+        "path_gain": [
+          [
+            "^descending_neuron$",
+            "^vnc_",
+            3.0
+          ],
+          [
+            "^visual_projection$",
+            "^descending_neuron$",
+            2.0
+          ]
+        ],
+        "type_path_gain": [
+          [
+            "^(LC4|LPLC2)$",
+            "^DNp01$",
+            3.0
+          ],
+          [
+            "^EPG$",
+            "^PEN_",
+            1.0
+          ],
+          [
+            "^PEN_",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^EPG$",
+            "^PEG$",
+            1.0
+          ],
+          [
+            "^PEG$",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^Delta7$",
+            "^(EPG$|PEN_)",
+            1.0
+          ],
+          [
+            "^(ER|ExR)",
+            "^(EPG$|PEN_|PEG$)",
+            1.0
+          ],
+          [
+            "^(ExR6|ER6|ER4m)$",
+            "^(PEN_|EPG$)",
+            0.0
+          ]
+        ],
+        "event_driven": null,
+        "weight_dtype": "float32",
+        "dt_by_module": null,
+        "prune_frozen": true,
+        "receptor_model": "sign",
+        "receptor_net_rule": "abs",
+        "receptor_nt_class_fallback": false,
+        "receptor_table": null,
+        "receptor_gain": null,
+        "slow_tau_ms": 200.0,
+        "slow_gain": 0.02,
+        "slow_gain_by_class": null,
+        "slow_tau_by_class": null,
+        "slow_mode": "additive",
+        "slow_gain_clip": [
+          0.0,
+          4.0
+        ],
+        "w_syn_by_nt": null,
+        "surrogate_grad": false,
+        "receptor_gain_resolved": null,
+        "slow_gain_by_class_resolved": null,
+        "slow_tau_by_class_resolved": null
+      },
+      "hold_edges": [
+        [
+          "^(ExR6|ER6|ER4m)$",
+          "^(PEN_|EPG$)",
+          0.0
+        ]
+      ],
+      "hold_edges_resolved": [
+        {
+          "pre": "^(ExR6|ER6|ER4m)$",
+          "post": "^(PEN_|EPG$)",
+          "factor": 0.0,
+          "n_pre_cells": 17,
+          "n_post_cells": 88,
+          "pre_types": [
+            "ER4m",
+            "ER6",
+            "ExR6"
+          ],
+          "post_types": [
+            "EPG",
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 1149,
+          "synapses": 37256.0
+        }
+      ],
+      "instruments": [
+        "ring_dc_hold",
+        "glno_sign"
+      ],
+      "instrument_records": [
+        {
+          "name": "ring_dc_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^(PEN_|EPG$), pre ~ ^(ExR6|ER6|ER4m)$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0,
+            "n_pre_cells": 17,
+            "n_post_cells": 88,
+            "pre_types": [
+              "ER4m",
+              "ER6",
+              "ExR6"
+            ],
+            "post_types": [
+              "EPG",
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 1149,
+            "synapses": 37256.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); receptor placement and kinetics at those contacts are open",
+          "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
+          "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
+          "audits": [
+            "docs/audits/compass_dc_balance.md",
+            "docs/audits/compass_ring_mechanism.md",
+            "docs/audits/exr6_evidence.md"
+          ]
+        },
+        {
+          "name": "glno_sign",
+          "class": "flyverse.instruments:TypeRelabel",
+          "kind": "relabel",
+          "law": "unverified",
+          "law_text": "type GLNO compiled as glutamate (NT_SIGN sign) in a scratch cache",
+          "parameters": {
+            "type": "GLNO",
+            "nt": "glutamate"
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
+          "source": "the stronger of two disagreeing EM predictions (glno_relabel.md); no sourced transmitter call exists",
+          "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
+          "audits": [
+            "docs/audits/glno_relabel.md",
+            "docs/audits/cx_glno.md"
+          ]
+        }
+      ],
+      "neural_stimuli": [
+        {
+          "name": "direct_GLNO_R",
+          "idx": [
+            4511,
+            14402
+          ],
+          "body_ids": [
+            "14881",
+            "25939"
+          ],
+          "poisson_hz": 90.0,
+          "start_s": 3.5,
+          "duration_s": 3.0,
+          "law": "unverified diagnostic level; a direct neural challenge, not a physiological transfer law"
+        }
+      ],
+      "preset": "instrumented",
+      "nt_override": {
+        "GLNO": "glutamate"
+      },
+      "cache_md5": "7a10d93ba2086f2c76bcdabdca79b4ec"
+    },
+    "C0": {
+      "lif": {
+        "v_rest": -52.0,
+        "v_reset": -52.0,
+        "v_th": -45.0,
+        "tau_m": 20.0,
+        "tau_syn": 5.0,
+        "t_ref": 2.2,
+        "delay": 1.8,
+        "w_syn": 0.275,
+        "dt": 0.5,
+        "rate_tau": 100.0,
+        "adapt_jump": 1.5,
+        "adapt_tau": 200.0,
+        "adapt_by_type": {
+          "^(EPG|PEN|PEG|Delta7)": 0.0
+        },
+        "std_u": 0.0,
+        "std_tau": 300.0,
+        "std_u_by_type": {
+          "^ORN_": 0.2,
+          "^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2
+        },
+        "input_norm_alpha": 1.0,
+        "input_norm_ref": 5000.0,
+        "same_type_gain": 0.1,
+        "conn_cap": 60.0,
+        "path_gain": [
+          [
+            "^descending_neuron$",
+            "^vnc_",
+            3.0
+          ],
+          [
+            "^visual_projection$",
+            "^descending_neuron$",
+            2.0
+          ]
+        ],
+        "type_path_gain": [
+          [
+            "^(LC4|LPLC2)$",
+            "^DNp01$",
+            3.0
+          ],
+          [
+            "^EPG$",
+            "^PEN_",
+            1.0
+          ],
+          [
+            "^PEN_",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^EPG$",
+            "^PEG$",
+            1.0
+          ],
+          [
+            "^PEG$",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^Delta7$",
+            "^(EPG$|PEN_)",
+            1.0
+          ],
+          [
+            "^(ER|ExR)",
+            "^(EPG$|PEN_|PEG$)",
+            1.0
+          ],
+          [
+            "^(ExR6|ER6|ER4m)$",
+            "^(PEN_|EPG$)",
+            0.0
+          ],
+          [
+            "^GLNO$",
+            "^PEN_",
+            0.0
+          ]
+        ],
+        "event_driven": null,
+        "weight_dtype": "float32",
+        "dt_by_module": null,
+        "prune_frozen": true,
+        "receptor_model": "sign",
+        "receptor_net_rule": "abs",
+        "receptor_nt_class_fallback": false,
+        "receptor_table": null,
+        "receptor_gain": null,
+        "slow_tau_ms": 200.0,
+        "slow_gain": 0.02,
+        "slow_gain_by_class": null,
+        "slow_tau_by_class": null,
+        "slow_mode": "additive",
+        "slow_gain_clip": [
+          0.0,
+          4.0
+        ],
+        "w_syn_by_nt": null,
+        "surrogate_grad": false,
+        "receptor_gain_resolved": null,
+        "slow_gain_by_class_resolved": null,
+        "slow_tau_by_class_resolved": null
+      },
+      "hold_edges": [
+        [
+          "^(ExR6|ER6|ER4m)$",
+          "^(PEN_|EPG$)",
+          0.0
+        ],
+        [
+          "^GLNO$",
+          "^PEN_",
+          0.0
+        ]
+      ],
+      "hold_edges_resolved": [
+        {
+          "pre": "^(ExR6|ER6|ER4m)$",
+          "post": "^(PEN_|EPG$)",
+          "factor": 0.0,
+          "n_pre_cells": 17,
+          "n_post_cells": 88,
+          "pre_types": [
+            "ER4m",
+            "ER6",
+            "ExR6"
+          ],
+          "post_types": [
+            "EPG",
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 1149,
+          "synapses": 37256.0
+        },
+        {
+          "pre": "^GLNO$",
+          "post": "^PEN_",
+          "factor": 0.0,
+          "n_pre_cells": 4,
+          "n_post_cells": 42,
+          "pre_types": [
+            "GLNO"
+          ],
+          "post_types": [
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 84,
+          "synapses": 16371.0
+        }
+      ],
+      "instruments": [
+        "ring_dc_hold",
+        "glno_pen_hold",
+        "glno_sign"
+      ],
+      "instrument_records": [
+        {
+          "name": "ring_dc_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^(PEN_|EPG$), pre ~ ^(ExR6|ER6|ER4m)$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0,
+            "n_pre_cells": 17,
+            "n_post_cells": 88,
+            "pre_types": [
+              "ER4m",
+              "ER6",
+              "ExR6"
+            ],
+            "post_types": [
+              "EPG",
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 1149,
+            "synapses": 37256.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); receptor placement and kinetics at those contacts are open",
+          "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
+          "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
+          "audits": [
+            "docs/audits/compass_dc_balance.md",
+            "docs/audits/compass_ring_mechanism.md",
+            "docs/audits/exr6_evidence.md"
+          ]
+        },
+        {
+          "name": "glno_pen_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^PEN_, pre ~ ^GLNO$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^GLNO$",
+            "post": "^PEN_",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^GLNO$",
+            "post": "^PEN_",
+            "factor": 0.0,
+            "n_pre_cells": 4,
+            "n_post_cells": 42,
+            "pre_types": [
+              "GLNO"
+            ],
+            "post_types": [
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 84,
+            "synapses": 16371.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the transfer of a GLNO side signal into PEN in round 7",
+          "source": "an explicit pathway-removal control, not a physiological receptor model",
+          "removal": "retire after the diagnostic; this hold is not an adoption candidate",
+          "audits": [
+            "docs/audits/compass_velocity_route.md"
+          ]
+        },
+        {
+          "name": "glno_sign",
+          "class": "flyverse.instruments:TypeRelabel",
+          "kind": "relabel",
+          "law": "unverified",
+          "law_text": "type GLNO compiled as glutamate (NT_SIGN sign) in a scratch cache",
+          "parameters": {
+            "type": "GLNO",
+            "nt": "glutamate"
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
+          "source": "the stronger of two disagreeing EM predictions (glno_relabel.md); no sourced transmitter call exists",
+          "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
+          "audits": [
+            "docs/audits/glno_relabel.md",
+            "docs/audits/cx_glno.md"
+          ]
+        }
+      ],
+      "neural_stimuli": [],
+      "preset": "instrumented",
+      "nt_override": {
+        "GLNO": "glutamate"
+      },
+      "cache_md5": "7a10d93ba2086f2c76bcdabdca79b4ec"
+    },
+    "CL": {
+      "lif": {
+        "v_rest": -52.0,
+        "v_reset": -52.0,
+        "v_th": -45.0,
+        "tau_m": 20.0,
+        "tau_syn": 5.0,
+        "t_ref": 2.2,
+        "delay": 1.8,
+        "w_syn": 0.275,
+        "dt": 0.5,
+        "rate_tau": 100.0,
+        "adapt_jump": 1.5,
+        "adapt_tau": 200.0,
+        "adapt_by_type": {
+          "^(EPG|PEN|PEG|Delta7)": 0.0
+        },
+        "std_u": 0.0,
+        "std_tau": 300.0,
+        "std_u_by_type": {
+          "^ORN_": 0.2,
+          "^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2
+        },
+        "input_norm_alpha": 1.0,
+        "input_norm_ref": 5000.0,
+        "same_type_gain": 0.1,
+        "conn_cap": 60.0,
+        "path_gain": [
+          [
+            "^descending_neuron$",
+            "^vnc_",
+            3.0
+          ],
+          [
+            "^visual_projection$",
+            "^descending_neuron$",
+            2.0
+          ]
+        ],
+        "type_path_gain": [
+          [
+            "^(LC4|LPLC2)$",
+            "^DNp01$",
+            3.0
+          ],
+          [
+            "^EPG$",
+            "^PEN_",
+            1.0
+          ],
+          [
+            "^PEN_",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^EPG$",
+            "^PEG$",
+            1.0
+          ],
+          [
+            "^PEG$",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^Delta7$",
+            "^(EPG$|PEN_)",
+            1.0
+          ],
+          [
+            "^(ER|ExR)",
+            "^(EPG$|PEN_|PEG$)",
+            1.0
+          ],
+          [
+            "^(ExR6|ER6|ER4m)$",
+            "^(PEN_|EPG$)",
+            0.0
+          ],
+          [
+            "^GLNO$",
+            "^PEN_",
+            0.0
+          ]
+        ],
+        "event_driven": null,
+        "weight_dtype": "float32",
+        "dt_by_module": null,
+        "prune_frozen": true,
+        "receptor_model": "sign",
+        "receptor_net_rule": "abs",
+        "receptor_nt_class_fallback": false,
+        "receptor_table": null,
+        "receptor_gain": null,
+        "slow_tau_ms": 200.0,
+        "slow_gain": 0.02,
+        "slow_gain_by_class": null,
+        "slow_tau_by_class": null,
+        "slow_mode": "additive",
+        "slow_gain_clip": [
+          0.0,
+          4.0
+        ],
+        "w_syn_by_nt": null,
+        "surrogate_grad": false,
+        "receptor_gain_resolved": null,
+        "slow_gain_by_class_resolved": null,
+        "slow_tau_by_class_resolved": null
+      },
+      "hold_edges": [
+        [
+          "^(ExR6|ER6|ER4m)$",
+          "^(PEN_|EPG$)",
+          0.0
+        ],
+        [
+          "^GLNO$",
+          "^PEN_",
+          0.0
+        ]
+      ],
+      "hold_edges_resolved": [
+        {
+          "pre": "^(ExR6|ER6|ER4m)$",
+          "post": "^(PEN_|EPG$)",
+          "factor": 0.0,
+          "n_pre_cells": 17,
+          "n_post_cells": 88,
+          "pre_types": [
+            "ER4m",
+            "ER6",
+            "ExR6"
+          ],
+          "post_types": [
+            "EPG",
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 1149,
+          "synapses": 37256.0
+        },
+        {
+          "pre": "^GLNO$",
+          "post": "^PEN_",
+          "factor": 0.0,
+          "n_pre_cells": 4,
+          "n_post_cells": 42,
+          "pre_types": [
+            "GLNO"
+          ],
+          "post_types": [
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 84,
+          "synapses": 16371.0
+        }
+      ],
+      "instruments": [
+        "ring_dc_hold",
+        "glno_pen_hold",
+        "glno_sign"
+      ],
+      "instrument_records": [
+        {
+          "name": "ring_dc_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^(PEN_|EPG$), pre ~ ^(ExR6|ER6|ER4m)$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0,
+            "n_pre_cells": 17,
+            "n_post_cells": 88,
+            "pre_types": [
+              "ER4m",
+              "ER6",
+              "ExR6"
+            ],
+            "post_types": [
+              "EPG",
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 1149,
+            "synapses": 37256.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); receptor placement and kinetics at those contacts are open",
+          "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
+          "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
+          "audits": [
+            "docs/audits/compass_dc_balance.md",
+            "docs/audits/compass_ring_mechanism.md",
+            "docs/audits/exr6_evidence.md"
+          ]
+        },
+        {
+          "name": "glno_pen_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^PEN_, pre ~ ^GLNO$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^GLNO$",
+            "post": "^PEN_",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^GLNO$",
+            "post": "^PEN_",
+            "factor": 0.0,
+            "n_pre_cells": 4,
+            "n_post_cells": 42,
+            "pre_types": [
+              "GLNO"
+            ],
+            "post_types": [
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 84,
+            "synapses": 16371.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the transfer of a GLNO side signal into PEN in round 7",
+          "source": "an explicit pathway-removal control, not a physiological receptor model",
+          "removal": "retire after the diagnostic; this hold is not an adoption candidate",
+          "audits": [
+            "docs/audits/compass_velocity_route.md"
+          ]
+        },
+        {
+          "name": "glno_sign",
+          "class": "flyverse.instruments:TypeRelabel",
+          "kind": "relabel",
+          "law": "unverified",
+          "law_text": "type GLNO compiled as glutamate (NT_SIGN sign) in a scratch cache",
+          "parameters": {
+            "type": "GLNO",
+            "nt": "glutamate"
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
+          "source": "the stronger of two disagreeing EM predictions (glno_relabel.md); no sourced transmitter call exists",
+          "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
+          "audits": [
+            "docs/audits/glno_relabel.md",
+            "docs/audits/cx_glno.md"
+          ]
+        }
+      ],
+      "neural_stimuli": [
+        {
+          "name": "direct_GLNO_L",
+          "idx": [
+            1966,
+            12075
+          ],
+          "body_ids": [
+            "12104",
+            "23325"
+          ],
+          "poisson_hz": 90.0,
+          "start_s": 3.5,
+          "duration_s": 3.0,
+          "law": "unverified diagnostic level; a direct neural challenge, not a physiological transfer law"
+        }
+      ],
+      "preset": "instrumented",
+      "nt_override": {
+        "GLNO": "glutamate"
+      },
+      "cache_md5": "7a10d93ba2086f2c76bcdabdca79b4ec"
+    },
+    "CR": {
+      "lif": {
+        "v_rest": -52.0,
+        "v_reset": -52.0,
+        "v_th": -45.0,
+        "tau_m": 20.0,
+        "tau_syn": 5.0,
+        "t_ref": 2.2,
+        "delay": 1.8,
+        "w_syn": 0.275,
+        "dt": 0.5,
+        "rate_tau": 100.0,
+        "adapt_jump": 1.5,
+        "adapt_tau": 200.0,
+        "adapt_by_type": {
+          "^(EPG|PEN|PEG|Delta7)": 0.0
+        },
+        "std_u": 0.0,
+        "std_tau": 300.0,
+        "std_u_by_type": {
+          "^ORN_": 0.2,
+          "^(lLN|v2LN|v3LN|il3LN|l2LN|vLN)": 0.2
+        },
+        "input_norm_alpha": 1.0,
+        "input_norm_ref": 5000.0,
+        "same_type_gain": 0.1,
+        "conn_cap": 60.0,
+        "path_gain": [
+          [
+            "^descending_neuron$",
+            "^vnc_",
+            3.0
+          ],
+          [
+            "^visual_projection$",
+            "^descending_neuron$",
+            2.0
+          ]
+        ],
+        "type_path_gain": [
+          [
+            "^(LC4|LPLC2)$",
+            "^DNp01$",
+            3.0
+          ],
+          [
+            "^EPG$",
+            "^PEN_",
+            1.0
+          ],
+          [
+            "^PEN_",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^EPG$",
+            "^PEG$",
+            1.0
+          ],
+          [
+            "^PEG$",
+            "^EPG$",
+            1.0
+          ],
+          [
+            "^Delta7$",
+            "^(EPG$|PEN_)",
+            1.0
+          ],
+          [
+            "^(ER|ExR)",
+            "^(EPG$|PEN_|PEG$)",
+            1.0
+          ],
+          [
+            "^(ExR6|ER6|ER4m)$",
+            "^(PEN_|EPG$)",
+            0.0
+          ],
+          [
+            "^GLNO$",
+            "^PEN_",
+            0.0
+          ]
+        ],
+        "event_driven": null,
+        "weight_dtype": "float32",
+        "dt_by_module": null,
+        "prune_frozen": true,
+        "receptor_model": "sign",
+        "receptor_net_rule": "abs",
+        "receptor_nt_class_fallback": false,
+        "receptor_table": null,
+        "receptor_gain": null,
+        "slow_tau_ms": 200.0,
+        "slow_gain": 0.02,
+        "slow_gain_by_class": null,
+        "slow_tau_by_class": null,
+        "slow_mode": "additive",
+        "slow_gain_clip": [
+          0.0,
+          4.0
+        ],
+        "w_syn_by_nt": null,
+        "surrogate_grad": false,
+        "receptor_gain_resolved": null,
+        "slow_gain_by_class_resolved": null,
+        "slow_tau_by_class_resolved": null
+      },
+      "hold_edges": [
+        [
+          "^(ExR6|ER6|ER4m)$",
+          "^(PEN_|EPG$)",
+          0.0
+        ],
+        [
+          "^GLNO$",
+          "^PEN_",
+          0.0
+        ]
+      ],
+      "hold_edges_resolved": [
+        {
+          "pre": "^(ExR6|ER6|ER4m)$",
+          "post": "^(PEN_|EPG$)",
+          "factor": 0.0,
+          "n_pre_cells": 17,
+          "n_post_cells": 88,
+          "pre_types": [
+            "ER4m",
+            "ER6",
+            "ExR6"
+          ],
+          "post_types": [
+            "EPG",
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 1149,
+          "synapses": 37256.0
+        },
+        {
+          "pre": "^GLNO$",
+          "post": "^PEN_",
+          "factor": 0.0,
+          "n_pre_cells": 4,
+          "n_post_cells": 42,
+          "pre_types": [
+            "GLNO"
+          ],
+          "post_types": [
+            "PEN_a(PEN1)",
+            "PEN_b(PEN2)"
+          ],
+          "n_entries": 84,
+          "synapses": 16371.0
+        }
+      ],
+      "instruments": [
+        "ring_dc_hold",
+        "glno_pen_hold",
+        "glno_sign"
+      ],
+      "instrument_records": [
+        {
+          "name": "ring_dc_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^(PEN_|EPG$), pre ~ ^(ExR6|ER6|ER4m)$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^(ExR6|ER6|ER4m)$",
+            "post": "^(PEN_|EPG$)",
+            "factor": 0.0,
+            "n_pre_cells": 17,
+            "n_post_cells": 88,
+            "pre_types": [
+              "ER4m",
+              "ER6",
+              "ExR6"
+            ],
+            "post_types": [
+              "EPG",
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 1149,
+            "synapses": 37256.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); receptor placement and kinetics at those contacts are open",
+          "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
+          "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
+          "audits": [
+            "docs/audits/compass_dc_balance.md",
+            "docs/audits/compass_ring_mechanism.md",
+            "docs/audits/exr6_evidence.md"
+          ]
+        },
+        {
+          "name": "glno_pen_hold",
+          "class": "flyverse.instruments:EdgeHold",
+          "kind": "edges",
+          "law": "counterfactual",
+          "law_text": "W[post ~ ^PEN_, pre ~ ^GLNO$] x 0 through LIFParams.type_path_gain",
+          "parameters": {
+            "pre": "^GLNO$",
+            "post": "^PEN_",
+            "factor": 0.0
+          },
+          "resolved": {
+            "pre": "^GLNO$",
+            "post": "^PEN_",
+            "factor": 0.0,
+            "n_pre_cells": 4,
+            "n_post_cells": 42,
+            "pre_types": [
+              "GLNO"
+            ],
+            "post_types": [
+              "PEN_a(PEN1)",
+              "PEN_b(PEN2)"
+            ],
+            "n_entries": 84,
+            "synapses": 16371.0
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "the transfer of a GLNO side signal into PEN in round 7",
+          "source": "an explicit pathway-removal control, not a physiological receptor model",
+          "removal": "retire after the diagnostic; this hold is not an adoption candidate",
+          "audits": [
+            "docs/audits/compass_velocity_route.md"
+          ]
+        },
+        {
+          "name": "glno_sign",
+          "class": "flyverse.instruments:TypeRelabel",
+          "kind": "relabel",
+          "law": "unverified",
+          "law_text": "type GLNO compiled as glutamate (NT_SIGN sign) in a scratch cache",
+          "parameters": {
+            "type": "GLNO",
+            "nt": "glutamate"
+          },
+          "trainable": false,
+          "checkpoint_hash": null,
+          "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
+          "source": "the stronger of two disagreeing EM predictions (glno_relabel.md); no sourced transmitter call exists",
+          "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
+          "audits": [
+            "docs/audits/glno_relabel.md",
+            "docs/audits/cx_glno.md"
+          ]
+        }
+      ],
+      "neural_stimuli": [
+        {
+          "name": "direct_GLNO_R",
+          "idx": [
+            4511,
+            14402
+          ],
+          "body_ids": [
+            "14881",
+            "25939"
+          ],
+          "poisson_hz": 90.0,
+          "start_s": 3.5,
+          "duration_s": 3.0,
+          "law": "unverified diagnostic level; a direct neural challenge, not a physiological transfer law"
+        }
+      ],
+      "preset": "instrumented",
+      "nt_override": {
+        "GLNO": "glutamate"
+      },
+      "cache_md5": "7a10d93ba2086f2c76bcdabdca79b4ec"
+    }
+  },
+  "family": [
+    [
+      "1_engagement",
+      "GLNO_LR_hz",
+      "HL",
+      "HR"
+    ],
+    [
+      "2_transfer",
+      "PEN_LR_hz",
+      "HL",
+      "HR"
+    ],
+    [
+      "3_left_edge_dependency",
+      "PEN_LR_hz",
+      "HL",
+      "CL"
+    ],
+    [
+      "4_right_edge_dependency",
+      "PEN_LR_hz",
+      "HR",
+      "CR"
+    ]
+  ],
+  "protocol": {
+    "gE": 1.0,
+    "gD": 1.0,
+    "gR": 1.0,
+    "delta7_pen": true,
+    "background_hz": 10.0,
+    "pulse_hz": 40.0,
+    "pulse_s": 2.0,
+    "seconds_after": 5.0,
+    "width": 4,
+    "start_wedge": 0,
+    "settle_s": 1.0,
+    "receptor_model": "sign",
+    "receptor_net_rule": "abs"
+  },
+  "level_hz": 90.0,
+  "law": "unverified diagnostic level; a direct neural challenge, not a physiological transfer law",
+  "turn_clock_only": true,
+  "recording_s": 8.0,
+  "input_window_s": [
+    3.5,
+    6.5
+  ],
+  "replicate_unit": "fresh-brain runs, six independent seeds per arm",
+  "decision": "engagement and intact transfer require positive results; held-edge contrasts describe network dependence, not a unique receptor mechanism",
+  "multiplicity": "one Holm family m=4, common.compare, n=6 per arm; floor 4*2/C(12,6)=0.00866",
+  "falsifiers": "no GLNO side engagement leaves transfer undetermined; engagement with null PEN side contrast detects no transfer at this challenge level",
+  "limits": "HL-CL/HR-CR include the changed operating state caused by removing GLNO-PEN feedback; H0/C0 are descriptive baselines. Result versus null is not an interaction test. No adoption or second follow-up is authorized."
+}

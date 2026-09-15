@@ -340,6 +340,94 @@ The declared branch for primary 3 result and unavailable following therefore sel
 transfer diagnostic. The present data cannot uniquely assign the failure to a receptor, GLNO amplitude,
 PEN recurrence, or confinement. A separate follow-up freeze will state its interventions and decisions.
 
+## 6. Single follow-up: direct GLNO-to-PEN challenge (predeclared before submission)
+
+This is the one follow-up selected by the valid cx8r result in section 5, written before any cx8t GPU
+submission. It tests transfer under an explicit neural challenge, not a receptor proposal or an adoption.
+Generator, simulator and reducer: `scripts/cx8_transfer.py`. One house submission, six jobs; each job
+runs all six conditions on fresh brains at one seed (0-5), for 36 runs. `--arm-block fam` keeps the
+seed family together. Existing cache and defaults remain unchanged.
+
+### 6.1 Conditions and intervention
+
+All six conditions use HG's full ring DC hold, GLNO-glutamate scratch graph and common diagnostic
+protocol: sign/abs receptors, shipped gains, compass adaptation zero, 1 s settle, EPG wedges 0-3 at
++40 Hz for 2 s on 10 Hz background, 5 s post-pulse. There is no body or signed-turn afferent.
+The nominal +90 deg/s clock is retained solely to reuse the [3.5,6.5) s readout window; it is never
+fed to proprioception. The intervention is direct Poisson forcing through `FlyBrain.stimulate`, on
+both GLNO cells of the named somaSide, for those 3 seconds.
+
+| arm | direct GLNO stimulus | additional held edges |
+|---|---|---|
+| H0 | none | none |
+| HL | left, 90 Hz | none |
+| HR | right, 90 Hz | none |
+| C0 | none | GLNO -> PEN |
+| CL | left, 90 Hz | GLNO -> PEN |
+| CR | right, 90 Hz | GLNO -> PEN |
+
+The 90 Hz level is **unverified**, a fixed strong diagnostic challenge. It reuses the highest nominal
+Poisson level already declared for the afferent experiment, now delivered to GLNO itself; it is not
+matched to GLNO's physiological rate, a fitted gain, or a clamp of its actual firing rate. Actual GLNO
+L/R and pre/pulse/post rates will be reported. The dose is not changed in response to the outcome.
+
+The extra `^GLNO$:^PEN_` hold is named `glno_pen_hold`: 84 entries / 16,371 synapses from four GLNO
+onto 42 PEN. Counts and descriptions are resolved on the actual signed scratch graph, whose CSR MD5
+remains `7a10d93ba2086f2c76bcdabdca79b4ec`. It is an output-path removal control, not a receptor row.
+The common `ring_dc_hold` remains 1,149 entries / 37,256 synapses from 17 cells onto 88 PEN/EPG.
+Every result names its preset, holds and relabel, target bodyIds, command rate, applied pulse onset,
+and the distinction between the unused turn clock and the actual direct neural stimulus.
+
+### 6.2 Four primaries and interpretation
+
+Run means over [3.5,6.5) s; six runs per arm, `common.compare` and one Holm family of four.
+The exact-U first-step floor is 4*2/C(12,6)=0.00866, satisfiable. Apply the same |z|>=3 and
+sample-size / deterministic-reference rules as section 3. No confinement gate on these neural-rate
+measurements. The outcome uses their recorded verdicts: result / null / underpowered / undetermined.
+
+1. `GLNO_LR_hz`, HL versus HR: engagement; expected positive.
+2. `PEN_LR_hz`, HL versus HR: transfer; expected positive under the model's inhibitory contralateral
+   GLNO projection (left GLNO inhibits right PEN, and conversely).
+3. `PEN_LR_hz`, HL versus CL: dependence on the GLNO-PEN edges under the left challenge; expected positive.
+4. `PEN_LR_hz`, HR versus CR: dependence under the right challenge; expected negative.
+
+If 1 and 2 are positive results, a strong imposed GLNO side signal can bias PEN at this operating state.
+If 1 is a result and 2 is null, no PEN side transfer is detected at the declared challenge level;
+this does not establish absent anatomy or identify a receptor/kinetic cause. If engagement fails,
+the transfer inference is undetermined regardless of any numerical PEN drift.
+
+Results on 3/4 in the expected directions support dependence of the network response on those edges.
+Their removal also changes PEN-to-GLNO feedback and the operating state. H0/C0 are therefore recorded
+as descriptive baselines, and all actual GLNO/PEN rates are shown. These are not matched-presynaptic-rate
+unitary transfer estimates. Result versus null is not an interaction test, and a null on 3/4 does not
+prove independence from the path. Any sign contrary to expectation is retained and reported.
+
+Descriptive only: every side rate, group pre/pulse/post rates, DNa02 L-R, EPG confinement, survival,
+rate, width and unwrapped centre motion. No bump tracking or physiological calibration is inferred
+from a rate response. No gain, receptor row or model default is adopted, and this diagnostic cannot
+unlock the suite/room milestone by itself. No second follow-up batch is authorized in this handoff.
+
+### 6.3 Validation and freeze
+
+The original HG path is unchanged when `neural_stimuli` is absent. The extra pulses are opt-in assay
+inputs, applied and expired through the existing control surface, with frame-aligned timing. CPU tests
+exercise left, right and held-path pulses on the real graph, compare the complete resolved LIF and
+instrument descriptions to the planned records, check target identities and emitted input windows,
+and test the family on independent synthetic rate differences. The initial plan test caught a raw
+sign-0 count of zero; the plan now resolves the actual GLNO-glutamate graph, matching the run.
+
+Pre-submission full CPU suite: **473 passed / 19 skipped, 220 subtests**, 216.42 s
+(`out/compass7/cx8t_full_cpu_final.log`). Original golden and all three MaleCNS cache file MD5s remain
+unchanged in main and the worktree. All six planned model records and 36 command identities were checked.
+
+After CPU validation and main merge, `freeze --out out/cx8t` writes an immutable `predeclared.json`
+with all 36 run identities, complete model/hold/stimulus descriptions, source SHA-256s (LF normalized),
+family and decision rules, and wrapper/manifest byte hashes. Submission is from main on house only.
+Analysis verifies these records and independently reconstructs the saved trace metrics and commanded
+pulse windows. Every per-seed value is emitted to `out/cx8t/analysis/per_seed.csv` with filenames and run ids.
+
+(cx8t results pending)
+
 ## Report
 
 ```yaml
