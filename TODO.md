@@ -322,7 +322,12 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
       (65,369 cells). Conflict rows to add: PFL3 (ACh in MaleCNS / FAFB, TYR predicted in BANC; PFL2 verified
       tyramine), Delta7 (`glutamate,serotonin` verified), LAL074; ~400 MaleCNS `unknown` (silenced) cells carry a
       classical-transmitter prediction in BANC; MaleCNS `serotonin` splits SER / DA / tyramine across sources.
-- [~] FAFB `column_assignment` (45,528 cells, 31 types, hex coordinates): the transform hex1 = q + 18, hex2 = p + 20 is in (1,581 columns; mirror <= 1.6 deg; T4 offsets cos >= 0.98; DRA strict rim check FAILS 100/126 and is recorded as an expected failure) -- still to use it as ground truth for
+- [x] FAFB `column_assignment` as ground truth for `trace.column_of_cells` (2026-09-15, `docs/audits/column_ground_truth.md`,
+      skeptic mostly sound): columnar types recovered to one ommatidium (T2 92 %, T3 97 % within 4.6 deg; chance 0.1 %);
+      LC11 / LC4 get a single column from a wide-field partner at the permutation distance from their input field -- the
+      round-2/3 LC windows were mis-centred, but re-windowing the same runs on the input-weighted centroid reproduces the
+      LC11 null (caveat added to object_baseline_r2.md and object_rectangles_r3.md). Rule: never window a visual_projection
+      cell on that single column. The transform hex1 = q + 18, hex2 = p + 20 is in (1,581 columns; mirror <= 1.6 deg; T4 offsets cos >= 0.98; DRA strict rim check FAILS 100/126 and is recorded as an expected failure) -- still to use it as ground truth for
       `trace.column_of_cells` and the LC anatomical windows; LC11 / LC10a themselves are not column-assigned there.
 - [ ] Do not: mix counts across releases unscaled; treat BANC's optic lobes as complete (T2 853 vs 1,466);
       prefer BANC predicted monoamine labels to its verified column; assume `fru` / `dsx` circuits are sex-shared.
