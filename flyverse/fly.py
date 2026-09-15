@@ -520,6 +520,10 @@ class FlyBrain:
                     self._frame(steps, modules)  # warm allocator and sparse kernels on a side stream
                 torch.cuda.current_stream(self.device).wait_stream(stream)
                 restore()
+                # The input ownership clone reads the warmup field, which lives outside the graph's
+                # private pool. Keep that storage alive for every replay, even after eager frames
+                # replace the runtime dictionary. Graphs do not retain arbitrary input tensors.
+                captured_inputs = dict(self._extensions.poisson) if modules else None
                 with torch.cuda.graph(graph, stream=stream):
                     self._frame(steps, modules)
                 torch.cuda.current_stream(self.device).wait_stream(stream)
@@ -530,7 +534,7 @@ class FlyBrain:
                     bound = {name: (dict(getattr(self._extensions, name)) if name in ('poisson', 'applied_inputs')
                                     else getattr(self._extensions, name))
                              for name in ('poisson', 'applied_inputs', 'previous_spikes')}
-                    self._graphs[key] = (graph, bound)
+                    self._graphs[key] = (graph, bound, captured_inputs)
                 else:
                     self._graphs[key] = graph
             except Exception:
@@ -542,7 +546,7 @@ class FlyBrain:
                     o.diagnostics = diagnostics
         cached = self._graphs[key]
         if modules:
-            graph, bound = cached
+            graph, bound, _ = cached
             for name, value in bound.items():
                 setattr(self._extensions, name, dict(value) if isinstance(value, dict) else value)
             graph.replay()
