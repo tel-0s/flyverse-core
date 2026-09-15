@@ -515,7 +515,11 @@ def jacobian_modes(A_sub, u, tau, epg_slice, wedge_of, p: brain.LIFParams, sigma
 def summarise_state(r, u, groups_slices, inside, wedge_of, nE):
     e = r[:nE]
     d = dict(epg_in=float(e[inside].mean()), epg_out=float(e[~inside].mean()), epg_in_min=float(e[inside].min()),
-             epg_out_max=float(e[~inside].max()), profile=[float(e[wedge_of == w].mean()) for w in range(16)])
+             epg_out_max=float(e[~inside].max()), profile=[float(e[wedge_of == w].mean()) for w in range(16)],
+             # 6B: the ledger's confinement count on the fixed point itself (bump_frames: >= 8 of 11 in, <= 3 of 35 out above 22 Hz)
+             in_above_22=int((e[inside] > BUMP_THRESH_HZ).sum()), out_above_22=int((e[~inside] > BUMP_THRESH_HZ).sum()),
+             n_in=int(inside.sum()), n_out=int((~inside).sum()))
+    d["confined_by_ledger_rule"] = bool(d["in_above_22"] >= 8 and d["out_above_22"] <= 3)
     for g, sl in groups_slices.items():
         d[g] = float(r[sl].mean()) if sl.stop > sl.start else 0.0
         d[f"u_{g}"] = float(u[sl].mean()) if sl.stop > sl.start else 0.0
@@ -524,12 +528,16 @@ def summarise_state(r, u, groups_slices, inside, wedge_of, nE):
 
 
 # ------------------------------------------------------------------------------------------------ analysis of one circuit
-def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", gain="per-cell") -> dict:
+def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", gain="per-cell", sigma=SIGMA_MV) -> dict:
+    """One configuration's structure pass. `sigma` (6B) is the input-noise width of the smoothed f-I used by the fixed
+    point, the gains and the slope bound -- SIGMA_MV = 2.0 by default (the 5A / 6A assumption), or a MEASURED value
+    (scripts/measure_lif_sigma.py); every number below that depends on it is labelled with it in `lif.sigma_mV`."""
     p = cir.p
     tau = p.tau_syn / 1000.0
     res = dict(label=cir.label, evidence=cir.evidence, lif=dict(conn_cap=p.conn_cap, same_type_gain=p.same_type_gain,
                receptor_model=p.receptor_model, receptor_net_rule=p.receptor_net_rule, w_syn=p.w_syn,
-               input_norm_ref=p.input_norm_ref, input_norm_alpha=p.input_norm_alpha),
+               input_norm_ref=p.input_norm_ref, input_norm_alpha=p.input_norm_alpha, sigma_mV=float(sigma),
+               type_path_gain_extra=[list(x) for x in (p.type_path_gain or [])[len(brain.DEFAULT_TYPE_PATH_GAIN):]]),
                n_cells={g: int(len(cir.idx[g])) for g in GROUPS}, glno_nt=sorted(set(cir.c.neurons.nt.to_numpy()[cir.idx["GLNO"]].tolist())))
     res["one_step"] = cir.one_step()
     res["same_type"] = cir.same_type_blocks()
@@ -555,7 +563,7 @@ def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", g
     g1 = gamma_crit_combined(lam1, d1 if keep_direct else 0.0, tau)
     g0 = gamma_crit_combined(lam0, d0 if keep_direct else 0.0, tau)
     g1_direct_only = gamma_crit_combined(0.0, d1, tau)
-    dmax, u_peak, f_peak = max_slope(p)
+    dmax, u_peak, f_peak = max_slope(p, sigma)
     res["two_step_gain"] = dict(
         lambda_k1_net=lam1, lambda_k0_net=lam0, lambda_k1_tuned=res["fourier"]["net_tuned"][1],
         direct_k1_mV=d1, direct_k0_mV=d0, reduction=reduction,
@@ -566,8 +574,8 @@ def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", g
         loop_gain_k1_at_6=float(36.0 * tau * tau * lam1 + 6.0 * tau * (d1 if keep_direct else 0.0)),
         loop_gain_k0_at_6=float(36.0 * tau * tau * lam0 + 6.0 * tau * (d0 if keep_direct else 0.0)),
         # the rate at which a supercritical mode saturates (f'(u) back to gamma_crit); NaN = never supercritical
-        saturation_hz_k1_uniform=rate_at_gain(g1, p), saturation_hz_k0_uniform=rate_at_gain(g0, p),
-        saturation_hz_k1_direct_only=rate_at_gain(g1_direct_only, p),
+        saturation_hz_k1_uniform=rate_at_gain(g1, p, sigma), saturation_hz_k0_uniform=rate_at_gain(g0, p, sigma),
+        saturation_hz_k1_direct_only=rate_at_gain(g1_direct_only, p, sigma),
         max_lif_slope=dmax, max_lif_slope_at_u=u_peak, max_lif_slope_at_hz=f_peak,
         supercritical_k1_uniform=bool(np.isfinite(g1) and g1 < dmax))
     # full sub-circuit linearisation
@@ -580,18 +588,21 @@ def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", g
     sl = {}; start = 0
     for g in GROUPS:
         sl[g] = slice(start, start + len(cir.idx[g])); start += len(cir.idx[g])
-    st = rate_fixed_point(A_sub, nE, inside, p, drive=drive)
+    st = rate_fixed_point(A_sub, nE, inside, p, sigma=sigma, drive=drive)
     states = {k: v for k, v in st.items() if k in ("background", "pulse", "after")}
     res["rate_model"] = {k: summarise_state(r, u, sl, inside, cir.wedge_of, nE) for k, (r, u) in states.items()}
     res["rate_model"]["drive"] = drive
+    res["rate_model"]["sigma_mV"] = float(sigma)
     res["rate_model"]["forced_mV"] = st["forced_mV"]
     a = res["rate_model"]["after"]
     res["rate_model"]["bump_after"] = bool(a["epg_in"] > 2 * a["epg_out"] and a["epg_in"] > 15.0)
     res["rate_model"]["runaway_after"] = bool(a["epg_out"] > 60.0)
+    # 6B: a bump the ledger would score as confined (the 6A miss: H3's fixed point was a 'bump' with every off-block cell above 22 Hz)
+    res["rate_model"]["confined_bump_after"] = bool(res["rate_model"]["bump_after"] and a["confined_by_ledger_rule"])
     # 6A fix 3: the true Jacobian diag(f'(u_i)) tau A at each realised state (a mode grows when Re mu > 1)
     jac = {}
     for k, (r, u) in states.items():
-        jm = jacobian_modes(A_sub, u, tau, slice(0, nE), cir.wedge_of, p, floor=(st["floor"] or {}).get(k))
+        jm = jacobian_modes(A_sub, u, tau, slice(0, nE), cir.wedge_of, p, sigma=sigma, floor=(st["floor"] or {}).get(k))
         gam = jm.pop("gamma")
         jm["gamma_by_group"] = {g: dict(mean=float(gam[sl[g]].mean()), max=float(gam[sl[g]].max())) for g in GROUPS if sl[g].stop > sl[g].start}
         jm["gamma_EPG_driven"] = float(gam[:nE][inside].mean())
@@ -619,7 +630,7 @@ def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", g
         out = {}
         for name, den in (("epg_recurrent", den_epg), ("with_relays", den_all)):
             gc = float(1.0 / den) if den > 0 else float("inf")
-            sat = rate_at_gain(gc, p)
+            sat = rate_at_gain(gc, p, sigma)
             out[name] = dict(denominator_mV_per_Hz=den, gamma_EPG_crit=gc, saturation_hz=sat,
                              closes=bool(np.isfinite(sat)), predicted_bump=bool(np.isfinite(sat) and sat > BUMP_THRESH_HZ))
         # 'the k = 1 gain' with per-cell gains: the loop gain of ring mode k = 1 of the EPG-only reduction,
@@ -678,7 +689,8 @@ def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", g
         f"-> saturation {tg['saturation_hz_k1']:.0f} Hz; Jacobian at the pulse: lead {jp['leading_re']:+.3f}, k1 gain {jp['loop_gain_k1']:+.3f}, "
         f"gamma_EPG(driven) {jp['gamma_EPG_driven']:.2f}; pulse PEN {pu['PEN_in']:.1f} Hz u {pu['u_PEN_in']:+.2f} mV; after: in {a['epg_in']:.1f} "
         f"out {a['epg_out']:.1f} PEN {a['PEN']:.1f} D7 {a['Delta7']:.1f} Ring {a['Ring']:.2f} GLNO {a['GLNO']:.1f} "
-        f"{'BUMP' if res['rate_model']['bump_after'] else ('RUNAWAY' if res['rate_model']['runaway_after'] else 'no bump')}")
+        f"{'BUMP' if res['rate_model']['bump_after'] else ('RUNAWAY' if res['rate_model']['runaway_after'] else 'no bump')}"
+        f" (in>22: {a['in_above_22']}/{a['n_in']}, out>22: {a['out_above_22']}/{a['n_out']}; sigma {sigma:g} mV)")
     return res, dict(K=K, M16=M16, Kp=Kp, Mp16=Mp16)
 
 
@@ -710,6 +722,9 @@ def config_for_arm(arm, c, c_glu, cells, cells_glu):
         if x == "--hold-edges":
             pre, post = extra[i + 1].split(":", 1)
             p = hold_params(pre, post, p)
+        elif x == "--edge-gain":                          # 6B: a per-type gain through the same stage (cx_wedge.parse_edge_gains)
+            pre, post, fac = cx_wedge.parse_edge_gains([extra[i + 1]])[0]
+            p = hold_params(pre, post, p, factor=fac)
     return (label, f"{desc} [{cls}]", c_glu if glu else c, p, cells_glu if glu else cells)
 
 
@@ -723,6 +738,34 @@ def hold_configs(c, c_glu, cells, cells_glu) -> list:
         out.append((f"H_{t}: {t} -> PEN,EPG held 0", ev + f" ({t} alone)", c, hold_params(rf"^{t}$", HOLD_POST), cells))
     out.append(("H3+GLNO=glu", ev + "; with the GLNO relabel (the correct-sign ring under the hold)", c_glu,
                 hold_params(HOLD_PRE, HOLD_POST), cells_glu))
+    return out
+
+
+# ------------------------------------------------------------------------------------------------ the 6B configs
+EPG_EPG_GAIN = r"^EPG$:^EPG$:10"      # x10 BEFORE the shipped same_type_gain 0.1 = exactly x1.0 on the 842 EPG -> EPG pairs
+
+
+def recurrence_configs(c, c_glu, cells, cells_glu) -> list:
+    """Thread 6B: the hold PLUS a wedge-local recurrence -- TWO labelled instruments at once (a counterfactual hold and
+    a hand-rule removal or a per-type gain), which decide a MECHANISM question, never an adoption. H3F = H3 with the
+    global same-type damping off; H3E = H3 with only the EPG -> EPG pairs undamped (`--edge-gain ^EPG$:^EPG$:10`,
+    which composes with the x0.1 to x1.0 on exactly those 842 pairs); each with and without the GLNO relabel. E and EG
+    (the per-type undamping WITHOUT the hold) are structural references only, not batch arms."""
+    ev_h = "LABELLED COUNTERFACTUAL (the 6A hold: ExR6 + ER6 + ER4m -> PEN, EPG at 0)"
+    pre, post, fac = cx_wedge.parse_edge_gains([EPG_EPG_GAIN])[0]
+    P = brain.LIFParams
+    out = [
+        ("H3F: hold + same-type damping off", ev_h + " + LABELLED INSTRUMENT (global same_type_gain 1)", c,
+         hold_params(HOLD_PRE, HOLD_POST, P(same_type_gain=1.0)), cells),
+        ("H3E: hold + EPG->EPG undamped (per-type)", ev_h + " + LABELLED INSTRUMENT (per-type gain: only the 842 EPG -> EPG pairs at x1.0, every other same-type clique x0.1)", c,
+         hold_params(pre, post, hold_params(HOLD_PRE, HOLD_POST), factor=fac), cells),
+        ("H3FG: H3F + GLNO=glu", ev_h + " + LABELLED INSTRUMENT (global same_type_gain 1) + the GLNO relabel", c_glu,
+         hold_params(HOLD_PRE, HOLD_POST, P(same_type_gain=1.0)), cells_glu),
+        ("H3EG: H3E + GLNO=glu", ev_h + " + LABELLED INSTRUMENT (per-type EPG->EPG undamped) + the GLNO relabel", c_glu,
+         hold_params(pre, post, hold_params(HOLD_PRE, HOLD_POST), factor=fac), cells_glu),
+        ("E: EPG->EPG undamped (per-type), no hold", "LABELLED INSTRUMENT (per-type gain) without the hold -- a structural reference, not a batch arm", c,
+         hold_params(pre, post, P(), factor=fac), cells),
+    ]
     return out
 
 
@@ -1025,8 +1068,59 @@ SECONDARIES_CX6 = ("epg_in_mean_post", "epg_out_mean_post", "epg_in_mean_during"
                    "Ring_mean_post", "GLNO_mean_post", "rest_mean_post", "vs_post_all", "Ring_mean_during", "Delta7_mean_during")
 
 
+# ---- thread 6B (docs/audits/compass_local_recurrence.md; out/cx7/predeclared.json). THE HOLD PLUS A WEDGE-LOCAL
+# RECURRENCE: two labelled instruments at once, at the SHIPPED gains, deciding whether this ring can hold a bump AT THE
+# DRIVEN TILE once the DC brake is off and the local recurrence is on -- a mechanism statement, never an adoption.
+CX7_ARMS = [
+    ("S", "shipped: gE 1 / gD 1, LIFParams() (receptor sign/abs), GLNO sign 0, no hold", "1:1", False,
+     ["--receptor-model", "shipped"], "the shipped path (reference)"),
+    ("H3", "ExR6 + ER6 + ER4m -> PEN, EPG held at 0 (6A)", "1:1", False,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3],
+     "LABELLED COUNTERFACTUAL (edges hold), the 6A arm: the second reference"),
+    ("H3F", "H3 + same-type damping off (same_type_gain 1)", "1:1", False,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3, "--lif", "same_type_gain=1"],
+     "TWO INSTRUMENTS: the hold + the GLOBAL hand-rule removal (every same-type clique at its connectome weight)"),
+    ("H3E", "H3 + only the EPG -> EPG pairs undamped (--edge-gain ^EPG$:^EPG$:10, x10 before the x0.1 = x1.0)", "1:1", False,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3, "--edge-gain", EPG_EPG_GAIN],
+     "TWO INSTRUMENTS: the hold + a PER-TYPE gain (842 EPG -> EPG pairs at x1.0; PEN_a, PEN_b, Delta7, PEG cliques stay x0.1)"),
+    ("F", "same-type damping off (same_type_gain 1) at the shipped gains, no hold", "1:1", False,
+     ["--receptor-model", "shipped", "--lif", "same_type_gain=1"],
+     "LABELLED INSTRUMENT (global), carried from cx5 / cx6: the recurrence WITHOUT the hold (what the hold adds to F)"),
+    ("H3G", "H3 + GLNO = glutamate (6A)", "1:1", True,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3],
+     "LABELLED COUNTERFACTUAL + the data-implied relabel, the 6A arm: the third reference"),
+    ("H3FG", "H3F + GLNO = glutamate", "1:1", True,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3, "--lif", "same_type_gain=1"],
+     "TWO INSTRUMENTS + the relabel"),
+    ("H3EG", "H3E + GLNO = glutamate", "1:1", True,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3, "--edge-gain", EPG_EPG_GAIN],
+     "TWO INSTRUMENTS (per-type) + the relabel"),
+]
+# The family that can move: 5 members vs each of the two references (S and H3), Holm within each family; 5 v 5 ->
+# p_floor 0.0079, 5 x 0.0079 = 0.040 <= 0.05, satisfiable. bump_hz_post / width_half_post are undefined in both references
+# (no confined frame in S or H3 in cx5 / cx6) and are PREDECLARED as magnitudes outside the family. centre_dist_t5 is the
+# ring distance (wedges) of the EPG profile's vector centre at 5 s from the driven block's centre (1.5) -- the quantity
+# 6A found decisive -- and is defined for every run.
+PRIMARIES_CX7 = ("survival_s", "frac_confined_post", "centre_dist_t5", "PEN_mean_during", "PEN_mean_post")
+MAGNITUDES_CX7 = ("bump_hz_post", "width_half_post")
+SECONDARIES_CX7 = ("epg_in_mean_post", "epg_out_mean_post", "epg_in_mean_during", "epg_out_mean_during", "Delta7_mean_post",
+                   "Ring_mean_post", "GLNO_mean_post", "rest_mean_post", "vs_post_all", "Ring_mean_during", "Delta7_mean_during",
+                   "ExR6_mean_pre", "ExR6_mean_during", "ExR6_mean_post", "ER6_mean_pre", "ER6_mean_during", "ER6_mean_post",
+                   "ER4m_mean_pre", "ER4m_mean_during", "ER4m_mean_post", "EPGt_mean_post", "PEG_mean_post", "epg_mean_pre",
+                   "PEN_mean_pre", "GLNO_mean_pre", "Delta7_mean_pre", "frac_confined_during", "centre_dist_post_confined")
+DRIVEN_CENTRE = 1.5           # wedges 0-3 -> centre 1.5
+DRIVEN_TILE_TOL = 1.5         # the driven-tile rule: centre within 1.5 wedges of the driven block's centre
+
+
+def ring_distance(a, b, n=16) -> float:
+    d = abs(float(a) - float(b)) % n
+    return float(min(d, n - d))
+
+
 def arm_tables(arms):
     """(primaries, secondaries) for an arm table."""
+    if arms is CX7_ARMS:
+        return (PRIMARIES_CX7, SECONDARIES_CX7)
     return (PRIMARIES_CX6, SECONDARIES_CX6) if arms is CX6_ARMS else (PRIMARIES, SECONDARIES)
 
 
@@ -1088,8 +1182,8 @@ def plan_batch(out_dir: Path, seeds=(0, 1, 2, 3), minutes=30, name="cx5", arms=N
           f"blocks fam_s<seed> (every seed's arms on one target). Generated by scripts/cx_ring_structure.py --plan-batch on {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
           f"{call} 2>&1 | tee {rel}/client_stdout.txt\n")
     (out_dir / "batch.sh").write_text(sh, encoding="utf-8", newline="\n")
-    write_tree_state(out_dir)
-    print(f"{len(jobs)} jobs -> {out_dir / 'batch.sh'}; tree_state.json ({len(sha)} files hashed)")
+    tree = write_tree_state(out_dir)
+    print(f"{len(jobs)} jobs -> {out_dir / 'batch.sh'}; tree_state.json ({len(tree['sha256'])} files hashed)")
     return jobs
 
 
@@ -1326,6 +1420,428 @@ def analyse_batch(out_dir: Path, ref="S", arms=None, seeds=(0, 1, 2, 3)):
     return df, cdf, rdf
 
 
+# ------------------------------------------------------------------------------------------------ thread 6B analysis
+def _run_rows_cx7(out_dir: Path, arms, problems: list) -> list:
+    """One row per run of a cx7-table batch: the recorded metrics, the per-type ring rates, the per-cell maxima, the
+    driven-tile distance at 5 s and (from the .npz) over the confined post-pulse frames, plus the provenance checks."""
+    import probe_compass_room as pcr
+    rows = []
+    for label, desc, gains, glu, extra, cls in arms:
+        gE, gD = (float(x) for x in gains.split(":"))
+        for f in sorted(out_dir.glob(f"{label}_s*.json")):
+            try:
+                rr = json.load(open(f, encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as e:
+                problems.append(f"{f.name}: unreadable ({e!r})"); continue
+            for r in rr:
+                m = r.get("metrics") or {}
+                prov = r.get("provenance") or {}
+                ex = prov.get("execution") or {}
+                cc = prov.get("compiled_connectome") or {}
+                lif = (prov.get("model") or {}).get("lif", {})
+                d = dict(arm=label, seed=r["seed"], file=f.name, gE=r["gE"], gD=r["gD"], device=ex.get("device"), device_name=ex.get("device_name"),
+                         host=ex.get("host"), md5=cc.get("md5"), nt_override=json.dumps(r.get("nt_override") or {}), lif_overrides=json.dumps(r.get("lif_overrides") or {}),
+                         same_type_gain=lif.get("same_type_gain"), receptor=f"{r.get('receptor_model')}/{r.get('receptor_net_rule')}", wall_s=r.get("wall_s"),
+                         ledger_survival=(r.get("ledger") or {}).get("compass.EPG.bump_survival_s", {}).get("status"),
+                         ledger_rate=(r.get("ledger") or {}).get("compass.EPG.bump_rate_hz", {}).get("status"),
+                         ledger_width=(r.get("ledger") or {}).get("compass.EPG.bump_width_wedges", {}).get("status"),
+                         hold_edges=json.dumps(r.get("hold_edges") or []), edge_gains=json.dumps(r.get("edge_gains") or []),
+                         hold_entries=int(sum(h.get("n_entries", 0) for h in (r.get("hold_edges_resolved") or []))),
+                         gain_entries=int(sum(h.get("n_entries", 0) for h in (r.get("edge_gains_resolved") or []))),
+                         gain_entries_same_type=int(sum(h.get("n_entries_same_type", 0) for h in (r.get("edge_gains_resolved") or []))),
+                         gain_effective_same_type=(r.get("edge_gains_resolved") or [{}])[0].get("effective_factor_same_type") if r.get("edge_gains_resolved") else None,
+                         centre_wedge_t5=r.get("t5.0_centre_wedge"), vs_t5=r.get("t5.0_vector_strength"),
+                         in_above_t5=r.get("t5.0_in_above"), out_above_t5=r.get("t5.0_out_above"),
+                         profile_end=";".join(f"{x:.0f}" for x in (r.get("wedge_profile_end") or [])))
+                d["centre_dist_t5"] = ring_distance(r["t5.0_centre_wedge"], DRIVEN_CENTRE) if r.get("t5.0_centre_wedge") is not None else float("nan")
+                for k in set(PRIMARIES_CX7 + MAGNITUDES_CX7 + SECONDARIES_CX7) - {"centre_dist_t5", "centre_dist_post_confined"}:
+                    d[k] = m.get(k)
+                for g in ("PEN", "Delta7", "PEG", "GLNO", "EPGt", "ExR6", "ER6", "ER4m"):
+                    for w in ("pre", "during", "post"):
+                        d[f"{g}_cell_max_{w}"] = m.get(f"{g}_cell_max_{w}")
+                # from the per-frame record: where the confined bump sits, and how long it is confined AT THE DRIVEN TILE
+                npz = out_dir / f"{label}_s{r['seed']}_gE{r['gE']:g}_gD{r['gD']:g}_s{r['seed']}.npz"
+                d["centre_dist_post_confined"] = float("nan"); d["survival_at_tile_s"] = float("nan"); d["frac_at_tile_post"] = float("nan")
+                if npz.is_file():
+                    z = np.load(npz)
+                    b = pcr.bump_frames(z["epg"], z["wedge_of"])
+                    tt = z["t"]; t_end = tt + 0.01
+                    sp = ((prov.get("stimulus") or {}).get("params") or {})
+                    t_rel = float(sp.get("settle_s", 1.0)) + float(sp.get("pulse_s", 2.0))      # the pulse end, from the run's own record
+                    post = tt >= t_rel - 1e-9
+                    dist = np.array([ring_distance(cw_, DRIVEN_CENTRE) for cw_ in b["centre"]])
+                    conf = b["confined"]
+                    at_tile = conf & (dist <= DRIVEN_TILE_TOL)
+                    d["centre_dist_post_confined"] = float(dist[post & conf].mean()) if (post & conf).any() else float("nan")
+                    last = np.flatnonzero(at_tile & post)
+                    d["survival_at_tile_s"] = float(t_end[last[-1]] - t_rel) if len(last) else 0.0
+                    d["frac_at_tile_post"] = float(at_tile[post].mean())
+                else:
+                    problems.append(f"{f.name}: per-frame record {npz.name} missing")
+                # checks
+                if str(d["device"]) != "cuda":
+                    problems.append(f"{f.name}: device {d['device']} (expected cuda)")
+                if r.get("arm") != label:
+                    problems.append(f"{f.name}: arm {r.get('arm')} != {label}")
+                if abs(float(r["gE"]) - gE) > 1e-9 or abs(float(r["gD"]) - gD) > 1e-9:
+                    problems.append(f"{f.name}: gains {r['gE']}:{r['gD']} != {gains}")
+                if bool((r.get("nt_override") or {}).get("GLNO") == "glutamate") != glu:
+                    problems.append(f"{f.name}: nt_override {r.get('nt_override')} does not match arm {label}")
+                if sorted(set(r.get("glno_nt") or [])) != (["glutamate"] if glu else ["unknown"]):
+                    problems.append(f"{f.name}: GLNO nt {r.get('glno_nt')} does not match arm {label}")
+                want_same = 1.0 if "same_type_gain=1" in extra else 0.1
+                if abs(float(lif.get("same_type_gain", want_same)) - want_same) > 1e-9:
+                    problems.append(f"{f.name}: same_type_gain {lif.get('same_type_gain')} != {want_same}")
+                if r.get("receptor_model") != brain.LIFParams().receptor_model:
+                    problems.append(f"{f.name}: receptor_model {r.get('receptor_model')} != shipped")
+                want_hold = [extra[i + 1] for i, x in enumerate(extra) if x == "--hold-edges"]
+                got_hold = [h[0] + ":" + h[1] for h in (r.get("hold_edges") or [])]
+                if got_hold != want_hold:
+                    problems.append(f"{f.name}: hold_edges {got_hold} != {want_hold} (arm {label})")
+                if want_hold and not all(abs(float(h[2])) < 1e-12 for h in (r.get("hold_edges") or [])):
+                    problems.append(f"{f.name}: hold factor is not 0: {r.get('hold_edges')}")
+                if want_hold and d["hold_entries"] != 1149:
+                    problems.append(f"{f.name}: hold matched {d['hold_entries']} entries, expected 1149")
+                want_gain = [extra[i + 1] for i, x in enumerate(extra) if x == "--edge-gain"]
+                got_gain = [f"{h[0]}:{h[1]}:{h[2]:g}" for h in (r.get("edge_gains") or [])]
+                if got_gain != want_gain:
+                    problems.append(f"{f.name}: edge_gains {got_gain} != {want_gain} (arm {label})")
+                if want_gain:
+                    eg = (r.get("edge_gains_resolved") or [{}])[0]
+                    if eg.get("n_entries") != 842 or eg.get("n_entries_same_type") != 842:
+                        problems.append(f"{f.name}: edge gain matched {eg.get('n_entries')} entries ({eg.get('n_entries_same_type')} same-type), expected 842 / 842")
+                    if abs(float(eg.get("effective_factor_same_type", 0.0)) - 1.0) > 1e-6:
+                        problems.append(f"{f.name}: effective EPG->EPG factor {eg.get('effective_factor_same_type')} != 1.0")
+                for g in ("ExR6", "ER6", "ER4m", "EPGt"):
+                    if m.get(f"{g}_mean_post") is None:
+                        problems.append(f"{f.name}: per-type ring rate {g}_mean_post not recorded")
+                rows.append(d)
+    return rows
+
+
+def analyse_batch_cx7(out_dir: Path, refs=("S", "H3"), seeds=(0, 1, 2, 3, 4)):
+    """Thread 6B analysis (CPU): the 6A path extended with two references, the driven-tile rule, the per-type ring
+    rates, the per-cell maxima and the predeclared calls for H3E / H3F, every table emitted to a named file."""
+    from flyverse.interp import common
+    ARMS = list(CX7_ARMS)
+    out_dir = Path(out_dir); an = out_dir / "analysis"; an.mkdir(parents=True, exist_ok=True)
+    problems = []
+    rows = _run_rows_cx7(out_dir, ARMS, problems)
+    df = pd.DataFrame(rows)
+    if df.empty:
+        print("no rows"); return None
+    order = {a[0]: i for i, a in enumerate(ARMS)}
+    df = df.sort_values(["arm", "seed"], key=lambda s: s.map(order) if s.name == "arm" else s).reset_index(drop=True)
+    counts = df.groupby("arm").seed.size()
+    for a_ in {a[0] for a in ARMS} - set(counts.index):
+        problems.append(f"arm {a_}: 0 runs")
+    for a_, n_ in counts.items():
+        if n_ != len(seeds):
+            problems.append(f"arm {a_}: {n_} runs, expected {len(seeds)}")
+    md5s = df.groupby("arm").md5.agg(lambda s: sorted(set(s)))
+
+    def vals(sub, k):
+        return [float(x) for x in sub[k].tolist() if x is not None and np.isfinite(float(x))]
+
+    # verdicts vs EACH reference: Holm within the (arm, ref) family of the five primaries; magnitudes and secondaries outside
+    comp = []
+    for ref in refs:
+        ref_df = df[df.arm == ref]
+        for label, desc, gains, glu, extra, cls in ARMS:
+            if label == ref:
+                continue
+            sub = df[df.arm == label]
+            if sub.empty:
+                continue
+            pv, res_k = {}, {}
+            for k in PRIMARIES_CX7 + MAGNITUDES_CX7 + SECONDARIES_CX7 + ("survival_at_tile_s", "frac_at_tile_post"):
+                a_, b_ = vals(sub, k), vals(ref_df, k)
+                fam = "primary" if k in PRIMARIES_CX7 else ("magnitude" if k in MAGNITUDES_CX7 else "secondary")
+                if len(a_) == 0 or len(b_) == 0:
+                    res_k[k] = dict(family=fam, verdict="no data" if len(a_) == 0 and len(b_) == 0 else "one-sided (reference has no confined frames)",
+                                    diff=float("nan"), z=float("nan"), p=float("nan"), p_floor=float("nan"), null_sd_zero=None, n_stim=len(a_), n_null=len(b_),
+                                    stim_values=[round(x, 4) for x in a_], null_values=[round(x, 4) for x in b_])
+                    continue
+                c_ = common.compare(a_, b_)
+                res_k[k] = dict(family=fam, verdict=c_["verdict"], diff=c_["diff"], z=c_["z"], p=c_["p"], p_floor=c_["p_floor"], null_sd_zero=c_["null_sd_zero"],
+                                n_stim=len(a_), n_null=len(b_), stim_values=[round(x, 4) for x in a_], null_values=[round(x, 4) for x in b_])
+                if k in PRIMARIES_CX7:
+                    pv[k] = c_["p"]
+            adj = holm(pv)
+            for k, v in res_k.items():
+                comp.append(dict(arm=label, ref=ref, key=k, p_holm=adj.get(k, float("nan")) if k in PRIMARIES_CX7 else float("nan"), m_holm=len(pv) if k in PRIMARIES_CX7 else None, **v))
+    cdf = pd.DataFrame(comp)
+    # the two predeclared rules, per seed
+    rule = []
+    for label, desc, gains, glu, extra, cls in ARMS:
+        sub = df[df.arm == label].sort_values("seed")
+        if sub.empty:
+            continue
+        s_ = sub.survival_s.astype(float).fillna(0).to_numpy(); w_ = sub.width_half_post.astype(float).to_numpy()
+        h_ = sub.bump_hz_post.astype(float).to_numpy(); dist = sub.centre_dist_t5.astype(float).to_numpy()
+        surv = s_ >= 5.0 - 1e-9
+        width_ok = np.isfinite(w_) & (w_ >= 2.5) & (w_ <= 5.0)
+        rate_ok = np.isfinite(h_) & (h_ >= 5.0) & (h_ <= 60.0)
+        tile = np.isfinite(dist) & (dist <= DRIVEN_TILE_TOL)
+        working = surv & width_ok & rate_ok
+        bump_at_tile = surv & width_ok & tile
+        rule.append(dict(arm=label, gains=gains, runs=int(len(sub)), working_compass_seeds=int(working.sum()), driven_tile_seeds=int(tile.sum()),
+                         bump_survives_seeds=int(surv.sum()), bump_at_tile_seeds=int(bump_at_tile.sum()), compass_at_tile_seeds=int((working & tile).sum()),
+                         working=bool(working.sum() >= 3), at_tile=bool(tile.sum() >= 3),
+                         survival=s_.tolist(), rate=h_.tolist(), width=w_.tolist(), centre_dist_t5=dist.tolist(), centre_t5=sub.centre_wedge_t5.tolist(),
+                         survival_at_tile=sub.survival_at_tile_s.tolist(), frac_confined_post=sub.frac_confined_post.tolist(),
+                         pen_during=sub.PEN_mean_during.tolist(), devices=sorted(set(map(str, sub.device_name))), md5=md5s.get(label, [])))
+    rdf = pd.DataFrame(rule)
+    # the predeclared phrases (worded for H3E and H3F; printed per arm, read for those two)
+    calls = []
+    for _, r_ in rdf.iterrows():
+        if r_.working_compass_seeds >= 3 and r_.driven_tile_seeds >= 3:
+            call = "a compass at the driven tile"
+        elif r_.bump_at_tile_seeds >= 3:
+            call = "a bump at the driven tile, not a compass (rate outside 5-60 Hz)"
+        elif r_.bump_survives_seeds >= 3:
+            call = "a bump, not at the driven tile"
+        else:
+            call = "no bump"
+        calls.append(dict(arm=r_.arm, runs=r_.runs, working_compass_seeds=r_.working_compass_seeds, driven_tile_seeds=r_.driven_tile_seeds,
+                          bump_survives_seeds=r_.bump_survives_seeds, bump_at_tile_seeds=r_.bump_at_tile_seeds, call=call,
+                          in_rule=r_.arm in ("H3E", "H3F")))
+    cl = pd.DataFrame(calls)
+    rank = {"no bump": 0, "a bump, not at the driven tile": 1, "a bump at the driven tile, not a compass (rate outside 5-60 Hz)": 2, "a compass at the driven tile": 3}
+    ce = cl[cl.arm == "H3E"].call.iloc[0] if (cl.arm == "H3E").any() else None
+    cf = cl[cl.arm == "H3F"].call.iloc[0] if (cl.arm == "H3F").any() else None
+    contrast = None
+    if ce and cf:
+        contrast = ("the per-type EPG->EPG recurrence is sufficient (H3E in the same class as H3F)" if rank[ce] >= rank[cf]
+                    else "the other same-type cliques are needed (H3F in a better class than H3E)")
+    cl.to_csv(an / "call.csv", index=False)
+    # per-type ring rates and per-cell maxima per arm (closing 6A's weak link)
+    rr = []
+    for label, *_ in ARMS:
+        sub = df[df.arm == label]
+        if sub.empty:
+            continue
+        for g in ("ExR6", "ER6", "ER4m", "EPGt", "PEG", "PEN", "Delta7", "GLNO", "Ring", "rest"):
+            for w in ("pre", "during", "post"):
+                k = f"{g}_mean_{w}"
+                if k in sub:
+                    v = sub[k].astype(float)
+                    rr.append(dict(arm=label, group=g, window=w, mean_min=float(v.min()), mean_max=float(v.max()), mean_mean=float(v.mean()),
+                                   values=",".join(f"{x:.4f}" for x in v),
+                                   cell_max_min=float(sub[f"{g}_cell_max_{w}"].astype(float).min()) if f"{g}_cell_max_{w}" in sub and sub[f"{g}_cell_max_{w}"].notna().any() else float("nan"),
+                                   cell_max_max=float(sub[f"{g}_cell_max_{w}"].astype(float).max()) if f"{g}_cell_max_{w}" in sub and sub[f"{g}_cell_max_{w}"].notna().any() else float("nan")))
+    ring_df = pd.DataFrame(rr)
+    ring_df.to_csv(an / "ring_rates.csv", index=False)
+    # state.csv (rule 28: every per-seed number the audit quotes comes from here or scatter.csv)
+    state_cols = ["arm", "seed", "epg_mean_pre", "PEN_mean_pre", "Delta7_mean_pre", "GLNO_mean_pre", "Ring_mean_pre", "ExR6_mean_pre", "ER6_mean_pre", "ER4m_mean_pre",
+                  "frac_confined_pre", "frac_confined_during", "frac_confined_post", "epg_in_mean_during", "epg_out_mean_during", "epg_in_mean_post", "epg_out_mean_post",
+                  "in_above_t5", "out_above_t5", "centre_wedge_t5", "centre_dist_t5", "vs_t5", "centre_dist_post_confined", "survival_at_tile_s", "frac_at_tile_post",
+                  "PEN_mean_during", "PEN_mean_post", "Delta7_mean_post", "GLNO_mean_post", "Ring_mean_post", "ExR6_mean_post", "ER6_mean_post", "ER4m_mean_post",
+                  "EPGt_mean_post", "PEG_mean_post", "rest_mean_post", "profile_end"]
+    df[[c for c in state_cols if c in df]].to_csv(an / "state.csv", index=False)
+    # scatter.csv: primaries + magnitudes + the at-tile survival, per arm
+    sc = []
+    for label, *_ in ARMS:
+        sub = df[df.arm == label].sort_values("seed")
+        if sub.empty:
+            continue
+        for k in PRIMARIES_CX7 + MAGNITUDES_CX7 + ("survival_at_tile_s", "centre_wedge_t5"):
+            v = sub[k].astype(float)
+            sc.append(dict(arm=label, key=k, seeds=",".join(str(int(x)) for x in sub.seed),
+                           values=",".join("nan" if not np.isfinite(float(x)) else f"{float(x):.4f}" for x in v),
+                           mean=float(np.nanmean(v)) if np.isfinite(v).any() else float("nan"),
+                           sd=float(np.nanstd(v, ddof=1)) if np.isfinite(v).sum() > 1 else float("nan")))
+    pd.DataFrame(sc).to_csv(an / "scatter.csv", index=False)
+    txt_missing = [a[0] + f"_s{s}" for a in ARMS for s in seeds if not (out_dir / f"{a[0]}_s{s}.txt").exists()]
+    df.to_csv(an / "runs.csv", index=False)
+    cdf.to_csv(an / "compare.csv", index=False)
+    rdf.to_csv(an / "decision.csv", index=False)
+    json.dump(dict(runs=df.to_dict("records"), compare=comp, decision=rule, calls=calls, contrast_H3E_vs_H3F=contrast, problems=problems, txt_missing=txt_missing,
+                   n_runs=int(len(df)), n_expected=len(ARMS) * len(seeds), refs=list(refs), primaries=list(PRIMARIES_CX7), magnitudes=list(MAGNITUDES_CX7),
+                   driven_centre=DRIVEN_CENTRE, driven_tile_tol=DRIVEN_TILE_TOL, generated_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                   generator="python " + " ".join(sys.argv), analysis_sha256=sha256_file(Path(__file__)),
+                   cx_wedge_sha256=sha256_file(ROOT / "scripts" / "cx_wedge.py"), common_sha256=sha256_file(ROOT / "flyverse" / "interp" / "common.py"),
+                   probe_compass_room_sha256=sha256_file(ROOT / "scripts" / "probe_compass_room.py")),
+              open(an / "analysis.json", "w", encoding="utf-8"), indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o))
+    L = [f"# batch analysis (cx7) -- n_runs {len(df)} of {len(ARMS) * len(seeds)} expected ({out_dir.as_posix()}/<arm>_s<seed>.json); generated {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n",
+         f"Problems ({len(problems)}): " + ("; ".join(problems) if problems else "none") + (f"; console .txt missing: {txt_missing}" if txt_missing else "") + "\n",
+         "## Per run\n"]
+    cols = ["arm", "seed", "survival_s", "survival_at_tile_s", "bump_hz_post", "width_half_post", "frac_confined_post", "centre_wedge_t5", "centre_dist_t5",
+            "epg_in_mean_post", "epg_out_mean_post", "PEN_mean_during", "PEN_mean_post", "Delta7_mean_post", "GLNO_mean_post", "ExR6_mean_post", "ER6_mean_post",
+            "ER4m_mean_post", "rest_mean_post", "ledger_survival", "ledger_rate", "ledger_width", "device_name", "md5", "wall_s"]
+    L.append("| " + " | ".join(cols) + " |"); L.append("|" + "---|" * len(cols))
+    for _, r in df.iterrows():
+        L.append("| " + " | ".join((f"{r[c]:.4g}" if isinstance(r[c], float) else str(r[c])) for c in cols) + " |")
+    L.append("\n## The two rules per arm (working compass: survival >= 5 AND width 2.5-5 AND rate 5-60, in >= 3 of 5; driven tile: centre within 1.5 wedges of 1.5 at 5 s, in >= 3 of 5)\n")
+    L.append("| arm | runs | working seeds | driven-tile seeds | surviving bump seeds | bump-at-tile seeds | compass-at-tile seeds | survival per seed | rate | width | centre dist t5 | survival at tile | call |")
+    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    fmtl = lambda v: "/".join("nan" if (x is None or (isinstance(x, float) and not np.isfinite(x))) else f"{x:.3g}" for x in v)   # noqa: E731
+    for _, r in rdf.iterrows():
+        call = cl[cl.arm == r.arm].call.iloc[0]
+        L.append(f"| {r.arm} | {r.runs} | {r.working_compass_seeds} | {r.driven_tile_seeds} | {r.bump_survives_seeds} | {r.bump_at_tile_seeds} | {r.compass_at_tile_seeds} | "
+                 f"{fmtl(r.survival)} | {fmtl(r.rate)} | {fmtl(r.width)} | {fmtl(r.centre_dist_t5)} | {fmtl(r.survival_at_tile)} | {call} |")
+    L.append(f"\nH3E vs H3F: {contrast}\n")
+    L.append("\n## Verdicts (common.compare, runs = the unit, 5 v 5; Holm within each (arm, reference) family of the five primaries)\n")
+    L.append("| arm | ref | key | family | verdict | diff | z | p | p Holm | null SD zero | stim values | null values |")
+    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    for _, r in cdf[cdf.family != "secondary"].iterrows():
+        L.append(f"| {r.arm} | {r.ref} | {r.key} | {r.family} | {r.verdict} | {r['diff']:+.4g} | {r.z:+.1f} | {r.p:.3g} | {r.p_holm:.3g} | {r.null_sd_zero} | {r.stim_values} | {r.null_values} |")
+    L.append("\n## Per-type ring rates (population means, Hz; min-max over seeds; per-cell max = max over cells of the window-mean rate)\n")
+    L.append("| arm | group | window | mean min-max | per-cell max min-max |"); L.append("|---|---|---|---|---|")
+    for _, r in ring_df.iterrows():
+        L.append(f"| {r.arm} | {r.group} | {r.window} | {r.mean_min:.3f}-{r.mean_max:.3f} | {r.cell_max_min:.3f}-{r.cell_max_max:.3f} |")
+    (an / "analysis.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        keys = list(PRIMARIES_CX7) + ["bump_hz_post", "survival_at_tile_s"]
+        fig, axes = plt.subplots(1, len(keys), figsize=(3.4 * len(keys), 3.6))
+        order_ = [a[0] for a in ARMS]
+        for ax, k in zip(axes, keys):
+            for i, arm in enumerate(order_):
+                v = df[df.arm == arm][k].astype(float).to_numpy()
+                v = np.where(np.isfinite(v), v, np.nan)
+                ax.scatter(np.full(len(v), i) + np.linspace(-0.15, 0.15, len(v)), v, s=18)
+                if np.isfinite(v).any():
+                    ax.plot([i - 0.25, i + 0.25], [np.nanmean(v)] * 2, color="k", lw=1)
+            ax.set_xticks(range(len(order_))); ax.set_xticklabels(order_, rotation=60, fontsize=7); ax.set_title(k, fontsize=9)
+        fig.tight_layout(); fig.savefig(an / "scatter.png", dpi=120); plt.close(fig)
+    except Exception as e:  # noqa: BLE001
+        print(f"scatter figure skipped: {e!r}")
+    print(f"n_runs {len(df)} ({out_dir.as_posix()}/<arm>_s<seed>.json); problems {len(problems)}")
+    for p_ in problems:
+        print("  PROBLEM", p_)
+    print(cl.to_string(index=False))
+    print("H3E vs H3F:", contrast)
+    print(f"-> {an / 'analysis.md'}, runs.csv, compare.csv, decision.csv, call.csv, scatter.csv, state.csv, ring_rates.csv, analysis.json, scatter.png")
+    return df, cdf, rdf
+
+
+def write_predeclaration_cx7(out_dir: Path, seeds, structure_json: Path, sigma_json: Path | None, name="cx7", minutes=30):
+    """The stamped 6B predeclaration (docs/INTERP.md 10.4 rule 10): arms, the two references, the family (m = 5) and its
+    drop rule, the two rules and the four-way phrases for H3E / H3F in words, the sigma measurement's consequence, and the
+    fixed tool's predictions per arm at the MEASURED sigma read out of `structure_json`. Archives any existing file."""
+    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    st = json.load(open(structure_json, encoding="utf-8"))
+    by_label = {r["label"].split(":")[0].strip(): r for r in st["configs"]}
+    arm_cfg = {"S": "shipped", "H3": "H3", "H3G": "H3+GLNO=glu", "F": "f", "H3F": "H3F", "H3E": "H3E", "H3FG": "H3FG", "H3EG": "H3EG"}
+    pred = {}
+    for label, desc, gains, glu, extra, cls in CX7_ARMS:
+        r = by_label.get(arm_cfg.get(label))
+        if r is None:
+            pred[label] = dict(note="no rate-model configuration for this arm"); continue
+        row = {}
+        for stt in ("background", "pulse", "after"):
+            m = r["rate_model"][stt]; b = r["bump_criterion"][stt]; j = r["jacobian"][stt]
+            row[stt] = dict(EPG_in_hz=m["epg_in"], EPG_out_hz=m["epg_out"], EPG_out_max_hz=m["epg_out_max"], in_above_22=m["in_above_22"], out_above_22=m["out_above_22"],
+                            confined_by_ledger_rule=m["confined_by_ledger_rule"], PEN_in_hz=m["PEN_in"], PEN_out_hz=m["PEN_out"],
+                            Delta7_hz=m["Delta7"], Ring_hz=m["Ring"], GLNO_hz=m["GLNO"], u_PEN_in_mV=m["u_PEN_in"], u_EPG_in_mV=m["u_EPG_in"],
+                            k1_gain=b["k1_gain"], gamma_EPG=b["gamma_EPG"], gamma_PEN=b["gamma_relay"]["PEN"], jacobian_leading=j["leading_re"],
+                            gamma_E_crit_epg_recurrent=b["epg_recurrent"]["gamma_EPG_crit"], saturation_hz_epg_recurrent=b["epg_recurrent"]["saturation_hz"],
+                            gamma_E_crit_with_relays=b["with_relays"]["gamma_EPG_crit"], saturation_hz_with_relays=b["with_relays"]["saturation_hz"])
+        row["fixed_point_bump_after_release"] = r["rate_model"]["bump_after"]
+        row["fixed_point_confined_bump_after_release"] = r["rate_model"]["confined_bump_after"]
+        row["fixed_point_runaway_after_release"] = r["rate_model"]["runaway_after"]
+        row["epg_recurrence_predicts_a_bump"] = r["bump_criterion"]["pulse"]["epg_recurrent"]["predicted_bump"]
+        row["epg_recurrence_saturation_hz"] = r["bump_criterion"]["pulse"]["epg_recurrent"]["saturation_hz"]
+        row["local_EPG_EPG_mV"] = r["local_kernels"]["direct"]
+        row["ring_rates_hz"] = {k: v for k, v in r["decomposition"]["pulse"].get("PEN_in<-Ring_by_type", {}).items()}
+        row["predicted_bump_at_driven_tile"] = bool(r["rate_model"]["confined_bump_after"])
+        row["predicted_PEN_during_hz"] = r["rate_model"]["pulse"]["PEN_in"]
+        row["predicted_PEN_post_hz"] = r["rate_model"]["after"]["PEN_in"]
+        row["predicted_bump_rate_hz"] = (r["rate_model"]["after"]["epg_in"] if r["rate_model"]["bump_after"] else r["bump_criterion"]["pulse"]["epg_recurrent"]["saturation_hz"])
+        pred[label] = row
+    sig = json.load(open(sigma_json, encoding="utf-8")) if sigma_json and Path(sigma_json).is_file() else None
+    doc = {
+        "schema": "flyverse.predeclaration/1", "stamped_utc": stamp, "written_before_submission": True,
+        "thread": "6B: the hold plus a wedge-local recurrence (docs/audits/compass_local_recurrence.md)",
+        "question": ("6A found the DC brake on the relays (ExR6 + ER6 + ER4m -> PEN, EPG) necessary and not sufficient: held off, PEN fires 40-48 Hz "
+                     "and the ring saturates into a five-wedge hump at the wrong place. The only wedge-local recurrence at the shipped gains is the "
+                     "x0.1-damped EPG -> EPG synapses. Can this ring hold a bump AT THE DRIVEN TILE once the DC brake is off AND the local recurrence "
+                     "is on? Two labelled instruments at once -- a mechanism question, never an adoption."),
+        "batch": {"name": name, "target": "house (<cluster-node>; .cluster.json default)", "submissions": 1, "jobs": len(seeds) * 2, "runs": len(CX7_ARMS) * len(seeds),
+                  "arms": len(CX7_ARMS), "seeds_per_arm": list(seeds),
+                  "generator": f"python scripts/cx_ring_structure.py --batch cx7 --plan-batch {out_dir.as_posix()} --minutes {minutes}",
+                  "blocks": "fam_s<seed>: every arm of one seed on ONE target; GLNO-silent arms (S, H3, H3F, H3E, F) in one job, GLNO = glutamate arms (H3G, H3FG, H3EG) in another",
+                  "job_line": ("mkdir -p out/cx7 && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/cx_wedge.py "
+                               "--no-structure --sim 1:1 --ledger --seed <s> --arm <A> --block fam_s<s> [--nt-override GLNO=glutamate] <arm flags> --sim-out out/cx7/<A>_s<s>.json "
+                               "> out/cx7/<A>_s<s>.txt 2>&1; s<i>=$?; tail -3 ...; exit $((s0 | s1 | ...)) -- tested on CPU before submission (out/cx7/smoke/jobline_check.txt)"),
+                  "protocol": ("the cx5 / cx6 protocol, unchanged: cx_wedge.simulate --ledger, FlyBrain on the full MaleCNS connectome, no world, compass adaptation 0, "
+                               "10 Hz Poisson background on all 46 EPG for the whole run, 1 s settle, wedges 0-3 (11 EPG) at +40 Hz for 2 s, then 5 s free; EPG per 10 ms "
+                               "frame scored by probe_compass_room.bump_frames; survival = end of the last confined post-pulse frame minus the pulse end (max 5.00 s). "
+                               "NEW RECORDED KEYS ONLY (the simulation is untouched): per-type ring rates ExR6 / ER6 / ER4m and EPGt as g__ groups, and the per-cell "
+                               "rates of the small compass groups with their per-cell maxima"),
+                  "gains": "SHIPPED (gE 1 / gD 1) in every arm",
+                  "cache": "GLNO-silent arms read the shared cache (compiled W md5 ef23cc27bea13be7f6a96f3c04fd3737); the GLNO = glutamate arms compile the 7a10d93b cache via --nt-override, as in cx6",
+                  "batch_sh_sha256": sha256_file(out_dir / "batch.sh") if (out_dir / "batch.sh").is_file() else None,
+                  "tree_state": (out_dir / "tree_state.json").as_posix()},
+        "instruments": {
+            "hold": "scripts/cx_wedge.py --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)' (6A; default None): 17 pre cells onto 88 post cells, 1,149 entries, 37,256 synapses at 0 -- a LABELLED COUNTERFACTUAL",
+            "global_recurrence": "--lif same_type_gain=1 (the global hand rule removed; every same-type clique at its connectome weight) -- a LABELLED INSTRUMENT (cx5's F)",
+            "per_type_recurrence": ("--edge-gain '^EPG$:^EPG$:10' (NEW in 6B, default None): a type_path_gain entry applied BEFORE same_type_gain, so x10 then x0.1 lands the 842 "
+                                    "EPG -> EPG pairs at exactly x1.0 (bit-identical to same_type_gain 1 on that block; tests/test_cx_wedge_hold.py) while PEN_a, PEN_b, Delta7 and PEG "
+                                    "cliques stay x0.1. No brain.py change was needed: the stage order allows it. A LABELLED INSTRUMENT (a per-type gain)"),
+            "bit_identity": "shipped path on CPU with both flags absent: out/cx7/smoke/smoke_default_path_noledger.json equals out/cx6/smoke/smoke_default_path.json on 120 of 121 shared fields (wall_s excepted), two new record-keeping keys",
+            "not_adoptable": "two instruments decide a MECHANISM question; neither the hold nor a per-type gain nor the global damping removal is a candidate default",
+        },
+        "arms": {label: dict(label=desc, gains_gE_gD=gains, glno_glutamate=glu, flags=list(extra), classification=cls) for label, desc, gains, glu, extra, cls in CX7_ARMS},
+        "references": ["S", "H3"],
+        "primaries": {
+            "keys": list(PRIMARIES_CX7),
+            "definitions": {"survival_s": "bump_survival_s (ledger)", "frac_confined_post": "fraction of post-pulse frames confined",
+                            "centre_dist_t5": "ring distance (wedges, 0-8) between the EPG profile's vector centre at 5 s (t5.0_centre_wedge) and the driven block's centre 1.5",
+                            "PEN_mean_during": "PEN population mean during the pulse", "PEN_mean_post": "after release"},
+            "family": ("Holm within each (arm, reference) family of the FIVE primaries, references S and H3 separately. m = 5 at 5 v 5 (p_floor 0.0079): "
+                       "5 x 0.0079 = 0.040 <= 0.05, satisfiable. bump_hz_post and width_half_post are undefined in both references (no confined frame in S or H3 in "
+                       "cx5 / cx6) and are declared MAGNITUDES outside the family; if a reference should turn out to have confined frames they stay magnitudes. "
+                       "A primary that returns no p is dropped from the denominator and reported as a magnitude (docs/INTERP.md 10.2)."),
+            "m_max": 5,
+            "magnitudes_outside_the_family": list(MAGNITUDES_CX7) + ["survival_at_tile_s (confined AND centre within 1.5 wedges of the driven block, from the .npz)",
+                                                                     "frac_at_tile_post", "centre_dist_post_confined"] + list(SECONDARIES_CX7),
+            "comparison": "flyverse.interp.common.compare, runs = the unit, 5 v 5; |z| >= 3 and p <= 0.05 -> result; a zero-SD null is structural (undetermined = read the magnitude with p)",
+        },
+        "decision_rule": {
+            "working_compass": "bump_survival_s >= 5 s AND bump_width_wedges in [2.5, 5] AND bump_rate_hz in [5, 60] Hz, per seed; the arm meets it in >= 3 of 5 seeds",
+            "driven_tile": f"centre_dist_t5 <= {DRIVEN_TILE_TOL} wedges (the driven block is wedges 0-3, centre {DRIVEN_CENTRE}), per seed; the arm meets it in >= 3 of 5 seeds",
+            "phrases (worded for H3E and H3F; printed per arm)": {
+                "a compass at the driven tile": "the working-compass rule AND the driven-tile rule each in >= 3 of 5 seeds",
+                "a bump at the driven tile, not a compass (rate outside 5-60 Hz)": "survival >= 5 s AND width 2.5-5 AND centre within 1.5 wedges in >= 3 of 5, but the rate row fails",
+                "a bump, not at the driven tile": "survival >= 5 s in >= 3 of 5 seeds but the driven-tile rule in < 3 of 5",
+                "no bump": "survival >= 5 s in < 3 of 5 seeds",
+            },
+            "H3E_vs_H3F": "'the per-type EPG->EPG recurrence is sufficient' when H3E lands in the same or a better class than H3F; 'the other same-type cliques are needed' when H3F lands in a better class",
+            "GLNO": "H3EG vs H3E and H3FG vs H3F: whether the relabel moves the class (read as magnitudes; the relabel's status belongs to docs/audits/glno_relabel.md)",
+            "what_the_hold_adds": "H3F vs F and H3E vs F (F carried as a reference): read as magnitudes",
+        },
+        "sigma": (dict(source=str(sigma_json), assumed_mV=SIGMA_MV, measured=sig.get("headline") if isinstance(sig, dict) else None,
+                       consequence=sig.get("consequence") if isinstance(sig, dict) else None) if sig else {"note": "no sigma measurement supplied"}),
+        "predictions_from_the_structure_pass": {
+            "source": f"{structure_json.as_posix()} (CPU; drive as a current with the forced rate as a floor, one-step EPG -> EPG term kept, per-cell gamma; sigma {st.get('modes', {}).get('sigma_mV')} mV)",
+            "reading": ("bump_at_driven_tile = the fixed point after release is a bump (in > 2 x out, in > 15 Hz) AND passes the ledger's confinement count on its own "
+                        "cells (>= 8 of 11 driven above 22 Hz, <= 3 of 35 outside) -- the criterion 6A's H3 prediction lacked; the rate is the fixed point's EPG-in "
+                        "when it holds a bump, else the EPG-recurrence saturation rate"),
+            "per_arm": pred,
+            "falsifiers": ("H3E or H3F holding a confined bump at the driven tile in >= 3/5 seeds where the fixed point predicts a saturated ring (or the reverse) is a "
+                           "tool miss to record. H3E in the same class as H3F says the EPG's own synapses carry the recurrence; H3F better than H3E says the PEN / PEG "
+                           "cliques matter. A working compass (rate 5-60 Hz) in any arm would be the first at the shipped gains."),
+        },
+        "analysis": {"path": f"python scripts/cx_ring_structure.py --batch cx7 --analyse {out_dir.as_posix()} (CPU), writing analysis/{{analysis.md,runs.csv,compare.csv,decision.csv,call.csv,scatter.csv,state.csv,ring_rates.csv,analysis.json,scatter.png}}",
+                     "per_seed_scatter": "analysis/scatter.csv and analysis/state.csv -- the audit pastes from those files (docs/INTERP.md 10.4 rule 28)",
+                     "checks": "per run: device cuda, arm label, gains, nt_override / glno_nt, same_type_gain, receptor_model, the hold (spec, factor 0, 1,149 entries), the edge gain (spec, 842 entries all same-type, effective factor 1.0), the per-type ring rates present"},
+        "adoption": "NOTHING IS ADOPTED BY THIS THREAD. Two instruments decide a mechanism question; every new flag defaults to None; no default changes.",
+    }
+    path = out_dir / "predeclared.json"
+    if path.exists():
+        arch = out_dir / f"predeclared.archived_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.json"
+        arch.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"archived the previous predeclaration -> {arch}")
+    path.write_text(json.dumps(doc, indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o)), encoding="utf-8")
+    print(f"-> {path} (stamped {stamp})")
+    return doc
+
+
 # ------------------------------------------------------------------------------------------------ predeclaration
 def write_predeclaration(out_dir: Path, arms, seeds, structure_json: Path, name="cx6", minutes=30, ref="S"):
     """The stamped predeclaration (docs/INTERP.md 10.4 rule 10: the predeclaration is this JSON, not the audit).
@@ -1375,7 +1891,7 @@ def write_predeclaration(out_dir: Path, arms, seeds, structure_json: Path, name=
                      "(-24.9 mV on PEN during the pulse, against a 7 mV gap) is what keeps the compass relays below "
                      "threshold. Holding exactly those edges at 0 turns that decomposition into a tested attribution."),
         "batch": {
-            "name": name, "target": "house (node1; .cluster.json default)", "submissions": 1,
+            "name": name, "target": "house (<cluster-node>; .cluster.json default)", "submissions": 1,
             "jobs": len(seeds) * 2, "runs": len(arms) * len(seeds), "arms": len(arms), "seeds_per_arm": list(seeds),
             "generator": f"python scripts/cx_ring_structure.py --batch cx6 --plan-batch {out_dir.as_posix()} --minutes {minutes}",
             "blocks": "fam_s<seed>: every arm of one seed on ONE target (an experimental factor is never the unit of scheduling)",
@@ -1480,7 +1996,7 @@ def write_predeclaration(out_dir: Path, arms, seeds, structure_json: Path, name=
 # ------------------------------------------------------------------------------------------------ validation of the
 # fixed tool against a batch that is already on disk (thread 6A step 1: the 5A batch this pass previously missed)
 def validate_batch(batch_dir: Path, out_dir: Path, drive="current", reduction="with-direct", gain="per-cell",
-                   arms=None, tol=0.10):
+                   arms=None, tol=0.10, sigma=SIGMA_MV):
     """For every shipped-gain arm of `arms` (default the cx5 table) that has runs in `batch_dir`: build the same
     configuration from the arm's own flags, run the structure pass, and compare
       * the predicted saturation rate of the k = 1 mode (the rate at which the LIF slope falls back to gamma_crit)
@@ -1508,7 +2024,7 @@ def validate_batch(batch_dir: Path, out_dir: Path, drive="current", reduction="w
         surv = [x[0] for x in meas if x[0] is not None]
         hz = [x[1] for x in meas if x[1] is not None and np.isfinite(x[1])]
         cir = Circuit(cfg[2], cfg[3], cfg[0], cfg[1], cells=dict(cfg[4]))
-        res, _ = analyse(cir, drive=drive, reduction=reduction, gain=gain)
+        res, _ = analyse(cir, drive=drive, reduction=reduction, gain=gain, sigma=sigma)
         tg = res["two_step_gain"]
         pred_hz = tg["saturation_hz_k1"]
         bc = res["bump_criterion"]["pulse"]
@@ -1547,7 +2063,7 @@ def validate_batch(batch_dir: Path, out_dir: Path, drive="current", reduction="w
                  f"{r['seeds_with_bump']}/{r['seeds']} | {'BUMP' if r['fixed_point_bump'] else ('RUNAWAY' if r['fixed_point_runaway'] else 'no bump')} | "
                  f"{r['pen_pulse_hz']:.1f} / {r['u_pen_pulse']:+.1f} | {r['jacobian_lead_pulse']:+.3f} / {r['k1_gain_pulse']:+.3f} |")
     (out_dir / "validation.md").write_text("\n".join(L) + "\n", encoding="utf-8")
-    json.dump(dict(batch=batch_dir.as_posix(), drive=drive, reduction=reduction, gain=gain, tol=tol, rows=rows,
+    json.dump(dict(batch=batch_dir.as_posix(), drive=drive, reduction=reduction, gain=gain, sigma_mV=float(sigma), tol=tol, rows=rows,
                    bump_calls_ok=ok_bump, bump_calls=len(df), rate_calls_ok=ok_rate, rate_calls=len(rate_rows),
                    generated_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), generator="python " + " ".join(sys.argv),
                    generator_sha256=sha256_file(Path(__file__)), glu_cache=str(glu_dir)),
@@ -1576,31 +2092,63 @@ def main():
                     help="linearisation: per-cell gamma_i = f'(u_i) at the realised fixed point (the fix) or a uniform gamma (5A)")
     ap.add_argument("--legacy", action="store_true", help="the 5A behaviour: --drive rate --reduction two-step --gain uniform")
     ap.add_argument("--holds", action="store_true", help="add the 6A hold configurations (ExR6 / ER6 / ER4m -> PEN,EPG at 0)")
-    ap.add_argument("--batch", default="cx5", choices=["cx5", "cx6"], help="which arm table --plan-batch / --analyse use")
-    ap.add_argument("--seeds", default=None, help="comma-separated seeds for --plan-batch (default: 0-3 for cx5, 0-4 for cx6)")
+    # thread 6B (docs/audits/compass_local_recurrence.md)
+    ap.add_argument("--local-recurrence", action="store_true", help="add the 6B configurations (the hold + same_type_gain 1 / + EPG->EPG undamped per type, each with GLNO = glu; and E alone)")
+    ap.add_argument("--sigma", type=float, default=SIGMA_MV, help=f"input-noise width (mV) of the smoothed f-I for the fixed point, gains and slope bound (default the assumed {SIGMA_MV}; pass the MEASURED value from scripts/measure_lif_sigma.py)")
+    ap.add_argument("--sigma-json", default=None, help="--predeclare (cx7): the sigma summary JSON whose headline / consequence are copied into the predeclaration")
+    ap.add_argument("--batch", default="cx5", choices=["cx5", "cx6", "cx7"], help="which arm table --plan-batch / --analyse use")
+    ap.add_argument("--seeds", default=None, help="comma-separated seeds for --plan-batch (default: 0-3 for cx5, 0-4 for cx6 / cx7)")
     ap.add_argument("--name", default=None, help="batch name for --plan-batch (default: the --batch value)")
     ap.add_argument("--tree-state", default=None, metavar="DIR", help="rewrite DIR/tree_state.json only (batch.sh untouched)")
     ap.add_argument("--predeclare", default=None, metavar="DIR", help="write DIR/predeclared.json (stamped; archives any existing one) from the arm table and DIR/structure/structure.json")
     ap.add_argument("--structure-json", default=None, help="--predeclare: the structure pass to read the predictions from (default <DIR>/structure/structure.json)")
+    ap.add_argument("--predictions-csv", nargs="+", default=None, metavar="STRUCTURE_JSON",
+                    help="thread 6B: write <--out>/predictions.csv -- one row per (configuration, sigma) with the fixed point's PEN / EPG rates, "
+                         "its confinement count on its own cells and the predicted bump -- from one or more structure.json files (no structure pass)")
     ap.add_argument("--validate-batch", default=None, metavar="DIR",
                     help="score this structure pass's predictions against an already-fetched batch (out/cx5): saturation rate vs measured bump_hz_post")
     a = ap.parse_args()
     if a.legacy:
         a.drive, a.reduction, a.gain = "rate", "two-step", "uniform"
-    arms = CX6_ARMS if a.batch == "cx6" else BATCH_ARMS
-    seeds = tuple(int(x) for x in a.seeds.split(",")) if a.seeds else ((0, 1, 2, 3, 4) if a.batch == "cx6" else (0, 1, 2, 3))
+    arms = {"cx5": BATCH_ARMS, "cx6": CX6_ARMS, "cx7": CX7_ARMS}[a.batch]
+    seeds = tuple(int(x) for x in a.seeds.split(",")) if a.seeds else ((0, 1, 2, 3, 4) if a.batch in ("cx6", "cx7") else (0, 1, 2, 3))
     if a.tree_state:
         write_tree_state(Path(a.tree_state)); return
     if a.predeclare:
         d = Path(a.predeclare)
-        write_predeclaration(d, arms, seeds, Path(a.structure_json) if a.structure_json else d / "structure" / "structure.json",
-                             name=a.name or a.batch, minutes=a.minutes); return
+        sj = Path(a.structure_json) if a.structure_json else d / "structure" / "structure.json"
+        if a.batch == "cx7":
+            write_predeclaration_cx7(d, seeds, sj, Path(a.sigma_json) if a.sigma_json else None, name=a.name or a.batch, minutes=a.minutes); return
+        write_predeclaration(d, arms, seeds, sj, name=a.name or a.batch, minutes=a.minutes); return
     if a.plan_batch:
         plan_batch(Path(a.plan_batch), seeds=seeds, minutes=a.minutes, name=a.name or a.batch, arms=arms); return
     if a.analyse:
+        if a.batch == "cx7":
+            analyse_batch_cx7(Path(a.analyse), seeds=seeds); return
         analyse_batch(Path(a.analyse), arms=arms, seeds=seeds); return
+    if a.predictions_csv:
+        rows = []
+        for path in a.predictions_csv:
+            st = json.load(open(path, encoding="utf-8"))
+            sig = st.get("modes", {}).get("sigma_mV")
+            for r in st["configs"]:
+                rm, bc = r["rate_model"], r["bump_criterion"]["pulse"]
+                pu, af = rm["pulse"], rm["after"]
+                rows.append(dict(config=r["label"].split(":")[0].strip(), sigma_mV=sig, source=Path(path).as_posix(),
+                                 max_lif_slope=st["modes"]["max_lif_slope"], local_EPG_EPG_mV=r["local_kernels"]["direct"],
+                                 gamma_E_crit=bc["epg_recurrent"]["gamma_EPG_crit"], gamma_E_crit_with_relays=bc["with_relays"]["gamma_EPG_crit"],
+                                 recurrence_saturation_hz=bc["epg_recurrent"]["saturation_hz"], gamma_EPG_driven=bc["gamma_EPG"],
+                                 gamma_relay_PEN=bc["gamma_relay"]["PEN"], PEN_pulse_hz=pu["PEN_in"], u_PEN_pulse_mV=pu["u_PEN_in"],
+                                 PEN_post_hz=af["PEN_in"], EPG_in_post_hz=af["epg_in"], EPG_out_post_hz=af["epg_out"],
+                                 in_above_22=af["in_above_22"], out_above_22=af["out_above_22"], bump_after=rm["bump_after"],
+                                 confined_bump_after=rm["confined_bump_after"], runaway_after=rm["runaway_after"]))
+        df = pd.DataFrame(rows)
+        out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+        df.to_csv(out / "predictions.csv", index=False)
+        print(df.to_string(index=False)); print(f"-> {out / 'predictions.csv'} ({len(df)} rows)")
+        return
     if a.validate_batch:
-        validate_batch(Path(a.validate_batch), Path(a.out), drive=a.drive, reduction=a.reduction, gain=a.gain); return
+        validate_batch(Path(a.validate_batch), Path(a.out), drive=a.drive, reduction=a.reduction, gain=a.gain, sigma=a.sigma); return
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     c = connectome.load(verbose=False)
@@ -1630,10 +2178,12 @@ def main():
     ]
     if a.holds:
         configs += hold_configs(c, c_glu, cells, cells_glu)
+    if a.local_recurrence:
+        configs += recurrence_configs(c, c_glu, cells, cells_glu)
     rows, mats = [], {}
     for label, ev, cc, p, cl in configs:
         cir = Circuit(cc, p, label, ev, cells=dict(cl))
-        r, m = analyse(cir, drive=a.drive, reduction=a.reduction, gain=a.gain)
+        r, m = analyse(cir, drive=a.drive, reduction=a.reduction, gain=a.gain, sigma=a.sigma)
         rows.append(r)
         key = label.split(":")[0].replace(" ", "_").replace("+", "")
         for k, v in m["M16"].items():
@@ -1656,9 +2206,9 @@ def main():
                        lambda_1=r["fourier"]["net"][1], lambda_0=r["fourier"]["net"][0], direct_k1=r["fourier"]["direct"][1]))
     rk.sort(key=lambda d: (-int(d["bump"]), -d["pen_pulse_hz"], -d["in_minus_out"], d["gamma_crit_k1"], -d["u_pen_pulse"]))
     res["ranking"] = rk
-    res["modes"] = dict(drive=a.drive, reduction=a.reduction, gain=a.gain, legacy=bool(a.legacy), sigma_mV=SIGMA_MV,
-                        u_for_rate={"10": u_for_rate(10.0), "50": u_for_rate(50.0)},
-                        max_lif_slope=max_slope()[0], max_lif_slope_at_u=max_slope()[1], max_lif_slope_at_hz=max_slope()[2])
+    res["modes"] = dict(drive=a.drive, reduction=a.reduction, gain=a.gain, legacy=bool(a.legacy), sigma_mV=float(a.sigma), sigma_assumed_mV=SIGMA_MV,
+                        u_for_rate={"10": u_for_rate(10.0, sigma=a.sigma), "50": u_for_rate(50.0, sigma=a.sigma)},
+                        max_lif_slope=max_slope(sigma=a.sigma)[0], max_lif_slope_at_u=max_slope(sigma=a.sigma)[1], max_lif_slope_at_hz=max_slope(sigma=a.sigma)[2])
     res["wall_s"] = time.time() - t0
     with open(out / "structure.json", "w", encoding="utf-8") as f:
         json.dump(res, f, indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o))
