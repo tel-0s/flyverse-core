@@ -26,11 +26,37 @@ elsewhere. The female caches carry raw sign-zero synapse counts, source hashes a
 `load(cache_dir=...)` reads its dataset from the manifest. Changing a cached NT confidence threshold requires
 `rebuild=True` or a new directory. FAFB's optional `edges="no_threshold"` uses `cache/fafb/no_threshold/`.
 
+`has_vnc` and `has_optic_columns` describe the **source release**, and survive subsetting even if the
+selection contains no cells of that kind. Dataset names are validated against the registered backends;
+an unknown name cannot silently acquire capabilities. Use `c.select(...)` to inspect the selected population.
+
+The backend refactor adds `model.dataset` and `model.release` to **every** Result's provenance, including
+MaleCNS. The legacy MaleCNS fingerprint keeps its exact key set. Subsets now retain their source
+`cache_dir` instead of losing it; this is a provenance correction, with no change to normalization or
+weights. Female subsets retain a cache root selected through `FLYVERSE_CACHE`; MaleCNS still requires
+an explicit `cache_dir` to use another location.
+
 FAFB has no VNC: `motor_groups`, `wing_groups`, `Proprioception`, and `fb.motor()` raise `NotAvailable`.
 Its brain and optic model can still run. BANC has no optic column map: `build_retina` raises `NotAvailable`,
 and `FlyBrain` leaves `optic` and `retina` unset. `optic=None` also explicitly disables the optic module on
 other graphs. Cells otherwise assigned to that module run in the LIF graph. This is a capability difference,
 not an assertion that an uncalibrated BANC optic circuit matches the graded model.
+
+FAFB's generic R7/R8 labels map to `R7_unclear`/`R8_unclear` (1,338/1,357 cells). This does not identify
+pale, yellow or DRA subtypes: any spectral, receptor or time-constant entries keyed to `R7p/R7y/R7d`
+or `R8p/R8y/R8d` cannot match those cells. Community DRA annotations validate the geometry only.
+Of its 1,581 columns, 51 lack reconstructed photoreceptors. They remain in the eye centring but have
+no direct photoreceptor input; recurrent optic activity is still possible. `retina.summarize(r, c)` and
+`r.coverage()` report them. When a live retina contains such columns, `provenance(..., fb=fb)` adds
+their count, side counts and column indices at `retina.coverage`.
+
+Both female backends intentionally use the shared `flywire` and `banc` alias vocabularies: the CSV's
+`system` column describes where a name came from, not a release filter. Ambiguous names stay unresolved.
+BANC's proprioceptive sides come from synthesized instance suffixes, derived from source soma side
+or the nerve-side fallback. In v888 every selected afferent has such a suffix, so none uses the
+connectivity-laterality fallback and none is classified `both`. MaleCNS often uses that fallback
+(including 85 `both` chordotonal cells). These are different side-assignment measurements, not evidence
+that bilateral afferents are absent in the female animal; the transducer laws are unchanged.
 
 The sweet-taste body-ID table remains MaleCNS-specific; female controllers report taste unavailable.
 Inspect `available_senses` before applying inputs. No female gains or transmitter overrides are tuned.

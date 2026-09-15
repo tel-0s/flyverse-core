@@ -159,6 +159,65 @@ def test_hex_axes_and_mirror():
         fafb.hex_coordinates(p, q, "unknown")
 
 
+def test_release_capabilities_validate_names_and_survive_subsets(tmp_path):
+    from dataclasses import replace
+    female_files(tmp_path)
+    c = cn.compile_connectome(dataset="fafb", data_dir=tmp_path, verbose=False)
+    assert c.has_optic_columns and not c.has_vnc
+    assert c.subset([0]).has_optic_columns   # release availability, not a census of selected cells
+    with pytest.raises(ValueError, match="unknown dataset"):
+        replace(c, dataset="unregistered")
+    with pytest.raises(ValueError, match="unknown connectome capability"):
+        c.require("typo")
+    c.dataset = "unregistered"
+    for attr in ("has_vnc", "has_optic_columns"):
+        with pytest.raises(ValueError, match="unknown dataset"):
+            getattr(c, attr)
+
+
+def test_fafb_nerve_roles_are_distinct(tmp_path):
+    female_files(tmp_path)
+    p = tmp_path / "classification.csv.gz"
+    cls = pd.read_csv(p)
+    cls["super_class"] = ["central", "motor", "sensory_ascending"]
+    cls["nerve"] = ["test_central", "test_motor", "test_sensory"]
+    cls.to_csv(p, index=False)
+    n, _ = fafb.read(tmp_path)
+    assert n.entryNerve.isna().tolist() == [True, True, False]
+    assert n.exitNerve.isna().tolist() == [True, False, True]
+    assert n.entryNerve.iloc[2] == "test_sensory" and n.exitNerve.iloc[1] == "test_motor"
+
+
+def test_retina_reports_missing_photoreceptors_in_summary_and_provenance(tmp_path):
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from scipy import sparse
+    from flyverse.retina import build_retina, summarize
+    female_files(tmp_path)
+    base = cn.compile_connectome(dataset="fafb", data_dir=tmp_path, verbose=False)
+    n = base.neurons.iloc[[0, 0, 1, 2]].copy().reset_index(drop=True)
+    n["bodyId"] = np.arange(1, 5, dtype=np.int64)
+    n["type"] = ["R7_unclear", "R7_unclear", "Mi1", "Mi1"]
+    n["hex1"], n["hex2"] = [1, 1, 2, 1], [1, 1, 1, 1]
+    n["hex_side"] = ["L", "L", "L", "R"]
+    c = cn.Connectome(n, sparse.csr_matrix((4, 4), dtype=np.float32),
+                     pd.Series(np.arange(4), index=n.bodyId), dataset="fafb", release="v783")
+    r = build_retina(c)
+    coverage = r.coverage()
+    assert coverage["n_columns"] == 3 and coverage["with_photoreceptors"] == 1
+    assert coverage["without_photoreceptors_indices"] == [1, 2]
+    assert coverage["by_side"] == {"L": {"n_columns": 2, "without_photoreceptors": 1},
+                                    "R": {"n_columns": 1, "without_photoreceptors": 1}}
+    assert "2 columns without photoreceptor input" in summarize(r, c)
+    record = {"mode": "test"}
+    p = common.provenance(c, fb=SimpleNamespace(retina=r), device="cpu", retina=record)
+    assert p["retina"]["coverage"] == coverage and record == {"mode": "test"}
+    empty = replace(r, pr_index=np.array([], dtype=int), pr_column=np.array([]), pr_sens=np.empty((0, 4)),
+                    col_side=r.col_side[:2], col_hex=r.col_hex[:2], col_dir=r.col_dir[:2], col_az_el=r.col_az_el[:2])
+    assert empty.coverage()["without_photoreceptors"] == 2
+    assert "R: no columns" in summarize(empty, c)
+
+
 def test_unavailable_capabilities_are_explicit(tmp_path):
     from flyverse.retina import build_retina
     from flyverse.senses import Proprioception
