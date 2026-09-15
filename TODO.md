@@ -369,5 +369,8 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
       `dataset=synthetic`, column-local neural-superposition cartridge onto L1/L2/L3) -- the only invented part,
       auditable. NOT a FAFB chimera: the two animals share zero body IDs and the optic -> central seam would have to
       be fabricated by type matching, which is the hypothesis a two-connectome comparison exists to test.
+      Astra's candidate reconstruction is in `docs/audits/banc_column_reconstruction.md`: 877 right-eye sites,
+      T4 direction check passes, DRA fails, anatomical L/R mirror unavailable. **A remains partial; B remains
+      blocked on validation** (owner decision). `scripts/recover_banc_columns.py` emits diagnostics only.
 - [ ] Do not: mix counts across releases unscaled; treat BANC's optic lobes as complete (T2 853 vs 1,466);
       prefer BANC predicted monoamine labels to its verified column; assume `fru` / `dsx` circuits are sex-shared.
