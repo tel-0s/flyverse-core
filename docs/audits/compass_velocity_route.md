@@ -21,7 +21,7 @@ turn -- with the ring's DC brake held and GLNO signed -- and does anything downs
 | HG | `ring_dc_hold` + `glno_sign` (= 6A's H3G) | the near-bump without a velocity input (replicates 6A) |
 | HGV | `ring_dc_hold` + `glno_sign` + `sided_turn_afferent` | **the arm**: the bump should move with the turn |
 | HGV- | HGV with the afferent sign flipped | the sign control: the bump should move the other way, or the effect is not the afferent |
-| HGVp | HGV with the hold restricted to PEN (`^(ExR6|ER6|ER4m)$:^PEN_`; EPG keeps its DC input) | added 2026-09-15 after 6B (`compass_local_recurrence.md` section 0): the hold on EPG removes the off-tile inhibition that H3E's hump lacked; does keeping it confine the bump |
+| HGVp | HGV with the hold restricted to PEN (`^(ExR6|ER6|ER4m)$:^PEN_`; EPG keeps its DC input) | added 2026-09-15 after 6B (`compass_local_recurrence.md`; wording corrected after its skeptic): H3E's hump sits near the driven tile but is ~7 wedges wide, and the hold removes ring inhibition from every EPG, driven and off-block alike, so 6B cannot say which part of it matters; HGVp keeps EPG's DC input to test whether that narrows the hump |
 
 The afferent instrument: Poisson `poisson_hz` on AN07B037_a/_b (and CB0675 / GNG580 / PS047_b in a second variant only
 if V is null on the first), rate = `k * max(0, +-yaw_deg_s)` on the side the connectome's contralateral routing
