@@ -1,0 +1,83 @@
+{
+  "functional_rows": 48,
+  "functional_pass": 48,
+  "functional_failures": [],
+  "suite_pairs": 87,
+  "suite_regressions": [],
+  "suite_status_changes": [
+    {
+      "seed": 1,
+      "key": "taste.MN9_hz",
+      "raw_value": 1.6904562711715698,
+      "instrumented_value": 4.295960903167725,
+      "raw_status": "FAIL",
+      "instrumented_status": "PASS",
+      "regressed": false
+    }
+  ],
+  "suite_missing": [],
+  "profile": [
+    {
+      "batch": 1,
+      "raw_ms": 13.311531960498542,
+      "instrumented_ms": 25.53172983461991,
+      "overhead_percent": 91.80158910623011,
+      "target_pass": false,
+      "module_cuda_us": 114.75625610351562,
+      "raw_repeats_ms": [
+        15.381985800340772,
+        11.241078120656312,
+        18.731301419902593,
+        10.995637190062553
+      ],
+      "instrumented_repeats_ms": [
+        25.486580869182944,
+        25.312546310015023,
+        27.515744511038065,
+        25.576878800056875
+      ]
+    },
+    {
+      "batch": 8,
+      "raw_ms": 64.20230659539811,
+      "instrumented_ms": 119.05660125077702,
+      "overhead_percent": 85.43975686273981,
+      "target_pass": false,
+      "module_cuda_us": 119.47724914550781,
+      "raw_repeats_ms": [
+        63.08817581972107,
+        65.31643737107515,
+        74.0371288312599,
+        61.94401070009917
+      ],
+      "instrumented_repeats_ms": [
+        118.47197521943599,
+        138.33048664033413,
+        119.64122728211805,
+        92.44650586042553
+      ]
+    },
+    {
+      "batch": 32,
+      "raw_ms": 89.8228413099423,
+      "instrumented_ms": 104.87927421461791,
+      "overhead_percent": 16.762365435225934,
+      "target_pass": false,
+      "module_cuda_us": 132.86656188964844,
+      "raw_repeats_ms": [
+        82.54656254081056,
+        90.17460047034547,
+        90.20412106998265,
+        89.47108214953914
+      ],
+      "instrumented_repeats_ms": [
+        113.23662956943735,
+        113.30147074069828,
+        96.52191885979846,
+        87.7937024901621
+      ]
+    }
+  ],
+  "verified_records": 116,
+  "ui_screenshot_exists": true
+}

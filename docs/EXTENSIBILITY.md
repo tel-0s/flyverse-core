@@ -17,6 +17,15 @@ nonfinite CUDA output may abort the CUDA context at a later launch; modules with
 keep synchronous validation. Activity proofs are cleared on reset, load and detach. These are internal
 performance hints, not a relaxation of the module output contract or a change to raw stepping.
 
+Resolved module selection indices are uploaded once at attachment. With CUDA graphs enabled, the
+single read-free compass module can be captured with the neural frame; hooks, live timed pulses,
+boundary adapters and general modules retain the eager scheduler. Each captured frame keeps its
+own output bindings and external input storage, records side-stream inputs on the replay stream,
+and restores module state around warmup/capture. Reset, detach and new external drive invalidate
+the relevant graphs. This is an explicit built-in capture contract, not a promise that arbitrary
+Python modules are capturable. The audit records exact lifecycle checks and the limits of full-room
+GPU reproducibility.
+
 `tests/test_bit_identity.py` holds that last sentence to the byte: one deterministic
 CPU scenario over a synthetic graph (all four senses, `stimulate`, `set_drive`,
 fractional-ms carry-over, a `state_dict` round trip, per-row and full `reset`) hashed

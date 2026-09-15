@@ -3190,3 +3190,31 @@ the earlier HG metrics and arrays exactly. Every per-seed row and the operating-
 `docs/audits/compass_velocity_route.md` section 6. Nothing adopted; no second follow-up submitted.
 Final CPU 473 passed / 19 skipped, 220 subtests; original golden and MaleCNS cache bytes unchanged.
 **Independent skeptic pending (Fable, when accounts reset).**
+
+
+## Session 12, imposed compass memory experiment (2026-09-15)
+
+The owner authorized a fast program/control arm under instrumented while the biological compass remains
+unresolved. CompassDriver integrates realized yaw and writes a continuous Poisson bump to the 46 EPGs
+through the existing module surface. It supplies angular memory; there is no world-heading/goal oracle,
+visual anchoring, motor overwrite or synapse change. The exact 50 Hz / 35 degree law is unverified.
+Wang's requested findings were read at 80b94e6608cf927ca2c9f2bbce0577c5a998684c, including the corrected
+qualification that fitted models can integrate with the feedback contacts present. Count-based failure
+does not identify the biological correction. Sources and limits are in `audits/compass_standin.md`.
+
+All 48 controlled trajectories (six seeds, B=8) pass the frozen engineering gates: stationary phase-error
+p95 5.45-8.50 deg, moving p95 8.41-23.51 deg, including estimator lag. All six controlled traces reproduce
+exactly after scheduler/capture optimization. The three-draw, 29-check comparison changes one taste status
+FAIL to PASS outside the gap, so strict preset admission fails despite no passing-row regression. The legacy
+pulse-memory compass row remains a known gap; this instrument follows its imposed phase, not an arbitrary
+neural pulse. The 60 s room observations do not establish food finding or replace the full admission gate.
+
+Native CUDA adds 54.22 us per 10 ms brain frame at B=1 (11.01%, misses the <=10% target), 3.19% at B=8,
+1.22% at B=32. CPU/CUDA traces confirm zero scalar readbacks in the optimized steady frame. Native B=6
+room median is 12.84/13.18 ms raw/instrumented; UI has only a visual smoke check. Two same-code eager
+room repeats diverge, as does eager versus captured; full-brain exactness gates fail and remain recorded.
+Two failed capture attempts are retained; the successful retry and final lifetime precaution pass the
+house fixtures. Final CPU 482 passed / 19 skipped / 220 subtests; house 15 exact lifecycle checks plus
+8 existing CUDA tests / 2 skipped / 3 subtests. Original golden and both worktrees' cache MD5s unchanged.
+Experimental opt-in only; raw remains default and no physiology adopted. **Independent skeptic pending
+(Fable, when accounts reset).**
