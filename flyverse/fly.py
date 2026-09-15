@@ -546,7 +546,12 @@ class FlyBrain:
                     o.diagnostics = diagnostics
         cached = self._graphs[key]
         if modules:
-            graph, bound, _ = cached
+            graph, bound, captured_inputs = cached
+            # Warmup inputs were allocated on the side stream. A caller can reset/detach
+            # immediately after queuing a replay; defer allocator reuse until that replay ends.
+            replay_stream = torch.cuda.current_stream(self.device)
+            for value in captured_inputs.values():
+                value.record_stream(replay_stream)
             for name, value in bound.items():
                 setattr(self._extensions, name, dict(value) if isinstance(value, dict) else value)
             graph.replay()
