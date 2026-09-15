@@ -39,7 +39,9 @@ LH_ODOUR_CHANNELS = {
 LH_ODOUR_TYPES = LH_ODOUR_CHANNELS["berry"]      # backwards compatibility
 
 
-def motor_groups(c: Connectome) -> MotorGroups:
+def motor_groups(c: Connectome, *, allow_missing_vnc=False) -> MotorGroups:
+    if not allow_missing_vnc:
+        c.require("vnc")
     fwd_types = ["DNp09", "DNa01", "DNa03", "DNb01", "DNa04"]
     g = MotorGroups(
         fwd_dn=c.select(type=fwd_types),
@@ -79,7 +81,9 @@ class WingGroups:
     haltere: np.ndarray
 
 
-def wing_groups(c: Connectome) -> WingGroups:
+def wing_groups(c: Connectome, *, allow_missing_vnc=False) -> WingGroups:
+    if not allow_missing_vnc:
+        c.require("vnc")
     steer = c.select(superclass="vnc_motor", subclass="wm", type="~^(b[123]|i[12]|iii[13]|hg[1-4]|ps[12]|tp[12]|tpn) MN$")
     side = c.neurons.somaSide.to_numpy()
     return WingGroups(
@@ -96,6 +100,7 @@ def haltere_side_groups(c: Connectome) -> dict:
     opt-in side-split readout `read_haltere_sides`. On the shipped cache 16 cells = 8 L / 8 R (hi2 MN x2 per side,
     MNhm42, MNhm03, hDVM MN, MNhm43, hi1 MN, hiii2 MN x1 per side); every instance carries an _L / _R suffix and
     somaSide agrees. Cells without a side are in neither group (reported as `unsided`)."""
+    c.require("vnc")
     h = c.select(superclass="vnc_motor", subclass="hm")
     side = c.neurons.somaSide.fillna("").to_numpy()[h]
     return {"L": h[side == "L"], "R": h[side == "R"], "unsided": h[(side != "L") & (side != "R")]}

@@ -67,6 +67,9 @@ only — it runs before the package is installed if you like.
 ```
 python scripts/fetch_data.py --list                 # what the manifest knows, and what is already present
 python scripts/fetch_data.py --malecns              # the MaleCNS files flyverse reads (~3.7 GB)
+python scripts/fetch_data.py --fafb                 # female brain v783, thresholded edges
+python scripts/fetch_data.py --fafb --edges no_threshold  # also fetch the optional unthresholded pair table
+python scripts/fetch_data.py --banc                 # female brain + VNC v888
 python scripts/fetch_data.py --external all         # third-party expression/typing tables -> data/external/
 python scripts/fetch_data.py --verify               # re-hash everything present
 ```
@@ -83,6 +86,21 @@ python scripts/fetch_data.py --malecns
 `scripts/build_*.py` scripts; the built CSVs are committed, so running the model does not need it.
 `data/external/` is git-ignored (Özel 2021, Davis 2020, Kurmangaliyev 2020, Nern 2025 and the typing tables
 are redistributed under their own licences — cite them from the manifest, do not re-host them).
+
+Female data paths are `FLYVERSE_DATA_FAFB` and `FLYVERSE_DATA_BANC`; the Windows defaults are
+`D:\Datasets\flywire\Female Adult Fly Brain v783` and `D:\Datasets\flywire\BANC v888`.
+The manifest pins public release URLs and SHA-256 hashes. No skeleton archive or per-synapse geometry
+archive is fetched. FAFB's `labels.csv.gz` is used by the independent dorsal-rim validation.
+
+```python
+from flyverse import connectome
+connectome.load(dataset="fafb")
+connectome.load(dataset="banc")
+```
+
+These compile into separate `cache/fafb/` and `cache/banc/` directories. The MaleCNS files remain intact.
+`FLYVERSE_CACHE` overrides the cache parent. BANC supports body experiments without an optic module;
+FAFB supplies vision but lacks VNC motor/proprioceptive populations. See `docs/CONTROL_SURFACE.md`.
 
 ## 3. Build the cache
 

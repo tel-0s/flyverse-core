@@ -650,6 +650,18 @@ def main() -> None:
     # type_aliases.csv is the name the integration plan gives this table; type_aliases_typing.csv is a copy that a
     # concurrently running per-source builder cannot clobber (build_type_map_nern2025.py writes type_aliases_nern2025.csv).
     cols = ["malecns_type", "alias", "system", "tier", "flag", "evidence"]
+    # The backend review records explicit notation/aggregate decisions in the
+    # canonical CSV. Preserve that evidence when regenerating upstream aliases.
+    # Names and targets still live only in the CSV, never in normalization code.
+    canonical = OUT_DIR / "type_aliases.csv"
+    if canonical.exists():
+        old = pd.read_csv(canonical, comment="#").fillna("")
+        keep = old.flag.map(lambda s: "backend_primary" in s.split(";"))
+        keep |= old.evidence.str.contains("CONNECTOME_BACKENDS_SPEC section 3", regex=False)
+        manual = old.loc[keep, cols]
+        if len(manual):
+            aliases = pd.concat([aliases, manual], ignore_index=True).drop_duplicates(
+                ["malecns_type", "alias", "system"], keep="last")
     for name in ("type_aliases.csv", "type_aliases_typing.csv"):
         with open(OUT_DIR / name, "w", encoding="utf-8", newline="") as f:
             f.write(header)

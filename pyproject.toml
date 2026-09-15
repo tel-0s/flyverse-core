@@ -59,7 +59,7 @@ interp = []
 dev = ["pytest", "ruff", "pyyaml"]
 
 [tool.setuptools]
-packages = ["flyverse", "flyverse.interp"]
+packages = ["flyverse", "flyverse.interp", "flyverse.backends"]
 
 [tool.setuptools.package-data]
 flyverse = ["data/*.csv", "data/*.json", "kernels/*.cu"]

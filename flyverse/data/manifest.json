@@ -448,5 +448,74 @@
    ],
    "unpack": "none; scripts/build_kurmangaliyev2020_tables.py streams GSE156455_matrix_main.mtx.gz (1.0 GB) once and caches per-cell counts of the 54 genes in _percell_54genes.npz next to it (git-ignored). GSE156455_matrix_early.mtx.gz (152 MB, 0-24 h APF) is not needed."
   }
+ },
+ "fafb": {
+  "citation": "FlyWire Codex FAFB v783 public release (https://codex.flywire.ai/faq)",
+  "licence": "CC BY 4.0; cite the release and original reconstruction papers",
+  "release": "v783",
+  "files": [
+   {
+    "path": "neurons.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/fafb/783/neurons.csv.gz",
+    "sha256": "6a6b3759e635f0f35a677d169052362131ec61d95f55919298b55c43fce4e719",
+    "size_mb": 1.68
+   },
+   {
+    "path": "classification.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/fafb/783/classification.csv.gz",
+    "sha256": "e946b552f4056dfc977707be0674609832c3f64332a22d69dc0d9615e7aae663",
+    "size_mb": 0.93
+   },
+   {
+    "path": "consolidated_cell_types.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/fafb/783/consolidated_cell_types.csv.gz",
+    "sha256": "8aba246d71dc40361677493629972ce3883048c3d02010adc42bda22962a1a2d",
+    "size_mb": 0.9
+   },
+   {
+    "path": "column_assignment.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/fafb/783/column_assignment.csv.gz",
+    "sha256": "bdf4ce7f62cc63493d53eefad3816ff2dfd08b190e97b35a492e0e453df2f0f6",
+    "size_mb": 0.46
+   },
+   {
+    "path": "connections_princeton.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/fafb/783/connections_princeton.csv.gz",
+    "sha256": "445f996bf6c4b1803b9ba186189138a3061ff8623aa94c0abcf38af30a5bd48b",
+    "size_mb": 68.46
+   },
+   {
+    "path": "connections_princeton_no_threshold.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/fafb/783/connections_princeton_no_threshold.csv.gz",
+    "sha256": "62c2e562a7470bfd32cbb98e36af3daa607ba0822b37223b34f2aa45250a920e",
+    "size_mb": 275.68,
+    "optional": "no_threshold"
+   },
+   {
+    "path": "labels.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/fafb/783/labels.csv.gz",
+    "sha256": "bdd4eafab2bfe30540256c84ea1513e4b1877c0c4cf03f919204b4eafae5868e",
+    "size_mb": 4.77
+   }
+  ]
+ },
+ "banc": {
+  "citation": "FlyWire Codex BANC v888 public release (https://codex.flywire.ai/faq)",
+  "licence": "CC BY 4.0; cite the release and original reconstruction papers",
+  "release": "v888",
+  "files": [
+   {
+    "path": "neurons.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/banc/888/neurons.csv.gz",
+    "sha256": "40a2201554a8c34d2c4b07c8322543a07c1b3faf5acafbac363fd1a3d0fa617f",
+    "size_mb": 2.88
+   },
+   {
+    "path": "connections_princeton.csv.gz",
+    "url": "https://storage.googleapis.com/flywire-data/codex/data/banc/888/connections_princeton.csv.gz",
+    "sha256": "8772298eb69455759c7b4a23ee1d1843f5b389965e312524e652415f8a09b312",
+    "size_mb": 29.16
+   }
+  ]
  }
 }

@@ -9,7 +9,8 @@ import copy
 import numpy as np
 import torch
 
-from . import brain, connectome, optic, regions, retina, senses
+from . import brain, connectome, regions, retina, senses
+from . import optic as optic_module
 from .motor import MotorRates, motor_groups, wing_groups, read_motor
 from .nt_readout import NTSource, NTSnapshot
 
@@ -39,8 +40,13 @@ class FlyBrain:
 
     def __init__(self, c=None, *, modules=None, batch=1, device=None, seed=0,
                  lif_params=None, optic_params=None, eye_geometry=None, cuda_graphs=False, cuda_kernels=None,
-                 cuda_sparse="torch", cuda_compact=True, nt_source: NTSource | None = None):
-        self.c = regions.subset(c if c is not None else connectome.load(verbose=False), modules)
+                 cuda_sparse="torch", cuda_compact=True, nt_source: NTSource | None = None,
+                 dataset=None, optic="auto"):
+        if optic not in (None, "auto"):
+            raise ValueError("optic must be 'auto' or None")
+        if c is not None and dataset is not None and c.dataset != dataset:
+            raise ValueError("dataset disagrees with the supplied connectome")
+        self.c = regions.subset(c if c is not None else connectome.load(dataset=dataset, verbose=False), modules)
         if self.c.n == 0:
             raise ValueError("FlyBrain needs at least one neuron")
         lp = lif_params or brain.LIFParams()
@@ -59,10 +65,10 @@ class FlyBrain:
         self._graphs = {}
         self.brain.record_activity = True
         self.retina = self.optic = None
-        if len(self.c.select(type=connectome.PHOTORECEPTOR_TYPES)) and len(self.c.select(superclass="ol_intrinsic")):
+        if optic is not None and self.c.has_optic_columns and len(self.c.select(type=connectome.PHOTORECEPTOR_TYPES)) and len(self.c.select(superclass="ol_intrinsic")):
             self.retina = retina.build_retina(self.c, eye_geometry)
             if self.retina.n_columns:
-                self.optic = optic.OpticLobe(self.c, self.retina, optic_params, device=self.device, batch=self.B,
+                self.optic = optic_module.OpticLobe(self.c, self.retina, optic_params, device=self.device, batch=self.B,
                                            cuda_kernels=cuda_kernels, cuda_sparse=cuda_sparse,
                                            receptor=self.receptor, receptor_gain=brain._receptor_gain(lp), slow=self.slow,
                                            surrogate_grad=lp.surrogate_grad)
@@ -84,7 +90,7 @@ class FlyBrain:
         self.wind_sense = senses.Wind(self.c) if len(self.c.select(type="~^JO-[CE]")) else None
         taste = senses.Taste(self.c)
         self.taste_sense = taste if len(taste.sweet) else None
-        self.groups, self.wings = motor_groups(self.c), wing_groups(self.c)
+        self.groups, self.wings = motor_groups(self.c, allow_missing_vnc=True), wing_groups(self.c, allow_missing_vnc=True)
         self._radiance = None
         self._pending_ms = 0.0
         self._base_poisson = torch.zeros_like(self.brain.poisson_p)
@@ -500,6 +506,7 @@ class FlyBrain:
         return StepResult(simulated, (time.perf_counter() - start) * 1000, count)
 
     def motor(self) -> MotorRates:
+        self.c.require("vnc")
         return read_motor(self.brain, self.groups, self.wings)
 
     def activity_mask(self, min_hz=1.0):

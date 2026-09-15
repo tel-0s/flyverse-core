@@ -585,3 +585,61 @@ default. Where each item now stands:
     is adopted -- it is a survey of two sources, and any use of them goes through the same audit-and-verify procedure.
 
 Do not start a round 6 of receptor work.
+
+
+## 8. Independent female connectomes: NT sources 4 and 5 (2026-09-14)
+
+The backend integration adds **FAFB v783 per-cell probabilities** (source 4) and **BANC v888 verified
+transmitters** (source 5). The public [FlyWire Codex releases](https://codex.flywire.ai/faq) are pinned by
+URL and SHA-256 in `flyverse/data/manifest.json`. Reproduce the table below with
+`python scripts/cross_connectome.py --out out/connectome_backends/anatomy`; `report.json` contains
+per-release provenance, conflicts, and the complete type-level overlap with MaleCNS's sign-zero cells.
+These sources annotate presynaptic transmitter identity; they do not measure live concentrations or
+establish a postsynaptic receptor response.
+
+FAFB's `neurons.csv.gz` contains `nt_type`, `nt_type_score`, and six probability columns
+(`da_avg`, `ser_avg`, `gaba_avg`, `glut_avg`, `ach_avg`, `oct_avg`). The backend accepts its NT label at
+score >= 0.5, otherwise `unknown`; the score threshold is recorded in the cache manifest. Of 139,255
+cells, 28,991 are below threshold or have no score before the photoreceptor histamine rule is applied.
+The unmodified scores are retained in `cache/fafb/nt_scores.parquet`. Its six-class predictor does not
+provide a histamine probability. Photoreceptor identity supplies that label under the existing rule.
+
+BANC's `Verified NT type` is present on 65,369 source rows before the non-neuron exclusion. When
+present, it takes precedence over `Predicted NT type`. A verified co-transmitter string selects its
+first classical transmitter (ACh/GABA/Glu/His), otherwise its first monoamine; the complete string
+remains in `nt_verified`. A verified label containing only unsupported transmitters, such as nitric
+oxide or glycine, becomes `unknown` rather than falling back to an incompatible prediction. This
+includes 14 glycine-only and 7 nitric-oxide-only source rows. Tyramine is a new canonical identity
+with **fast sign 0**. The receptor table has no tyramine column: it contributes neither a fabricated
+fast sign nor a fabricated slow effect. Raw counts remain available at its explicit-zero CSR entries.
+
+| Type | MaleCNS v1.0 compiled label | FAFB v783 (score >= 0.5) | BANC v888 verified-first label |
+|---|---|---|---|
+| PFL3 | ACh 24/24 | ACh 24/24 | TYR 24/25, ACh 1/25; prediction only |
+| PFL2 | ACh 12/12 | ACh 12/12 | TYR 12/12, **verified** |
+| Delta7 | Glu 42/42 | Glu 33/42, unknown 9/42 | Glu 40/40; verified `glutamate,serotonin` retained |
+| LAL074 | Glu 2/2 | Glu 4/4 | Glu 2/4, serotonin 2/4; prediction only |
+| PS059 | GABA 4/4 | unknown 4/4; `nt_type` missing, score 0 | GABA 4/4 |
+
+These conflicts are observations, not reasons to change MaleCNS or add a female override. In particular,
+FAFB's PS059 -> DNa02 anatomical contacts remain in the graph (311 L->L and 351 R->R synapses), but have
+fast sign zero under the specified per-cell NT rule. Its GABA probabilities are only 0.37-0.44; the backend
+does not silently substitute the source edge table's transmitter labels or MaleCNS's GABA assignment.
+PFL3's predicted BANC tyramine is not verified by the PFL2 result. The Delta7 string documents possible
+co-transmission that the single-`nt` fast-sign contract does not simulate as two simultaneous channels.
+No MaleCNS unknown-type regex or type-level NT override is applied to either female graph.
+
+Alias normalization changes the population behind an overlap count. Among MaleCNS's 2,361 `unknown`
+cells, 795 have a normalized type represented in BANC. BANC cells belonging to those types include
+1,841 ACh, 263 GABA and 199 glutamate labels. **These are not 2,303 individually recovered MaleCNS
+labels**: the types can also contain cells that MaleCNS already labels, and cell counts differ across
+releases. The preliminary survey's approximate 400-cell prediction overlap used a different name join.
+The machine-readable report keeps both the MaleCNS denominator and the female label histogram.
+Likewise, the 415 MaleCNS serotonin cells have 346 cells whose types appear in BANC; BANC cells of those
+types include serotonin 160, dopamine 82, tyramine 42 and classical-transmitter labels. No one-to-one
+cross-animal match is inferred.
+
+The default compiler retains unclassified BANC rows: only the explicitly named glia/non-neuron/trachea
+classes are excluded. All NT totals and input budgets therefore use the resulting 157,789-cell graph.
+See `docs/audits/connectome_backends.md` for counts, alias decisions, and the distinction between missing
+type matches and independently established sex-specific circuits.

@@ -164,6 +164,7 @@ class Proprioception:
                  hair_plate_tonic_hz=5.0, hair_plate_max_hz=100.0,
                  campaniform_load_hz=50.0, campaniform_max_hz=100.0,
                  haltere_k=1.0, haltere_max_hz=250.0, coriolis_gain_per_rad_s=1.0):
+        c.require("vnc")
         self.c = c
         self.channels, flags = self.parse_flags(channels)
         self.haltere_coriolis, self.leg_cycle, self.haltere_sided = flags["haltere_coriolis"], flags["leg_cycle"], flags["haltere_sided"]

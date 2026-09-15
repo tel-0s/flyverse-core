@@ -69,6 +69,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--malecns", action="store_true", help="fetch the MaleCNS flat-connectome files flyverse reads")
+    ap.add_argument("--fafb", action="store_true", help="fetch FAFB v783 tables (no skeleton archive)")
+    ap.add_argument("--banc", action="store_true", help="fetch BANC v888 tables")
+    ap.add_argument("--edges", choices=["threshold", "no_threshold"], default="threshold")
     ap.add_argument("--external", default="", help="'all' or comma-separated source keys from the manifest")
     ap.add_argument("--data-dir", default=None, help="where the MaleCNS files go (default: flyverse.connectome.DATA_DIR)")
     ap.add_argument("--verify", action="store_true", help="hash every present file against the manifest")
@@ -78,16 +81,19 @@ def main() -> int:
     if args.data_dir:
         data_dir = args.data_dir
     else:
-        sys.path.insert(0, ROOT)
-        from flyverse import connectome
-        data_dir = str(connectome.DATA_DIR)
+        data_dir = os.environ.get("FLYVERSE_DATA", r"D:\Datasets\male-cns-connectome-v1.0\flat-connectome")
     groups: list[tuple[str, str, list[dict]]] = [("malecns", data_dir, m["malecns"]["files"])]
+    female_defaults = {"fafb": r"D:\Datasets\flywire\Female Adult Fly Brain v783", "banc": r"D:\Datasets\flywire\BANC v888"}
+    for dataset in ("fafb", "banc"):
+        base = os.environ.get(f"FLYVERSE_DATA_{dataset.upper()}", female_defaults[dataset])
+        groups.append((dataset, base, [f for f in m[dataset]["files"]
+                      if not f.get("optional") or f["optional"] == args.edges]))
     for key, src in m["external"].items():
         groups.append((key, os.path.join(EXTERNAL, key), src["files"]))
 
-    if args.list or not (args.malecns or args.external or args.verify):
+    if args.list or not (args.malecns or args.fafb or args.banc or args.external or args.verify):
         for key, base, files in groups:
-            info = m["external"].get(key) or m["malecns"]
+            info = m["external"].get(key) or m[key]
             print(f"[{key}] {info.get('citation', '')}  licence: {info.get('licence', '?')}  -> {base}")
             for f in files:
                 p = os.path.join(base, f["path"]); st = "present" if os.path.exists(p) else "missing"
@@ -99,6 +105,9 @@ def main() -> int:
     wanted = set()
     if args.malecns:
         wanted.add("malecns")
+    for dataset in ("fafb", "banc"):
+        if getattr(args, dataset):
+            wanted.add(dataset)
     if args.external:
         wanted |= set(m["external"]) if args.external == "all" else set(args.external.split(","))
     bad = 0
