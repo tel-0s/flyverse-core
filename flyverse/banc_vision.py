@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import scipy.sparse as sp
 
 DATA = Path(__file__).with_name("data")
 QUALIFICATION = "synthetic input layer on a candidate lattice"
@@ -42,32 +43,23 @@ def read_candidate():
     return pd.read_csv(path), meta
 
 
-def extend_candidate(c, *, cache_dir=None):
-    """Append the predeclared synthetic cartridge model, leaving every native edge intact.
-
-    The returned graph owns a scratch cache. Removing its synthetic nodes restores
-    the original graph, including its lack of optical coordinates/capability.
-    """
-    from .connectome import save
-    from .interp.common import connectome_fingerprint
+def _validate_base(c, meta):
+    from .interp.common import _md5_csr
 
     if c.dataset != "banc" or c.reference is not c or c._extension is not None:
         raise ValueError("candidate vision requires a full, unextended BANC graph")
-    if cache_dir is not None and c.cache_dir is not None:
-        path, base = Path(cache_dir).resolve(), Path(c.cache_dir).resolve()
-        if path == base or base in path.parents or path in base.parents:
-            raise ValueError(
-                "candidate scratch must be separate from the biological cache"
-            )
-    columns, meta = read_candidate()
     if (
         c.release != meta["release"]
-        or connectome_fingerprint(c)["md5"] != meta["base_csr_md5"]
+        or _md5_csr(c.W) != meta["base_csr_md5"]
         or annotation_sha256(c) != meta["base_annotations_sha256"]
+        or c.neurons[["hex1", "hex2"]].notna().any().any()
     ):
         raise ValueError(
             "BANC candidate was reconstructed for a different biological graph/annotation table"
         )
+
+
+def _candidate_tables(c, columns, meta):
     if columns.bodyId.duplicated().any() or not columns.side.eq("R").all():
         raise ValueError(
             "candidate asset must have unique biological IDs and only right-eye columns"
@@ -82,7 +74,6 @@ def extend_candidate(c, *, cache_dir=None):
     n.loc[idx, ["hex1", "hex2"]] = columns[["hex1", "hex2"]].to_numpy()
     n.loc[idx, "hex_side"] = "R"
     n.loc[idx, "hex_source"] = "connectivity_candidate"
-    annotated = replace(c, neurons=n, _norm_cache={})
     seeds = columns[columns.type.eq("Mi1")].sort_values(["hex1", "hex2"])
     if seeds.duplicated(["hex1", "hex2"]).any():
         raise ValueError("candidate cartridge coordinates must be unique")
@@ -107,20 +98,127 @@ def extend_candidate(c, *, cache_dir=None):
         columns={"bodyId_pre": "body_pre", "bodyId_post": "body_post"}
     )[["body_pre", "body_post"]]
     edges["weight"] = pairs.type.map(meta["input_layer"]["weight_by_target"])
+    return n, nodes, edges
+
+
+def validate_candidate_cache(c):
+    """Check persisted candidates against the packaged model, not just their label.
+
+    This is read-only; it also accepts the original acceptance caches whose
+    metadata predates the subsequently attached functional evidence.
+    """
+    from .interp.common import _md5_csr
+
+    if not c.has_optic_columns or c.dataset != "banc" or c.reference is not c:
+        raise ValueError("persisted graph is not a full BANC candidate")
+    columns, meta = read_candidate()
+    for key in (
+        "candidate_id",
+        "release",
+        "columns_sha256",
+        "base_csr_md5",
+        "base_annotations_sha256",
+        "input_layer",
+        "checks",
+        "accuracy_estimate",
+    ):
+        if c.vision.get(key) != meta[key]:
+            raise ValueError(f"persisted candidate metadata mismatch: {key}")
+    base = c._extension_base
+    if base is None:
+        raise ValueError("persisted candidate lacks its biological base")
+    _validate_base(base, meta)
+    n, nodes, edges = _candidate_tables(base, columns, meta)
+    expected = pd.concat([n, nodes], ignore_index=True)
+    # extend() fills these fields on synthetic nodes; native values remain intact.
+    expected.loc[len(n) :, "sign"] = -1.0
+    fields = [
+        "bodyId",
+        "type",
+        "nt",
+        "sign",
+        "superclass",
+        "somaSide",
+        "hex1",
+        "hex2",
+        "hex_side",
+        "hex_source",
+    ]
+    if (
+        c.n != len(expected)
+        or not expected[fields]
+        .astype(object)
+        .fillna("")
+        .equals(c.neurons[fields].astype(object).fillna(""))
+        or not c.neurons.dataset.iloc[len(n) :].eq("synthetic").all()
+    ):
+        raise ValueError(
+            "persisted candidate neurons/columns differ from the pinned model"
+        )
+    mapping = pd.Series(np.arange(len(expected)), index=expected.bodyId)
+    addition = sp.csr_matrix(
+        (
+            -edges.weight.to_numpy(np.float32),
+            (
+                mapping.loc[edges.body_post].to_numpy(),
+                mapping.loc[edges.body_pre].to_numpy() - base.n,
+            ),
+        ),
+        shape=(base.n, len(nodes)),
+        dtype=base.W.dtype,
+    )
+    expected_w = sp.vstack(
+        [
+            sp.hstack([base.W, addition], format="csr"),
+            sp.csr_matrix((len(nodes), len(expected)), dtype=base.W.dtype),
+        ],
+        format="csr",
+    )
+    if c.W.shape != expected_w.shape or _md5_csr(c.W) != _md5_csr(expected_w):
+        raise ValueError("persisted candidate synapses differ from the pinned model")
+
+
+def extend_candidate(c, *, cache_dir=None):
+    """Append the predeclared model in a scratch cache, leaving native edges intact.
+
+    Removing its synthetic nodes restores the original graph, including its lack
+    of optical coordinates/capability.
+    """
+    from .connectome import save
+
+    columns, meta = read_candidate()
+    _validate_base(c, meta)
+    if cache_dir is not None and c.cache_dir is not None:
+        path, base = Path(cache_dir).resolve(), Path(c.cache_dir).resolve()
+        if path == base or base in path.parents or path in base.parents:
+            raise ValueError(
+                "candidate scratch must be separate from the biological cache"
+            )
+    n, nodes, edges = _candidate_tables(c, columns, meta)
+    annotated = replace(c, neurons=n, _norm_cache={})
     out = annotated.extend(nodes, edges, cache_dir=cache_dir)
     # extend() saved an annotated copy as its base. Restore the actual biological
     # base so prune() and a save/load round trip undo the candidate coordinates too.
     out._extension_base = c
     out._extension["vision"] = copy.deepcopy(meta)
     out._extension["vision"]["realised"] = {
-        "cartridges": len(cartridges),
+        "cartridges": len(nodes) // 6,
         "synthetic_nodes": len(nodes),
         "synthetic_edges": len(edges),
-        "target_cells": targets.type.value_counts().to_dict(),
+        "target_cells": n.loc[n.type.isin(["L1", "L2", "L3"]) & n.hex1.notna(), "type"]
+        .value_counts()
+        .to_dict(),
         "empty_cartridges": len(
-            cartridges.merge(
-                targets[["hex1", "hex2"]].drop_duplicates(), how="left", indicator=True
-            ).query('_merge == "left_only"')
+            nodes[["hex1", "hex2"]]
+            .drop_duplicates()
+            .merge(
+                n.loc[
+                    n.type.isin(["L1", "L2", "L3"]) & n.hex1.notna(), ["hex1", "hex2"]
+                ].drop_duplicates(),
+                how="left",
+                indicator=True,
+            )
+            .query('_merge == "left_only"')
         ),
     }
     save(out, out.cache_dir)

@@ -36,7 +36,7 @@ is met by every backend. Then:
 | `status` | str | `status` (`Traced` filter) | compile filter only | `Traced` for every row of the release | same |
 | `entryNerve`, `exitNerve` | str / NaN | annotations | `senses` (`LEG_NERVES`) | `nerve` (brain nerves only) | `Nerve` mapped (section 2.4) |
 | `flywireType`, `hemibrainType`, `mancType` | str / NaN | annotations | provenance, aliasing | `primary_type` verbatim; others NaN | `Primary Cell Type` verbatim; `Alternative Cell Type(s)` |
-| `assignedOlHex1`, `assignedOlHex2` -> `hex1`, `hex2`, `hex_side`, `hex_source` | float / str | optic-lobe column annotation + `_assign_photoreceptor_columns` | `Retina`, `OpticLobe`, `interp.trace.column_of_cells`, the atlas | `column_assignment` (section 2.5) | **none** -- BANC has no column map; `hex*` all NaN, `Retina` / `OpticLobe` unavailable |
+| `assignedOlHex1`, `assignedOlHex2` -> `hex1`, `hex2`, `hex_side`, `hex_source` | float / str | optic-lobe column annotation + `_assign_photoreceptor_columns` | `Retina`, `OpticLobe`, `interp.trace.column_of_cells`, the atlas | `column_assignment` (section 2.5) | **none by default** -- the biological release has no column map; `hex*` all NaN, `Retina` / `OpticLobe` unavailable. Explicit `vision="candidate"` adds experimental right-eye coordinates and synthetic R1-R6; see section 1.4. |
 | `nt` | str in `TRANSMITTERS` + `unknown` (+ `tyramine`, new) | consensus > type prediction > body prediction | `NT_SIGN`, receptor model, slow term, fingerprint | section 2.2 | section 2.2 |
 | `sign` | float32 | `NT_SIGN[nt]` | `W` | same rule | same rule |
 | `in_syn`, `in_syn_l2` | float | computed | fan-in normalisation | computed | computed |
@@ -72,6 +72,22 @@ c = connectome.load(dataset="fafb", edges="no_threshold")  # option recorded in 
 c.dataset, c.release                                        # "banc", "v888"
 connectome.load()                                           # unchanged: MaleCNS, cache/, bit-identical
 ```
+
+Subsequent owner-authorised experiment: `connectome.load(dataset="banc", vision="candidate",
+vision_cache_dir=<unused scratch directory>)` appends synthetic R1-R6 through `Connectome.extend`
+and enables a pinned right-eye candidate map. `vision=None` retains the source release; the optional
+`vision_cache_dir` requires the candidate opt-in and otherwise defaults to a caller-owned temporary
+directory. `cache_dir` continues to name the biological input cache. `has_vnc` describes the source
+release; `has_optic_columns` may also be enabled by this explicit candidate extension, and both retain
+their meaning on subsets. Pruning all synthetic nodes restores the original graph and its unavailable
+optic capability. No biological synapse changes, and the left eye remains unavailable.
+
+This is a **synthetic input layer on a candidate lattice**, not a validated BANC annotation. Its estimated
+80-85% exact-column accuracy and failed anatomical gates travel in Result provenance. Functional motion
+and loom acceptance is qualified by an inherited orientation convention, excess synthetic input budgets
+and a more complete/wider eye than the MaleCNS comparator. See
+[CONTROL_SURFACE.md](CONTROL_SURFACE.md#connectome-datasets) and the
+[experiment audit](audits/banc_candidate_experiment.md) for controls, caveats and the pinned packaged assets.
 
 `compile_connectome` becomes a thin dispatcher over `backends/malecns.py` (the current code, moved verbatim),
 `backends/fafb.py`, `backends/banc.py`, each returning `(neurons, W_raw_pairs)` in the contract; the shared tail

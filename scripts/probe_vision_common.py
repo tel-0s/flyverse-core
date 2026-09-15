@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from flyverse import connectome, retina
+from flyverse.banc_vision import validate_candidate_cache
 from flyverse.interp.common import Result, provenance
 
 
@@ -49,8 +50,7 @@ def load(args):
         and (args.vision_cache / "extension.json").exists()
     ):
         c = connectome.load(args.vision_cache, dataset=args.dataset, verbose=False)
-        if c.vision is None or c.vision["mode"] != args.vision:
-            raise ValueError("persisted graph is not the requested candidate")
+        validate_candidate_cache(c)
     else:
         c = connectome.load(
             dataset=args.dataset,
