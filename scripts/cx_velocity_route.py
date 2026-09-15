@@ -26,10 +26,12 @@ parameter here, the analogue of the 90 deg/s imposed visual rotation of deficit_
 | HG | instrumented | ring_dc_hold | glutamate (glno_sign) | -- | 6A's H3G |
 | HGV | instrumented | ring_dc_hold | glutamate | sided_turn_afferent k 0.5 | THE ARM |
 | HGV- | instrumented | ring_dc_hold | glutamate | sided_turn_afferent k 0.5 sign -1 | the sign control |
+| HGVp | instrumented | ring_dc_hold_pen (`^(ExR6|ER6|ER4m)$:^PEN_`: EPG keeps its ring input) | glutamate | sided_turn_afferent k 0.5 | HGV with the PEN-side hold only (6B, compass_local_recurrence.md 0: holding EPG too lets 11-12 of 35 off-block cells fire) |
 | HGVk025 / HGVk1 | as HGV at k 0.25 / 1.0 | descriptive (the k sweep on HGV only) |
 
-Predeclared family (Holm, m = 5): (1) bump_follow_wedges_per_s HGV vs HG; (2) bump_follow_wedges_per_s HGV vs HGV-;
-(3) GLNO_LR_hz V vs S; (4) PEN_LR_hz HGV vs HG; (5) DNa02_LR_hz HGV vs HG. `bump_follow_wedges_per_s` is the slope of
+Predeclared family (Holm, m = 6; 6 v 6 exact-U floor 0.0022 x 6 = 0.013, satisfiable): (1) bump_follow_wedges_per_s
+HGV vs HG; (2) bump_follow_wedges_per_s HGV vs HGV-; (3) GLNO_LR_hz V vs S; (4) PEN_LR_hz HGV vs HG; (5) DNa02_LR_hz
+HGV vs HG; (6) frac_confined_post HGVp vs HGV. `bump_follow_wedges_per_s` is the slope of
 the unwrapped bump centre over the turn window times the sign of the turn (ideal 4.0 w/s at 90 deg/s); it is read
 beside `bump_follow_confined_frac`, because on a dead bump the centre is noise -- the analysis reports both and never
 calls a follow on a bump that was confined in fewer than half the turn-window frames (the gate is named in the row).
@@ -49,22 +51,27 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from flyverse.interp import common  # noqa: E402
 
-HOLD = "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)"
+HOLD = "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)"          # 6A's hold, on PEN and EPG: `ring_dc_hold`
+HOLD_PEN = "^(ExR6|ER6|ER4m)$:^PEN_"              # the PEN-side hold only (EPG keeps its ExR6 / ER6 / ER4m input): `ring_dc_hold_pen`
 TURN = ("90", "0.5:3.5")
-# label, glutamate, hold, instrument spec, role
-ARMS = [("S", False, False, None, "raw reference"),
-        ("V", False, False, "sided_turn_afferent:k=0.5", "the afferent alone"),
-        ("HG", True, True, None, "ring_dc_hold + glno_sign (6A's H3G)"),
-        ("HGV", True, True, "sided_turn_afferent:k=0.5", "the arm"),
-        ("HGV-", True, True, "sided_turn_afferent:k=0.5:sign=-1", "the sign control"),
-        ("HGVk025", True, True, "sided_turn_afferent:k=0.25", "descriptive: k 0.25 on HGV"),
-        ("HGVk1", True, True, "sided_turn_afferent:k=1.0", "descriptive: k 1.0 on HGV")]
-PRIMARY = ["S", "V", "HG", "HGV", "HGV-"]
+# label, glutamate, hold spec (None = none), instrument spec, role
+ARMS = [("S", False, None, None, "raw reference"),
+        ("V", False, None, "sided_turn_afferent:k=0.5", "the afferent alone"),
+        ("HG", True, HOLD, None, "ring_dc_hold + glno_sign (6A's H3G)"),
+        ("HGV", True, HOLD, "sided_turn_afferent:k=0.5", "the arm"),
+        ("HGV-", True, HOLD, "sided_turn_afferent:k=0.5:sign=-1", "the sign control"),
+        ("HGVp", True, HOLD_PEN, "sided_turn_afferent:k=0.5",
+         "HGV with the hold on the PEN side only (6B section 0: with EPG held too the off-tile cells lose their inhibition)"),
+        ("HGVk025", True, HOLD, "sided_turn_afferent:k=0.25", "descriptive: k 0.25 on HGV"),
+        ("HGVk1", True, HOLD, "sided_turn_afferent:k=1.0", "descriptive: k 1.0 on HGV")]
+PRIMARY = ["S", "V", "HG", "HGV", "HGV-", "HGVp"]
 FAMILY = [("1_bump_follow_HGV_vs_HG", "bump_follow_wedges_per_s", "HGV", "HG"),
           ("2_bump_follow_HGV_vs_HGV-", "bump_follow_wedges_per_s", "HGV", "HGV-"),
           ("3_GLNO_LR_V_vs_S", "GLNO_LR_hz", "V", "S"),
           ("4_PEN_LR_HGV_vs_HG", "PEN_LR_hz", "HGV", "HG"),
-          ("5_DNa02_LR_HGV_vs_HG", "DNa02_LR_hz", "HGV", "HG")]
+          ("5_DNa02_LR_HGV_vs_HG", "DNa02_LR_hz", "HGV", "HG"),
+          ("6_frac_confined_post_HGVp_vs_HGV", "frac_confined_post", "HGVp", "HGV")]
+HOLD_NAMES = {HOLD: "ring_dc_hold", HOLD_PEN: "ring_dc_hold_pen"}
 KEYS = ["survival_s", "bump_hz_post", "width_half_post", "frac_confined_post", "bump_follow_wedges_per_s",
         "bump_follow_confined_frac", "bump_follow_ideal_wedges_per_s", "GLNO_LR_hz", "PEN_LR_hz", "DNa02_LR_hz",
         "PS196b_LR_hz", "AFF_LR_hz", "GLNO_LR_hz_rest", "PEN_LR_hz_rest", "PEN_mean_post", "GLNO_mean_post",
@@ -85,7 +92,7 @@ def arm_command(label, glu, hold, spec, seed, rel):
     if glu:
         parts.append("--nt-override GLNO=glutamate")
     if hold:
-        parts.append(f"--hold-edges {sh_token(HOLD)}")
+        parts.append(f"--hold-edges {sh_token(hold)}")
     if glu or hold or spec:
         parts.append("--preset instrumented")
     if spec:
@@ -129,11 +136,10 @@ def plan_batch(out_dir: Path, seeds, minutes=30, name="cx8"):
         lines.append(f"python scripts/cluster_run.py --name {name} --minutes {minutes} --arm-block fam "
                      + " ".join('"' + j["line"] + '"' for j in call) + f" --fetch {rel}/ 2>&1 | tee {rel}/client_stdout_{i}.txt")
     (out_dir / "batch.sh").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-    arms = {a[0]: dict(glutamate=a[1], hold=a[2], instrument=a[3], role=a[4], preset=("instrumented" if (a[1] or a[2] or a[3]) else "raw"),
-                       instruments=([a[3].split(":")[0]] if a[3] else []) + (["ring_dc_hold"] if a[2] else []) + (["glno_sign"] if a[1] else []))
+    arms = {a[0]: dict(glutamate=a[1], hold=a[2], instrument=a[3], role=a[4], **{k: v for k, v in expected(a[0]).items() if k in ("preset", "instruments")})
             for a in ARMS}
     (out_dir / "arms.json").write_text(json.dumps({"batch": name, "seeds": list(seeds), "turn_deg_s": float(TURN[0]), "turn_window_s": TURN[1],
-                                                   "hold": HOLD, "arms": arms, "family": FAMILY, "primary_arms": PRIMARY,
+                                                   "holds": HOLD_NAMES, "arms": arms, "family": FAMILY, "primary_arms": PRIMARY,
                                                    "follow_gate_confined_frac": FOLLOW_GATE, "generated_utc": stamp,
                                                    "status": "DRAFT, not submitted"}, indent=1), encoding="utf-8")
     print(f"{len(jobs)} jobs in {len(calls)} call(s) -> {out_dir / 'batch.sh'} (DRAFT, not submitted); {out_dir / 'arms.json'}")
@@ -144,7 +150,7 @@ def plan_batch(out_dir: Path, seeds, minutes=30, name="cx8"):
 def expected(label):
     for a in ARMS:
         if a[0] == label:
-            names = ([a[3].split(":")[0]] if a[3] else []) + (["ring_dc_hold"] if a[2] else []) + (["glno_sign"] if a[1] else [])
+            names = ([a[3].split(":")[0]] if a[3] else []) + ([HOLD_NAMES[a[2]]] if a[2] else []) + (["glno_sign"] if a[1] else [])
             return dict(preset="instrumented" if (a[1] or a[2] or a[3]) else "raw", instruments=names, glutamate=a[1], hold=a[2], spec=a[3])
     return None
 
@@ -193,8 +199,9 @@ def load_runs(runs_dir: Path, alias: dict) -> tuple[list, list]:
                     bad.append(f"instruments {r.get('instruments')} != {exp['instruments']}")
                 if exp["glutamate"] != (r.get("nt_override", {}).get("GLNO") == "glutamate"):
                     bad.append("GLNO relabel mismatch")
-                if exp["hold"] != (row["hold_entries"] > 0):
-                    bad.append("hold mismatch")
+                held = [f"{h[0]}:{h[1]}" for h in r.get("hold_edges", []) if len(h) >= 2]
+                if ([exp["hold"]] if exp["hold"] else []) != held or bool(exp["hold"]) != (row["hold_entries"] > 0):
+                    bad.append(f"hold {held} != {[exp['hold']] if exp['hold'] else []}")
                 if r.get("turn_deg_s") != float(TURN[0]):
                     bad.append(f"turn {r.get('turn_deg_s')} != {TURN[0]}")
                 if exp["spec"] and not m.get("turn_fed"):

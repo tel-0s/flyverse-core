@@ -28,7 +28,7 @@ def test_plan_batch_shape_and_job_lines():
         sh = (out / "batch.sh").read_text(encoding="utf-8")
         assert sh.startswith("#!/bin/bash\nset -o pipefail\n")
         assert "DRAFT" in sh and "NOT SUBMITTED" in sh
-        assert len(jobs) == 42 and len(calls) == 2 and all(len(c) <= cvr.MAX_JOBS_PER_CALL for c in calls)
+        assert len(jobs) == 48 and len(calls) == 2 and all(len(c) <= cvr.MAX_JOBS_PER_CALL for c in calls)
         assert sh.count("python scripts/cluster_run.py --name cx8 --minutes 30 --arm-block fam ") == 2
         assert sh.count("--fetch out/cx8/") == 2
         # a block never straddles two calls
@@ -47,22 +47,32 @@ def test_plan_batch_shape_and_job_lines():
         assert "--instrument sided_turn_afferent:k=0.25" in lines[("HGVk025", 5)]
         assert "--preset instrumented --sim-out" in lines[("HG", 1)] and "--instrument" not in lines[("HG", 1)]
         assert "--nt-override" not in lines[("V", 2)] and "--hold-edges" not in lines[("V", 2)] and "--preset instrumented" in lines[("V", 2)]
+        hgvp = lines[("HGVp", 4)]                                                   # the PEN-side hold only
+        assert "--hold-edges '^(ExR6|ER6|ER4m)$:^PEN_' " in hgvp and "EPG" not in hgvp.split("--hold-edges")[1].split("--preset")[0]
+        assert "--nt-override GLNO=glutamate" in hgvp and "--instrument sided_turn_afferent:k=0.5 " in hgvp
         arms = json.loads((out / "arms.json").read_text(encoding="utf-8"))
         assert arms["arms"]["HGV"]["instruments"] == ["sided_turn_afferent", "ring_dc_hold", "glno_sign"]
+        assert arms["arms"]["HGVp"]["instruments"] == ["sided_turn_afferent", "ring_dc_hold_pen", "glno_sign"]
+        assert arms["arms"]["HGVp"]["hold"] == cvr.HOLD_PEN and arms["arms"]["HGV"]["hold"] == cvr.HOLD
+        assert len(arms["family"]) == 6 and arms["family"][5][1:] == ["frac_confined_post", "HGVp", "HGV"]
         assert arms["arms"]["S"]["preset"] == "raw" and arms["status"].startswith("DRAFT")
         # no infrastructure identifiers (no user@host, no mounted run directory): the job lines name only repo paths
         assert "@" not in sh and "/mnt/" not in sh and "ssh " not in sh
 
 
-def _run(arm, seed, follow, glno_lr, pen_lr, dna_lr, confined=1.0, preset=None, instruments=None, glu=None, hold=None, turn_fed=None):
+def _run(arm, seed, follow, glno_lr, pen_lr, dna_lr, confined=1.0, preset=None, instruments=None, glu=None, hold=None, turn_fed=None,
+         frac_confined_post=1.0):
     exp = cvr.expected(arm)
     inst = exp["instruments"] if instruments is None else instruments
+    hold = exp["hold"] if hold is None else hold
+    pre, post = hold.split(":", 1) if hold else (None, None)
     return {"arm": arm, "seed": seed, "device": "cuda", "preset": exp["preset"] if preset is None else preset, "instruments": inst,
             "nt_override": ({"GLNO": "glutamate"} if (exp["glutamate"] if glu is None else glu) else {}),
-            "hold_edges_resolved": ([{"n_entries": 1149}] if (exp["hold"] if hold is None else hold) else []),
+            "hold_edges": ([[pre, post, 0.0]] if hold else []),
+            "hold_edges_resolved": ([{"n_entries": 1149 if post != "^PEN_" else 461}] if hold else []),
             "turn_deg_s": 90.0, "wall_s": 20.0,
             "provenance": {"preset": exp["preset"], "compiled_connectome": {"md5": "abc"}},
-            "metrics": {"survival_s": 5.0, "bump_hz_post": 100.0, "width_half_post": 3.0, "frac_confined_post": 1.0,
+            "metrics": {"survival_s": 5.0, "bump_hz_post": 100.0, "width_half_post": 3.0, "frac_confined_post": frac_confined_post,
                         "bump_follow_wedges_per_s": follow, "bump_follow_confined_frac": confined, "bump_follow_ideal_wedges_per_s": 4.0,
                         "GLNO_LR_hz": glno_lr, "PEN_LR_hz": pen_lr, "DNa02_LR_hz": dna_lr, "PS196b_LR_hz": 1.0, "AFF_LR_hz": 22.0,
                         "turn_fed": (bool(exp["spec"]) if turn_fed is None else turn_fed)}}
@@ -79,25 +89,29 @@ def test_analyse_computes_the_family_with_holm_and_the_follow_gate():
                     "HG": _run("HG", seed, 0.0 + n(0, 0.02), 0.0 + n(0, 0.05), 0.0 + n(0, 0.05), 0.0),
                     "HGV": _run("HGV", seed, 3.5 + n(0, 0.2), 3.0 + n(0, 0.2), 2.0 + n(0, 0.1), 0.0),
                     "HGV-": _run("HGV-", seed, -3.5 + n(0, 0.2), -3.0 + n(0, 0.2), -2.0 + n(0, 0.1), 0.0),
+                    "HGVp": _run("HGVp", seed, 3.5 + n(0, 0.2), 3.0, 2.0, 0.0, frac_confined_post=0.95 + n(0, 0.01)),
                     "HGVk025": _run("HGVk025", seed, 1.5, 1.5, 1.0, 0.0), "HGVk1": _run("HGVk1", seed, 4.0, 6.0, 4.0, 0.0)}
+            rows["HGV"]["metrics"]["frac_confined_post"] = 0.6 + n(0, 0.02)                # HGVp confines better: test 6
             for arm, row in rows.items():
                 (runs / f"{arm}_s{seed}.json").write_text(json.dumps([row]), encoding="utf-8")
         # one HGV run with a dead bump: gated out of the follow comparisons, kept everywhere else
-        dead = _run("HGV", 5, 15.0, 3.0, 2.0, 0.0, confined=0.0)
+        dead = _run("HGV", 5, 15.0, 3.0, 2.0, 0.0, confined=0.0, frac_confined_post=0.6)
         (runs / "HGV_s5.json").write_text(json.dumps([dead]), encoding="utf-8")
         out = runs / "analysis"
         summary = cvr.analyse(runs, out, None, {})
-        assert summary["n_runs"] == 42 and summary["problems"] == []
+        assert summary["n_runs"] == 48 and summary["problems"] == []
         comp = {r["test"]: r for r in summary["family"]}
+        assert len(comp) == 6
+        assert comp["6_frac_confined_post_HGVp_vs_HGV"]["verdict_holm"] == "result" and comp["6_frac_confined_post_HGVp_vs_HGV"]["n_stim"] == 6
         assert comp["1_bump_follow_HGV_vs_HG"]["n_stim"] == 5 and comp["1_bump_follow_HGV_vs_HG"]["n_null"] == 6      # the gate
         assert comp["1_bump_follow_HGV_vs_HG"]["verdict"] == "result" and comp["1_bump_follow_HGV_vs_HG"]["verdict_holm"] == "result"
         assert comp["2_bump_follow_HGV_vs_HGV-"]["verdict_holm"] == "result"
         assert comp["3_GLNO_LR_V_vs_S"]["verdict_holm"] == "result"
         assert comp["4_PEN_LR_HGV_vs_HG"]["verdict_holm"] == "result"
         assert comp["5_DNa02_LR_HGV_vs_HG"]["verdict"] in ("null", "undetermined")           # all zeros: no result
-        assert all(r["m"] == 5 for r in comp.values())
+        assert all(r["m"] == 6 for r in comp.values())
         ps = {k: r["p"] for k, r in comp.items()}
-        adj = cvr.holm(ps, m=5)
+        adj = cvr.holm(ps, m=6)
         assert all(abs(adj[k] - comp[k]["p_holm"]) < 1e-12 for k in comp)
         assert min(adj.values()) >= min(v for v in ps.values() if np.isfinite(v))
         for f in ("runs.csv", "per_seed.csv", "compare.csv", "descriptive.csv", "analysis.md", "analysis.json"):

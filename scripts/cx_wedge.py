@@ -168,6 +168,7 @@ def parse_edge_gains(items) -> list:
 
 # ---------------------------------------------------------------------------------------------- round 7: presets / instruments
 RING_DC_HOLD = (r"^(ExR6|ER6|ER4m)$", r"^(PEN_|EPG$)")      # the 6A hold, named `ring_dc_hold` when recorded as an instrument
+RING_DC_HOLD_PEN = (r"^(ExR6|ER6|ER4m)$", r"^PEN_")         # the PEN-side hold only (round 7 arm HGVp): `ring_dc_hold_pen`
 PRESETS = ("raw", "instrumented")
 
 
@@ -212,7 +213,8 @@ def build_instruments(c, instrument_specs, preset, hold_edges=None, nt_override=
     holds = list(hold_edges or [])
     resolved = hold_edge_counts(c, holds) if holds else []
     for i, ((pre, post, f), rec) in enumerate(zip(holds, resolved)):
-        name = "ring_dc_hold" if (pre, post) == RING_DC_HOLD and f == 0.0 else f"edge_hold_{i}"
+        name = ("ring_dc_hold" if (pre, post) == RING_DC_HOLD and f == 0.0 else
+                "ring_dc_hold_pen" if (pre, post) == RING_DC_HOLD_PEN and f == 0.0 else f"edge_hold_{i}")
         out.append(fi.EdgeHold(pre, post, f, name=name, resolved=rec))
     for t, nt in (nt_override or {}).items():
         out.append(fi.TypeRelabel(t, nt))

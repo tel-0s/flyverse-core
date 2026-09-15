@@ -10,11 +10,14 @@
  ],
  "turn_deg_s": 90.0,
  "turn_window_s": "0.5:3.5",
- "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+ "holds": {
+  "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)": "ring_dc_hold",
+  "^(ExR6|ER6|ER4m)$:^PEN_": "ring_dc_hold_pen"
+ },
  "arms": {
   "S": {
    "glutamate": false,
-   "hold": false,
+   "hold": null,
    "instrument": null,
    "role": "raw reference",
    "preset": "raw",
@@ -22,7 +25,7 @@
   },
   "V": {
    "glutamate": false,
-   "hold": false,
+   "hold": null,
    "instrument": "sided_turn_afferent:k=0.5",
    "role": "the afferent alone",
    "preset": "instrumented",
@@ -32,7 +35,7 @@
   },
   "HG": {
    "glutamate": true,
-   "hold": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
    "instrument": null,
    "role": "ring_dc_hold + glno_sign (6A's H3G)",
    "preset": "instrumented",
@@ -43,7 +46,7 @@
   },
   "HGV": {
    "glutamate": true,
-   "hold": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
    "instrument": "sided_turn_afferent:k=0.5",
    "role": "the arm",
    "preset": "instrumented",
@@ -55,7 +58,7 @@
   },
   "HGV-": {
    "glutamate": true,
-   "hold": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
    "instrument": "sided_turn_afferent:k=0.5:sign=-1",
    "role": "the sign control",
    "preset": "instrumented",
@@ -65,9 +68,21 @@
     "glno_sign"
    ]
   },
+  "HGVp": {
+   "glutamate": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^PEN_",
+   "instrument": "sided_turn_afferent:k=0.5",
+   "role": "HGV with the hold on the PEN side only (6B section 0: with EPG held too the off-tile cells lose their inhibition)",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold_pen",
+    "glno_sign"
+   ]
+  },
   "HGVk025": {
    "glutamate": true,
-   "hold": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
    "instrument": "sided_turn_afferent:k=0.25",
    "role": "descriptive: k 0.25 on HGV",
    "preset": "instrumented",
@@ -79,7 +94,7 @@
   },
   "HGVk1": {
    "glutamate": true,
-   "hold": true,
+   "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
    "instrument": "sided_turn_afferent:k=1.0",
    "role": "descriptive: k 1.0 on HGV",
    "preset": "instrumented",
@@ -120,6 +135,12 @@
    "DNa02_LR_hz",
    "HGV",
    "HG"
+  ],
+  [
+   "6_frac_confined_post_HGVp_vs_HGV",
+   "frac_confined_post",
+   "HGVp",
+   "HGV"
   ]
  ],
  "primary_arms": [
@@ -127,9 +148,10 @@
   "V",
   "HG",
   "HGV",
-  "HGV-"
+  "HGV-",
+  "HGVp"
  ],
  "follow_gate_confined_frac": 0.5,
- "generated_utc": "2026-09-15T19:35:36Z",
+ "generated_utc": "2026-09-15T19:46:24Z",
  "status": "DRAFT, not submitted"
 }
