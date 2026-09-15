@@ -525,6 +525,19 @@ round-3 additions):
    that is worth the runs, and whether more LC10a runs under a new declaration are worth them, are the two open
    protocol decisions on our side.
 
+### 3d.1 Window caveat on the LC rows (added 2026-09-15)
+
+`docs/audits/column_ground_truth.md` (independent skeptic: mostly sound) checked the column inference behind the
+anatomical LC windows against FAFB v783's column map: columnar types are recovered to one ommatidium, but LC11 / LC4
+are given a single column inherited from a wide-field Li / TmY19b partner (~2 % of input) that lies a median 67 deg
+(MaleCNS) from the cell's input-weighted centroid -- the permutation distance. The round-2 sphere-ladder and round-3
+rectangle LC11 families were re-windowed on the input-weighted centroid (and on a box of 2 x r50): the null is
+unchanged (smallest exact-U p 0.394 / 0.240 against 0.180 as shipped; Holm needs 0.00417), and the sphere sweeps
+elevation 0 while the LC11 centroids sit at |el| ~ 24 deg, so the corrected window is entered by fewer bodies. **The
+LC11 null stands; the caveat is about per-cell interpretability of the exported windows, not the family call.** Rows
+exported with `window_source = anatomical` should be read with that centre in mind; future rounds place LC windows on
+the input-weighted centroid with a box >= r50 or on a fitted RF.
+
 ## 4. Neurome evidence bundles
 
 Accepted initially as **read-only observations**: predicted anatomical counts, source annotations, reconstruction
