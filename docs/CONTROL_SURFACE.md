@@ -26,8 +26,9 @@ elsewhere. The female caches carry raw sign-zero synapse counts, source hashes a
 `load(cache_dir=...)` reads its dataset from the manifest. Changing a cached NT confidence threshold requires
 `rebuild=True` or a new directory. FAFB's optional `edges="no_threshold"` uses `cache/fafb/no_threshold/`.
 
-`has_vnc` and `has_optic_columns` describe the **source release**, and survive subsetting even if the
-selection contains no cells of that kind. Dataset names are validated against the registered backends;
+`has_vnc` describes the **source release**. `has_optic_columns` describes an available source map or an
+explicit BANC candidate extension. Both survive subsetting even if the selection contains no cells of
+that kind; neither counts the cells in the subset. Dataset names are validated against the registered backends;
 an unknown name cannot silently acquire capabilities. Use `c.select(...)` to inspect the selected population.
 
 The backend refactor adds `model.dataset` and `model.release` to **every** Result's provenance, including
@@ -37,10 +38,36 @@ weights. Female subsets retain a cache root selected through `FLYVERSE_CACHE`; M
 an explicit `cache_dir` to use another location.
 
 FAFB has no VNC: `motor_groups`, `wing_groups`, `Proprioception`, and `fb.motor()` raise `NotAvailable`.
-Its brain and optic model can still run. BANC has no optic column map: `build_retina` raises `NotAvailable`,
+Its brain and optic model can still run. Default BANC has no optic column map: `build_retina` raises `NotAvailable`,
 and `FlyBrain` leaves `optic` and `retina` unset. `optic=None` also explicitly disables the optic module on
 other graphs. Cells otherwise assigned to that module run in the LIF graph. This is a capability difference,
 not an assertion that an uncalibrated BANC optic circuit matches the graded model.
+
+An explicit experiment enables the BANC right eye:
+
+```python
+c = connectome.load(dataset="banc", vision="candidate",
+                    vision_cache_dir="out/my_banc_candidate")
+fb = FlyBrain(c)  # uses the candidate retina and optic model
+```
+
+`vision` defaults to `None`; the only opt-in value is `"candidate"`, on a full, unextended BANC graph.
+`vision_cache_dir` selects a separate, unused scratch graph directory. It requires `vision="candidate"`;
+omitting it allocates a temporary directory exposed as `c.cache_dir`, which the caller owns. `cache_dir`
+still selects the biological input graph. The probes can reuse that persisted candidate through
+`--vision candidate --vision-cache <scratch>` after checking its hashes, coordinates and synthetic edges
+against the pinned model. Removing every synthetic node with `prune` restores the original BANC graph,
+including `has_optic_columns=False`, also after save/load.
+
+This is a **synthetic input layer on a candidate lattice**: six negative-ID R1-R6 cells per right-eye
+cartridge, column-local input to BANC's own L1/L2/L3, unchanged biological synapses, no left-eye input.
+The map is estimated at 80-85% exact and 97-98% within one column; anatomical DRA/mirror gates remain
+closed. Result provenance carries these checks and the candidate qualifier. The eight motion directions
+and loom-to-GF row pass the fixed functional protocol, but the direction convention was inherited from
+MaleCNS. Synthetic input budgets and eye coverage exceed the male comparator's; T5 selectivity is weak
+and BANC TTM stays silent. See the [experiment audit](audits/banc_candidate_experiment.md) before interpreting
+cross-dataset magnitudes or behaviour. The pinned CSV and metadata total about 1.04 MB uncompressed and
+ship in the wheel so runtime coordinates do not depend on a new download or local reconstruction.
 
 FAFB's generic R7/R8 labels map to `R7_unclear`/`R8_unclear` (1,338/1,357 cells). This does not identify
 pale, yellow or DRA subtypes: any spectral, receptor or time-constant entries keyed to `R7p/R7y/R7d`
