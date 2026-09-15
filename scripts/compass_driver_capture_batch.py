@@ -24,8 +24,8 @@ def build(out):
                  for scheduler,name in (('eager','room_eager_a'),('eager','room_eager_b'),('captured','room_instrumented'))]
     commands += [f'python scripts/compass_driver_room.py --mode {mode} --seed 10 --native --out {rel}/room_native_{mode}' for mode in ('raw','instrumented')]
     log=f'{rel}/run.txt'
-    job=f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( "+' && '.join(commands)+f' ) > {log} 2>&1; st=$?; tail -8 {log}; exit $st'
-    command='python scripts/cluster_run.py --target house --name compass-capture --minutes 30 --arm-block fam '+shlex.quote(job)+f' --fetch {rel}/ 2>&1 | tee {rel}/client_stdout.txt'
+    job=f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( "+' && '.join(commands)+f' ) > {log} 2>&1 && tail -8 {log}'
+    command='python scripts/cluster_run.py --target house --name compass-capture-retry --minutes 30 --arm-block fam '+shlex.quote(job)+f' --fetch {rel}/ 2>&1 | tee {rel}/client_stdout.txt'
     (out/'batch.sh').write_text('#!/bin/bash\nset -o pipefail\n'+command+'\n',encoding='utf-8',newline='\n')
     paths=[p for p in (ROOT/'flyverse').rglob('*') if p.suffix in ('.py','.cu','.metal','.csv')]
     paths+=list((ROOT/'scripts').glob('*compass_driver*.py'))+[ROOT/'docs/audits/compass_standin.md',ROOT/'tests/test_cuda.py']
