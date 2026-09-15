@@ -3141,3 +3141,359 @@ confined in 4/6 seeds and persists in 3/6 (bump 148-155 Hz in three of them). Th
 ("lost at gE 1.75 / gD >= 15") is accurate; the header line is not.
 
 ---
+
+
+## Level controls, round 4c (2026-09-15)
+
+Batch `vncd6-2ad71d` (house B200, 24 jobs, 0 failed): A / L / M2 (modulation-only cycle at the realised amplitude 0.948)
+/ C x 6 seeds, family level3, Holm m = 7 satisfiable at 6 v 6. Independent Opus skeptic, verdict **mostly sound**: all
+28 decision rows, the preconditions, the level model and the sided rows reproduce with an independent reducer; ALL 39
+per-seed lists quoted in prose verified against per_seed.csv / level_model_r2_residual_runs.csv (the round-4b failure
+does not recur); eight secondary items refuted (the 'same afferent alternation' support -- the law creates a slow
+yaw-locked sided afferent signal that DNa02, not the relay, integrates; a 'no cell silent' sentence; the derivation's
+spread statistics of the wrong array; the DNa02_R verdict history; a min/max header; the slope-uncertainty covariance;
+an RSE named RMSE; a file/mask attribution). Nothing adopted. The full pass is appended to
+`docs/audits/level_controls_r2.md`; the verdict and the refuted list verbatim:
+
+### Verdict
+
+**MOSTLY SOUND.** Every number this audit's conclusions rest on reproduces from the recordings with an independent
+reducer: the 28 decision-table rows exactly, the preconditions exactly, the level model exactly (slopes, intercepts,
+transfer, residuals, differences, corrections and the vncd5 self-check), the sided rows exactly, the fractions, the
+decomposition, the chain rates and the behaviour table exactly. The stamps are clean, the archive is byte-identical to
+`predeclared.json`, there was one submission, and -- the thing round 4b failed -- **all 39 per-seed lists quoted in prose
+are the data**. The post-stamp reducer edit is documented, provably outcome-free (byte-identical decision tables), and
+handled as INTERP 10.4 item 11 requires. The three headline claims stand: F4 is closed (M2 v C `null` on all seven, at
+a design that could have seen round 4b's excess); the structure term is the modulation (+4.6 vs +4.7 Hz, the same
+number with and without the amplitude law); and the turn term owns the per-frame sided DNa02 signal. What is refuted
+is supporting material, not conclusions: the "same afferent alternation" sentence is the wrong argument for the right
+claim (the slow, yaw-locked afferent component differs 2.6-fold and is where the whole DNa02 signal lives); one
+sentence in 8.2 contradicts its own table; section 3's dispersion statistics are of the L/R mean, not the per-leg
+amplitude; the Report's open question mis-states DNa02_R's verdict history; a "min / max" is a mean of extrema; the
+slope-uncertainty formula drops a -0.95 correlation; and section 7 drops round 4b's R8 extrapolation caveat, which this
+batch inherits unchanged. None of that moves a verdict, and all of it is fixable in prose.
+
+**What rounds 4, 4b and 4c jointly say about the leg cycle.** Three batches of the same protocol now agree on an
+attribution and on its size: against a level-matched round-2 transducer at the same chordotonal level, the leg cycle
+raises the ascending relay AN04B003 by **+3.7 to +7.1 Hz per side** (`result`, CALLED in the one batch whose Holm
+family was satisfiable) and DNa02_L by **+0.09 to +0.15 Hz** (`result` in all three) -- a replicated attribution, not a
+single-batch finding. Round 4c splits that term cleanly in two. The rate part is the **per-phase modulation**: an arm
+that keeps the phase/stance structure and holds the amplitude at the cycle's own realised 0.948 reproduces the cycle
+arm on every rate row (fractions 0.94-1.00 against the level control's 0.69-0.88) and is `null` against it on all seven
+primaries, with a level-corrected structure term of +4.60 +/- 0.31 Hz against the cycle's +4.72 +/- 0.32 -- so round 4b's
+M-over-C excess was its +6.0 Hz of level, and the amplitude / turn law adds **no drive** at the relay or at DNa02. The
+sided part is the **amplitude / turn law**, and it is a sidedness, not a rate: the law writes a slow, yaw-locked L-R
+asymmetry into the afferents (mean |slow chord L-R| 1.65 Hz against the flat arm's 0.63, corr with yaw -0.78 against
++0.01) which DNa02 integrates into a -0.34 Hz tripod-conditioned L-R swing (against -0.09), while the relay, which
+follows the fast tripod term, sees nothing of it -- and no window rate, yaw SD, straightness or behavioural primary
+moves. Two rows stay unsettled across all three batches: DNa02_R (+0.09-0.11 Hz) and the clean yaw SD (+0.49-0.59
+deg/s) over the level control reproduce as differences every time and as verdicts only sometimes, because the
+denominator is the control arm's own between-run scatter. Nothing is adopted; `LegCycle.flat_amplitude_value` is an
+opt-in labelled-control parameter whose default path is bit-identical to the shipped one, and the structure term still
+carries a -9.5 Hz hair-plate and -24.7 Hz campaniform mismatch that is corrected at slopes extrapolated ~9.5 Hz off
+their calibration manifold, and an unmeasured `half_width_m` that scales the one row the turn term owns.
+
+### Refuted
+
+**R1. "The afferent alternation is the same" is not an argument for the sided-DNa02 attribution -- the afferent
+waveforms are NOT matched.** Section 8.3 reading (ii) and the Report's `key_claims` sided-rows bullet support
+"the turn term owns the per-frame sided DNa02 signal" with "the same AN04B003 antiphase (-3.60 vs -3.63) and the same
+afferent alternation (mean per-frame |chordotonal L-R| 12.36 C, 12.16 M2)", i.e. *same input, different DNa02
+sidedness*. That reading does not hold. Splitting the commanded chordotonal L-R at one step cycle (a 12-frame centred
+boxcar, 8.3 Hz stepping at 100 Hz frames) on clean walking frames, run mean over the six runs of each arm
+(`scratchpad/sided.py`):
+
+| statistic of commanded chordotonal L-R | L | M2 | C | M2 - C (z) |
+|---|---|---|---|---|
+| SD, total | 14.14 | 14.05 | 14.28 | -0.24 (-1.4) |
+| SD, FAST (tripod) | 5.07 | **13.99** | **14.02** | -0.03 (-0.2) |
+| SD, SLOW (> 1 step cycle) | 12.25 | **1.55** | **2.78** | **-1.23 (-13.2)** |
+| mean \|SLOW\| (Hz) | 15.31 | **0.63** | **1.65** | **-1.02 (-18.5)** |
+| corr(yaw, SLOW) | +0.290 | **+0.009** | **-0.779** | +0.788 (+74) |
+| corr(DNa02 L-R, SLOW) | -0.000 | **+0.009** | **-0.533** | +0.542 (+54) |
+| corr(DNa02 L-R, FAST) | +0.012 | -0.033 | -0.039 | +0.006 (+2.1) |
+| E[DNa02 L-R \| SLOW > 0] - E[. \| < 0] | -0.022 | **+0.066** | **-1.552** | +1.619 (+24.5) |
+| E[DNa02 L-R \| FAST > 0] - E[. \| < 0] | +0.027 | **-0.123** | **-0.159** | +0.035 (+2.2) |
+| E[AN04B003 L-R \| FAST > 0] - E[. \| < 0] | +0.061 | **-3.756** | **-3.750** | -0.006 (-0.2) |
+| E[AN04B003 L-R \| SLOW > 0] - E[. \| < 0] | +2.320 | +0.994 | +0.589 | +0.405 (+4.9) |
+
+The mean |L-R| is dominated by the fast tripod term, which the two arms share to 0.8 %. The whole difference lives in
+the slow term, which C has (mean |slow| 1.65 Hz, yaw-locked at -0.78) and M2 cannot have (|amp L-R| exactly 0). DNa02's
+sidedness follows the slow term and only the slow term; the relay follows the fast term and is identical in both arms --
+which is exactly why "the antiphase is the same" is true and irrelevant to the DNa02 row. **The mechanism the audit
+states is right; the supporting sentence is wrong.** The amplitude/turn law *creates a slow yaw-locked sided afferent
+signal*, and DNa02 (not the relay) integrates it. It is not that DNa02 reads matched afferents differently.
+
+**R2. Section 8.2: "No cell in these tables is silent in any arm" is contradicted by its own table.** `chain_SNpp45_hz`
+in arm A is **exactly 0.0000 Hz** (`analysis/pairwise.csv`, and the 8.2 table prints `SNpp45 | 0.00 | 55.65 | 45.77 |
+46.16`). A has no sense attached, so the hair-plate afferents are undriven. Every other row of 8.2 has a non-zero A
+value (AN04B003 0.60 / 0.31, GLNO 0.05, PS196_b 0.21, IN13B001 10.64 / 6.50, PS059 8.80 / 4.93).
+
+**R3. Section 3's spread statistics are of the wrong array (and the same sentence mixes two arrays).** The sentence
+names "the per-leg amplitude ... (`cyc__amp_L` / `cyc__amp_R`)" and then quotes "5th / 50th / 95th percentile
+0.9451 / 0.9471 / 0.9523 ... 0.1 % of frames above 1.0". `out/vncd6/derive_flat_amplitude.py` line 37 sets
+`a = 0.5 * (aL[walk] + aR[walk])`, so those three percentiles and `frac_above_1` are of the **per-frame L/R mean**,
+while `amp_max` in the same record is taken over the per-leg arrays. Recomputed over the per-leg amplitudes (my own
+mask, post-skip, on the ground, `step_hz > 0`, `out/vncd5/room_C_r*_body.npz`): **p05 / p50 / p95 = 0.9193 / 0.9473 /
+0.9753 and 0.63 % of leg-frames above 1.0** -- three times the quoted spread and six times the quoted tail, and exactly
+the round-4b skeptic pass's independently checked C4 numbers ("0.919-0.975, max 1.547, 0.6 % of frames above 1.0").
+The run mean (0.947728 +/- 0.000044), the per-run maxima (1.356 / 1.436 / 1.515 / 1.547 / 1.359) and |amp L-R| 0.0170
+all reproduce exactly, so **the chosen value 0.948 is unaffected**; what is misstated is how wide the distribution is
+that the constant replaces.
+
+**R4. The Report's open question gets the cross-batch verdict history wrong for DNa02_R.** `open_questions` says
+DNa02_R and the clean yaw SD "reproduce as differences in three batches and as verdicts in none since round 4".
+Recomputed C v L with one reducer from each batch's own `room_table.csv` `*_runs`:
+
+| key | vncd4 (5 v 5) | vncd5 (5 v 5) | vncd6 (6 v 6) |
+|---|---|---|---|
+| DNa02_R | +0.1030, z +16.6, p 0.0079 -> **result** | +0.1068, z +7.8, p 0.0079 -> **result** | +0.0941, z +2.9, p 0.0022 -> null |
+| clean yaw SD | +0.5718, z +7.1, p 0.0079 -> **result** | +0.4896, z +2.8, p 0.0079 -> null | +0.5881, z +2.6, p 0.0087 -> null |
+
+DNa02_R **was** a verdict in round 4b (z +7.8) -- as section 6 F3 of this very audit says correctly ("DNa02_R is
+`result` in rounds 4 and 4b"). The Report contradicts section 6. Only the yaw SD matches the "verdicts in none since
+round 4" wording.
+
+**R5. Section 4.1's C amplitude "min / max" are means of the per-run minima and maxima, not a min and a max.** The
+cell reads `0.947750 (0.452 / 1.574; 0.017509)` under the header "amp on walking frames (min / max; |L-R|)".
+`arm_levels.csv` carries these as `amp_min_mean` / `amp_max_mean`, i.e. the run mean of each run's extremum.
+Recomputed per run, C's per-leg minima are `[0.4956 0.3023 0.5599 0.5440 0.0603 0.7520]` and maxima
+`[1.5388 1.7267 1.4686 1.4886 1.9787 1.2420]`: **the pooled range is 0.060 .. 1.979**, four times wider on the low
+side than the printed "0.452". (M2's column is exact: one distinct value 0.948000 in every run.)
+
+**R6. Section 7's slope-uncertainty formula drops a -0.95 slope correlation and therefore understates two of the three
+pooled corrections.** The audit propagates `sqrt((dChord?se_b)^2 + (dHair?se_c)^2)`. On the six-point arm-level design
+`corr(b, ?) = -0.951` (my refit: `cov(b,c) = -9.6e-4`, se_b 0.0355, se_c 0.0285), so the independent-SE form is not the
+right one. Full-covariance propagation `sqrt(v^T Cov v)`:
+
+| pair / side | correction | audit +/- | full-cov +/- |
+|---|---|---|---|
+| M2 v C, pooled | -0.114 | 0.029 | 0.016 |
+| M2 v L, L | -0.165 | 0.461 | **0.220** |
+| M2 v L, R | +1.729 | 0.306 | **0.412** |
+| M2 v L, pooled | +0.782 | 0.281 | **0.307** |
+| C v L, L | -0.079 | 0.444 | **0.228** |
+| C v L, R | +1.872 | 0.329 | **0.431** |
+| C v L, pooled | +0.896 | 0.274 | **0.321** |
+
+The pooled structure terms become **+4.60 +/- 0.31 (M2) and +4.72 +/- 0.32 (C)**. No reading changes; the stated error does.
+
+**R7. "Point RMSE 0.128" is the residual standard error, not an RMSE.** On the six arm-side means with 2 residual df,
+`sqrt(RSS/dof) = 0.1279` (the audit's number) but `sqrt(mean resid^2) = 0.0739`. Both are legitimate; only one is an
+RMSE, and round 4b's audit quoted the six-point fit's RMSE (0.1059 for its run-level fit) in the same role.
+
+**R8. Section 8.3's table attributes a row to a file that does not carry it, and to the wrong mask (rule 28's
+neighbourhood).** The table is headed `analysis/sided_frames.csv`; `sided_frames.csv` holds 22 keys and
+`mean per-frame |chordotonal L-R|` is not among them. That row is `commanded_chordotonal_absLR_hz` from
+`analysis/pairwise.csv`, a room key computed on the **post-skip non-airborne** mask, not on the clean-walking-frame
+mask the table's caption declares. On the clean-frame mask it reads **12.07 (M2) / 12.27 (C)**, not 12.16 / 12.36.
+(Values and verdict are otherwise right: diff -0.2046, z -0.88, null.)
+
+---
+
+
+## Compass round 6A, the DC-balance test (2026-09-15)
+
+Batch `cx6-995cd5` (house B200, 10 jobs, 0 failed, 40 runs): the fixed ring-structure tool and the counterfactual
+hold of ExR6 / ER6 / ER4m onto PEN and EPG at the shipped gains, 8 arms x 5 seeds. Independent Opus skeptic, verdict
+**mostly sound**: every primary and secondary of all 40 runs reproduced with an independent bump-frame implementation;
+the wedge matrices and gamma_E_crit to four decimals; the hold resolved to exactly 17 cells / 88 targets / 1,149 entries;
+S / F / R reproduce cx5 over all 456 (metric, run) pairs; the predeclared call NECESSARY BUT NOT SUFFICIENT is what the
+rule's own words give. Refuted: the '8.27 Hz/mV maximum LIF gain' (an unconverged quadrature of a number that is 8.00,
+of a function the fixed point does not iterate, at an assumed sigma -- 'unreachable' not earned though the
+comparison's sign is); '7 of 8 arms called' is 3 of 4 distinct predictions; the receptor-tier rank move compares two
+ranking keys with a float-noise tail; three pre-pulse ranges; the silent sentence; the incident's timestamps. Nothing
+adopted. The full pass is appended to `docs/audits/compass_dc_balance.md`; the verdict and the refuted list verbatim:
+
+### Verdict
+
+**Mostly sound.** Every measurement in this batch is exactly reproducible: my own `bump_frames` recovers all 40 runs'
+six primaries and two dozen secondaries with zero difference; my own weight-shaping pipeline recovers every M16 block,
+every local kernel and every `gamma_E_crit` to four decimals; every `compare` verdict, z, p and Holm value reproduces,
+and m = 4 is the predeclaration's own drop rule applied, not a post-hoc denominator; the hold resolves to exactly the
+17 cells, 88 targets, 1,149 entries and 37,256 synapses claimed, its regexes touch nothing else and exclude EPGt, and
+its one unnamed side effect (the fan-in) is 2 % on one cell; S / F / R reproduce cx5 with max |diff| 0.0 not over the
+144 pairs claimed but over all 456; the stamps order correctly, the predeclaration is unamended and its `batch.sh`
+hash is the file that was submitted, the job-line exit expression was tested before submission, and the accidentally
+overwritten 5A artefacts regenerate every number 5A's audit quotes from them to the printed digit. The predeclared call
+-- **necessary but not sufficient** -- is what the rule's own words give for these numbers, and the two headline
+findings (the hold lifts PEN ~100x and buys no bump; the same DC term holds the unstimulated ring at rest) survive the
+pass intact and are, if anything, understated. What fails is again the argument around the result. The headline
+"8.27 Hz/mV is the maximum gain this LIF has anywhere" is a 61-node quadrature estimate of a number that is 8.00, of a
+function that is not the one the fixed point iterates (whose own numerical slope reaches 7,528 Hz/mV near threshold),
+at a noise level that is assumed rather than measured and at which the answer is entirely determined -- so
+"unreachable" is not earned even though the comparison's sign is right; "7 of 8 arms called correctly" is 3 of 4
+distinct predictions from a one-bit classifier that tracks `same_type_gain`; the receptor tier's fall "from 1st to 14th
+of 15" compares two different ranking keys with a tail ordered by float underflow; three pre-pulse EPG ranges quote a
+seed-0 value where the named file gives a lower minimum; the `silent` sentence asserts something the protocol cannot
+measure and picks the wrong quietest number; and the incident carries three mutually inconsistent timestamps, none of
+which is the one in the file. None of these changes a row of `decision.csv` or the call; all of them change what a
+reader would believe about how firmly it is established. With corrections 1-13 the audit is sound.
+
+**What compass rounds 5 and 6 jointly say.** At the shipped gains the compass question is **closed as a null and opened
+as an attribution**: 5A showed that no data-implied type-level change -- the GLNO relabel, the receptor tier, the
+monoamine slow class, the fan-in, the cap -- moves the shipped ring off its uniform state, and that the binding
+constraint is a DC balance on the relays rather than a missing k = 1 mode; 6A fixed the three tool defects 5A's skeptic
+named and then ran the one `edges`-kind counterfactual that decision implied, and the answer is that the DC term is
+**real and insufficient**: holding 2 ExR6 + 4 ER6 + 11 ER4m off PEN and EPG lifts the driven PEN from 0.29-0.66 Hz to
+40.2-48.3 Hz (`result`, Holm 0.0317) -- ExR6 and ER6 carrying it, ER4m a `null` on PEN -- and buys zero seconds of
+confined bump in 5 of 5 seeds, because the same term is what keeps the unstimulated ring near its drive, so removing it
+saturates the ring instead of releasing it. Everything that holds a bump across both rounds is a **labelled instrument
+or a labelled reference** (`same_type_gain` 1, gE 2 / gD 15, or the hold with the GLNO relabel), every one of them
+fails `compass.EPG.bump_rate_hz` by 2.5-3.4x, and three of the four drift off the driven tile -- so
+`compass.EPG.bump_survival_s` stays FAIL and the rate and width rows stay NOT_APPLICABLE, and **nothing in either round
+licenses an adoption**. What the two rounds jointly license is one measurement and one data question: record per-type
+ring rates in the protocol (the rate model's weakest link, 2.1-2.6x high on H3 and 3.5-4.6x on H_ER6, is its ring
+rates, and no arm in either round measures them), and settle ExR6's transmitter, receptor and modulatory status in the
+animal, which is `UNKNOWN` at the type level and is the single largest term in the balance both rounds are about.
+
+### Refuted
+
+**R1. "THE MAXIMUM GAIN THIS LIF HAS AT ANY OPERATING POINT IS 8.27 Hz/mV (u 8.60, 25.1 Hz), converged over quadrature
+order" (section 0, 1.1 defect 3, 1.2, 1.4, 4; Report `summary` and `key_claims` line 7).** Three separate problems.
+
+*(a) 8.27 is the quadrature, not the function.* `lif_fi_prime` estimates `f_sigma'(u) = (1/sigma) E[x f_det(u + sigma x)]`
+by Gauss-Hermite. I computed the same integral by adaptive quadrature (`scipy.integrate.quad`, `epsabs` 1e-13, split at
+threshold):
+
+| | max f'(u) (Hz/mV) | at u (mV) | f there (Hz) |
+|---|---|---|---|
+| **exact (adaptive quadrature), sigma 2 mV** | **7.9969** | **8.6069** | **25.54** |
+| `lif_fi_prime`, 15 nodes | 8.6571 | 8.598 | |
+| `lif_fi_prime`, 31 nodes | 8.3128 | 9.241 | |
+| `lif_fi_prime`, 61 nodes (**the tool's default; the audit's 8.27**) | 8.2747 | 8.602 | |
+| `lif_fi_prime`, 101 nodes | 8.1864 | 8.871 | |
+| `lif_fi_prime`, 201 nodes | 8.1270 | 8.771 | |
+| `lif_fi_prime`, >= 401 nodes | NaN (numpy `hermegauss` overflows) | | |
+
+The sequence is monotone decreasing after the first term and is still moving at 201 nodes; it is *not* converged, it is
+walking down to 8.00. 8.27 is 3.4 % high, and the implementation cannot be pushed past ~201 nodes to show it.
+
+*(b) The f-I the fixed point actually iterates is not bounded by 8.27 at all.* `rate_fixed_point`, `u_for_rate` and
+`rate_at_gain` all evaluate `cx_wedge.lif_fi`, which is the **15-node** quadrature. That function has step-like
+structure at the node images `u = theta - sigma x_j` (one of which is exactly u = 7.0). On a 1e-4 mV grid over
+u in [0, 60] its own numerical slope reaches **7,528 Hz/mV at u 7.0001**, 2,099 Hz/mV somewhere in u in [9, 12] and
+41.4 Hz/mV in [12, 20]; it exceeds 33.34 Hz/mV at 346 of 600,001 grid points. At the audit's quoted peak u = 8.60 the
+central difference of `lif_fi` is **107.8 Hz/mV** against `lif_fi_prime`'s 8.27. The test said to pin this
+(`test_lif_fi_prime_matches_a_finite_difference_and_is_bounded`) samples u = 9, 12, 20, 40, 80 at 10 / 3 / 2 / 2 / 2 %
+-- i.e. everywhere except the peak the headline quotes.
+
+*(c) The bound is a property of the assumed sigma, which is hard-coded and never measured.* `SIGMA_MV = 2.0`. Exact max
+slope against sigma:
+
+| sigma (mV) | 0.25 | 0.50 | 1.00 | 1.50 | **2.00** | 3.00 | 4.00 | 6.00 |
+|---|---|---|---|---|---|---|---|---|
+| max f' (Hz/mV) | 25.26 | 16.15 | 10.97 | 9.04 | **8.00** | 6.86 | 6.21 | 5.43 |
+
+gamma_crit 33.34 is reached at sigma **0.168 mV**, 28.77 at 0.207 mV, 25.8 at 0.242 mV. Nothing in this project has
+measured the effective input noise of the spiking LIF, and no arm of this batch varies sigma.
+
+*What survives, and which number is right.* 5A's skeptic's "25.8 Hz/mV at u 7.1" is exactly reproduced from the
+deterministic f-I (I get 25.782), and `f_det'` does diverge (622 Hz/mV at u 7.001, 3,939 at 7.0001), so the audit is
+right that 25.8 is a sample on a divergence and not a maximum. **The right number to compare `gamma_E_crit` against is
+the maximum of the same f-I whose slope defines gamma, i.e. 8.00 Hz/mV at sigma 2 mV -- not 8.27 and not 25.8.** With
+33.3 vs 8.00 the sign of the comparison is unchanged, and S / G / C / CG measurably hold no bump, so the *conclusion*
+stands. The word **"unreachable" is not justified as an absolute**: it is "unreachable in the rate model at the
+sigma = 2 mV that model assumes", and the model's own 15-node numerics do not respect the bound.
+
+**R2. The quadrature-convergence sequence is in no named file.** "8.66 at 15 nodes, 8.31 at 31, 8.27 at 61, 8.19 at 101"
+(section 1.1, 1.4 and Report `key_claims` 7) and "the first implementation here returned 724-3,135 Hz/mV" (section 1.4)
+appear only in the docstring of `scripts/cx_ring_structure.py`; no file under `out/cx6/` records them. `max_lif_slope`
+8.274678082726133 / `_at_u` 8.60177 / `_at_hz` 25.129694787680478 *are* in `structure.json` and `validation.json`, so
+the single number 8.27 is sourced and the convergence claim is not (the same complaint 5A's skeptic R1 made). The
+script's own docstring also contradicts the audit: it says the peak is "at u ~ 9 mV, **~33 Hz**" where the audit and
+`structure.json` say u 8.60, **25.1 Hz**.
+
+**R3. The pre-pulse EPG ranges (section 3.1 "The pre-pulse state matters"; Report `key_claims` 2).** The sentence names
+its file (`analysis/state.csv`, the 1 s settle) and then misquotes three of its columns:
+
+| arm | audit | `state.csv` `epg_mean_pre` (my recomputation from the `.npz` is identical) |
+|---|---|---|
+| S | "9.1-10.0" | **8.7337 - 10.0317** (per seed 9.068, 9.339, **8.734**, 10.032, 9.780) |
+| H_ExR6 | "9.1-10.0" | **8.9619 - 10.0433** |
+| F | "9.1-10.1" | **8.7337 - 10.0532** |
+
+"9.1" is seed 0's value (9.0678), not the minimum -- a number reconstructed rather than read from the named file, which
+is exactly the failure `INTERP.md` 10.4 rule 28 exists against. Everything else in the same sentence is exact (S PEN
+0.00-0.02, Delta7 8.42-11.78, GLNO 0.00; H3 19.73-62.91 / 8.79-42.66 / 28.27-103.51 / 32.49-131.39; H3G
+10.33-40.52 / 1.03-16.46 / 12.38-68.83 / 5.06-58.78; R 16.67-42.79 / 10.47-34.00; H_ExR6 PEN 0.28-0.55; F PEN
+0.00-0.16).
+
+**R4. "Nothing in this batch is `silent` in the project's sense (`INTERP.md` 10: max rate < 0.5 Hz per cell): the
+quietest population mean quoted here is S's PEN at 0.29-0.66 Hz during the pulse and 0.009-0.062 Hz after"
+(section 3.1).** Wrong twice.
+(i) The quietest population means the audit quotes are far lower: the `rest post` column of the same table is
+**0.00151-0.00156 Hz** for S / H_ER6 / H_ER4m (printed there as 0.002), and S's `GLNO_mean_pre` is **exactly 0.000000 Hz
+in 5 of 5 seeds** -- quoted two paragraphs later as "GLNO 0.00".
+(ii) More seriously, `silent` is a per-cell max, and this protocol records only group means (`fb.brain.mean_rate` into
+`g__*`); no quantity in the batch can decide it either way for PEN. Where a mean is exactly 0 the max is 0, so S's GLNO
+during the settle **is** silent by the project's definition. The audit's own note that a quantity no file carries is not
+quoted applies here.
+*Checked and clean:* the audit never says PEN is silent. The only other uses of the word are the `GLNO` column of the
+arm table and "GLNO-silent run", both the transmitter label, not the rate rule.
+
+**R5. "The data-implied receptor tier `c`, which 5A's ranking put first, falls to 14th of 15" (section 1.3(i); Report
+`key_claims` 8).** The rank move is not a finding. Ranks 5-15 of the 6A table and 1-10 of the `--legacy` table all have
+`bump` False and `in_minus_out` = -1.78e-15 and are then ordered by `pen_pulse_hz`, whose values are
+
+    1.0e-04 (b+f), 2.2e-09 (b), 2.1e-09 (a+b), 1.8e-09 (f), 1.7e-09 (a+f), 1.5e-09 (H_ER4m),
+    1.4e-09 (shipped), 1.4e-09 (a), 5.2e-98 (c+f), 3.5e-179 (c), 3.5e-179 (a+c)
+
+-- arithmetic underflow, not rates. Worse, the two rankings are keyed differently: 5A's published ranking (its section
+1.3) is "by the fixed point's bump -- none; then gamma_crit(k1), then the PEN margin", which is what put `c` first; the
+regenerated `--legacy` run of the same tool puts `c` **9th of 10**, not 1st. So "1st -> 14th of 15" compares a
+gamma_crit-ordered list with a PEN-rate-ordered list whose tail is float noise -- and the audit's own section 6 already
+says the legacy tie order "is float noise" without saying the same of its own. The substantive half is verified and
+should carry the claim alone: `c`'s `gamma_E_crit` falls 33.340 -> 28.768 (-13.7 %), stays 3.6x above the LIF's maximum
+slope, and its PEN margin *worsens*, -15.78 -> -17.63 mV.
+
+**R6. "every compass cell except Delta7 is still exactly 0" (section 1.4, second bullet).** In the regenerated 5A fixed
+point (`out/cx5/structure/structure.json`, `jacobian`) the per-group mean gains are
+
+| state | EPG | PEN | PEG | EPGt | Delta7 | **Ring** | **GLNO** | leading eig |
+|---|---|---|---|---|---|---|---|---|
+| background | 8.8e-41 | 1.1e-08 | 5.6e-18 | 1.4e-09 | **4.676** | **0.242** | **0.049** | +0.1387 |
+| pulse | 0 | 2.1e-10 | 1.7e-26 | 1.5e-07 | **5.224** | **0.359** | **0.320** | +0.0878 |
+
+Delta7 4.68 / 5.22 and the leading eigenvalues +0.139 / +0.088 reproduce exactly, but Ring (the ER/ExR population, 308
+cells) and GLNO are not zero, and the compass cells are effectively but not "exactly" zero. (The audit inherits the
+phrasing from 5A's skeptic table; it is inaccurate in both.)
+
+**R7. "7 of 8 shipped-gain cx5 arms called correctly" overstates the evidence: it is 3 of 4 distinct predictions.** The
+call `predicted_bump` depends on one number, `local_kernels['direct']`, which takes only four values over the eight
+arms, because the GLNO relabel never enters an EPG-recurrence criterion:
+
+| | S, G | C, CG | F, FG | CF, CFG |
+|---|---|---|---|---|
+| local EPG->EPG (mV), my own shaping | 5.9987 | 6.9523 | 59.7926 | 66.2921 |
+| gamma_E_crit (Hz/mV) | 33.340 | 28.768 | 3.345 | 3.017 |
+| call | no bump | no bump | bump | bump |
+
+So the eight calls are four predictions each made twice, and the single pair that *splits* in the measurement (F 4/4,
+FG 0/4) is the pair the tool gets wrong. The classifier is "does the arm carry `same_type_gain` 1?", and the arms split
+4/4 on exactly that flag. The rate half is 2 of 3 arms, as stated, and is sound.
+Related attribution: the 144 / 160 Hz predictions are not new to 6A -- 5A's skeptic pass R3 already published 145 Hz for
+`f` and 161 Hz for `cf` against the same measurements, from the same one-step coefficients (+59.76 / +66.51 mV). The
+audit credits the skeptic for the Jacobian fix (1.1 defect 3) and for the 25.8 (1.4) but presents the F / CFG rate
+validation as the fixed tool's own.
+
+**R8. The incident is timestamped three different ways and none matches the file (section 6; Report `key_claims` 13).**
+Section 6 says the argument-less run was at **08:03:28Z**; the Report `key_claims` and
+`out/cx5/structure/REGENERATED_BY_6A.txt` both say **08:05Z**. Section 6 and the .txt say the artefacts were regenerated
+"at **08:31Z**"; the regenerated file itself records `generated_utc` **2026-09-15T08:20:39Z** (mtime 08:22:11Z, and
+`REGENERATED_BY_6A.txt` mtime 08:22:41Z). Nothing in `out/cx5/structure/` carries 08:31Z or 08:03:28Z.
+
+**R9. "THE RATE MODEL'S RING RATES REMAIN THE WEAK LINK (2.2-4.6x high on the held arms)" (Report `recommendations` 5).**
+Only two of the four held arms are in that band, and the ratios are:
+
+| arm | predicted PEN during pulse | measured | ratio |
+|---|---|---|---|
+| H3 | 102.96 | 40.17-48.31 | **2.13-2.56x** (audit: "2.2x") |
+| H_ER6 | 10.79 | 2.35-3.12 | 3.46-4.59x |
+| H_ExR6 | 14.68 | 8.89-14.88 | **0.99-1.65x** |
+| H3G | 40.23 | 26.49-29.00 | **1.39-1.52x** |
+
+Section 3.2 and `key_claims` 9 state this correctly with the exceptions named; the recommendation line generalises past
+its own data.
+
+---

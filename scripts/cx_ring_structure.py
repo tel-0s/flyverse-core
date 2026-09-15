@@ -34,26 +34,33 @@ Outputs (out/cx5/structure/): structure.json (every number, provenance), structu
 (cell-level A blocks and M16 per configuration), evidence_glno.json (MaleCNS / BANC GLNO transmitter read here).
 Nothing here changes a default; no file outside out/ is written.
 
-KNOWN DEFECTS OF THIS STRUCTURE PASS -- read the ranking it prints with these in mind. Found by the independent skeptic
-pass of 2026-09-15 and recorded in docs/audits/compass_ring_mechanism.md sections 1.3 and 3.3; NOT fixed here (this note
-is documentation only -- no behaviour has changed):
+THE THREE DEFECTS OF THE 5A PASS, FIXED HERE (thread 6A, docs/audits/compass_dc_balance.md; the 5A statements are in
+docs/audits/compass_ring_mechanism.md sections 1.3 / 3.3 and its skeptic pass R2 / R3). Each fix is the DEFAULT and the
+5A behaviour is reachable for comparison with `--legacy` (or the individual `--drive rate`, `--reduction two-step`,
+`--gain uniform`); `--legacy` reproduces the 5A numbers exactly and is what the validation table compares against:
 
-  1. The EPG-only two-step reduction DROPS THE ONE-STEP EPG -> EPG TERM. M16['net'] is PEN + PEG + Delta7 + Ring only;
-     the 'direct' one-step matrix is computed, printed (in mV, in the same table row as the mV^2 lambdas) and then never
-     used. Its k = 1 ring-Fourier coefficient is +6.00 mV damped (gamma_crit = 1 / (tau d_1) = 33.4 Hz/mV, never
-     reached) and +59.76 mV undamped (3.35 Hz/mV, reached by the LIF at any u below ~34 mV), so the undamped
-     EPG -> EPG ring is supercritical on its own and predicts, to 4-7 %, the bump the same_type_gain = 1 arms actually
-     hold (145 Hz predicted for f, 161 Hz for cf, against 151-156 and 156-158 observed) -- the bump this pass misses.
-  2. rate_fixed_point ENTERS THE FORCED BACKGROUND AS A RATE, NOT AS A CURRENT (r = f(tau A r) + forced), so a driven
-     EPG sits at u = -22 to -68 mV while 'firing' at 10-50 Hz and gamma_EPG = f'(u_EPG) = 0 BY CONSTRUCTION -- no
-     recurrent EPG term, direct or two-step, can ever engage. Put the same drive in as a current (10 Hz <-> 6.63 mV,
-     50 Hz <-> 11.99 mV) and the same deterministic model, at the same sigma = 2 mV, separates the families: shipped
-     returns to 14.3 / 15.3 Hz after release (no bump), undamped runs away to 264 / 272 Hz.
+  1. FORCED DRIVE AS A CURRENT (`--drive current`, default; `--drive rate` = 5A). 5A's rate_fixed_point added the
+     forced background as a RATE (r = f(tau A r) + forced), so a driven EPG sat at u = -22 to -68 mV while 'firing' at
+     10-50 Hz and gamma_EPG = f'(u_EPG) = 0 BY CONSTRUCTION -- no recurrent EPG term could ever engage. The drive now
+     enters as a current u_forced = f^-1(rate) under the same smoothed LIF f-I (`u_for_rate`: 10 Hz -> 6.628 mV,
+     50 Hz -> 11.993 mV at sigma 2 mV; derived, not hardcoded), i.e. r = f(tau A r + u_forced).
+  2. THE ONE-STEP EPG -> EPG TERM IS KEPT (`--reduction with-direct`, default; `--reduction two-step` = 5A). The
+     EPG-only reduction's loop gain of ring mode k is now gamma tau d_k + gamma^2 tau^2 lambda_k (d_k = the one-step
+     EPG -> EPG ring-Fourier coefficient in mV, lambda_k = the two-step one in mV^2), so gamma_crit(k) solves that
+     quadratic (`gamma_crit_combined`). 5A computed lambda_k alone and printed d_k in the same row without using it.
+     The rate at which a supercritical one-step ring saturates -- the rate where f'(u) falls back to gamma_crit,
+     `rate_at_gain` -- is reported per configuration and is what the F-family validation checks.
+  3. PER-CELL GAIN AT THE REALISED FIXED POINT (`--gain per-cell`, default; `--gain uniform` = 5A's gamma 6 reading).
+     The linearisation is the true Jacobian J = diag(gamma_i) tau A with gamma_i = f'(u_i) (`lif_fi_prime`, the exact
+     derivative of the same Gauss-Hermite-smoothed f-I) at the fixed point the model actually occupies, reported per
+     state (leading eigenvalue, spectral radius, and the leading mode whose EPG profile is ring index k = 1: 'the k = 1
+     gain'), alongside the weight-matrix eigenvalues, which are a NECESSARY CONDITION and not the attractor.
 
-Consequence: the fixed point this script ranks configurations by has gamma = 0 on every compass cell except Delta7, so
-THE RANKING IT PRINTS IS COMPUTED AT A ZERO-GAIN STATE. At that state the true Jacobian diag(gamma_i) tau A is stable in
-every mode (leading eigenvalue +0.045 at background, +0.079 during the pulse), against +3.55 under a uniform gamma = 6,
-and the ranking puts the one arm that does hold a bump (f) last-equal. Fix both before the ranking is relied on again.
+`--holds` adds the 6A counterfactual configurations (ExR6 / ER6 / ER4m held at 0 onto PEN and EPG, and each type
+alone) through the same `type_path_gain` stage `cx_wedge.py --hold-edges` uses, so the structure pass and the batch
+hold the same edges. `--validate-batch DIR` scores the fixed tool against an already-fetched batch (out/cx5): the
+predicted saturation rate per configuration against the measured `bump_hz_post`, and the predicted / measured bump.
+Nothing here changes a default; no file outside out/ is written.
 """
 from __future__ import annotations
 
@@ -78,6 +85,135 @@ import cx_wedge  # noqa: E402
 RING16 = cx_wedge.RING16
 GROUPS = ("EPG", "PEN", "PEG", "Delta7", "EPGt", "Ring", "GLNO")
 THETA_MV = 7.0          # v_th - v_rest of LIFParams()
+BUMP_THRESH_HZ = 22.0   # probe_compass_room.THRESH_HZ: the per-cell rate the ledger's bump rule counts as 'in the bump'
+SIGMA_MV = 2.0          # the input-noise smoothing of cx_wedge.lif_fi, unchanged from 5A. AN ASSUMPTION, NEVER
+                        # MEASURED: nothing in this project has measured the spiking LIF's effective input noise, and
+                        # no arm of cx6 varies it. Every slope bound below is a property of this number (max slope
+                        # 25.3 Hz/mV at sigma 0.25, 11.0 at 1.0, 8.00 at 2.0; gamma_crit 33.3 is reached at 0.17).
+# The 6A hold: the DC inhibition the 5A decomposition names, held at 0 onto the relays and the ring (an `edges`-kind
+# LABELLED COUNTERFACTUAL; the same regex pair scripts/cx_wedge.py --hold-edges installs).
+HOLD_PRE = r"^(ExR6|ER6|ER4m)$"
+HOLD_POST = r"^(PEN_|EPG$)"
+
+
+# ------------------------------------------------------------------------------------------------ the LIF f-I, its
+# derivative and its inverse (6A fixes 1 and 3; the f-I itself is cx_wedge.lif_fi, unchanged)
+def lif_fi_det(u, p: brain.LIFParams | None = None):
+    """The deterministic LIF f-I (Hz), 1000 / (t_ref + tau_m ln(u / (u - theta))) above threshold and 0 below."""
+    p = p or brain.LIFParams()
+    theta = p.v_th - p.v_rest
+    u = np.atleast_1d(np.asarray(u, dtype=float))
+    out = np.zeros_like(u)
+    m = u > theta + 1e-12
+    if m.any():
+        out[m] = 1000.0 / (p.t_ref + p.tau_m * np.log(u[m] / (u[m] - theta)))
+    return out
+
+
+def lif_fi_prime(u, p: brain.LIFParams | None = None, sigma: float = SIGMA_MV, nodes: int = 61):
+    """d/du of the smoothed LIF f-I (Hz/mV), the cell gain gamma_i the linearisation needs.
+
+    cx_wedge.lif_fi is the Gaussian convolution f_sigma(u) = E[f_det(u + sigma x)] (Gauss-Hermite, 15 nodes). Its
+    derivative E[f_det'(u + sigma x)] cannot be taken node by node: f_det'(u) = f^2 tau_m theta / (1000 u (u - theta))
+    DIVERGES as u -> theta+ (the deterministic f-I has infinite slope at threshold; 5A's '25.8 Hz/mV at u 7.1' is a
+    point on that divergence, not a maximum), so a node landing near threshold returns hundreds of Hz/mV. Integrating by
+    parts removes the singularity exactly -- phi'(x) = -x phi(x), so
+
+        f_sigma'(u) = (1 / sigma) E[x f_det(u + sigma x)]
+
+    -- and the estimate becomes finite, but it is NOT CONVERGED: the maximum over u reads 8.66 Hz/mV at 15 nodes,
+    8.31 at 31, 8.27 at 61 (this function's default), 8.19 at 101 and 8.13 at 201, still falling, and numpy's
+    `hermegauss` overflows to NaN above ~201 nodes. Exact adaptive quadrature of the same integral gives
+    **8.00 Hz/mV at u 8.61 (25.5 Hz)** at sigma 2 mV, so the 61-node default is 3.4 % high. `structure.json` records
+    the 61-node value (`max_lif_slope` 8.2747 at u 8.6018, 25.13 Hz).
+
+    Two limits on what any of this means. (i) The bound is a property of the ASSUMED sigma: `SIGMA_MV = 2.0` is
+    hard-coded and the effective input noise of the spiking LIF has never been measured in this project. The exact
+    maximum slope is 25.3 Hz/mV at sigma 0.25 mV, 11.0 at 1.0 and 8.00 at 2.0, and a gamma_crit of 33.3 Hz/mV would be
+    reached at sigma 0.17 mV. (ii) The f-I the fixed point actually iterates is `cx_wedge.lif_fi` at 15 nodes, which is
+    not smooth near threshold and does not respect the bound. So the honest statement is: at sigma 2 mV a gamma_crit of
+    28.8-33.3 Hz/mV is above every operating point of the exact smoothed f-I by a factor of 3.6-4.2 -- not that such a
+    gain is unreachable. 5A's '25.8 Hz/mV at u 7.1' is right for the DETERMINISTIC f-I and is a sample on its
+    divergence, so it was never a maximum either."""
+    p = p or brain.LIFParams()
+    xs, ws = np.polynomial.hermite_e.hermegauss(nodes)
+    ws = ws / ws.sum()
+    u = np.atleast_1d(np.asarray(u, dtype=float))
+    out = np.zeros_like(u)
+    for x, w in zip(xs, ws):
+        out += w * x * lif_fi_det(u + sigma * x, p)
+    return out / sigma
+
+
+def u_for_rate(hz: float, p: brain.LIFParams | None = None, sigma: float = SIGMA_MV, lo: float = -60.0, hi: float = 400.0) -> float:
+    """The mean input u (mV above rest) at which the smoothed LIF f-I fires `hz`: f^-1, by bisection on a monotone
+    function. This is how a forced Poisson drive of `hz` enters the rate model as a CURRENT (6A fix 1)."""
+    f = lambda x: float(cx_wedge.lif_fi(np.array([x]), p, sigma)[0])   # noqa: E731
+    if hz <= 0:
+        return float(lo)
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if f(mid) < hz:
+            lo = mid
+        else:
+            hi = mid
+    return float(0.5 * (lo + hi))
+
+
+_MAX_SLOPE_CACHE = {}
+
+
+def max_slope(p: brain.LIFParams | None = None, sigma: float = SIGMA_MV) -> tuple:
+    """(max f'(u), the u where it peaks, f(u) there), computed from `lif_fi_prime` at its default quadrature order:
+    the largest slope the SMOOTHED f-I has at any operating point, at the ASSUMED `sigma` (`SIGMA_MV` = 2.0, never
+    measured). The Gauss-Hermite estimate is not converged -- see `lif_fi_prime`; this returns 8.27 Hz/mV where exact
+    adaptive quadrature gives 8.00 at u 8.61 (25.5 Hz). A gamma_crit above it does not close a loop in this rate model
+    at this sigma (shipped: gamma_crit(k1) 33.4 vs 8.0-8.3), which is a statement about the rate model and its assumed
+    noise, not about the spiking LIF."""
+    p = p or brain.LIFParams()
+    key = (p.t_ref, p.tau_m, p.v_th - p.v_rest, sigma)
+    if key not in _MAX_SLOPE_CACHE:
+        u = np.linspace(p.v_th - p.v_rest - 4 * sigma, 200.0, 100001)
+        d = lif_fi_prime(u, p, sigma)
+        i = int(np.argmax(d))
+        _MAX_SLOPE_CACHE[key] = (float(d[i]), float(u[i]), float(cx_wedge.lif_fi(np.array([u[i]]), p, sigma)[0]))
+    return _MAX_SLOPE_CACHE[key]
+
+
+def rate_at_gain(gamma: float, p: brain.LIFParams | None = None, sigma: float = SIGMA_MV) -> float:
+    """The rate at which a loop whose critical gain is `gamma` saturates: f(u*) at the u* ABOVE the slope peak where
+    f'(u*) = gamma. The slope falls monotonically there, so a supercritical loop grows until the gain has fallen back
+    to 1 / (loop weight). NaN when gamma exceeds `max_slope`: the loop is not supercritical at any operating point of
+    the smoothed f-I at the assumed sigma. (gamma 3.35 -> 144 Hz, 3.01 -> 160 Hz, 33.4 -> NaN.)"""
+    p = p or brain.LIFParams()
+    if not np.isfinite(gamma) or gamma <= 0:
+        return float("nan")
+    dmax, u_peak, _ = max_slope(p, sigma)
+    if gamma >= dmax:
+        return float("nan")
+    lo, hi = u_peak, 5000.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if float(lif_fi_prime(np.array([mid]), p, sigma)[0]) > gamma:
+            lo = mid
+        else:
+            hi = mid
+    return float(cx_wedge.lif_fi(np.array([0.5 * (lo + hi)]), p, sigma)[0])
+
+
+def gamma_crit_combined(lam: float, d: float, tau: float) -> float:
+    """The uniform cell gain at which ring mode k of the EPG-only reduction reaches loop gain 1 when BOTH the one-step
+    EPG -> EPG coefficient d_k (mV) and the two-step coefficient lambda_k (mV^2) are kept (6A fix 2):
+    gamma tau d + gamma^2 tau^2 lambda = 1. With d = 0 this is 5A's 1 / (tau sqrt(lambda)); with lambda = 0 it is
+    1 / (tau d). inf when no positive gamma solves it."""
+    lam, d = float(lam), float(d)
+    if abs(lam) < 1e-12:
+        return float(1.0 / (tau * d)) if d > 0 else float("inf")
+    disc = d * d + 4.0 * lam
+    if disc < 0:
+        return float("inf")
+    g = (-d + np.sqrt(disc)) / (2.0 * tau * lam)
+    return float(g) if g > 0 and np.isfinite(g) else float("inf")
 
 
 # ------------------------------------------------------------------------------------------------ small helpers
@@ -287,24 +423,93 @@ class Circuit:
 
 
 # ------------------------------------------------------------------------------------------------ rate model
-def rate_fixed_point(A_sub, nE, inside, p: brain.LIFParams, background_hz=10.0, pulse_hz=40.0, sigma=2.0, iters=4000, alpha=0.05):
-    """cx_wedge.rate_model on an explicit sub-circuit matrix: r = f(tau_syn A r + forced), LIF f-I smoothed over
-    sigma mV of input noise, background -> pulse -> release, each relaxed to a fixed point."""
+def rate_fixed_point(A_sub, nE, inside, p: brain.LIFParams, background_hz=10.0, pulse_hz=40.0, sigma=SIGMA_MV, iters=4000,
+                     alpha=0.05, drive="current"):
+    """The threshold-linear fixed point of an explicit sub-circuit matrix under the cx_wedge protocol (background ->
+    pulse -> release, each relaxed), with the LIF f-I smoothed over sigma mV of input noise.
+
+    drive 'current' (6A fix 1, the default): r = max(f(tau A r + u_forced), r_forced), u_forced = f^-1(r_forced) on the
+    EPG. The drive enters as the CURRENT that produces the forced rate, so a driven EPG that is not held below threshold
+    by its own inputs has a real gain f'(u) -- 5A's defect. The forced rate stays a FLOOR because `FlyBrain.stimulate`
+    forces spikes through `poisson_p` (brain.py: forced = rand < poisson_p, ORed with the threshold crossing), so a
+    hyperpolarised EPG still fires at the driven rate; without the floor the same fixed point collapses the whole ring
+    to 2.7 Hz (ring inhibition cancels the 6.63 mV drive), against a measured 9.5-14 Hz. Gains follow the same rule:
+    gamma_i = f'(u_i) where the cell fires intrinsically, 0 where its rate is the forced floor.
+    drive 'current-nofloor' is the literal reading (no floor), 'rate' is 5A's r = f(tau A r) + r_forced, which leaves
+    the driven EPG at u -22 to -68 mV while 'firing' and so has gamma_EPG = 0 by construction. Both kept for
+    comparison."""
     tau = p.tau_syn / 1000.0
     n = A_sub.shape[0]
-    forced = np.zeros(n); forced[:nE] = background_hz
+    if drive not in ("current", "current-nofloor", "rate"):
+        raise ValueError(f"drive must be 'current', 'current-nofloor' or 'rate', got {drive!r}")
+    if drive.startswith("current"):
+        floor_on = drive == "current"
+        u_bg_drive, u_pulse_drive = u_for_rate(background_hz, p, sigma), u_for_rate(background_hz + pulse_hz, p, sigma)
+        f_bg = np.zeros(n); f_bg[:nE] = u_bg_drive
+        f_pulse = f_bg.copy(); f_pulse[:nE][inside] = u_pulse_drive
+        r_floor_bg = np.zeros(n); r_floor_bg[:nE] = background_hz
+        r_floor_pulse = r_floor_bg.copy(); r_floor_pulse[:nE][inside] = background_hz + pulse_hz
+        floors = {id(f_bg): r_floor_bg, id(f_pulse): r_floor_pulse}
+        r0 = np.maximum(cx_wedge.lif_fi(f_bg, p, sigma), r_floor_bg) if floor_on else cx_wedge.lif_fi(f_bg, p, sigma)
 
-    def relax(f, r):
-        for _ in range(iters):
+        def relax(fu, r):
+            fl = floors[id(fu)] if floor_on else None
+            u = tau * (A_sub @ r) + fu
+            for _ in range(iters):
+                u = tau * (A_sub @ r) + fu
+                tgt = cx_wedge.lif_fi(u, p, sigma)
+                if fl is not None:
+                    tgt = np.maximum(tgt, fl)
+                r = (1 - alpha) * r + alpha * tgt
+            return r, u
+    else:
+        f_bg = np.zeros(n); f_bg[:nE] = background_hz
+        f_pulse = f_bg.copy(); f_pulse[:nE][inside] += pulse_hz
+        r0 = f_bg.copy()
+
+        def relax(fr, r):
             u = tau * (A_sub @ r)
-            r = (1 - alpha) * r + alpha * (cx_wedge.lif_fi(u, p, sigma) + f)
-        return r, u
+            for _ in range(iters):
+                u = tau * (A_sub @ r)
+                r = (1 - alpha) * r + alpha * (cx_wedge.lif_fi(u, p, sigma) + fr)
+            return r, u
 
-    r_bg, u_bg = relax(forced, forced.copy())
-    fp = forced.copy(); fp[:nE][inside] += pulse_hz
-    r_pulse, u_pulse = relax(fp, r_bg)
-    r_after, u_after = relax(forced, r_pulse)
-    return dict(background=(r_bg, u_bg), pulse=(r_pulse, u_pulse), after=(r_after, u_after))
+    r_bg, u_bg = relax(f_bg, r0)
+    r_pulse, u_pulse = relax(f_pulse, r_bg)
+    r_after, u_after = relax(f_bg, r_pulse)
+    out = dict(background=(r_bg, u_bg), pulse=(r_pulse, u_pulse), after=(r_after, u_after))
+    out["drive"] = drive
+    cur = drive.startswith("current")
+    out["forced_mV"] = dict(background=float(f_bg[0]) if cur else None,
+                            pulse=float(f_pulse[:nE][inside][0]) if cur else None)
+    out["floor"] = (dict(background=r_floor_bg, pulse=r_floor_pulse, after=r_floor_bg) if drive == "current" else None)
+    return out
+
+
+def jacobian_modes(A_sub, u, tau, epg_slice, wedge_of, p: brain.LIFParams, sigma=SIGMA_MV, n_report=6, floor=None):
+    """The TRUE linearisation at a realised state (6A fix 3): J = diag(f'(u_i)) tau A, whose eigenvalues are loop gains
+    (dimensionless; a mode grows when Re mu > 1). Returns the leading eigenvalue, the spectral radius, the per-group
+    gains, and the leading mode whose EPG profile has ring index k -- 'the k = 1 gain' is lead['1']."""
+    gamma = lif_fi_prime(u, p, sigma)
+    if floor is not None:                    # a cell whose rate is the forced floor has no gain: its spikes are forced
+        gamma = np.where(cx_wedge.lif_fi(u, p, sigma) > np.asarray(floor), gamma, 0.0)
+    J = (gamma[:, None] * tau) * A_sub
+    w, V = np.linalg.eig(J)
+    order = np.argsort(-np.real(w))
+    rows, lead = [], {}
+    for i in order:                      # scan every mode so the leading k = 1 mode ('the k = 1 gain') is always found
+        v = V[epg_slice, i]
+        prof = np.array([v[wedge_of == k].mean() if (wedge_of == k).any() else 0.0 for k in range(16)])
+        spec = np.abs(np.fft.fft(prof)) ** 2
+        kk = int(np.argmax(spec)); kk = min(kk, 16 - kk)
+        row = dict(re=float(np.real(w[i])), im=float(np.imag(w[i])), k=kk,
+                   k_power=float(spec.max() / max(spec.sum(), 1e-12)),
+                   epg_share=float(np.sum(np.abs(v) ** 2) / max(np.sum(np.abs(V[:, i]) ** 2), 1e-12)))
+        if len(rows) < n_report:
+            rows.append(row)
+        lead.setdefault(str(kk), row)
+    return dict(leading_re=float(np.real(w[order[0]])), spectral_radius=float(np.abs(w).max()),
+                gamma=gamma, top=rows, leading_by_k=lead)
 
 
 def summarise_state(r, u, groups_slices, inside, wedge_of, nE):
@@ -319,7 +524,7 @@ def summarise_state(r, u, groups_slices, inside, wedge_of, nE):
 
 
 # ------------------------------------------------------------------------------------------------ analysis of one circuit
-def analyse(cir: Circuit, log=print) -> dict:
+def analyse(cir: Circuit, log=print, drive="current", reduction="with-direct", gain="per-cell") -> dict:
     p = cir.p
     tau = p.tau_syn / 1000.0
     res = dict(label=cir.label, evidence=cir.evidence, lif=dict(conn_cap=p.conn_cap, same_type_gain=p.same_type_gain,
@@ -345,10 +550,26 @@ def analyse(cir: Circuit, log=print) -> dict:
                                  volley_delta7_to_epg=res["one_step"]["Delta7->EPG"]["total_per_post"],
                                  volley_ring_to_epg=res["one_step"]["Ring->EPG"]["total_per_post"])
     lam1 = res["fourier"]["net"][1]; lam0 = res["fourier"]["net"][0]
-    res["two_step_gain"] = dict(lambda_k1_net=lam1, lambda_k0_net=lam0, lambda_k1_tuned=res["fourier"]["net_tuned"][1],
-                                gamma_crit_k1=float(1.0 / (tau * np.sqrt(lam1))) if lam1 > 0 else float("inf"),
-                                gamma_crit_k0=float(1.0 / (tau * np.sqrt(lam0))) if lam0 > 0 else float("inf"),
-                                loop_gain_k1_at_6=float(36.0 * tau * tau * lam1), loop_gain_k0_at_6=float(36.0 * tau * tau * lam0))
+    d1 = res["fourier"]["direct"][1]; d0 = res["fourier"]["direct"][0]     # the ONE-STEP EPG -> EPG coefficients (mV)
+    keep_direct = reduction == "with-direct"
+    g1 = gamma_crit_combined(lam1, d1 if keep_direct else 0.0, tau)
+    g0 = gamma_crit_combined(lam0, d0 if keep_direct else 0.0, tau)
+    g1_direct_only = gamma_crit_combined(0.0, d1, tau)
+    dmax, u_peak, f_peak = max_slope(p)
+    res["two_step_gain"] = dict(
+        lambda_k1_net=lam1, lambda_k0_net=lam0, lambda_k1_tuned=res["fourier"]["net_tuned"][1],
+        direct_k1_mV=d1, direct_k0_mV=d0, reduction=reduction,
+        # 6A fix 2: gamma tau d_k + gamma^2 tau^2 lambda_k = 1 (the one-step term kept); 5A's value is the d = 0 root
+        gamma_crit_k1=g1, gamma_crit_k0=g0,
+        gamma_crit_k1_two_step_only=float(1.0 / (tau * np.sqrt(lam1))) if lam1 > 0 else float("inf"),
+        gamma_crit_k1_direct_only=g1_direct_only,
+        loop_gain_k1_at_6=float(36.0 * tau * tau * lam1 + 6.0 * tau * (d1 if keep_direct else 0.0)),
+        loop_gain_k0_at_6=float(36.0 * tau * tau * lam0 + 6.0 * tau * (d0 if keep_direct else 0.0)),
+        # the rate at which a supercritical mode saturates (f'(u) back to gamma_crit); NaN = never supercritical
+        saturation_hz_k1_uniform=rate_at_gain(g1, p), saturation_hz_k0_uniform=rate_at_gain(g0, p),
+        saturation_hz_k1_direct_only=rate_at_gain(g1_direct_only, p),
+        max_lif_slope=dmax, max_lif_slope_at_u=u_peak, max_lif_slope_at_hz=f_peak,
+        supercritical_k1_uniform=bool(np.isfinite(g1) and g1 < dmax))
     # full sub-circuit linearisation
     A_sub, idx = cir.sub()
     nE = len(cir.idx["EPG"])
@@ -359,13 +580,70 @@ def analyse(cir: Circuit, log=print) -> dict:
     sl = {}; start = 0
     for g in GROUPS:
         sl[g] = slice(start, start + len(cir.idx[g])); start += len(cir.idx[g])
-    st = rate_fixed_point(A_sub, nE, inside, p)
-    res["rate_model"] = {k: summarise_state(r, u, sl, inside, cir.wedge_of, nE) for k, (r, u) in st.items()}
+    st = rate_fixed_point(A_sub, nE, inside, p, drive=drive)
+    states = {k: v for k, v in st.items() if k in ("background", "pulse", "after")}
+    res["rate_model"] = {k: summarise_state(r, u, sl, inside, cir.wedge_of, nE) for k, (r, u) in states.items()}
+    res["rate_model"]["drive"] = drive
+    res["rate_model"]["forced_mV"] = st["forced_mV"]
     a = res["rate_model"]["after"]
     res["rate_model"]["bump_after"] = bool(a["epg_in"] > 2 * a["epg_out"] and a["epg_in"] > 15.0)
+    res["rate_model"]["runaway_after"] = bool(a["epg_out"] > 60.0)
+    # 6A fix 3: the true Jacobian diag(f'(u_i)) tau A at each realised state (a mode grows when Re mu > 1)
+    jac = {}
+    for k, (r, u) in states.items():
+        jm = jacobian_modes(A_sub, u, tau, slice(0, nE), cir.wedge_of, p, floor=(st["floor"] or {}).get(k))
+        gam = jm.pop("gamma")
+        jm["gamma_by_group"] = {g: dict(mean=float(gam[sl[g]].mean()), max=float(gam[sl[g]].max())) for g in GROUPS if sl[g].stop > sl[g].start}
+        jm["gamma_EPG_driven"] = float(gam[:nE][inside].mean())
+        jm["loop_gain_k1"] = float(jm["leading_by_k"].get("1", {}).get("re", float("nan")))
+        jm["loop_gain_k0"] = float(jm["leading_by_k"].get("0", {}).get("re", float("nan")))
+        jac[k] = jm
+    res["jacobian"] = jac
+    # 6A: THE BUMP CRITERION the tool is validated on -- the EPG ring mode k = 1 with per-cell gains. An increment of
+    # the driven EPG rate returns to the EPG as gamma_E tau d_1 (its own synapses, one step) + gamma_E gamma_relay
+    # tau^2 lambda_1 (through PEN / PEG / Delta7, two steps), so the loop closes at
+    #     gamma_E_crit = 1 / (tau d_1 + gamma_relay tau^2 lambda_1),
+    # with gamma_relay READ OFF THE REALISED FIXED POINT (0 while the relays are below threshold -- the shipped case,
+    # where the criterion reduces to the one-step term 5A dropped). A loop that closes grows until f'(u) has fallen
+    # back to gamma_E_crit, which is `rate_at_gain`: the predicted bump rate. gamma_E_crit above the LIF's maximum
+    # slope (8.3 Hz/mV at sigma 2 mV) is never reached at any operating point -> no bump.
+    local = {k: float(prof[k][0] + 2 * prof[k][1]) for k in prof}     # the wedge-local band |post - pre| <= 1
+    crit = {}
+    for k in ("background", "pulse", "after"):
+        gam = jac[k]["gamma_by_group"]
+        g = {x: float(gam.get(x, {}).get("mean", 0.0)) for x in ("PEN", "PEG", "Delta7", "Ring")}
+        # (i) the EPG's OWN recurrence, wedge-local and one-sided -- the criterion this tool is validated on
+        den_epg = tau * (local["direct"] if keep_direct else 0.0)
+        # (ii) the same with the relays adiabatic at their REALISED gains (0 while they are below threshold)
+        den_all = den_epg + tau * tau * sum(g[x] * local[x] for x in ("PEN", "PEG", "Delta7", "Ring"))
+        out = {}
+        for name, den in (("epg_recurrent", den_epg), ("with_relays", den_all)):
+            gc = float(1.0 / den) if den > 0 else float("inf")
+            sat = rate_at_gain(gc, p)
+            out[name] = dict(denominator_mV_per_Hz=den, gamma_EPG_crit=gc, saturation_hz=sat,
+                             closes=bool(np.isfinite(sat)), predicted_bump=bool(np.isfinite(sat) and sat > BUMP_THRESH_HZ))
+        # 'the k = 1 gain' with per-cell gains: the loop gain of ring mode k = 1 of the EPG-only reduction,
+        # gamma_E (tau d_1 + tau^2 sum_X gamma_X lambda_1^X) -- a projection, always defined (the Jacobian's own
+        # k = 1 CLASSIFICATION is nan whenever no eigenvector's EPG profile peaks at k = 1, e.g. when gamma_EPG = 0)
+        lam1_by = {x: float(res["fourier"][x][1]) for x in ("PEN", "PEG", "Delta7", "Ring")}
+        gE = float(jac[k]["gamma_EPG_driven"])
+        k1_gain = gE * (tau * (d1 if keep_direct else 0.0) + tau * tau * sum(g[x] * lam1_by[x] for x in lam1_by))
+        k1_gain_epg_only = gE * tau * (d1 if keep_direct else 0.0)
+        crit[k] = dict(gamma_relay=g, gamma_EPG=gE, local_kernels=local, k1_gain=float(k1_gain),
+                       k1_gain_epg_only=float(k1_gain_epg_only), lambda_1_by_relay=lam1_by,
+                       jacobian_k1_classified=float(jac[k]["loop_gain_k1"]), max_lif_slope=dmax, **out)
+    res["bump_criterion"] = crit
+    res["local_kernels"] = local
+    res["two_step_gain"]["gamma_crit_k1_recurrent"] = crit["pulse"]["epg_recurrent"]["gamma_EPG_crit"]
+    res["two_step_gain"]["saturation_hz_k1"] = crit["pulse"]["epg_recurrent"]["saturation_hz"]
+    res["two_step_gain"]["supercritical_k1"] = crit["pulse"]["epg_recurrent"]["closes"]
+    res["two_step_gain"]["predicted_bump"] = crit["pulse"]["epg_recurrent"]["predicted_bump"]
+    res["two_step_gain"]["gamma_crit_with_relays"] = crit["pulse"]["with_relays"]["gamma_EPG_crit"]
+    res["two_step_gain"]["saturation_hz_with_relays"] = crit["pulse"]["with_relays"]["saturation_hz"]
+    res["two_step_gain"]["predicted_bump_with_relays"] = crit["pulse"]["with_relays"]["predicted_bump"]
     # PEN DC margin during the pulse: mean input of the PENs whose glomerulus lies in the driven wedges
     pen_in = np.isin(np.asarray(np.round(cir.pos["PEN"]), int) % 16, [0, 1, 2, 3])
-    for k, (r, u) in st.items():
+    for k, (r, u) in states.items():
         up = u[sl["PEN"]]
         res["rate_model"][k]["u_PEN_in"] = float(up[pen_in].mean()); res["rate_model"][k]["u_PEN_out"] = float(up[~pen_in].mean())
         res["rate_model"][k]["PEN_in"] = float(r[sl["PEN"]][pen_in].mean()); res["rate_model"][k]["PEN_out"] = float(r[sl["PEN"]][~pen_in].mean())
@@ -374,8 +652,9 @@ def analyse(cir: Circuit, log=print) -> dict:
     # ring-neuron types that carry the Ring term (their fixed-point rates and their share)
     dec = {}
     rt = np.array(cir.cells["Ring"]["label"])
-    for k, (r, u) in st.items():
+    for k, (r, u) in states.items():
         d = {}
+        d["forced_mV"] = float(st["forced_mV"]["pulse" if k == "pulse" else "background"] or 0.0) if drive == "current" else 0.0
         for post, rows_ in (("PEN_in", pen_in), ("EPG_in", inside)):
             grp = "PEN" if post == "PEN_in" else "EPG"
             for g in GROUPS:
@@ -393,11 +672,58 @@ def analyse(cir: Circuit, log=print) -> dict:
     res["decomposition"] = dec
     B_pe = cir.block("PEN", "EPG")[pen_in][:, inside]
     res["pen_drive_per_hz"] = dict(direct_EPG=float(B_pe.sum(axis=1).mean() * tau))
-    log(f"[{cir.label}] k1 net {lam1:+.0f} (PEN {res['fourier']['PEN'][1]:+.0f}, D7 {fD[1]:+.0f}, Ring {fR[1]:+.0f}); k0 net {lam0:+.0f}; "
-        f"gamma_crit(k1) {res['two_step_gain']['gamma_crit_k1']:.2f} Hz/mV; circuit lead k1 mu {lead.get(1, {}).get('re', float('nan')):+.1f} "
-        f"(gamma_crit {lead.get(1, {}).get('gamma_crit', float('nan')):.2f}); rate model after: in {a['epg_in']:.1f} out {a['epg_out']:.1f} "
-        f"PEN {a['PEN']:.1f} D7 {a['Delta7']:.1f} Ring {a['Ring']:.2f} GLNO {a['GLNO']:.1f} u_PEN_in {a['u_PEN_in']:+.2f} mV {'BUMP' if res['rate_model']['bump_after'] else ''}")
+    tg = res["two_step_gain"]; jp = res["jacobian"]["pulse"]; pu = res["rate_model"]["pulse"]
+    log(f"[{cir.label}] k1 net {lam1:+.0f} (PEN {res['fourier']['PEN'][1]:+.0f}, D7 {fD[1]:+.0f}, Ring {fR[1]:+.0f}), direct k1 {d1:+.2f} mV; "
+        f"gamma_crit(k1) {tg['gamma_crit_k1']:.2f} Hz/mV (two-step only {tg['gamma_crit_k1_two_step_only']:.2f}; max LIF slope {tg['max_lif_slope']:.1f}) "
+        f"-> saturation {tg['saturation_hz_k1']:.0f} Hz; Jacobian at the pulse: lead {jp['leading_re']:+.3f}, k1 gain {jp['loop_gain_k1']:+.3f}, "
+        f"gamma_EPG(driven) {jp['gamma_EPG_driven']:.2f}; pulse PEN {pu['PEN_in']:.1f} Hz u {pu['u_PEN_in']:+.2f} mV; after: in {a['epg_in']:.1f} "
+        f"out {a['epg_out']:.1f} PEN {a['PEN']:.1f} D7 {a['Delta7']:.1f} Ring {a['Ring']:.2f} GLNO {a['GLNO']:.1f} "
+        f"{'BUMP' if res['rate_model']['bump_after'] else ('RUNAWAY' if res['rate_model']['runaway_after'] else 'no bump')}")
     return res, dict(K=K, M16=M16, Kp=Kp, Mp16=Mp16)
+
+
+# ------------------------------------------------------------------------------------------------ the 6A hold configs
+def hold_params(pre: str, post: str, base: brain.LIFParams | None = None, factor: float = 0.0) -> brain.LIFParams:
+    """LIFParams with one `edges`-kind hold appended to type_path_gain -- the same stage and the same regex pair that
+    `cx_wedge.py --hold-edges` installs, so the structure pass and the batch hold exactly the same edges."""
+    import dataclasses
+    base = base or brain.LIFParams()
+    tpg = list(base.type_path_gain if base.type_path_gain is not None else brain.DEFAULT_TYPE_PATH_GAIN) + [(pre, post, float(factor))]
+    return dataclasses.replace(base, type_path_gain=tpg)
+
+
+def config_for_arm(arm, c, c_glu, cells, cells_glu):
+    """(label, evidence, connectome, LIFParams, cells) for one arm of a batch table, read off its own command flags --
+    so the structure pass and the batch are configured from ONE source. Returns None for an arm at gains other than
+    1:1 (the rate model here is built at the shipped path gains; the R references are not predicted)."""
+    label, desc, gains, glu, extra, cls = arm
+    if gains != "1:1":
+        return None
+    kw = {}
+    if "sign+gain" in extra:
+        kw["receptor_model"] = "sign+gain"
+        kw["receptor_net_rule"] = "abs"
+    if "same_type_gain=1" in extra:
+        kw["same_type_gain"] = 1.0
+    p = brain.LIFParams(**kw)
+    for i, x in enumerate(extra):
+        if x == "--hold-edges":
+            pre, post = extra[i + 1].split(":", 1)
+            p = hold_params(pre, post, p)
+    return (label, f"{desc} [{cls}]", c_glu if glu else c, p, cells_glu if glu else cells)
+
+
+def hold_configs(c, c_glu, cells, cells_glu) -> list:
+    """The 6A counterfactual configurations: the DC inhibition the 5A decomposition names, held at 0 onto PEN and EPG --
+    all three types together, each alone, and the three together with GLNO = glutamate. LABELLED COUNTERFACTUALS."""
+    ev = ("LABELLED COUNTERFACTUAL (an `edges`-kind hold, docs/INTERP.md 10.1 step 5), not a candidate default: "
+          "the DC term 5A's decomposition names, set to 0")
+    out = [("H3: ExR6+ER6+ER4m -> PEN,EPG held 0", ev, c, hold_params(HOLD_PRE, HOLD_POST), cells)]
+    for t in ("ExR6", "ER6", "ER4m"):
+        out.append((f"H_{t}: {t} -> PEN,EPG held 0", ev + f" ({t} alone)", c, hold_params(rf"^{t}$", HOLD_POST), cells))
+    out.append(("H3+GLNO=glu", ev + "; with the GLNO relabel (the correct-sign ring under the hold)", c_glu,
+                hold_params(HOLD_PRE, HOLD_POST), cells_glu))
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ evidence blocks
@@ -666,31 +992,54 @@ PRIMARIES = ("survival_s", "bump_hz_post", "width_half_post", "frac_confined_pos
 SECONDARIES = ("epg_in_mean_post", "epg_out_mean_post", "PEN_mean_post", "Delta7_mean_post", "Ring_mean_post", "GLNO_mean_post", "rest_mean_post",
                "PEN_mean_during", "vs_post_all")
 
+# ---- thread 6A (docs/audits/compass_dc_balance.md; out/cx6/predeclared.json). The cx5 protocol at the SHIPPED gains,
+# with the DC term of 5A's decomposition held at 0 (an `edges`-kind LABELLED COUNTERFACTUAL, never a candidate default).
+HOLD3 = r"^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)"
+CX6_ARMS = [
+    ("S", "shipped: gE 1 / gD 1, LIFParams() (receptor sign/abs), GLNO sign 0, no hold", "1:1", False,
+     ["--receptor-model", "shipped"], "the shipped path (reference)"),
+    ("H3", "ExR6 + ER6 + ER4m -> PEN, EPG held at 0", "1:1", False,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3],
+     "LABELLED COUNTERFACTUAL (edges hold): the DC term 5A's fixed point names (-24.9 mV on PEN during the pulse)"),
+    ("H_ExR6", "ExR6 -> PEN, EPG held at 0", "1:1", False,
+     ["--receptor-model", "shipped", "--hold-edges", r"^ExR6$:^(PEN_|EPG$)"],
+     "LABELLED COUNTERFACTUAL: the largest single term (2 cells, -14.8 mV on PEN in the rate model)"),
+    ("H_ER6", "ER6 -> PEN, EPG held at 0", "1:1", False,
+     ["--receptor-model", "shipped", "--hold-edges", r"^ER6$:^(PEN_|EPG$)"],
+     "LABELLED COUNTERFACTUAL: 4 cells, -9.8 mV on PEN in the rate model"),
+    ("H_ER4m", "ER4m -> PEN, EPG held at 0", "1:1", False,
+     ["--receptor-model", "shipped", "--hold-edges", r"^ER4m$:^(PEN_|EPG$)"],
+     "LABELLED COUNTERFACTUAL: 11 cells, -12.6 mV on EPG in the rate model"),
+    ("F", "same-type damping off (same_type_gain 1) at the shipped gains", "1:1", False,
+     ["--receptor-model", "shipped", "--lif", "same_type_gain=1"],
+     "LABELLED INSTRUMENT (global), carried over from cx5 for continuity: the only shipped-gain arm that held a bump"),
+    ("R", "experiment gains gE 2 / gD 15 (Delta7 -> EPG only), GLNO silent", "2:15", False,
+     ["--no-delta7-pen", "--receptor-model", "shipped"], "LABELLED reference (cx5): the bump that exists"),
+    ("H3G", "H3 + GLNO = glutamate", "1:1", True,
+     ["--receptor-model", "shipped", "--hold-edges", HOLD3],
+     "LABELLED COUNTERFACTUAL + the data-implied relabel: the correct-sign ring under the hold"),
+]
+# 5 v 5 -> p_floor 0.0079, so a Holm family of m <= 6 is satisfiable (6 x 0.0079 = 0.047 <= 0.05).
+PRIMARIES_CX6 = ("survival_s", "bump_hz_post", "width_half_post", "frac_confined_post", "PEN_mean_during", "PEN_mean_post")
+SECONDARIES_CX6 = ("epg_in_mean_post", "epg_out_mean_post", "epg_in_mean_during", "epg_out_mean_during", "Delta7_mean_post",
+                   "Ring_mean_post", "GLNO_mean_post", "rest_mean_post", "vs_post_all", "Ring_mean_during", "Delta7_mean_during")
 
-def plan_batch(out_dir: Path, seeds=(0, 1, 2, 3), minutes=30, name="cx5"):
-    """Writes out/cx5/batch.sh (ONE cluster_run.py submission; one job per seed x GLNO condition, the arms of a job run
-    sequentially, blocks fam_s<seed>), the predeclaration skeleton and tree_state.json."""
+
+def arm_tables(arms):
+    """(primaries, secondaries) for an arm table."""
+    return (PRIMARIES_CX6, SECONDARIES_CX6) if arms is CX6_ARMS else (PRIMARIES, SECONDARIES)
+
+
+def sh_token(tok: str) -> str:
+    """Single-quote a command token that carries shell metacharacters (the hold regexes carry $ ( ) |), so the line is
+    safe both in batch.sh's double-quoted argument and in the remote shell that finally runs it."""
+    return f"'{tok}'" if any(ch in tok for ch in "$()|*?&;<>\\\"` ") else tok
+
+
+def write_tree_state(out_dir: Path):
+    """<out_dir>/tree_state.json: HEAD, the diff against origin/main and the sha256 of every file that ships with the
+    batch (cluster_run.py copies every file that differs from origin/main onto the run copy)."""
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
-    rel = out_dir.as_posix()
-    jobs = []
-    for s in seeds:
-        for glu in (False, True):
-            arms = [a for a in BATCH_ARMS if a[3] == glu]
-            parts, sts = [], []
-            for i, (label, _, gains, _, extra, _) in enumerate(arms):
-                stem = f"{rel}/{label}_s{s}"
-                cmd = (f"python scripts/cx_wedge.py --no-structure --sim {gains} --ledger --seed {s} --arm {label} --block fam_s{s} "
-                       + ("--nt-override GLNO=glutamate " if glu else "") + " ".join(extra) + f" --sim-out {stem}.json > {stem}.txt 2>&1; s{i}=\\$?; tail -3 {stem}.txt")
-                parts.append(cmd); sts.append(f"s{i}")
-            line = (f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && "
-                    + "; ".join(parts) + f"; exit \\$(({' | '.join(sts)}))")     # bash arithmetic: bare names, no $ (a $s0 in the double-quoted line would expand at submission)
-            jobs.append(dict(seed=s, glu=glu, arms=[a[0] for a in arms], line=line))
-    call = (f"python scripts/cluster_run.py --name {name} --minutes {minutes} --arm-block fam " + " ".join('"' + j["line"] + '"' for j in jobs)
-            + f" --fetch {rel}/")
-    sh = (f"#!/bin/bash\n# ONE submission: {len(jobs)} jobs = {len(seeds)} seeds x 2 GLNO conditions; each job runs its {len(BATCH_ARMS) // 2} arms sequentially; "
-          f"blocks fam_s<seed> (every seed's arms on one target). Generated by scripts/cx_ring_structure.py --plan-batch on {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
-          f"{call} 2>&1 | tee {rel}/client_stdout.txt\n")
-    (out_dir / "batch.sh").write_text(sh, encoding="utf-8", newline="\n")
     # tree state: git diff --stat and the sha256 of every file that differs from origin/main (cluster_run ships them all)
     status = git("status", "--porcelain").splitlines()
     files = sorted({ln[3:].strip() for ln in status if ln.strip()} | {"scripts/cx_wedge.py", "scripts/cx_ring_structure.py", "scripts/cx_glno.py",
@@ -704,9 +1053,42 @@ def plan_batch(out_dir: Path, seeds=(0, 1, 2, 3), minutes=30, name="cx5"):
     tree = dict(stamped_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), head=git("rev-parse", "HEAD"), branch=git("rev-parse", "--abbrev-ref", "HEAD"),
                 origin_main=git("rev-parse", "origin/main"), diff_stat=git("diff", "--stat").splitlines(), status_short=status, sha256=sha,
                 note="cluster_run.py ships every file that differs from origin/main: the uncommitted edits above travel with the run (this task may not commit). "
-                     "flyverse/body.py, flyverse/senses.py, scripts/probe_vnc_drive.py, tests/test_*.py and docs/audits/level_controls.md are another thread's "
-                     "concurrent edits; cx_wedge.py --sim builds FlyBrain without a world, so senses.py / body.py are not on the simulated path.")
+                     "Another thread is concurrently editing scripts/probe_vnc_drive.py, flyverse/senses.py and docs/audits/level_controls_r2.md; "
+                     "cx_wedge.py --sim builds FlyBrain without a world, so senses.py / body.py are not on the simulated path.")
     (out_dir / "tree_state.json").write_text(json.dumps(tree, indent=1), encoding="utf-8")
+    print(f"tree_state.json ({len(sha)} files hashed) -> {out_dir / 'tree_state.json'}")
+    return tree
+
+
+def plan_batch(out_dir: Path, seeds=(0, 1, 2, 3), minutes=30, name="cx5", arms=None):
+    """Writes <out_dir>/batch.sh (ONE cluster_run.py submission; one job per seed x GLNO condition, the arms of a job run
+    sequentially, blocks fam_s<seed>), and tree_state.json."""
+    arms_all = list(arms or BATCH_ARMS)
+    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    rel = out_dir.as_posix()
+    jobs = []
+    for s in seeds:
+        for glu in (False, True):
+            arms_j = [a for a in arms_all if a[3] == glu]
+            if not arms_j:
+                continue
+            parts, sts = [], []
+            for i, (label, _, gains, _, extra, _) in enumerate(arms_j):
+                stem = f"{rel}/{label}_s{s}"
+                cmd = (f"python scripts/cx_wedge.py --no-structure --sim {gains} --ledger --seed {s} --arm {label} --block fam_s{s} "
+                       + ("--nt-override GLNO=glutamate " if glu else "") + " ".join(sh_token(x) for x in extra)
+                       + f" --sim-out {stem}.json > {stem}.txt 2>&1; s{i}=\\$?; tail -3 {stem}.txt")
+                parts.append(cmd); sts.append(f"s{i}")
+            line = (f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && "
+                    + "; ".join(parts) + f"; exit \\$(({' | '.join(sts)}))")     # bash arithmetic: bare names, no $ (a $s0 in the double-quoted line would expand at submission)
+            jobs.append(dict(seed=s, glu=glu, arms=[a[0] for a in arms_j], line=line))
+    call = (f"python scripts/cluster_run.py --name {name} --minutes {minutes} --arm-block fam " + " ".join('"' + j["line"] + '"' for j in jobs)
+            + f" --fetch {rel}/")
+    sh = (f"#!/bin/bash\n# ONE submission: {len(jobs)} jobs = {len(seeds)} seeds x 2 GLNO conditions; each job runs its arms sequentially; "
+          f"blocks fam_s<seed> (every seed's arms on one target). Generated by scripts/cx_ring_structure.py --plan-batch on {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
+          f"{call} 2>&1 | tee {rel}/client_stdout.txt\n")
+    (out_dir / "batch.sh").write_text(sh, encoding="utf-8", newline="\n")
+    write_tree_state(out_dir)
     print(f"{len(jobs)} jobs -> {out_dir / 'batch.sh'}; tree_state.json ({len(sha)} files hashed)")
     return jobs
 
@@ -724,13 +1106,16 @@ def holm(pvals: dict) -> dict:
     return adj
 
 
-def analyse_batch(out_dir: Path, ref="S"):
-    """Tables, verdicts and the per-seed scatter from the fetched out/cx5/<arm>_s<seed>.json rows (CPU)."""
+def analyse_batch(out_dir: Path, ref="S", arms=None, seeds=(0, 1, 2, 3)):
+    """Tables, verdicts and the per-seed scatter from the fetched <out_dir>/<arm>_s<seed>.json rows (CPU)."""
     from flyverse.interp import common
+    ARMS = list(arms or BATCH_ARMS)
+    PRIM, SEC = arm_tables(arms or BATCH_ARMS)
+    seeds = tuple(seeds)
     out_dir = Path(out_dir); an = out_dir / "analysis"; an.mkdir(parents=True, exist_ok=True)
     rows = []
     problems = []
-    for label, desc, gains, glu, extra, cls in BATCH_ARMS:
+    for label, desc, gains, glu, extra, cls in ARMS:
         gE, gD = (float(x) for x in gains.split(":"))
         for f in sorted(out_dir.glob(f"{label}_s*.json")):
             try:
@@ -748,8 +1133,12 @@ def analyse_batch(out_dir: Path, ref="S"):
                          ledger_survival=(r.get("ledger") or {}).get("compass.EPG.bump_survival_s", {}).get("status"),
                          ledger_rate=(r.get("ledger") or {}).get("compass.EPG.bump_rate_hz", {}).get("status"),
                          ledger_width=(r.get("ledger") or {}).get("compass.EPG.bump_width_wedges", {}).get("status"),
+                         hold_edges=json.dumps(r.get("hold_edges") or []),
+                         hold_entries=int(sum(h.get("n_entries", 0) for h in (r.get("hold_edges_resolved") or []))),
+                         hold_pre_cells=int(sum(h.get("n_pre_cells", 0) for h in (r.get("hold_edges_resolved") or []))),
+                         hold_post_cells=int(sum(h.get("n_post_cells", 0) for h in (r.get("hold_edges_resolved") or []))),
                          profile_post=r.get("wedge_profile_post"))
-                for k in PRIMARIES + SECONDARIES:
+                for k in PRIM + SEC:
                     d[k] = m.get(k)
                 # checks: device / arm / gains / override
                 if str(d["device"]) != "cuda":
@@ -768,20 +1157,28 @@ def analyse_batch(out_dir: Path, ref="S"):
                 want_rm = "sign+gain" if "sign+gain" in extra else brain.LIFParams().receptor_model
                 if r.get("receptor_model") != want_rm:
                     problems.append(f"{f.name}: receptor_model {r.get('receptor_model')} != {want_rm}")
+                want_hold = [extra[i + 1] for i, x in enumerate(extra) if x == "--hold-edges"]
+                got_hold = [h[0] + ":" + h[1] for h in (r.get("hold_edges") or [])]
+                if got_hold != want_hold:
+                    problems.append(f"{f.name}: hold_edges {got_hold} != {want_hold} (arm {label})")
+                if want_hold and not all(abs(float(h[2])) < 1e-12 for h in (r.get("hold_edges") or [])):
+                    problems.append(f"{f.name}: hold factor is not 0: {r.get('hold_edges')}")
+                if want_hold and d["hold_entries"] == 0:
+                    problems.append(f"{f.name}: hold {want_hold} matched 0 entries")
                 rows.append(d)
     df = pd.DataFrame(rows)
     if df.empty:
         print("no rows"); return None
-    df = df.sort_values(["arm", "seed"], key=lambda s: s.map({a[0]: i for i, a in enumerate(BATCH_ARMS)}) if s.name == "arm" else s).reset_index(drop=True)
+    df = df.sort_values(["arm", "seed"], key=lambda s: s.map({a[0]: i for i, a in enumerate(ARMS)}) if s.name == "arm" else s).reset_index(drop=True)
     counts = df.groupby("arm").seed.size()
-    expected = {a[0] for a in BATCH_ARMS}
+    expected = {a[0] for a in ARMS}
     for a in expected - set(counts.index):
         problems.append(f"arm {a}: 0 runs")
     md5s = df.groupby("arm").md5.agg(lambda s: sorted(set(s)))
     # verdicts vs the reference per arm, primaries with Holm within the arm's family
     ref_df = df[df.arm == ref]
     comp = []
-    for label, desc, gains, glu, extra, cls in BATCH_ARMS:
+    for label, desc, gains, glu, extra, cls in ARMS:
         if label == ref:
             continue
         sub = df[df.arm == label]
@@ -789,7 +1186,7 @@ def analyse_batch(out_dir: Path, ref="S"):
             continue
         pv = {}
         res_k = {}
-        for k in PRIMARIES:
+        for k in PRIM:
             a_ = [x for x in sub[k].tolist() if x is not None and np.isfinite(x)]
             b_ = [x for x in ref_df[k].tolist() if x is not None and np.isfinite(x)]
             if len(a_) == 0 or len(b_) == 0:
@@ -802,10 +1199,10 @@ def analyse_batch(out_dir: Path, ref="S"):
                             n_stim=len(a_), n_null=len(b_), stim_values=[round(x, 4) for x in a_], null_values=[round(x, 4) for x in b_])
             pv[k] = c_["p"]
         adj = holm(pv)
-        for k in PRIMARIES:
+        for k in PRIM:
             res_k[k]["p_holm"] = adj.get(k, float("nan"))
             comp.append(dict(arm=label, key=k, **res_k[k]))
-        for k in SECONDARIES:
+        for k in SEC:
             a_ = [x for x in sub[k].tolist() if x is not None and np.isfinite(x)]
             b_ = [x for x in ref_df[k].tolist() if x is not None and np.isfinite(x)]
             if a_ and b_:
@@ -815,7 +1212,7 @@ def analyse_batch(out_dir: Path, ref="S"):
     cdf = pd.DataFrame(comp)
     # the predeclared decision rule per arm
     rule = []
-    for label, desc, gains, glu, extra, cls in BATCH_ARMS:
+    for label, desc, gains, glu, extra, cls in ARMS:
         sub = df[df.arm == label]
         ok = [(bool(s >= 5.0) and bool(np.isfinite(w) and 2.5 <= w <= 5.0) and bool(np.isfinite(h) and 5.0 <= h <= 60.0))
               for s, w, h in zip(sub.survival_s.fillna(0), sub.width_half_post.astype(float), sub.bump_hz_post.astype(float))]
@@ -824,19 +1221,64 @@ def analyse_batch(out_dir: Path, ref="S"):
                          working=bool(sum(ok) >= 3 and len(sub) >= 4), survival=sub.survival_s.tolist(), rate=sub.bump_hz_post.tolist(), width=sub.width_half_post.tolist(),
                          frac_confined_post=sub.frac_confined_post.tolist(), devices=sorted(set(map(str, sub.device_name))), md5=md5s.get(label, [])))
     rdf = pd.DataFrame(rule)
+    # the 6A three-way call, in the predeclared words (out/cx6/predeclared.json): applied to every arm, read for H3
+    if arms is CX6_ARMS:
+        calls = []
+        for label, desc, gains, glu, extra, cls in ARMS:
+            sub = df[df.arm == label]
+            if sub.empty:
+                continue
+            r_ = rdf[rdf.arm == label].iloc[0]
+            pen_d = sub.PEN_mean_during.astype(float)
+            call = ("the DC balance is the whole story" if int(r_.working_compass_seeds) >= 3 else
+                    ("not the story (PEN stays below 1 Hz)" if float(pen_d.max()) < 1.0 else "necessary but not sufficient (PEN fires, no working bump)"))
+            calls.append(dict(arm=label, gains=gains, runs=int(len(sub)), working_compass_seeds=int(r_.working_compass_seeds),
+                              bump_survives_seeds=int(r_.bump_survives_seeds), pen_during_min=float(pen_d.min()), pen_during_max=float(pen_d.max()),
+                              pen_post_max=float(sub.PEN_mean_post.astype(float).max()), call=call))
+        pd.DataFrame(calls).to_csv(an / "call.csv", index=False)
+    # the per-run STATE table (what the ring is doing before / during / after the pulse, and WHERE the bump is), emitted
+    # to a named file so the audit pastes rather than retypes (docs/INTERP.md 10.4 rule 28)
+    strows = []
+    for label, desc, gains, glu, extra, cls in ARMS:
+        for f in sorted(out_dir.glob(f"{label}_s*.json")):
+            for r in json.load(open(f, encoding="utf-8")):
+                m = r.get("metrics") or {}
+                strows.append(dict(arm=label, seed=r["seed"],
+                                   **{k: m.get(k) for k in ("epg_mean_pre", "PEN_mean_pre", "Delta7_mean_pre", "GLNO_mean_pre",
+                                                            "Ring_mean_pre", "rest_mean_pre", "frac_confined_pre", "frac_confined_during",
+                                                            "frac_confined_post", "epg_in_mean_during", "epg_out_mean_during",
+                                                            "epg_in_mean_post", "epg_out_mean_post", "epg_max_post",
+                                                            "in_above_end", "out_above_end", "PEN_mean_during", "PEN_mean_post",
+                                                            "Delta7_mean_post", "GLNO_mean_post", "Ring_mean_post", "rest_mean_post")},
+                                   centre_wedge_t5=r.get("t5.0_centre_wedge"), vs_t5=r.get("t5.0_vector_strength"),
+                                   in_above_t5=r.get("t5.0_in_above"), out_above_t5=r.get("t5.0_out_above"),
+                                   profile_end=";".join(f"{x:.0f}" for x in (r.get("wedge_profile_end") or []))))
+    pd.DataFrame(strows).to_csv(an / "state.csv", index=False)
+    # per-seed scatter, emitted to a named file (docs/INTERP.md 10.4 rule 28: prose pastes from this file, never retypes)
+    sc = []
+    for label, desc, gains, glu, extra, cls in ARMS:
+        sub = df[df.arm == label].sort_values("seed")
+        if sub.empty:
+            continue
+        for k in PRIM:
+            sc.append(dict(arm=label, key=k, seeds=",".join(str(int(x)) for x in sub.seed),
+                           values=",".join("nan" if not np.isfinite(float(v)) else f"{float(v):.4f}" for v in sub[k].astype(float)),
+                           mean=float(np.nanmean(sub[k].astype(float))) if np.isfinite(sub[k].astype(float)).any() else float("nan"),
+                           sd=float(np.nanstd(sub[k].astype(float), ddof=1)) if np.isfinite(sub[k].astype(float)).sum() > 1 else float("nan")))
+    pd.DataFrame(sc).to_csv(an / "scatter.csv", index=False)
     # console-vs-json device check: every .txt should say the device
-    txt_missing = [a[0] + f"_s{s}" for a in BATCH_ARMS for s in range(4) if not (out_dir / f"{a[0]}_s{s}.txt").exists()]
+    txt_missing = [a[0] + f"_s{s}" for a in ARMS for s in seeds if not (out_dir / f"{a[0]}_s{s}.txt").exists()]
     # write
     df.drop(columns=["profile_post"]).to_csv(an / "runs.csv", index=False)
     cdf.to_csv(an / "compare.csv", index=False)
     rdf.to_csv(an / "decision.csv", index=False)
     json.dump(dict(runs=df.drop(columns=["profile_post"]).to_dict("records"), compare=comp, decision=rule, problems=problems, txt_missing=txt_missing,
-                   n_runs=int(len(df)), n_expected=len(BATCH_ARMS) * 4, generated_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                   n_runs=int(len(df)), n_expected=len(ARMS) * len(seeds), generated_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                    generator="python " + " ".join(sys.argv), analysis_sha256=sha256_file(Path(__file__)),
                    cx_wedge_sha256=sha256_file(ROOT / "scripts" / "cx_wedge.py"), common_sha256=sha256_file(ROOT / "flyverse" / "interp" / "common.py")),
               open(an / "analysis.json", "w", encoding="utf-8"), indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o))
     # markdown
-    L = [f"# cx5 analysis -- n_runs {len(df)} of {len(BATCH_ARMS) * 4} expected ({out_dir.as_posix()}/<arm>_s<seed>.json); generated {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"]
+    L = [f"# batch analysis -- n_runs {len(df)} of {len(ARMS) * len(seeds)} expected ({out_dir.as_posix()}/<arm>_s<seed>.json); generated {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"]
     L.append(f"Problems ({len(problems)}): " + ("; ".join(problems) if problems else "none") + (f"; console .txt missing: {txt_missing}" if txt_missing else "") + "\n")
     L.append("## Per run\n")
     cols = ["arm", "seed", "gE", "gD", "survival_s", "bump_hz_post", "width_half_post", "frac_confined_post", "epg_in_mean_post", "epg_out_mean_post", "PEN_mean_during",
@@ -863,8 +1305,8 @@ def analyse_batch(out_dir: Path, ref="S"):
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         fig, axes = plt.subplots(1, 4, figsize=(16, 3.6))
-        order = [a[0] for a in BATCH_ARMS]
-        for ax, k in zip(axes, PRIMARIES):
+        order = [a[0] for a in ARMS]
+        for ax, k in zip(axes, PRIM[:4]):
             for i, arm in enumerate(order):
                 v = df[df.arm == arm][k].astype(float).to_numpy()
                 v = np.where(np.isfinite(v), v, np.nan)
@@ -879,8 +1321,241 @@ def analyse_batch(out_dir: Path, ref="S"):
     for p_ in problems:
         print("  PROBLEM", p_)
     print(rdf[["arm", "gains", "runs", "working_compass_seeds", "bump_survives_seeds", "working"]].to_string(index=False))
-    print(f"-> {an / 'analysis.md'}, runs.csv, compare.csv, decision.csv, analysis.json, scatter.png")
+    print(f"-> {an / 'analysis.md'}, runs.csv, compare.csv, decision.csv, scatter.csv, analysis.json, scatter.png"
+          + ", state.csv" + (", call.csv" if arms is CX6_ARMS else ""))
     return df, cdf, rdf
+
+
+# ------------------------------------------------------------------------------------------------ predeclaration
+def write_predeclaration(out_dir: Path, arms, seeds, structure_json: Path, name="cx6", minutes=30, ref="S"):
+    """The stamped predeclaration (docs/INTERP.md 10.4 rule 10: the predeclaration is this JSON, not the audit).
+    Arms, primaries, the Holm family and its size, the decision rule in words, and the structure pass's PREDICTIONS
+    per arm read out of `structure_json` -- all written before the batch is submitted. If a predeclaration is already
+    there it is archived next to it (rule 6 of the 5A skeptic pass: archive before any amendment)."""
+    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    st = json.load(open(structure_json, encoding="utf-8"))
+    by_label = {}
+    for r in st["configs"]:
+        key = r["label"].split(":")[0].strip()
+        by_label[key] = r
+    pred = {}
+    # the structure configurations that correspond to the batch's arms
+    arm_cfg = {"S": "shipped", "H3": "H3", "H_ExR6": "H_ExR6", "H_ER6": "H_ER6", "H_ER4m": "H_ER4m",
+               "H3G": "H3+GLNO=glu", "F": "f", "R": None}
+    for label, desc, gains, glu, extra, cls in arms:
+        cfg = arm_cfg.get(label)
+        r = by_label.get(cfg) if cfg else None
+        if r is None:
+            pred[label] = dict(note="no rate-model prediction (the reference gains gE 2 / gD 15 are outside the "
+                                    "shipped-gain rate model); the cx5 measurement is the expectation: a bump at 201-203 Hz in 4/4 seeds")
+            continue
+        row = {}
+        for stt in ("background", "pulse", "after"):
+            m = r["rate_model"][stt]; b = r["bump_criterion"][stt]; j = r["jacobian"][stt]
+            row[stt] = dict(EPG_in_hz=m["epg_in"], EPG_out_hz=m["epg_out"], PEN_in_hz=m["PEN_in"], PEN_out_hz=m["PEN_out"],
+                            Delta7_hz=m["Delta7"], Ring_hz=m["Ring"], GLNO_hz=m["GLNO"], u_PEN_in_mV=m["u_PEN_in"],
+                            u_EPG_in_mV=m["u_EPG_in"], k1_gain=b["k1_gain"], k1_gain_epg_only=b["k1_gain_epg_only"],
+                            gamma_EPG=b["gamma_EPG"], gamma_PEN=b["gamma_relay"]["PEN"],
+                            jacobian_leading=j["leading_re"], spectral_radius=j["spectral_radius"])
+        row["fixed_point_bump_after_release"] = r["rate_model"]["bump_after"]
+        row["epg_recurrence_predicts_a_bump"] = r["bump_criterion"]["pulse"]["epg_recurrent"]["predicted_bump"]
+        row["epg_recurrence_saturation_hz"] = r["bump_criterion"]["pulse"]["epg_recurrent"]["saturation_hz"]
+        row["decomposition_pulse_PEN"] = {k.replace("PEN_in<-", ""): v for k, v in r["decomposition"]["pulse"].items()
+                                          if k.startswith("PEN_in<-") and not k.endswith("by_type")}
+        row["decomposition_pulse_EPG"] = {k.replace("EPG_in<-", ""): v for k, v in r["decomposition"]["pulse"].items()
+                                          if k.startswith("EPG_in<-") and not k.endswith("by_type")}
+        pred[label] = row
+    doc = {
+        "schema": "flyverse.predeclaration/1",
+        "stamped_utc": stamp,
+        "written_before_submission": True,
+        "thread": "6A: the DC-balance test (docs/audits/compass_dc_balance.md)",
+        "question": ("5A's fixed point says the DC inhibition through 2 ExR6 + 4 ER6 + 11 ER4m onto PEN and EPG "
+                     "(-24.9 mV on PEN during the pulse, against a 7 mV gap) is what keeps the compass relays below "
+                     "threshold. Holding exactly those edges at 0 turns that decomposition into a tested attribution."),
+        "batch": {
+            "name": name, "target": "house (node1; .cluster.json default)", "submissions": 1,
+            "jobs": len(seeds) * 2, "runs": len(arms) * len(seeds), "arms": len(arms), "seeds_per_arm": list(seeds),
+            "generator": f"python scripts/cx_ring_structure.py --batch cx6 --plan-batch {out_dir.as_posix()} --minutes {minutes}",
+            "blocks": "fam_s<seed>: every arm of one seed on ONE target (an experimental factor is never the unit of scheduling)",
+            "job_line": ("mkdir -p out/cx6 && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' "
+                         "&& python scripts/cx_wedge.py --no-structure --sim <gE:gD> --ledger --seed <s> --arm <A> --block fam_s<s> "
+                         "[--nt-override GLNO=glutamate] <arm flags> --sim-out out/cx6/<A>_s<s>.json > out/cx6/<A>_s<s>.txt 2>&1; "
+                         "s<i>=$?; tail -3 ...; exit $((s0 | s1 | ...)) -- the exit expression carries the python codes (tested on CPU "
+                         "before submission; cx5's first submission died on a $((...)) expansion)"),
+            "protocol": ("the cx5 protocol, unchanged: cx_wedge.simulate --ledger, FlyBrain on the full MaleCNS connectome, no world, "
+                         "compass adaptation 0, 10 Hz Poisson background on all 46 EPG for the whole run, 1 s settle, wedges 0-3 (11 EPG) "
+                         "at +40 Hz for 2 s, then 5 s free; EPG per 10 ms frame scored by probe_compass_room.bump_frames (vs > 0.6, "
+                         ">= 8 of 11 block cells > 22 Hz, <= 3 of 35 outside); survival = end of the last confined post-pulse frame "
+                         "minus the pulse end (max 5.00 s)"),
+            "gains": "SHIPPED (gE 1 / gD 1) in every arm except the labelled reference R (gE 2 / gD 15, Delta7 -> EPG only)",
+            "cache": ("GLNO-silent arms read the cluster's shared cache (compiled W md5 ef23cc27bea13be7f6a96f3c04fd3737); the H3G arm "
+                      "compiles GLNO = glutamate into the run dir's out/cache_<hash>/ via --nt-override GLNO=glutamate, the same scratch "
+                      "table cx5 used (local out/cache_c51b23e2, compiled W md5 7a10d93ba2086f2c76bcdabdca79b4ec; identical content to "
+                      "the cx5b scratch cache out/cache_glno_glu)"),
+            "batch_sh_sha256": sha256_file(out_dir / "batch.sh") if (out_dir / "batch.sh").is_file() else None,
+            "tree_state": (out_dir / "tree_state.json").as_posix(),
+            "job_line_tested_on_cpu": ("out/cx6/smoke/jobline_check.txt + exitcheck_*.sh / holdcheck.sh: the job lines were extracted "
+                                       "from batch.sh BY BASH (out/cx6/smoke/argv_shim.py), the exit expression returns 0 when every arm "
+                                       "succeeds and 7 when any one of them exits 7, and the --hold-edges regexes reach python's argv "
+                                       "intact through both quoting levels"),
+        },
+        "hold": {
+            "kind": "edges (docs/INTERP.md 2 / 10.1 step 5) -- a LABELLED COUNTERFACTUAL, not a candidate default",
+            "mechanism": ("scripts/cx_wedge.py --hold-edges PRE_REGEX:POST_REGEX, a new flag defaulting to None, which appends "
+                          "(pre, post, 0.0) to LIFParams.type_path_gain -- the same stage of brain._shaped_weights that carries gE / gD. "
+                          "With the flag absent the installed gain list is entry-for-entry the previous one: the shipped default path is "
+                          "bit-identical on CPU (out/cx6/smoke/smoke_default_path.json vs out/cx5/smoke/smoke_default_path.json, 117 of 117 "
+                          "recorded fields equal)."),
+            "spec_H3": HOLD3,
+            "resolves_to": "17 presynaptic cells (2 ExR6 + 4 ER6 + 11 ER4m) onto 88 postsynaptic cells (46 EPG + 42 PEN); 1,149 W entries, 37,256 synapses. EPGt is NOT held.",
+            "not_adoptable": "a hold is a counterfactual and can never become a default; what it can do is decide whether the DC balance is the story",
+        },
+        "arms": {label: dict(label=desc, gains_gE_gD=gains, glno_glutamate=glu, flags=list(extra), classification=cls)
+                 for label, desc, gains, glu, extra, cls in arms},
+        "reference": ref,
+        "primaries": {
+            "keys": list(PRIMARIES_CX6),
+            "family": ("Holm within each arm's family of the six primaries vs S. m <= 6 is satisfiable at 5 v 5 "
+                       "(p_floor 0.0079, 6 x 0.0079 = 0.047 <= 0.05). A member that returns no p -- bump_hz_post and "
+                       "width_half_post are undefined in an arm with no confined frame, and are constant by construction "
+                       "when neither arm has one -- is DROPPED from the Holm denominator and reported as a magnitude "
+                       "(docs/INTERP.md 10.2: a quantity that cannot move is not a test)."),
+            "m_max": 6,
+            "reported_outside_the_family": list(SECONDARIES_CX6) + ["epg_in/out during and post (magnitudes)", "per-type ring rates (not recorded by this protocol)"],
+            "comparison": ("flyverse.interp.common.compare, runs = the unit, 5 v 5; |z| >= 3 and p <= 0.05 -> result; a zero-SD null is "
+                           "structural and reads as the magnitude diff with p (compare returns undetermined)"),
+            "ledger_rows": {"compass.EPG.bump_survival_s": ">= 5 s", "compass.EPG.bump_rate_hz": "5-60 Hz (NOT_APPLICABLE unless survival >= 5)",
+                            "compass.EPG.bump_width_wedges": "2.5-5 wedges (same)", "frac_confined_post": "reported, no bound"},
+        },
+        "decision_rule": {
+            "working_compass": "bump_survival_s >= 5 s AND bump_width_wedges in [2.5, 5] AND bump_rate_hz in [5, 60] Hz, per seed",
+            "the DC balance is the whole story": "H3 carries a bump meeting the working-compass rule at the shipped gains in >= 3 of 5 seeds",
+            "necessary but not sufficient": "PEN fires under H3 (PEN_mean_during >= 1 Hz in the majority of seeds) but no arm meets the working-compass rule",
+            "not the story": "PEN stays below 1 Hz under H3 (PEN_mean_during < 1 Hz in every seed)",
+            "attribution_per_type": "H_ExR6 / H_ER6 / H_ER4m against H3 say which of the three carries the DC term; each is read as a magnitude against S",
+            "GLNO": "H3G vs H3 is the first informative test of the GLNO sign at the SHIPPED gains, because it is the first shipped-gain configuration in which PEN and GLNO fire",
+        },
+        "predictions_from_the_structure_pass": {
+            "source": f"{structure_json.as_posix()} (CPU; drive as a current with the forced rate as a floor, the one-step "
+                      f"EPG -> EPG term kept, per-cell gamma at the realised fixed point)",
+            "tool_validation": ("scripts/cx_ring_structure.py --validate-batch out/cx5: the fixed tool calls bump / no-bump correctly in 7 of "
+                                "8 shipped-gain cx5 arms and predicts the saturation rate of the arms that held a bump to 5.4 % (F: 144 vs 152.5 Hz) "
+                                "and 1.7 % (CFG: 160 vs 157.1); it predicts NO bump for S, G, C and CG (gamma_crit 33.3 / 28.8 Hz/mV against a maximum "
+                                "LIF slope of 8.27). The one miss is FG (predicted a bump, measured none): the EPG-recurrence criterion cannot see the "
+                                "glutamatergic GLNO's brake on PEN."),
+            "statement": ("H3: PEN crosses threshold and the loop closes. The first-order DC number is 5A's: with the ring term at 0 the driven PEN's "
+                          "input during the pulse is +9.7 (EPG) - 0.6 (Delta7) = +9.1 mV against the 7 mV gap. Self-consistently (the relays then drive "
+                          "the EPG back) the fixed point runs much higher -- PEN 103 Hz at u +27.0 mV during the pulse, EPG in 260 Hz -- and holds after "
+                          "release (EPG in 252 Hz, out 25.8, PEN 103, Delta7 143, GLNO 247), a state whose off-bump EPGs are ABOVE the ledger's 22 Hz "
+                          "threshold, so a confinement failure is as likely as a clean bump. H_ExR6 alone: PEN 14.7 Hz during the pulse (u +1.3 mV), no "
+                          "bump after release. H_ER6 alone: PEN 10.8 Hz (u -4.7). H_ER4m alone: PEN 0.0 Hz (u -15.5) -- ER4m is onto EPG, not PEN. "
+                          "H3G: PEN 40.2 Hz during the pulse (GLNO -26.8 mV brakes it), bump after release at EPG in 158.7 Hz. S: PEN 0.0 Hz, u -15.8, "
+                          "no bump (as measured in cx5). The k = 1 loop gain with per-cell gains is 0.000 in every shipped arm (gamma_EPG = 0: the driven "
+                          "EPG's spikes are forced and its membrane is 33 mV below threshold), 0.434 during the pulse / 0.495 after under H3, and "
+                          "0.731 / 1.024 under H3G."),
+            "per_arm": pred,
+            "falsifiers": ("H3 with PEN below 1 Hz would refute the DC-balance attribution outright. H3 with PEN firing but no bump would say the DC "
+                           "balance is necessary and not sufficient. A bump in H3 whose rate is 150-250 Hz would meet the survival row and fail "
+                           "compass.EPG.bump_rate_hz, exactly as every bump this project has produced so far."),
+        },
+        "analysis": {
+            "path": f"python scripts/cx_ring_structure.py --batch cx6 --analyse {out_dir.as_posix()} (CPU), writing analysis/{{analysis.md,runs.csv,compare.csv,decision.csv,call.csv,scatter.csv,analysis.json,scatter.png}}",
+            "per_seed_scatter": "analysis/scatter.csv (one row per arm x primary, the per-seed values in the `values` column) -- the audit pastes from that file (docs/INTERP.md 10.4 rule 28)",
+            "checks": "per run: device cuda, arm label, gains, nt_override / glno_nt, same_type_gain, receptor_model, AND the hold (hold_edges equals the arm's declared spec, factor 0, non-zero matched entries)",
+        },
+        "adoption": "NOTHING IS ADOPTED BY THIS THREAD. A hold is a counterfactual; the new flag defaults to None; no default changes.",
+    }
+    path = out_dir / "predeclared.json"
+    if path.exists():
+        arch = out_dir / f"predeclared.archived_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.json"
+        arch.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"archived the previous predeclaration -> {arch}")
+    path.write_text(json.dumps(doc, indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o)), encoding="utf-8")
+    print(f"-> {path} (stamped {stamp})")
+    return doc
+
+
+# ------------------------------------------------------------------------------------------------ validation of the
+# fixed tool against a batch that is already on disk (thread 6A step 1: the 5A batch this pass previously missed)
+def validate_batch(batch_dir: Path, out_dir: Path, drive="current", reduction="with-direct", gain="per-cell",
+                   arms=None, tol=0.10):
+    """For every shipped-gain arm of `arms` (default the cx5 table) that has runs in `batch_dir`: build the same
+    configuration from the arm's own flags, run the structure pass, and compare
+      * the predicted saturation rate of the k = 1 mode (the rate at which the LIF slope falls back to gamma_crit)
+        with the MEASURED `bump_hz_post` of the runs that held a bump -- `tol` relative;
+      * the predicted bump (is the k = 1 mode supercritical at any operating point?) with the measured survival.
+    Writes <out_dir>/validation.{json,md} and prints the table. No default changes; nothing is fitted."""
+    arms = list(arms or BATCH_ARMS)
+    batch_dir, out_dir = Path(batch_dir), Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    c = connectome.load(verbose=False)
+    c_glu, glu_dir, _ = cx_wedge.load_connectome({"GLNO": "glutamate"}, scratch=True, verbose=False)
+    cells, cells_glu = cx_wedge.compass_cells(c), cx_wedge.compass_cells(c_glu)
+    rows = []
+    for arm in arms:
+        label = arm[0]
+        cfg = config_for_arm(arm, c, c_glu, cells, cells_glu)
+        files = sorted(batch_dir.glob(f"{label}_s*.json"))
+        if cfg is None or not files:
+            continue
+        meas = []
+        for f in files:
+            for r in json.load(open(f, encoding="utf-8")):
+                m = r.get("metrics") or {}
+                meas.append((m.get("survival_s"), m.get("bump_hz_post"), m.get("PEN_mean_during"), m.get("epg_in_mean_during")))
+        surv = [x[0] for x in meas if x[0] is not None]
+        hz = [x[1] for x in meas if x[1] is not None and np.isfinite(x[1])]
+        cir = Circuit(cfg[2], cfg[3], cfg[0], cfg[1], cells=dict(cfg[4]))
+        res, _ = analyse(cir, drive=drive, reduction=reduction, gain=gain)
+        tg = res["two_step_gain"]
+        pred_hz = tg["saturation_hz_k1"]
+        bc = res["bump_criterion"]["pulse"]
+        held = [s for s in surv if s >= 5.0]
+        meas_hz = float(np.mean([h for s, h, _, _ in meas if s is not None and s >= 5.0 and h is not None and np.isfinite(h)])) if held else float("nan")
+        rel = abs(pred_hz - meas_hz) / meas_hz if (np.isfinite(pred_hz) and np.isfinite(meas_hz) and meas_hz > 0) else float("nan")
+        pred_bump = bool(tg["predicted_bump"])
+        meas_bump = bool(len(held) >= max(1, len(surv) // 2))
+        rows.append(dict(arm=label, runs=len(meas), gamma_crit_k1=bc["epg_recurrent"]["gamma_EPG_crit"],
+                         gamma_crit_k1_uniform=tg["gamma_crit_k1"], gamma_crit_with_relays=bc["with_relays"]["gamma_EPG_crit"],
+                         saturation_with_relays=bc["with_relays"]["saturation_hz"], predicted_bump_with_relays=bc["with_relays"]["predicted_bump"],
+                         local_direct_mV=bc["local_kernels"]["direct"], local_PEN=bc["local_kernels"]["PEN"], local_Ring=bc["local_kernels"]["Ring"],
+                         local_Delta7=bc["local_kernels"]["Delta7"], gamma_relay_pulse=bc["gamma_relay"], direct_k1_mV=tg["direct_k1_mV"],
+                         lambda_k1=tg["lambda_k1_net"], max_lif_slope=tg["max_lif_slope"], predicted_supercritical=pred_bump,
+                         predicted_hz=pred_hz, measured_hz=meas_hz, rel_error=rel, seeds_with_bump=len(held), seeds=len(surv),
+                         measured_survival=surv, measured_hz_per_seed=[round(h, 3) for h in hz],
+                         bump_call_ok=bool(pred_bump == meas_bump),
+                         rate_call_ok=bool(np.isfinite(rel) and rel <= tol) if meas_bump else None,
+                         fixed_point_bump=res["rate_model"]["bump_after"], fixed_point_runaway=res["rate_model"]["runaway_after"],
+                         pen_pulse_hz=res["rate_model"]["pulse"]["PEN_in"], u_pen_pulse=res["rate_model"]["pulse"]["u_PEN_in"],
+                         jacobian_lead_pulse=res["jacobian"]["pulse"]["leading_re"], k1_gain_pulse=res["jacobian"]["pulse"]["loop_gain_k1"]))
+    df = pd.DataFrame(rows)
+    ok_bump = int(df.bump_call_ok.sum()) if len(df) else 0
+    rate_rows = df[df.rate_call_ok.notna()] if len(df) else df
+    ok_rate = int(rate_rows.rate_call_ok.sum()) if len(rate_rows) else 0
+    L = [f"# cx_ring_structure validation against {batch_dir.as_posix()} (drive {drive}, reduction {reduction}, gain {gain}); "
+         f"generated {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n",
+         f"Bump / no-bump called correctly in {ok_bump} of {len(df)} arms; the saturation rate within {100 * tol:.0f} % in "
+         f"{ok_rate} of {len(rate_rows)} arms that held a bump.\n",
+         "| arm | gamma_E crit (Hz/mV) | local EPG->EPG (mV) | direct k1 (mV) | lambda_1 (mV^2) | loop closes (max LIF slope {:.2f} Hz/mV) | predicted Hz | measured Hz | rel err | seeds with a bump | fixed point | PEN during pulse (Hz / mV) | Jacobian lead / k1 gain (pulse) |".format(float(df.max_lif_slope.iloc[0]) if len(df) else float("nan")),
+         "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        rel_txt = "--" if not np.isfinite(r["rel_error"]) else "{:.1f} %".format(100 * r["rel_error"])
+        L.append(f"| {r['arm']} | {r['gamma_crit_k1']:.2f} | {r['local_direct_mV']:+.2f} | {r['direct_k1_mV']:+.2f} | {r['lambda_k1']:+.0f} | {r['predicted_supercritical']} | "
+                 f"{'--' if not np.isfinite(r['predicted_hz']) else format(r['predicted_hz'], '.0f')} | {r['measured_hz']:.1f} | {rel_txt} | "
+                 f"{r['seeds_with_bump']}/{r['seeds']} | {'BUMP' if r['fixed_point_bump'] else ('RUNAWAY' if r['fixed_point_runaway'] else 'no bump')} | "
+                 f"{r['pen_pulse_hz']:.1f} / {r['u_pen_pulse']:+.1f} | {r['jacobian_lead_pulse']:+.3f} / {r['k1_gain_pulse']:+.3f} |")
+    (out_dir / "validation.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+    json.dump(dict(batch=batch_dir.as_posix(), drive=drive, reduction=reduction, gain=gain, tol=tol, rows=rows,
+                   bump_calls_ok=ok_bump, bump_calls=len(df), rate_calls_ok=ok_rate, rate_calls=len(rate_rows),
+                   generated_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), generator="python " + " ".join(sys.argv),
+                   generator_sha256=sha256_file(Path(__file__)), glu_cache=str(glu_dir)),
+              open(out_dir / "validation.json", "w", encoding="utf-8"), indent=1,
+              default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o))
+    print("\n".join(L))
+    print(f"-> {out_dir / 'validation.md'}, {out_dir / 'validation.json'}")
+    return df
 
 
 # ------------------------------------------------------------------------------------------------ main
@@ -892,11 +1567,40 @@ def main():
     ap.add_argument("--plan-batch", default=None, metavar="DIR", help="write DIR/batch.sh, DIR/tree_state.json for the wedge-compass batch (no structure pass)")
     ap.add_argument("--minutes", type=int, default=30)
     ap.add_argument("--analyse", default=None, metavar="DIR", help="analyse the fetched batch in DIR (no structure pass)")
+    # thread 6A: the three fixes are the defaults; --legacy (or the individual switches) reproduces the 5A behaviour
+    ap.add_argument("--drive", default="current", choices=["current", "rate"],
+                    help="how the forced EPG background / pulse enters the rate model: 'current' (u = f^-1(rate); the fix) or 'rate' (5A)")
+    ap.add_argument("--reduction", default="with-direct", choices=["with-direct", "two-step"],
+                    help="EPG-only reduction: keep the one-step EPG->EPG term in the loop gain (the fix) or the two-step terms only (5A)")
+    ap.add_argument("--gain", default="per-cell", choices=["per-cell", "uniform"],
+                    help="linearisation: per-cell gamma_i = f'(u_i) at the realised fixed point (the fix) or a uniform gamma (5A)")
+    ap.add_argument("--legacy", action="store_true", help="the 5A behaviour: --drive rate --reduction two-step --gain uniform")
+    ap.add_argument("--holds", action="store_true", help="add the 6A hold configurations (ExR6 / ER6 / ER4m -> PEN,EPG at 0)")
+    ap.add_argument("--batch", default="cx5", choices=["cx5", "cx6"], help="which arm table --plan-batch / --analyse use")
+    ap.add_argument("--seeds", default=None, help="comma-separated seeds for --plan-batch (default: 0-3 for cx5, 0-4 for cx6)")
+    ap.add_argument("--name", default=None, help="batch name for --plan-batch (default: the --batch value)")
+    ap.add_argument("--tree-state", default=None, metavar="DIR", help="rewrite DIR/tree_state.json only (batch.sh untouched)")
+    ap.add_argument("--predeclare", default=None, metavar="DIR", help="write DIR/predeclared.json (stamped; archives any existing one) from the arm table and DIR/structure/structure.json")
+    ap.add_argument("--structure-json", default=None, help="--predeclare: the structure pass to read the predictions from (default <DIR>/structure/structure.json)")
+    ap.add_argument("--validate-batch", default=None, metavar="DIR",
+                    help="score this structure pass's predictions against an already-fetched batch (out/cx5): saturation rate vs measured bump_hz_post")
     a = ap.parse_args()
+    if a.legacy:
+        a.drive, a.reduction, a.gain = "rate", "two-step", "uniform"
+    arms = CX6_ARMS if a.batch == "cx6" else BATCH_ARMS
+    seeds = tuple(int(x) for x in a.seeds.split(",")) if a.seeds else ((0, 1, 2, 3, 4) if a.batch == "cx6" else (0, 1, 2, 3))
+    if a.tree_state:
+        write_tree_state(Path(a.tree_state)); return
+    if a.predeclare:
+        d = Path(a.predeclare)
+        write_predeclaration(d, arms, seeds, Path(a.structure_json) if a.structure_json else d / "structure" / "structure.json",
+                             name=a.name or a.batch, minutes=a.minutes); return
     if a.plan_batch:
-        plan_batch(Path(a.plan_batch), minutes=a.minutes); return
+        plan_batch(Path(a.plan_batch), seeds=seeds, minutes=a.minutes, name=a.name or a.batch, arms=arms); return
     if a.analyse:
-        analyse_batch(Path(a.analyse)); return
+        analyse_batch(Path(a.analyse), arms=arms, seeds=seeds); return
+    if a.validate_batch:
+        validate_batch(Path(a.validate_batch), Path(a.out), drive=a.drive, reduction=a.reduction, gain=a.gain); return
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     c = connectome.load(verbose=False)
@@ -924,10 +1628,12 @@ def main():
         ("c+f: sign+gain + damping off", "(c) and (f)", c, P(receptor_model="sign+gain", same_type_gain=1.0), cells),
         ("b+f: cap lifted + damping off (instrument)", "(b) and (f)", c, P(conn_cap=0.0, same_type_gain=1.0), cells),
     ]
+    if a.holds:
+        configs += hold_configs(c, c_glu, cells, cells_glu)
     rows, mats = [], {}
     for label, ev, cc, p, cl in configs:
         cir = Circuit(cc, p, label, ev, cells=dict(cl))
-        r, m = analyse(cir)
+        r, m = analyse(cir, drive=a.drive, reduction=a.reduction, gain=a.gain)
         rows.append(r)
         key = label.split(":")[0].replace(" ", "_").replace("+", "")
         for k, v in m["M16"].items():
@@ -935,15 +1641,24 @@ def main():
         for k, v in m["K"].items():
             mats[f"K_{key}_{k}"] = v
     res["configs"] = rows
-    # ranking of the single and combined changes
+    # ranking of the single and combined changes (6A: by the fixed point with the drive as a current, then the PEN rate
+    # it reaches during the pulse, then the combined gamma_crit(k1) with the one-step term kept, then the DC margin)
     rk = []
     for r in rows:
-        a_ = r["rate_model"]["after"]
-        rk.append(dict(label=r["label"], bump=r["rate_model"]["bump_after"], in_minus_out=a_["epg_in"] - a_["epg_out"],
-                       gamma_crit_k1=r["two_step_gain"]["gamma_crit_k1"], u_pen_pulse=r["rate_model"]["pulse"]["u_PEN_in"],
-                       lambda_1=r["fourier"]["net"][1], lambda_0=r["fourier"]["net"][0]))
-    rk.sort(key=lambda d: (-int(d["bump"]), -d["in_minus_out"], d["gamma_crit_k1"], -d["u_pen_pulse"]))
+        a_ = r["rate_model"]["after"]; pu_ = r["rate_model"]["pulse"]; tg_ = r["two_step_gain"]
+        rk.append(dict(label=r["label"], bump=r["rate_model"]["bump_after"], runaway=r["rate_model"]["runaway_after"],
+                       in_minus_out=a_["epg_in"] - a_["epg_out"], epg_in_after=a_["epg_in"], epg_out_after=a_["epg_out"],
+                       pen_pulse_hz=pu_["PEN_in"], pen_after_hz=a_["PEN_in"], u_pen_pulse=pu_["u_PEN_in"],
+                       gamma_crit_k1=tg_["gamma_crit_k1"], gamma_crit_k1_two_step_only=tg_["gamma_crit_k1_two_step_only"],
+                       saturation_hz_k1=tg_["saturation_hz_k1"], supercritical_k1=tg_["supercritical_k1"],
+                       predicted_bump=tg_["predicted_bump"], gamma_crit_k1_recurrent=tg_["gamma_crit_k1_recurrent"],
+                       jacobian_lead_pulse=r["jacobian"]["pulse"]["leading_re"], k1_gain_pulse=r["jacobian"]["pulse"]["loop_gain_k1"],
+                       lambda_1=r["fourier"]["net"][1], lambda_0=r["fourier"]["net"][0], direct_k1=r["fourier"]["direct"][1]))
+    rk.sort(key=lambda d: (-int(d["bump"]), -d["pen_pulse_hz"], -d["in_minus_out"], d["gamma_crit_k1"], -d["u_pen_pulse"]))
     res["ranking"] = rk
+    res["modes"] = dict(drive=a.drive, reduction=a.reduction, gain=a.gain, legacy=bool(a.legacy), sigma_mV=SIGMA_MV,
+                        u_for_rate={"10": u_for_rate(10.0), "50": u_for_rate(50.0)},
+                        max_lif_slope=max_slope()[0], max_lif_slope_at_u=max_slope()[1], max_lif_slope_at_hz=max_slope()[2])
     res["wall_s"] = time.time() - t0
     with open(out / "structure.json", "w", encoding="utf-8") as f:
         json.dump(res, f, indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o))

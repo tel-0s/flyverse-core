@@ -39,7 +39,9 @@ Families (--family): 'vncd' (round 2, ARMS), 'body' (round 3, ARMS_BODY; docs/au
 mn_ref_hz (LEVEL_MN_REF_HZ, a labelled control passed as --mn-ref-hz; the sense's default is untouched) / C all+leg_cycle /
 D all+leg_cycle+haltere_sided; and 'level2' (round 5, ARMS_LEVEL2; docs/audits/level_controls.md): A / L / U unsided /
 K channel-matched (--hair-plate-max-hz, --campaniform-load-hz) / M modulation-only (all+leg_cycle+leg_cycle_flat) / C --
-the three labelled controls that split the C-over-L excess into its parts. `pairs` reads the pair set from
+the three labelled controls that split the C-over-L excess into its parts; and 'level3' (round 4c, ARMS_LEVEL3;
+docs/audits/level_controls_r2.md): A / L / M2 modulation-only AT THE CYCLE'S REALISED AMPLITUDE (body.LegCycle(flat_amplitude=True,
+flat_amplitude_value=0.948), passed as --flat-amplitude-value) / C. `pairs` reads the pair set from
 PAIRS_BY_FAMILY (`--predeclared <json>` Holm-calls the stamped families into decision_table.csv); the recorder-based
 sidedness keys are at lag 0 (the round-3 alignment kept as *_lagm1) and DNa02_L / _R share DNa02_LR_hz's frame mask.
 Every run JSON carries a `sense` block (spec, every token, mn_ref_hz, hair_plate_max_hz, campaniform_load_hz, the
@@ -119,18 +121,39 @@ ARM_LABEL_LEVEL2 = {"A": "shipped (sense off)",
                     "K": f"proprioception all, mn_ref_hz {LEVEL_MN_REF_HZ}, hair_plate_max_hz / campaniform_load_hz matched to the cycle arm's channel means (CHANNEL-MATCHED level control)",
                     "M": "all + leg cycle with the per-leg amplitude held at 1 (MODULATION-ONLY control: phase modulation without the amplitude / turn term)",
                     "C": "all + leg cycle (per-leg, per-phase leg channels)"}
-ARM_MN_REF = {"level": {"L": LEVEL_MN_REF_HZ}, "level2": {"L": LEVEL_MN_REF_HZ, "U": LEVEL_MN_REF_HZ, "K": LEVEL_MN_REF_HZ}}      # per family, per arm: the sense's mn_ref_hz when it is not the default (None = the default)
+# Round 4c (thread level controls round 2, docs/audits/level_controls_r2.md): round 4b's modulation-only arm M held the amplitude
+# at 1.000 while the cycle law realises 0.948 in straight walking, so M bought +6.0 Hz of chordotonal over C and F4 ("does the
+# amplitude / turn law add drive beyond the per-phase modulation?") stayed open. M2 is the same flat cycle at the cycle's OWN
+# realised walking-mean amplitude: body.LegCycle(flat_amplitude=True, flat_amplitude_value=LEVEL3_FLAT_AMPLITUDE). The value is
+# derived on CPU from the round-4b cycle arm's recordings (out/vncd6/flat_amplitude_derivation.json, generator
+# out/vncd6/derive_flat_amplitude.py: the per-leg amplitude on walking frames of out/vncd5/room_C_r*_body.npz, run mean 0.9477,
+# rounded to 3 decimals) and passed on the job line (--flat-amplitude-value); LegCycle's default (1.0) is untouched. L is the
+# round-4 level reference, re-run inside the batch. Six runs per arm so a seven-member Holm family is satisfiable (6 v 6 floor
+# p 0.0021645 x 7 = 0.0152; docs/INTERP.md 10.2). No compass arms.
+LEVEL3_FLAT_AMPLITUDE = 0.948
+ARMS_LEVEL3 = {"A": None, "L": "all", "M2": "all+leg_cycle+leg_cycle_flat", "C": "all+leg_cycle"}
+ARM_LABEL_LEVEL3 = {"A": "shipped (sense off)",
+                    "L": f"proprioception all, mn_ref_hz {LEVEL_MN_REF_HZ} (LEVEL-MATCHED LABELLED CONTROL, the level reference re-run within this batch)",
+                    "M2": f"all + leg cycle with the per-leg amplitude held at the cycle's realised walking mean {LEVEL3_FLAT_AMPLITUDE} (MODULATION-ONLY control AT THE CYCLE'S LEVEL: phase modulation without the amplitude / turn term)",
+                    "C": "all + leg cycle (per-leg, per-phase leg channels)"}
+ARM_MN_REF = {"level": {"L": LEVEL_MN_REF_HZ}, "level2": {"L": LEVEL_MN_REF_HZ, "U": LEVEL_MN_REF_HZ, "K": LEVEL_MN_REF_HZ},
+              "level3": {"L": LEVEL_MN_REF_HZ}}      # per family, per arm: the sense's mn_ref_hz when it is not the default (None = the default)
 # per family, per arm: further Proprioception constructor keywords of a labelled control (None = the sense's own default)
 ARM_SENSE_KW = {"level2": {"K": {"hair_plate_max_hz": LEVEL2_HAIR_PLATE_MAX_HZ, "campaniform_load_hz": LEVEL2_CAMPANIFORM_LOAD_HZ}}}
+# per family, per arm: body.LegCycle constructor keywords of a labelled control of the cycle (the flag flat_amplitude itself comes
+# from the spec token 'leg_cycle_flat'; None = LegCycle's own default)
+ARM_CYCLE_KW = {"level3": {"M2": {"flat_amplitude_value": LEVEL3_FLAT_AMPLITUDE}}}
 FAMILIES = {"vncd": (ARMS, ARM_LABEL, "ABE"), "body": (ARMS_BODY, ARM_LABEL_BODY, "ADE"), "level": (ARMS_LEVEL, ARM_LABEL_LEVEL, "ALCD"),
-            "level2": (ARMS_LEVEL2, ARM_LABEL_LEVEL2, "")}     # arms, labels, compass arms ('' = no compass protocol in the family)
-ARM_ORDER = "ABLUKMCDE"              # table order across families (L / U / K / M sit between the round-2 transducer and the cycle)
+            "level2": (ARMS_LEVEL2, ARM_LABEL_LEVEL2, ""), "level3": (ARMS_LEVEL3, ARM_LABEL_LEVEL3, "")}     # arms, labels, compass arms ('' = no compass protocol in the family)
+ARM_ORDER = ("A", "B", "L", "U", "K", "M", "M2", "C", "D", "E")   # table order across families (L / U / K / M / M2 sit between the round-2 transducer and the cycle)
 # adjacent-arm pairs `pairs` calls, per family: (treatment, reference)
 PAIRS_BY_FAMILY = {"vncd": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
                    "body": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
                    "level": (("L", "A"), ("C", "L"), ("D", "C"), ("C", "A"), ("D", "L")),
-                   "level2": (("U", "L"), ("K", "L"), ("C", "K"), ("M", "C"), ("C", "U"), ("M", "K"), ("L", "A"), ("C", "L"))}
+                   "level2": (("U", "L"), ("K", "L"), ("C", "K"), ("M", "C"), ("C", "U"), ("M", "K"), ("L", "A"), ("C", "L")),
+                   "level3": (("M2", "C"), ("M2", "L"), ("C", "L"), ("C", "A"), ("L", "A"), ("M2", "A"))}   # the four decision pairs first; L v A and M2 v A are the fraction bookkeeping
 SENSE_KW_FLAGS = (("mn_ref_hz", "mn_ref_hz"), ("hair_plate_max_hz", "hair_plate_max_hz"), ("campaniform_load_hz", "campaniform_load_hz"))   # (argparse dest, constructor keyword)
+CYCLE_KW_FLAGS = (("flat_amplitude_value", "flat_amplitude_value"),)                                                                          # (argparse dest, LegCycle keyword)
 
 
 def mn_ref_of(arm, family, override=None):
@@ -152,6 +175,19 @@ def sense_kwargs_of(arm, family, args=None):
     for dest, key in SENSE_KW_FLAGS:
         if key == "mn_ref_hz":
             continue
+        v = getattr(args, dest, None) if args is not None else None
+        v = table.get(key) if v is None else v
+        if v is not None:
+            kw[key] = float(v)
+    return kw
+
+
+def cycle_kwargs_of(arm, family, args=None):
+    """Every non-default body.LegCycle constructor keyword of an arm (besides `flat_amplitude`, which the spec token names):
+    an explicit flag (--flat-amplitude-value) wins, else the family table ARM_CYCLE_KW, else nothing (LegCycle's own defaults)."""
+    kw = {}
+    table = ARM_CYCLE_KW.get(family, {}).get(arm, {})
+    for dest, key in CYCLE_KW_FLAGS:
         v = getattr(args, dest, None) if args is not None else None
         v = table.get(key) if v is None else v
         if v is not None:
@@ -201,7 +237,7 @@ def spec_of(arm, family="vncd"):
 def watch_of(family):
     # NOTE: the vncd4 (level family) batch ran with the round-2 watch list (PS059 not recorded per frame; its window mean is
     # in the decomposition); the level family records PS059 from here on, the level2 family PS059 and IN13B001.
-    if family == "level2":
+    if family in ("level2", "level3"):
         return WATCH_LEVEL2
     return WATCH_BODY if family in ("body", "level") else WATCH
 
@@ -224,13 +260,20 @@ def afferent_groups(sense):
     return out
 
 
-def attach_cycle(sense, target):
+def attach_cycle(sense, target, cycle_kw=None):
     """Attach body.LegCycle to a BatchBody (`leg_cycle`) or a body.Locomotion (`cycle`) when the sense names 'leg_cycle';
-    'leg_cycle_flat' builds it with flat_amplitude=True (the modulation-only control), the default LegCycle() otherwise."""
+    'leg_cycle_flat' builds it with flat_amplitude=True (the modulation-only control), the default LegCycle() otherwise.
+    `cycle_kw` (cycle_kwargs_of: e.g. flat_amplitude_value for the level3 M2 arm) are further LegCycle keywords of a labelled
+    control and are refused without the flat token (they are read by nothing else)."""
     from flyverse import body
     if sense is None or not sense.leg_cycle:
+        if cycle_kw:
+            raise SystemExit(f"cycle keywords {cycle_kw} given but the spec names no leg cycle")
         return None
-    cyc = body.LegCycle(flat_amplitude=True) if getattr(sense, "leg_cycle_flat", False) else body.LegCycle()
+    cycle_kw = dict(cycle_kw or {})
+    if cycle_kw and not getattr(sense, "leg_cycle_flat", False):
+        raise SystemExit(f"cycle keywords {cycle_kw} are read only under 'leg_cycle_flat' (flat_amplitude_value is the flat law's constant)")
+    cyc = body.LegCycle(flat_amplitude=True, **cycle_kw) if getattr(sense, "leg_cycle_flat", False) else body.LegCycle()
     if hasattr(target, "leg_cycle"):
         target.leg_cycle = cyc
     else:
@@ -292,14 +335,16 @@ def cmd_room(args) -> int:
         # campaniform_load_hz; senses.py and its defaults are untouched). Replaced before the first step, so every frame reads it.
         fb.proprioception_sense = senses.Proprioception(c, spec, **sense_kw)
     sense = fb.proprioception_sense if spec is not None else senses.Proprioception(c, "all")   # A: the same cells, recorded
-    cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.body)
+    cycle_kw = cycle_kwargs_of(args.arm, fam, args) if spec is not None else {}
+    cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.body, cycle_kw)
     counts = sense.counts()
     srec = sense_record(sense, spec, sense_kw) if spec is not None else {"spec": None, "tokens": {}, "overrides": {}, "note": "the shipped path: no sense attached"}
+    srec["cycle"] = vars(cycle) if cycle else None; srec["cycle_overrides"] = dict(cycle_kw)      # the LegCycle a labelled cycle control was built with
     started_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     info = world.make_room(0, "all")[1]; top_z = float(info["table_top_z"]); x0, x1, y0, y1 = [float(v) for v in info["table_extent"]]
     _log(f"[room {args.arm}] started {started_utc}; family {fam} spec {spec or 'off'} channels {sense.channels} coriolis {sense.haltere_coriolis} leg_cycle {sense.leg_cycle} "
          f"haltere_sided {sense.haltere_sided} unsided {getattr(sense, 'unsided', False)} leg_cycle_flat {getattr(sense, 'leg_cycle_flat', False)} params {sense.params} "
-         f"mn_ref {sense.mn_ref_hz} sense overrides {sense_kw} cycle {vars(cycle) if cycle else None} block {args.block}")
+         f"mn_ref {sense.mn_ref_hz} sense overrides {sense_kw} cycle {vars(cycle) if cycle else None} cycle overrides {cycle_kw} block {args.block}")
     _log(f"[room {args.arm}] BatchSim B={B} neurons={c.n:,} device={brain.device} env seeds={seeds} brain seed={args.seed} receptor_model {lp.receptor_model} "
          f"type_path_gain {lp.type_path_gain} cuda kernels {brain.cuda} event_driven {brain.event_driven} cuda_graphs {fb.cuda_graphs} fence False")
     n = c.neurons; ty = n.type.fillna("").to_numpy(); side = n.somaSide.fillna("?").to_numpy()
@@ -556,7 +601,8 @@ def cmd_compass(args) -> int:
     sense = fb.proprioception_sense if spec is not None else senses.Proprioception(c, "all")
     srec = sense_record(sense, spec, sense_kw) if spec is not None else {"spec": None, "tokens": {}, "overrides": {}, "note": "the shipped path: no sense attached"}
     started_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.loco)     # scalar body: Locomotion.cycle
+    cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.loco,     # scalar body: Locomotion.cycle
+                         cycle_kwargs_of(args.arm, fam, args) if spec is not None else {})
     groups = afferent_groups(sense)
     from flyverse.motor import haltere_side_groups
     hm_groups = sense.haltere_mn_groups if sense.haltere_mn_groups is not None else haltere_side_groups(c)
@@ -754,18 +800,22 @@ def cmd_plan(args) -> int:
         from replicate_connectome_walk import write_plan
         return write_plan(args)
     d = args.dir.rstrip("/")
-    name = args.name or {"vncd": "vncd", "body": "vncd3", "level": "vncd4", "level2": "vncd5"}[fam]
+    name = args.name or {"vncd": "vncd", "body": "vncd3", "level": "vncd4", "level2": "vncd5", "level3": "vncd6"}[fam]
     pre = f"mkdir -p {d} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && "
     fam_flag = f" --family {fam}" if fam != "vncd" else ""
     room_arms = list(arms)
-    flag_of = {"mn_ref_hz": "--mn-ref-hz", "hair_plate_max_hz": "--hair-plate-max-hz", "campaniform_load_hz": "--campaniform-load-hz"}
+    flag_of = {"mn_ref_hz": "--mn-ref-hz", "hair_plate_max_hz": "--hair-plate-max-hz", "campaniform_load_hz": "--campaniform-load-hz",
+               "flat_amplitude_value": "--flat-amplitude-value"}
 
     def arm_flags(arm):
-        # a labelled control carries every non-default sense parameter explicitly on the job line (self-describing batch.sh)
+        # a labelled control carries every non-default sense / cycle parameter explicitly on the job line (self-describing batch.sh)
         kw = sense_kwargs_of(arm, fam)
         if arm in ARM_SENSE_KW.get(fam, {}) and any(v is None for v in ARM_SENSE_KW[fam][arm].values()):
             raise SystemExit(f"arm {arm} of family {fam} has an underived sense parameter (ARM_SENSE_KW): run the derivation first")
-        return "".join(f" {flag_of[k]} {v}" for k, v in kw.items())
+        ckw = cycle_kwargs_of(arm, fam)
+        if arm in ARM_CYCLE_KW.get(fam, {}) and any(v is None for v in ARM_CYCLE_KW[fam][arm].values()):
+            raise SystemExit(f"arm {arm} of family {fam} has an underived cycle parameter (ARM_CYCLE_KW): run the derivation first")
+        return "".join(f" {flag_of[k]} {v}" for k, v in list(kw.items()) + list(ckw.items()))
     cmds = []
 
     # The job strings are written into batch.sh inside DOUBLE quotes, so every `$` below is escaped as `\$` there: the
@@ -888,7 +938,7 @@ def load_room(d, only_seeds=None):
     runs = {}
     import re
     for p in sorted(glob.glob(os.path.join(d, "room_*_r*.json"))):
-        m = re.fullmatch(r"room_[A-Z]_r(\d+)\.json", Path(p).name)
+        m = re.fullmatch(r"room_[A-Z][A-Z0-9]?_r(\d+)\.json", Path(p).name)       # arms are one letter, or one letter + one digit (level3's M2)
         if not m or (only_seeds is not None and int(m.group(1)) not in only_seeds):
             continue
         j = json.loads(Path(p).read_text(encoding="utf-8"))
@@ -1452,6 +1502,7 @@ def cmd_pairs(args) -> int:
     keys += [k for k in sorted(j0["run"]) if k.startswith(("commanded_", "measured_")) and k.endswith("_hz")]
     keys += sorted({f"{w}_hz" for items in runs.values() for _, j in items for w in j["watch"]})
     keys += sorted(chain_keys)
+    keys = list(dict.fromkeys(keys))                 # DNa02_L_hz / DNa02_R_hz are both room keys and watch keys: one row each (the values are one run key)
     rows = []
     for key in keys:
         vals = {a: np.array([j["run"][key] for _, j in items if j["run"].get(key) is not None], float) for a, items in runs.items()}
@@ -1466,6 +1517,12 @@ def cmd_pairs(args) -> int:
                 row.update({f"{t}v{r}_diff": cmp_["diff"], f"{t}v{r}_z": cmp_["z"], f"{t}v{r}_p": cmp_["p"], f"{t}v{r}_verdict": cmp_["verdict"]})
         rows.append(row)
     pdf = pd.DataFrame(rows); pdf.to_csv(Path(out, "pairwise.csv"), index=False)
+    # EVERY per-run value behind pairwise.csv, long format, script-emitted (docs/INTERP.md 10.4 item 28: a per-seed list quoted in
+    # prose is pasted from this file's `value` column, never retyped): one row per (key, arm, seed, run file)
+    ps_rows = [{"key": key, "arm": a, "seed": int(j["seed"]), "file": Path(p).name, "value": j["run"][key]}
+               for key in keys for a in arm_order for p, j in runs[a] if j["run"].get(key) is not None]
+    per_seed = pd.DataFrame(ps_rows); per_seed.to_csv(Path(out, "per_seed.csv"), index=False)
+    print(f"\n== per-run values of every tabulated key -> {out}/per_seed.csv ({len(per_seed)} rows: key, arm, seed, file, value)")
     print(f"\n== adjacent-arm verdicts (common.compare; {'5' if only is None else len(only)} runs per arm) -> {out}/pairwise.csv")
     show = [k for k, _ in ROOM_KEYS + ROBUST_KEYS + CYCLE_KEYS + SIDED_KEYS] + [k for k in keys if k.startswith("commanded_") and ("_LR_" in k or ":L_" in k or ":R_" in k or (k.endswith("_hz") and ":" not in k))] + [k for k in keys if k.endswith("_hz") and any(k.startswith(w) for w in WATCH_LEVEL2)] + sorted(chain_keys)
     for _, r in pdf[pdf.key.isin(show)].iterrows():
@@ -1486,7 +1543,7 @@ def cmd_pairs(args) -> int:
     if getattr(args, "predeclared", None):
         holm_families(pdf, args.predeclared, out)
     # DNa02 decomposition summary
-    dd = decompose_summary(args.analysis or out, "DNa02", "".join(arm_order))
+    dd = decompose_summary(args.analysis or out, "DNa02", list(arm_order))
     if len(dd):
         dd.to_csv(Path(out, "dna02_decompose_summary.csv"), index=False)
         print(f"\n== DNa02 rate-weighted input per arm (mV/s per post cell; decompose_DNa02_*_per_type.csv) -> {out}/dna02_decompose_summary.csv")
@@ -1517,15 +1574,18 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     fam_help = ("arm family: 'vncd' (round 2: B all / C legs / D haltere / E coriolis), 'body' (round 3: C + leg cycle / D + side-split haltere / E + coriolis; "
                 "docs/audits/body_sided_state.md), 'level' (round 4: L = 'all' at the level-matched mn_ref_hz, a labelled control / C + leg cycle / D + side-split haltere; docs/audits/level_matched_control.md) "
-                "or 'level2' (round 5: L / U unsided / K channel-matched / M modulation-only / C, the three controls that split 'structure'; docs/audits/level_controls.md)")
+                "or 'level2' (round 5: L / U unsided / K channel-matched / M modulation-only / C, the three controls that split 'structure'; docs/audits/level_controls.md) "
+                "or 'level3' (round 4c: A / L / M2 modulation-only at the cycle's realised amplitude 0.948 / C; docs/audits/level_controls_r2.md)")
     all_arms = sorted({a for arms_, _, _ in FAMILIES.values() for a in arms_})
     mn_help = "the sense's mn_ref_hz for this arm (default: the family table -- the level family's L arm -- else the sense's own default 30 Hz; a LABELLED CONTROL parameter, never a default)"
     kw_help = "a further senses.Proprioception constructor keyword of a labelled control arm (default: the family table ARM_SENSE_KW -- the level2 family's K arm -- else the sense's own default)"
+    cyc_help = "body.LegCycle.flat_amplitude_value for a 'leg_cycle_flat' arm (default: the family table ARM_CYCLE_KW -- the level3 family's M2 arm, 0.948 -- else LegCycle's own default 1.0; a LABELLED CONTROL parameter, never a default)"
     r = sub.add_parser("room", help="one plain-fly room run (GPU)")
     r.add_argument("--dataset", choices=["malecns", "banc"], default=None)
     r.add_argument("--arm", required=True, choices=all_arms); r.add_argument("--seed", type=int, default=0); r.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
     r.add_argument("--mn-ref-hz", type=float, default=None, help=mn_help)
     r.add_argument("--hair-plate-max-hz", type=float, default=None, help=kw_help); r.add_argument("--campaniform-load-hz", type=float, default=None, help=kw_help)
+    r.add_argument("--flat-amplitude-value", type=float, default=None, help=cyc_help)
     r.add_argument("--batch", type=int, default=16); r.add_argument("--seconds", type=float, default=60.0); r.add_argument("--skip", type=float, default=5.0)
     r.add_argument("--every", type=int, default=2, help="capture the watch / afferent Recorder every N frames"); r.add_argument("--mean-every", type=int, default=5)
     r.add_argument("--device", default=None); r.add_argument("--cuda-sparse", default="torch"); r.add_argument("--out", required=True)
@@ -1534,6 +1594,7 @@ def main(argv=None):
     k.add_argument("--arm", required=True, choices=all_arms); k.add_argument("--seed", type=int, default=0); k.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
     k.add_argument("--mn-ref-hz", type=float, default=None, help=mn_help)
     k.add_argument("--hair-plate-max-hz", type=float, default=None, help=kw_help); k.add_argument("--campaniform-load-hz", type=float, default=None, help=kw_help)
+    k.add_argument("--flat-amplitude-value", type=float, default=None, help=cyc_help)
     k.add_argument("--gains", default="2:15"); k.add_argument("--seconds", type=float, default=10.0); k.add_argument("--skip", type=float, default=3.0)
     k.add_argument("--rate", type=float, default=90.0); k.add_argument("--dna02-hz", type=float, default=20.0); k.add_argument("--sparse", default="warp", choices=["warp", "torch"])
     k.add_argument("--quick", action="store_true"); k.add_argument("--device", default=None); k.add_argument("--cache-dir", default=None); k.add_argument("--out", required=True)

@@ -176,6 +176,70 @@ class FlatAmplitudeTests(unittest.TestCase):
         self.assertTrue(np.all(st["amp"][[f.speed >= body.LegCycle().v_min and not f.airborne for f in m.flies]] == 1.0))
 
 
+class FlatAmplitudeValueTests(unittest.TestCase):
+    """Round 4c's MODULATION-ONLY control AT THE CYCLE'S LEVEL (LegCycle(flat_amplitude=True, flat_amplitude_value=0.948);
+    docs/audits/level_controls_r2.md): the parameter defaults to 1.0 and is read by nothing unless `flat_amplitude` is on, so
+    the default cycle AND round 4b's flat cycle are unchanged bit for bit; with a value the amplitude is that constant on every
+    walking leg whatever the yaw, 0 standing and airborne, and the timing, the tripod and the loads are the default's."""
+
+    def test_default_value_is_one_and_both_existing_cycles_are_unchanged(self):
+        self.assertEqual(body.LegCycle().flat_amplitude_value, 1.0)
+        self.assertEqual(vars(body.LegCycle()), vars(body.LegCycle(flat_amplitude_value=1.0)))
+        self.assertEqual(vars(body.LegCycle(flat_amplitude=True)), vars(body.LegCycle(flat_amplitude=True, flat_amplitude_value=1.0)))
+        ref, off, flat1, flat1v = body.LegCycle(), body.LegCycle(flat_amplitude_value=0.948), body.LegCycle(flat_amplitude=True), body.LegCycle(flat_amplitude=True, flat_amplitude_value=1.0)
+        for yaw in (2.0, -2.0, 0.0):
+            k0 = ref.advance(ref.initial_phase(1), [0.01], [yaw], [False], 0.01)
+            k1 = off.advance(off.initial_phase(1), [0.01], [yaw], [False], 0.01)         # the value is unread without the flag: the default law, bit for bit
+            for key in k0:
+                np.testing.assert_array_equal(k0[key], k1[key])
+            f0 = flat1.advance(flat1.initial_phase(1), [0.01], [yaw], [False], 0.01)
+            f1 = flat1v.advance(flat1v.initial_phase(1), [0.01], [yaw], [False], 0.01)   # round 4b's M arm is the value 1.0, bit for bit
+            for key in f0:
+                np.testing.assert_array_equal(f0[key], f1[key])
+            np.testing.assert_array_equal(f0["amp"], np.ones((1, 6)))
+
+    def test_flat_value_is_the_constant_while_walking_and_carries_no_yaw(self):
+        flat, ref = body.LegCycle(flat_amplitude=True, flat_amplitude_value=0.948), body.LegCycle()
+        for yaw in (2.0, -2.0, 0.0):
+            k = flat.advance(flat.initial_phase(1), [0.01], [yaw], [False], 0.01)
+            k0 = ref.advance(ref.initial_phase(1), [0.01], [yaw], [False], 0.01)
+            np.testing.assert_array_equal(k["amp"], np.full((1, 6), 0.948))                # every leg, whatever the yaw: |amp L-R| exactly 0
+            for key in ("phase", "stance", "freq", "beta", "load_L", "load_R", "n_stance"):
+                np.testing.assert_array_equal(k[key], k0[key])                              # nothing else moved
+        k = flat.advance(flat.initial_phase(1), [0.0], [0.0], [False], 0.01)                # standing: amp 0
+        np.testing.assert_allclose(k["amp"], 0.0); self.assertTrue(k["stance"].all())
+        k = flat.advance(flat.initial_phase(1), [0.02], [1.0], [True], 0.01)                # airborne: suspended, amp 0
+        np.testing.assert_allclose(k["amp"], 0.0); self.assertFalse(k["stance"].any())
+        k = flat.advance(flat.initial_phase(2), [0.008, 0.0004], [0.5, 0.5], [False, False], 0.01)
+        np.testing.assert_array_equal(k["amp"], [[0.948] * 6, [0.0] * 6])
+
+    def test_batch_sim_default_and_flat_one_are_bit_identical_with_the_value_at_its_default_and_the_value_feeds_the_sense(self):
+        a = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+haltere_sided"); a.body.leg_cycle = body.LegCycle()
+        b = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+haltere_sided"); b.body.leg_cycle = body.LegCycle(flat_amplitude_value=0.948)
+        m = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+leg_cycle_flat+haltere_sided"); m.body.leg_cycle = body.LegCycle(flat_amplitude=True)
+        m1 = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+leg_cycle_flat+haltere_sided"); m1.body.leg_cycle = body.LegCycle(flat_amplitude=True, flat_amplitude_value=1.0)
+        m2 = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+leg_cycle_flat+haltere_sided"); m2.body.leg_cycle = body.LegCycle(flat_amplitude=True, flat_amplitude_value=0.948)
+        for _ in range(12): a.step(); b.step(); m.step(); m1.step(); m2.step()
+        for k, v in snapshot(a.fb).items(): torch.testing.assert_close(v, snapshot(b.fb)[k], rtol=0, atol=0)      # the value is unread without the flag
+        for k, v in snapshot(m.fb).items(): torch.testing.assert_close(v, snapshot(m1.fb)[k], rtol=0, atol=0)     # round 4b's M is the value 1.0
+        for fa, fb_ in zip(a.flies, b.flies):
+            np.testing.assert_array_equal(fa.leg_amp, fb_.leg_amp); np.testing.assert_array_equal(fa.leg_phase, fb_.leg_phase)
+        for fm, fm1 in zip(m.flies, m1.flies):
+            np.testing.assert_array_equal(fm.leg_amp, fm1.leg_amp)
+        for fm in m2.flies:
+            if fm.speed >= body.LegCycle().v_min and not fm.airborne:
+                np.testing.assert_array_equal(fm.leg_amp, np.full(6, 0.948))
+        # the flat sense injects the flat state at the value: the chordotonal command is the phase law at amplitude 0.948
+        sense = m2.fb.proprioception_sense
+        state = m2.body.proprio_state(m2.motor, haltere_sides=sense.haltere_sides(m2.brain))
+        m2.step()
+        expect = {ch: hz for ch, _, hz in sense.rates(**state, batch=2)}
+        np.testing.assert_allclose(m2.brain.poisson_p[:, [9, 10, 11, 20]].numpy(), expect["chordotonal"] * (m2.brain.p.dt / 1000), rtol=1e-5)
+        walking = [f.speed >= body.LegCycle().v_min and not f.airborne for f in m2.flies]
+        st = body.LegCycle.state(m2.flies)
+        self.assertTrue(np.all(st["amp"][walking] == 0.948))
+
+
 class BatchAndScalarTests(unittest.TestCase):
     def test_shipped_path_is_bit_identical_with_the_cycle_attached_and_the_sense_off(self):
         a = BatchSim(2, c=graph(), device="cpu", seed=3)

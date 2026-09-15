@@ -259,7 +259,11 @@ class LegCycle:
     `flat_amplitude` (default False; a LABELLED CONTROL construction, docs/audits/level_controls.md): the per-leg
     amplitude law is replaced by amp_i = 1 for every leg while the cycle runs (walking, on the ground; 0 standing and
     airborne as before), so the yaw term (half_width_m) and the |amp L-R| turn term are absent and only the phase /
-    stance-swing modulation remains. The timing laws, the tripod and the loads are unchanged by the flag."""
+    stance-swing modulation remains. The timing laws, the tripod and the loads are unchanged by the flag.
+    `flat_amplitude_value` (default 1.0; read ONLY under `flat_amplitude`, docs/audits/level_controls_r2.md): the
+    constant the flat law holds every walking leg at. 1.0 is round 4b's arm M; the round-4c control M2 sets it to the
+    default law's own realised walking-mean amplitude (0.948, derived on CPU from the cycle arm's recordings) so that
+    the modulation-only control sits at the cycle's afferent LEVEL. Both are LABELLED CONTROL constructions."""
     swing_s: float = 0.030
     stance_coef_s: float = 0.9328
     stance_exp: float = -1.025
@@ -268,7 +272,8 @@ class LegCycle:
     half_width_m: float = 0.0010   # lateral distance of the stance tarsi from the yaw axis: APPROXIMATE, not measured
     v_min: float = 0.0005
     stance_min: float = 0.5
-    flat_amplitude: bool = False   # opt-in: amp_i = 1 while walking (the modulation-only control arm); the default law otherwise
+    flat_amplitude: bool = False   # opt-in: amp_i = flat_amplitude_value while walking (the modulation-only control arm); the default law otherwise
+    flat_amplitude_value: float = 1.0   # the flat law's constant (round 4b's M: 1.0; round 4c's M2: the cycle's realised 0.948); unread unless flat_amplitude
     LEGS = ("L1", "R1", "L2", "R2", "L3", "R3")
     SIDE = (1, -1, 1, -1, 1, -1)              # +1 left, -1 right (the senses' convention)
     SEGMENT = (1, 1, 2, 2, 3, 3)
@@ -298,8 +303,8 @@ class LegCycle:
         # left legs (side +1) travel v - yaw * b, right legs v + yaw * b: yaw > 0 is a left turn, left legs inside
         v_leg = np.maximum(v[:, None] - side[None] * yaw[:, None] * self.half_width_m, 0.0)
         tau_fin = np.where(np.isfinite(tau_st), tau_st, 0.0)
-        if self.flat_amplitude:                                      # opt-in control: every walking leg at amplitude 1
-            amp = np.where(air[:, None] | ~np.isfinite(tau_st)[:, None], 0.0, np.ones_like(v_leg))
+        if self.flat_amplitude:                                      # opt-in control: every walking leg at the flat constant (1 by default)
+            amp = np.where(air[:, None] | ~np.isfinite(tau_st)[:, None], 0.0, np.full_like(v_leg, float(self.flat_amplitude_value)))
         else:
             amp = np.where(air[:, None], 0.0, v_leg * tau_fin[:, None] / self.step_ref_m)
         n_st = stance.sum(1)
