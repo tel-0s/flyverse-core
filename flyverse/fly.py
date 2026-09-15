@@ -41,9 +41,26 @@ class FlyBrain:
     def __init__(self, c=None, *, modules=None, batch=1, device=None, seed=0,
                  lif_params=None, optic_params=None, eye_geometry=None, cuda_graphs=False, cuda_kernels=None,
                  cuda_sparse="torch", cuda_compact=True, nt_source: NTSource | None = None,
-                 dataset=None, optic="auto"):
+                 dataset=None, optic="auto", preset="raw", instruments=None):
+        """`preset` (docs/PRESETS_SPEC.md): 'raw' -- the default -- is the connectome, the LIF, the receptor table, the
+        senses and the motor readout exactly as shipped, byte-identical to a call without the keyword
+        (tests/test_bit_identity.py); 'instrumented' is 'raw' plus the named `instruments` (flyverse.instruments
+        objects: a labelled stand-in, a held edge, a relabel), each installed through the surface that already exists
+        for its kind and each recorded by describe() in provenance()['instruments'] beside 'preset'. Nothing about the
+        default changes: preset='raw' with instruments raises, and the constructor never builds an instrument on its own."""
         if optic not in (None, "auto"):
             raise ValueError("optic must be 'auto' or None")
+        from .instruments import PRESETS, _check_instrument
+        if preset not in PRESETS:
+            raise ValueError(f"preset must be one of {PRESETS}, got {preset!r}")
+        instruments = list(instruments or [])
+        if preset == "raw" and instruments:
+            raise ValueError("preset 'raw' attaches no instrument (docs/PRESETS_SPEC.md 1); use preset='instrumented'")
+        names = [_check_instrument(inst) for inst in instruments]
+        if len(set(names)) != len(names):
+            raise ValueError(f"instrument names must be unique: {names}")
+        self.preset = preset
+        self.instruments = {}
         if c is not None and dataset is not None and c.dataset != dataset:
             raise ValueError("dataset disagrees with the supplied connectome")
         self.c = regions.subset(c if c is not None else connectome.load(dataset=dataset, verbose=False), modules)
@@ -106,6 +123,18 @@ class FlyBrain:
         # the shipped path must not clone on every call nor grow a record trimmed only by a vision frame (B1 of
         # docs/audits/extensibility_review.md).
         self._vision_has_advanced = False
+        # preset 'instrumented': install each instrument through the surface its kind already has (a stand-in grows
+        # the proprioception sense's channel; a hold / relabel record verifies the gain list / the cache carries it)
+        for inst in instruments:
+            install = getattr(inst, "install", None)
+            if callable(install):
+                install(self)
+            self.instruments[inst.name] = inst
+
+    def instrument_records(self):
+        """[describe() of each instrument], JSON-ready -- provenance()['instruments']; [] under preset 'raw'."""
+        from .instruments import records
+        return records(self.instruments.values())
 
     def _extension_runtime(self):
         if self._extensions is None:

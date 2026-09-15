@@ -44,6 +44,22 @@ clique stays damped: the per-type undamping 5A / 6A asked for, with no brain.py 
 per-type ring rates (ExR6 / ER6 / ER4m, plus EPGt) and the per-cell maximum rate of the small compass groups, so the
 rate model's ring rates and INTERP.md 10's `silent` (max rate per cell < 0.5 Hz) are measured, not inferred.
 
+Round 7 (docs/audits/compass_velocity_route.md, docs/PRESETS_SPEC.md, docs/INSTRUMENTS.md): `--preset raw|instrumented`
+(default raw: byte-identical to a call without it) and `--instrument NAME[:k=0.5][:sign=-1][:cells=variant]`
+(repeatable; implies `--preset instrumented`) attach a flyverse.instruments stand-in to the FlyBrain --
+`sided_turn_afferent`, Poisson spikes on PS196_b's ascending afferents at k * max(0, +-yaw_deg_s) on the side the
+graph implies. Under `--preset instrumented` the 6A hold (`ring_dc_hold`), the GLNO relabel (`glno_sign`) and a 6B
+edge gain are ALSO recorded as instruments (an `edges` / `relabel` record each, PRESETS_SPEC 2.4) beside the flags
+that install them, so the JSON's `provenance.instruments` lists everything hand-written in the run; without the
+preset flag those flags behave and record exactly as in 6A / 6B. `--turn DEG_S` (ledger runs only; default None =
+nothing fed) imposes a signed yaw rate -- positive = a left turn, the body's convention -- over `--turn-window
+START:END` seconds after the pulse end; cx_wedge has no body, so the turn is a PRESCRIBED protocol parameter (the
+analogue of the 90 deg/s imposed visual rotation of deficit_rotation.md), fed to the afferent instrument through
+FlyBrain.proprioception(yaw_rate=) when one is attached and merely recorded when none is. Every ledger run records
+per-side rates of PEN / GLNO / DNa02 / PS196_b per frame and the round-7 measures: `<G>_LR_hz` (mean L - R over the
+turn window), `bump_follow_wedges_per_s` (slope of the unwrapped bump centre over the turn window, times the sign of
+the turn; ideal 16 / 360 * |turn|) and the afferents' own per-side rates.
+
 Findings (docs/audits/cx_wedge.md): the tuned structure is there (PEN excitation local, Delta7 inhibition
 cosine-shaped with own-wedge / opposite = 0.10); the loop is shut at gain x1 by the untuned EPG -> ExR6 / ExR4 /
 ER6 / ER4m -> EPG, PEN feedback, not by Delta7; a persistent, confined bump exists in the LIF for gE 1.75-2 with
@@ -147,6 +163,95 @@ def parse_edge_gains(items) -> list:
             except re.error as e:
                 raise SystemExit(f"--edge-gain {it!r}: bad regex {r!r} ({e})")
         out.append((pre, post, f))
+    return out
+
+
+# ---------------------------------------------------------------------------------------------- round 7: presets / instruments
+RING_DC_HOLD = (r"^(ExR6|ER6|ER4m)$", r"^(PEN_|EPG$)")      # the 6A hold, named `ring_dc_hold` when recorded as an instrument
+PRESETS = ("raw", "instrumented")
+
+
+def resolve_preset(preset, instrument_specs) -> str:
+    """--preset / --instrument -> the preset: None with no instrument is 'raw' (the default, byte-identical); an
+    instrument implies 'instrumented'; 'raw' with an instrument is refused (docs/PRESETS_SPEC.md 1)."""
+    specs = list(instrument_specs or [])
+    if preset is not None and preset not in PRESETS:
+        raise SystemExit(f"--preset must be one of {PRESETS}, got {preset!r}")
+    if specs and preset == "raw":
+        raise SystemExit("--preset raw attaches no instrument; drop --instrument or use --preset instrumented")
+    return preset or ("instrumented" if specs else "raw")
+
+
+def parse_turn_window(s) -> tuple:
+    """--turn-window START:END (seconds after the pulse end) -> (start, end); default 0.5:3.5."""
+    if s is None:
+        return (0.5, 3.5)
+    try:
+        a, b = (float(x) for x in str(s).split(":", 1))
+    except ValueError:
+        raise SystemExit(f"--turn-window expects START:END seconds, got {s!r}")
+    if not (np.isfinite(a) and np.isfinite(b)) or a < 0 or b <= a:
+        raise SystemExit(f"--turn-window needs 0 <= START < END, got {s!r}")
+    return (a, b)
+
+
+def build_instruments(c, instrument_specs, preset, hold_edges=None, nt_override=None, edge_gains=None, same_type_gain=None) -> list:
+    """The flyverse.instruments list a run attaches: the --instrument stand-ins, and -- under preset 'instrumented'
+    only -- an `edges` record per --hold-edges (the 6A hold is `ring_dc_hold`), a `relabel` record per --nt-override
+    (GLNO is `glno_sign`) and an `edges` record per --edge-gain, each with the resolved counts. Under 'raw' the list
+    is empty whatever the flags (the flags still record themselves in the row as in 6A / 6B)."""
+    from flyverse import instruments as fi
+    if preset == "raw":
+        return []
+    out = []
+    for spec in instrument_specs or []:
+        try:
+            out.append(fi.parse_instrument(spec, c))
+        except ValueError as e:
+            raise SystemExit(f"--instrument {spec!r}: {e}")
+    holds = list(hold_edges or [])
+    resolved = hold_edge_counts(c, holds) if holds else []
+    for i, ((pre, post, f), rec) in enumerate(zip(holds, resolved)):
+        name = "ring_dc_hold" if (pre, post) == RING_DC_HOLD and f == 0.0 else f"edge_hold_{i}"
+        out.append(fi.EdgeHold(pre, post, f, name=name, resolved=rec))
+    for t, nt in (nt_override or {}).items():
+        out.append(fi.TypeRelabel(t, nt))
+    gains = list(edge_gains or [])
+    resolved = hold_edge_counts(c, gains, same_type_gain=same_type_gain) if gains else []
+    for i, ((pre, post, f), rec) in enumerate(zip(gains, resolved)):
+        out.append(fi.EdgeGain(pre, post, f, name=f"edge_gain_{i}", resolved=rec))
+    return out
+
+
+def side_groups(c, types) -> dict:
+    """{'<label>_L': idx, '<label>_R': idx} of the cells of `types` ({label: type or (types)}) by somaSide -- the per-side
+    groups the ledger records (PEN, GLNO, DNa02, PS196_b). Types are looked up in the connectome, never assumed."""
+    ty = c.neurons.type.fillna("").to_numpy().astype(str)
+    soma = c.neurons.somaSide.fillna("").to_numpy().astype(str)
+    out = {}
+    for label, t in types.items():
+        m = np.isin(ty, list(t) if isinstance(t, (list, tuple)) else [t])
+        out[f"{label}_L"], out[f"{label}_R"] = np.flatnonzero(m & (soma == "L")), np.flatnonzero(m & (soma == "R"))
+    return out
+
+
+def bump_follow(centre, confined, tt, t_on, t_off, turn_deg_s):
+    """The round-7 primary measure: slope (wedges / s) of the UNWRAPPED bump centre over the turn window, times the sign
+    of the turn, so a bump that follows the turn in ring order is positive whatever the direction; NaN without a turn or
+    with fewer than 3 finite frames. Also the confined fraction over the window and the ideal 16 / 360 * |turn|."""
+    if turn_deg_s is None:
+        return {"bump_follow_wedges_per_s": float("nan"), "bump_follow_confined_frac": float("nan"), "bump_follow_ideal_wedges_per_s": float("nan"), "bump_follow_n_frames": 0}
+    m = (tt >= t_on - 1e-9) & (tt < t_off - 1e-9)
+    cen = np.asarray(centre, float)[m]
+    ok = np.isfinite(cen)
+    out = {"bump_follow_confined_frac": float(np.mean(np.asarray(confined)[m])) if m.any() else float("nan"),
+           "bump_follow_ideal_wedges_per_s": float(abs(turn_deg_s) * 16.0 / 360.0), "bump_follow_n_frames": int(ok.sum())}
+    if ok.sum() < 3:
+        out["bump_follow_wedges_per_s"] = float("nan")
+        return out
+    unwrapped = np.unwrap(cen[ok] * (2 * np.pi / 16.0)) * (16.0 / (2 * np.pi))
+    slope = float(np.polyfit(tt[m][ok], unwrapped, 1)[0])
+    out["bump_follow_wedges_per_s"] = slope * float(np.sign(turn_deg_s))
     return out
 
 
@@ -606,7 +711,7 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
              thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, gR=1.0, verbose=True,
              receptor_model=None, receptor_net_rule="class", nt_override=None,
              lif_overrides=None, ledger=False, arm=None, block=None, device=None, ledger_npz=None, hold_edges=None,
-             edge_gains=None):
+             edge_gains=None, preset="raw", instrument_specs=None, turn_deg_s=None, turn_window=(0.5, 3.5), settle_s=1.0):
     """FlyBrain on the full connectome; drive `width` contiguous wedges (of 16) of the EPG ring from `start_wedge`;
     report persistence and confinement after the pulse. receptor_model / receptor_net_rule thread
     LIFParams.receptor_model (the optional receptor-expression sign stage); nt_override is recorded in the row (the
@@ -630,9 +735,27 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
     `parse_edge_gains`, appended to type_path_gain after the holds -- a per-type gain, a LABELLED INSTRUMENT. Default
     None. The ledger record additionally carries the per-type ring rates (ExR6 / ER6 / ER4m) and EPGt as `g__*`
     groups, and the per-cell rates of the small compass groups (`cells__*`) with their per-cell maximum in `metrics`
-    (`<group>_cell_max_pre/during/post`), so `silent` in the INTERP.md 10 sense is decidable from the run."""
+    (`<group>_cell_max_pre/during/post`), so `silent` in the INTERP.md 10 sense is decidable from the run.
+
+    Round 7 (docs/audits/compass_velocity_route.md): preset = 'raw' (default; FlyBrain(preset='raw'), byte-identical)
+    or 'instrumented'; instrument_specs = the `--instrument` strings (flyverse.instruments.parse_instrument); under
+    'instrumented' the holds / relabel / edge gains are ALSO recorded as instruments (build_instruments). turn_deg_s
+    (ledger only, default None) = a prescribed signed yaw rate over turn_window = (start, end) seconds after the pulse
+    end, fed through FlyBrain.proprioception(yaw_rate=) when an afferent instrument is attached, recorded either way.
+    settle_s (default 1.0, the 6A value) is the background settle before the pulse. The ledger record grows the
+    per-side groups PEN / GLNO / DNa02 / PS196_b (+ the afferents when attached) and `metrics` the round-7 measures
+    `<G>_LR_hz` (mean L - R over the turn window; over the post window without a turn), `<G>_LR_hz_rest` (after the
+    turn) and `bump_follow_*`."""
     from flyverse.fly import FlyBrain
     log = print if verbose else (lambda *a, **k: None)
+    if turn_deg_s is not None and not ledger:
+        raise ValueError("--turn needs --ledger (the per-frame loop feeds the yaw)")
+    if turn_deg_s is not None and (not np.isfinite(turn_deg_s)):
+        raise ValueError("--turn must be finite (deg/s; positive = a left turn)")
+    if not np.isfinite(settle_s) or settle_s < 0:
+        raise ValueError("settle_s must be finite and >= 0")
+    if preset not in PRESETS:
+        raise ValueError(f"preset must be one of {PRESETS}")
     epg = cells["EPG"]
     wedge_of = np.asarray(np.round(epg["pos"]), int) % 16
     inside = np.isin(wedge_of, [(start_wedge + j) % 16 for j in range(width)])
@@ -654,9 +777,13 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
         params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=tpg,
                                  receptor_model=receptor_model, receptor_net_rule=receptor_net_rule, **(lif_overrides or {}))
         t0 = time.time()
-        fb = FlyBrain(c, lif_params=params, seed=seed, cuda_graphs=cuda_graphs, device=device)
+        # round 7: the instrument list (empty under 'raw', whatever the flags) rides on the constructor and into provenance
+        insts = build_instruments(c, instrument_specs, preset, hold_edges=hold_edges, nt_override=nt_override,
+                                  edge_gains=edge_gains, same_type_gain=params.same_type_gain)
+        fb = FlyBrain(c, lif_params=params, seed=seed, cuda_graphs=cuda_graphs, device=device, preset=preset, instruments=insts)
+        afferent = next((i for i in insts if getattr(i, "name", None) == "sided_turn_afferent"), None)
         # background: FlyBrain.stimulate pulses expire, so hold the background as a long pulse (as the grid did)
-        total_ms = (1.0 + pulse_s + seconds) * 1000
+        total_ms = (settle_s + pulse_s + seconds) * 1000
         fb.stimulate(idx_epg, background_hz, total_ms + 100)
 
         def sample(tag):
@@ -683,10 +810,14 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                    hold_edges=[[p_, q_, float(f_)] for p_, q_, f_ in (hold_edges or [])],
                    hold_edges_resolved=hold_edge_counts(c, hold_edges) if hold_edges else [],
                    edge_gains=[[p_, q_, float(f_)] for p_, q_, f_ in (edge_gains or [])],
-                   edge_gains_resolved=hold_edge_counts(c, edge_gains, same_type_gain=params.same_type_gain) if edge_gains else [])
+                   edge_gains_resolved=hold_edge_counts(c, edge_gains, same_type_gain=params.same_type_gain) if edge_gains else [],
+                   # round 7: the preset and the instrument list (names here; every describe() in provenance.instruments)
+                   preset=preset, instruments=[i.name for i in insts], instrument_specs=list(instrument_specs or []),
+                   turn_deg_s=(float(turn_deg_s) if turn_deg_s is not None else None),
+                   turn_window_s=[float(turn_window[0]), float(turn_window[1])], settle_s=float(settle_s))
         marks = (0.5, 1.0, 2.0, 3.0, 5.0)
         if not ledger:
-            fb.step(1000.0)                                             # 1 s settle on background
+            fb.step(settle_s * 1000)                                    # 1 s settle on background (settle_s default 1.0)
             row.update(sample("pre"))
             fb.stimulate(idx_epg[inside], background_hz + pulse_hz, pulse_s * 1000)
             fb.step(pulse_s * 1000)
@@ -699,13 +830,21 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
             # per-10-ms-frame record of the EPG (probe_unitary's loop), the same samples at the same instants
             import probe_compass_room as pcr
             from flyverse.interp import common
-            settle_s = 1.0
             frames = int(round(total_ms / 10.0))
             rec_epg = np.zeros((frames, len(idx_epg)), np.float32)
             grp = {"PEN": pen_idx, "Delta7": d7_idx, "PEG": peg_idx, "Ring": ring_idx, "GLNO": glno_idx, "rest": others,
                    # 6B: per-type ring rates and EPGt (recording more groups does not touch the simulation)
                    "EPGt": epgt_idx, "ExR6": ring_type_idx["ExR6"], "ER6": ring_type_idx["ER6"], "ER4m": ring_type_idx["ER4m"]}
+            # round 7: per-side groups (somaSide) of the velocity route -- the L-R measures; types looked up, never assumed
+            sides = side_groups(c, {"PEN": ("PEN_a(PEN1)", "PEN_b(PEN2)"), "GLNO": "GLNO", "DNa02": "DNa02", "PS196b": "PS196_b"})
+            if afferent is not None:
+                sides["AFF_L"], sides["AFF_R"] = afferent.idx[afferent.side > 0], afferent.idx[afferent.side < 0]
+            grp.update(sides)
             rec_grp = {k: np.zeros(frames, np.float32) for k in grp}
+            # the prescribed turn (round 7): on over [t_on, t_off) after the pulse end; fed only when an afferent is attached
+            t_on = settle_s + pulse_s + turn_window[0]; t_off = settle_s + pulse_s + turn_window[1]
+            yaw_deg = np.zeros(frames, np.float32)
+            feed_turn = turn_deg_s is not None and getattr(fb, "proprioception_sense", None) is not None
             # 6B: per-cell rates of the small groups (127 cells), for the per-cell maximum INTERP.md 10's `silent` needs
             cell_grp = {k: grp[k] for k in ("PEN", "Delta7", "PEG", "GLNO", "EPGt", "ExR6", "ER6", "ER4m")}
             rec_cells = {k: np.zeros((frames, len(v)), np.float32) for k, v in cell_grp.items()}
@@ -721,6 +860,11 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                 if not pulsed and tt[k] >= settle_s - 1e-9:
                     fb.stimulate(idx_epg[inside], background_hz + pulse_hz, pulse_s * 1000)
                     pulsed = True
+                if turn_deg_s is not None:
+                    yaw_deg[k] = turn_deg_s if (tt[k] >= t_on - 1e-9 and tt[k] < t_off - 1e-9) else 0.0
+                    if feed_turn and (k == 0 or yaw_deg[k] != yaw_deg[k - 1]):
+                        # the body channel that already exists: leg / haltere MN rates 0 (no body), airborne False, the yaw
+                        fb.proprioception(0.0, 0.0, 0.0, False, yaw_rate=float(np.deg2rad(yaw_deg[k])))
                 fb.step(10.0)
                 rec_epg[k] = fb.brain.rates(idx_epg)
                 for g, gi in grp.items():
@@ -760,6 +904,21 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                  **{f"{g}_n_cells": int(v.shape[1]) for g, v in rec_cells.items()},
                  "in_above_end": int((rec_epg[-1][inside] > thresh_hz).sum()), "out_above_end": int((rec_epg[-1][~inside] > thresh_hz).sum()),
                  "frames": int(frames), "frame_s": 0.01}
+            # round 7: the L-R measures over the turn window (the post window without a turn) and after the turn
+            turn_m = ((tt >= t_on - 1e-9) & (tt < t_off - 1e-9)) if turn_deg_s is not None else post
+            rest_m = (tt >= t_off - 1e-9) if turn_deg_s is not None else np.zeros(frames, bool)
+            for g in ("PEN", "GLNO", "DNa02", "PS196b", "AFF"):
+                if f"{g}_L" not in rec_grp:
+                    continue
+                L, R = rec_grp[f"{g}_L"], rec_grp[f"{g}_R"]
+                m[f"{g}_L_hz_turn"], m[f"{g}_R_hz_turn"] = mean_if(L, turn_m), mean_if(R, turn_m)
+                m[f"{g}_LR_hz"] = mean_if(L - R, turn_m)
+                m[f"{g}_LR_hz_rest"] = mean_if(L - R, rest_m)
+                m[f"{g}_n_L"], m[f"{g}_n_R"] = int(len(grp[f"{g}_L"])), int(len(grp[f"{g}_R"]))
+            m.update(bump_follow(b["centre"], conf, tt, t_on, t_off, turn_deg_s))
+            m["turn_deg_s"] = float(turn_deg_s) if turn_deg_s is not None else None
+            m["turn_on_s"], m["turn_off_s"] = (float(t_on), float(t_off)) if turn_deg_s is not None else (None, None)
+            m["turn_fed"] = bool(feed_turn)
             led = {"compass.EPG.bump_survival_s": {"value": survival, "op": ">=", "bound": 5.0, "status": "PASS" if survival >= 5.0 else "FAIL"}}
             for key, val, lo, hi in (("compass.EPG.bump_rate_hz", m["bump_hz_post"], 5.0, 60.0), ("compass.EPG.bump_width_wedges", m["width_half_post"], 2.5, 5.0)):
                 st = "NOT_APPLICABLE" if survival < 5.0 else ("PASS" if (np.isfinite(val) and lo <= val <= hi) else "FAIL")
@@ -774,15 +933,21 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                           "start_wedge": start_wedge, "settle_s": settle_s, "nt_override": dict(nt_override or {}),
                           "lif_overrides": dict(lif_overrides or {}), "receptor_model": receptor_model, "receptor_net_rule": receptor_net_rule,
                           "hold_edges": row["hold_edges"], "hold_edges_resolved": row["hold_edges_resolved"],
-                          "edge_gains": row["edge_gains"], "edge_gains_resolved": row["edge_gains_resolved"]},
+                          "edge_gains": row["edge_gains"], "edge_gains_resolved": row["edge_gains_resolved"],
+                          "preset": preset, "instruments": row["instruments"], "instrument_specs": row["instrument_specs"],
+                          "turn_deg_s": row["turn_deg_s"], "turn_window_s": row["turn_window_s"], "turn_fed": bool(feed_turn)},
                           "control": "arm shipped (gE 1 / gD 1, LIFParams() on the shipped cache)"}))
             if ledger_npz:
                 Path(ledger_npz).parent.mkdir(parents=True, exist_ok=True)
-                np.savez_compressed(ledger_npz, t=tt, epg=rec_epg, wedge_of=wedge_of, inside=inside, **{f"g__{k}": v for k, v in rec_grp.items()},
+                np.savez_compressed(ledger_npz, t=tt, epg=rec_epg, wedge_of=wedge_of, inside=inside, yaw_deg_s=yaw_deg,
+                                    **{f"g__{k}": v for k, v in rec_grp.items()},
                                     **{f"cells__{k}": v for k, v in rec_cells.items()})
                 row["ledger_npz"] = str(ledger_npz)
             log(f"ledger: confined pre {m['frac_confined_pre']:.2f} post {m['frac_confined_post']:.2f}, survival {survival:.2f} s, bump {m['bump_hz_post']:.1f} Hz, "
                 f"width {m['width_half_post']:.1f}; {[(k, v['status']) for k, v in led.items()]}; device {row['device']}")
+            log(f"round 7: preset {preset}, instruments {row['instruments']}, turn {row['turn_deg_s']} deg/s over {row['turn_window_s']} s after the pulse "
+                f"(fed {feed_turn}); L-R Hz over the turn window: " + ", ".join(f"{g} {m[f'{g}_LR_hz']:+.3f}" for g in ("PEN", "GLNO", "DNa02", "PS196b", "AFF") if f"{g}_LR_hz" in m)
+                + f"; bump_follow {m['bump_follow_wedges_per_s']:+.3f} w/s (ideal {m['bump_follow_ideal_wedges_per_s']:.2f}, confined {m['bump_follow_confined_frac']:.2f})")
         row["wall_s"] = round(time.time() - t0, 1)
 
         def fmt(tag):
@@ -873,6 +1038,17 @@ def main():
                     help="repeatable; hold one class of edges at 0 in the weight matrix (an `edges`-kind LABELLED COUNTERFACTUAL, "
                          "docs/INTERP.md 10.1 step 5), e.g. --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)'")
     # thread 6B (docs/audits/compass_local_recurrence.md): one new flag, default None, a per-type gain through the same stage
+    ap.add_argument("--preset", default=None, choices=list(PRESETS),
+                    help="docs/PRESETS_SPEC.md: 'raw' (default, byte-identical to no flag) or 'instrumented' (the --instrument stand-ins, "
+                         "and the --hold-edges / --nt-override / --edge-gain records, listed in provenance.instruments); --instrument implies it")
+    ap.add_argument("--instrument", action="append", default=None, metavar="NAME[:k=..][:sign=..][:cells=..]",
+                    help="repeatable; a flyverse.instruments stand-in, e.g. sided_turn_afferent:k=0.5:sign=-1:cells=AN07B037 "
+                         "(k in {0.25, 0.5, 1.0} Hz per deg/s, unverified; sign -1 = the HGV- control; cells AN07B037 | CB0675 | GNG580 | PS047_b | all)")
+    ap.add_argument("--turn", type=float, default=None, metavar="DEG_S",
+                    help="--ledger only: a prescribed signed yaw rate (deg/s, positive = a left turn) over --turn-window, fed to the afferent "
+                         "instrument when attached and recorded either way (cx_wedge has no body: docs/audits/compass_velocity_route.md)")
+    ap.add_argument("--turn-window", default=None, metavar="START:END", help="seconds after the pulse end the turn is on (default 0.5:3.5)")
+    ap.add_argument("--settle-s", type=float, default=1.0, help="background settle before the pulse (s; default 1.0, the 6A value)")
     ap.add_argument("--edge-gain", action="append", default=None, metavar="PRE_REGEX:POST_REGEX:FACTOR",
                     help="repeatable; multiply one class of edges by FACTOR in the weight matrix through type_path_gain (applied BEFORE "
                          "same_type_gain, so '^EPG$:^EPG$:10' undamps exactly the EPG -> EPG pairs under the shipped x0.1) -- a LABELLED "
@@ -888,6 +1064,10 @@ def main():
     nt_override = parse_nt_override(a.nt_override)
     hold_edges = parse_hold_edges(a.hold_edges)
     edge_gains = parse_edge_gains(a.edge_gain)
+    preset = resolve_preset(a.preset, a.instrument)             # round 7: 'raw' unless asked (or an instrument is named)
+    turn_window = parse_turn_window(a.turn_window)
+    if a.turn is not None and not a.ledger:
+        raise SystemExit("--turn needs --ledger")
     c, cache_dir, table = load_connectome(nt_override, scratch=a.scratch_cache)
     if cache_dir is not None:
         print(f"connectome from scratch cache {cache_dir} (TYPE_NT_OVERRIDE = {table})")
@@ -927,7 +1107,8 @@ def main():
                              start_wedge=a.start_wedge, width=a.width, seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen,
                              gR=a.ring_gain, receptor_model=receptor_model, receptor_net_rule=receptor_net_rule, nt_override=nt_override,
                              lif_overrides=lif_overrides, ledger=a.ledger, arm=a.arm, block=a.block, device=a.device, ledger_npz=npz,
-                             hold_edges=hold_edges, edge_gains=edge_gains)
+                             hold_edges=hold_edges, edge_gains=edge_gains, preset=preset, instrument_specs=a.instrument or [],
+                             turn_deg_s=a.turn, turn_window=turn_window, settle_s=a.settle_s)
         if a.sim_out:
             path = Path(a.sim_out)
             old = json.load(open(path)) if path.exists() else []

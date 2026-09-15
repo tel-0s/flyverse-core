@@ -167,8 +167,24 @@ class Proprioception:
                        half_width_m yaw term and the |amp L-R| turn term -- are absent from the afferents and only
                        the per-leg / per-phase modulation remains). The sense itself reads `legs['amp']` as given;
                        the token requires 'leg_cycle' and is recorded in `spec` so a run is self-describing.
+
+    Round 7 (docs/PRESETS_SPEC.md, docs/INSTRUMENTS.md), one further opt-in token, OFF unless named and NOT part of
+    'all' -- an INSTRUMENT in the PRESETS_SPEC sense, a labelled stop-gap with an unverified law:
+
+      'turn_afferent'  an EXTRA channel (not one of CHANNELS): PS196_b's named ascending afferents (AN07B037_a / _b by
+                       default; instruments.SidedTurnAfferent for the variants) read the body's SIGNED yaw rate -- the
+                       same `yaw_rate` argument the haltere_coriolis stop-gap reads -- and fire at
+                       k * max(0, +-yaw_deg_s) on the side the connectome's contralateral routing implies. It is the
+                       body-derived signal the shipped ascending report lacks (NOTES compass round 2: PS196_b's L-R
+                       moves the same way in both turn directions), so it lives here beside the Coriolis term rather
+                       than as a flyverse.modules module (a module sees neural quantities only, and none carries the
+                       fly's own turn signed). The transducer object is `turn_afferent` (built with the defaults when
+                       the token is named and none is given); its describe() lands in provenance through
+                       FlyBrain(preset='instrumented', instruments=[...]). 'turn_afferent' alone is a valid spec.
     """
     CHANNELS = ("chordotonal", "hair_plate", "campaniform", "haltere")
+    EXTRA_CHANNELS = ("turn_afferent",)          # instruments: never selected by 'all'
+    LEG_CHANNELS = ("chordotonal", "hair_plate", "campaniform")
     LEG_NERVES = ("ProLN", "MesoLN", "MetaLN", "ProAN", "VProN", "DProN", "ProCN")
     FLAGS = ("haltere_coriolis", "leg_cycle", "haltere_sided", "unsided", "leg_cycle_flat")
     SEGMENT_OF_NERVE = {"ProLN": 1, "ProAN": 1, "VProN": 1, "DProN": 1, "ProCN": 1, "MesoLN": 2, "MetaLN": 3}
@@ -177,10 +193,11 @@ class Proprioception:
                  chordotonal_tonic_hz=10.0, chordotonal_max_hz=150.0,
                  hair_plate_tonic_hz=5.0, hair_plate_max_hz=100.0,
                  campaniform_load_hz=50.0, campaniform_max_hz=100.0,
-                 haltere_k=1.0, haltere_max_hz=250.0, coriolis_gain_per_rad_s=1.0):
+                 haltere_k=1.0, haltere_max_hz=250.0, coriolis_gain_per_rad_s=1.0, turn_afferent=None):
         c.require("vnc")
         self.c = c
         self.channels, flags = self.parse_flags(channels)
+        self.turn_afferent = None
         self.haltere_coriolis, self.leg_cycle, self.haltere_sided = flags["haltere_coriolis"], flags["leg_cycle"], flags["haltere_sided"]
         self.unsided, self.leg_cycle_flat = flags["unsided"], flags["leg_cycle_flat"]
         self._held = {}
@@ -213,20 +230,41 @@ class Proprioception:
             "campaniform": pro & (sub == "campaniform sensilla") & np.isin(nerve, self.LEG_NERVES),
             "haltere": pro & (sub == "haltere"),
         }
-        self.idx = {ch: np.flatnonzero(masks[ch]) for ch in self.channels}
+        self.idx = {ch: np.flatnonzero(masks[ch]) for ch in self.channels if ch in masks}
         self.side = {ch: self._sides(idx, side_threshold) for ch, idx in self.idx.items()}
         self.side_source = {ch: self._side_source(idx) for ch, idx in self.idx.items()}
         self.segment = {ch: self._segments(idx, nerve) for ch, idx in self.idx.items()}
-        self.leg_weights = {ch: self._leg_weights(ch) for ch in self.channels if ch != "haltere"}
+        self.leg_weights = {ch: self._leg_weights(ch) for ch in self.channels if ch in self.LEG_CHANNELS}
         self.haltere_mn_groups = None
         if self.haltere_sided:
             from .motor import haltere_side_groups
             self.haltere_mn_groups = haltere_side_groups(c)
+        if "turn_afferent" in self.channels or turn_afferent is not None:
+            self.add_turn_afferent(turn_afferent)
+
+    def add_turn_afferent(self, instrument=None):
+        """Grow the 'turn_afferent' channel (round 7's labelled stop-gap, docs/INSTRUMENTS.md): `instrument` is an
+        instruments.SidedTurnAfferent (the defaults when None). Idempotent for the same instrument; a different one
+        replaces the channel's cells and parameters. Returns the instrument."""
+        from .instruments import SidedTurnAfferent
+        inst = SidedTurnAfferent(self.c) if instrument is None else instrument
+        if not isinstance(inst, SidedTurnAfferent):
+            raise TypeError("turn_afferent must be an instruments.SidedTurnAfferent")
+        if "turn_afferent" not in self.channels:
+            self.channels = tuple(self.channels) + ("turn_afferent",)
+        self.turn_afferent = inst
+        self.idx["turn_afferent"] = inst.idx
+        self.side["turn_afferent"] = inst.side
+        self.side_source["turn_afferent"] = {"instance": 0, "laterality": 0, "somaSide": int(len(inst.idx))}
+        self.segment["turn_afferent"] = np.zeros(len(inst.idx), dtype=int)
+        self.params["turn_afferent"] = dict(inst.parameters)
+        return inst
 
     @classmethod
     def parse_flags(cls, spec):
         """'all' | 'all+haltere_coriolis' | 'chordotonal,haltere' | 'all+leg_cycle+haltere_sided' -> (channels, flags dict
-        over FLAGS). 'haltere_coriolis' also selects the haltere channel; 'leg_cycle' / 'haltere_sided' select nothing."""
+        over FLAGS). 'haltere_coriolis' also selects the haltere channel; 'leg_cycle' / 'haltere_sided' select nothing.
+        'turn_afferent' selects the extra instrument channel of that name ('all' never does)."""
         if isinstance(spec, (list, tuple)):
             spec = ",".join(spec)
         if not isinstance(spec, str) or not spec.strip():
@@ -241,11 +279,11 @@ class Proprioception:
                 names.append("haltere")
             elif p in cls.FLAGS:
                 continue
-            elif p in cls.CHANNELS:
+            elif p in cls.CHANNELS or p in cls.EXTRA_CHANNELS:
                 names.append(p)
             else:
-                raise ValueError(f"unknown proprioception channel {p!r}; choose from {cls.CHANNELS} (+ {cls.FLAGS})")
-        channels = tuple(ch for ch in cls.CHANNELS if ch in names)
+                raise ValueError(f"unknown proprioception channel {p!r}; choose from {cls.CHANNELS} (+ {cls.FLAGS}; instruments {cls.EXTRA_CHANNELS})")
+        channels = tuple(ch for ch in cls.CHANNELS + cls.EXTRA_CHANNELS if ch in names)
         if not channels:
             raise ValueError("proprioception spec selects no channel")
         if flags["haltere_sided"] and "haltere" not in channels:
@@ -268,7 +306,11 @@ class Proprioception:
 
     @property
     def spec(self):
-        s = "all" if self.channels == self.CHANNELS else ",".join(self.channels)
+        base = tuple(ch for ch in self.channels if ch in self.CHANNELS)
+        s = "all" if base == self.CHANNELS else ",".join(base)
+        for ch in self.EXTRA_CHANNELS:
+            if ch in self.channels:
+                s = f"{s}+{ch}" if s else ch
         for f in self.FLAGS:
             if getattr(self, f):
                 s += "+" + f
@@ -342,7 +384,10 @@ class Proprioception:
             out[ch] = dict(n=int(len(idx)), L=int((s > 0).sum()), R=int((s < 0).sum()), both=int((s == 0).sum()),
                            vnc_sensory=int((sc[idx] == "vnc_sensory").sum()),
                            sensory_ascending=int((sc[idx] == "sensory_ascending").sum()), side_source=self.side_source[ch])
-            if ch != "haltere" and self.leg_cycle:
+            if ch == "turn_afferent":
+                out[ch]["instrument"] = self.turn_afferent.name
+                out[ch]["types"] = list(self.turn_afferent.types)
+            if ch in self.LEG_CHANNELS and self.leg_cycle:
                 seg = self.segment[ch]
                 out[ch]["segments"] = {"T1": int((seg == 1).sum()), "T2": int((seg == 2).sum()), "T3": int((seg == 3).sum()), "none": int((seg == 0).sum())}
                 out[ch]["legs"] = {leg: int((self.leg_weights[ch][:, j] == 1.0).sum()) for j, leg in enumerate(("L1", "R1", "L2", "R2", "L3", "R3"))}
@@ -422,6 +467,11 @@ class Proprioception:
                     hz = p["load_hz"] * (leg_drive[ch] @ self.leg_weights[ch].T) * ground[:, None]
                 else:
                     hz = np.repeat((p["load_hz"] * ground)[:, None], len(idx), axis=1)
+            elif ch == "turn_afferent":
+                # round 7's labelled stop-gap (instruments.SidedTurnAfferent): the SIGNED yaw rate, sided by the graph;
+                # the instrument clamps to its own max_hz, so the channel is appended as it comes
+                out.append((ch, idx, self.turn_afferent.rates(yaw, batch)))
+                continue
             else:
                 mod = 1.0 + p["coriolis_gain_per_rad_s"] * np.abs(yaw)
                 if hs is not None:

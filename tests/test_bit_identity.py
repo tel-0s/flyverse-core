@@ -150,10 +150,12 @@ RADIANCE = np.array([[.10, .20, .30, .40], [.90, .10, .55, .05],
                      [.33, .66, .11, .77], [.50, .50, .50, .50]], dtype=np.float32)
 
 
-def scenario():
-    """The default path, exercised once. Returns {stage: digest}; nothing is attached at any point."""
+def scenario(**preset):
+    """The default path, exercised once. Returns {stage: digest}; nothing is attached at any point. `preset` is the
+    docs/PRESETS_SPEC.md keyword (`preset="raw"`), passed through only when given so the same scenario runs on a tree
+    that predates it."""
     fb = FlyBrain(graph(), batch=2, device="cpu", seed=7,
-                  lif_params=LIFParams(receptor_model=None))       # no receptor cache: the test must run data-free
+                  lif_params=LIFParams(receptor_model=None), **preset)       # no receptor cache: the test must run data-free
     # getattr: the same scenario file is meant to run unchanged against an older tree, to compare versions
     assert getattr(fb, "_extensions", None) is None and fb.optic is not None
     out = {}
@@ -230,6 +232,44 @@ class BitIdentityTests(unittest.TestCase):
         brain must actually have spiked."""
         stages = list(scenario().values())
         self.assertEqual(len(set(stages)), len(stages))
+
+
+class RawPresetTests(unittest.TestCase):
+    """docs/PRESETS_SPEC.md 1: `FlyBrain(preset="raw")` is byte-identical to `FlyBrain()` on every path -- the same
+    recorded golden, the same installed weights, the same spike train."""
+
+    def test_preset_raw_matches_the_recorded_golden(self):
+        got = scenario(preset="raw")
+        for stage in GOLDEN:
+            with self.subTest(stage=stage):
+                self.assertEqual(got[stage], GOLDEN[stage], f"preset='raw' moved the default path at stage {stage!r}")
+
+    @staticmethod
+    def _weights_md5(fb) -> str:
+        W = fb.brain._W_cpu.tocsr()
+        h = hashlib.md5()
+        for part in (W.data, W.indices, W.indptr):
+            h.update(np.ascontiguousarray(part).tobytes())
+        return h.hexdigest()
+
+    def test_preset_raw_weights_and_spike_train_are_identical(self):
+        c = graph()
+        plain = FlyBrain(c, batch=2, device="cpu", seed=3, lif_params=LIFParams(receptor_model=None))
+        raw = FlyBrain(c, batch=2, device="cpu", seed=3, lif_params=LIFParams(receptor_model=None), preset="raw")
+        self.assertEqual(raw.preset, "raw"); self.assertEqual(raw.instruments, {})
+        self.assertEqual(self._weights_md5(plain), self._weights_md5(raw))
+        trains = []
+        for fb in (plain, raw):
+            fb.smell({"DM1": 1.0}, {"DM1": 0.5})
+            fb.stimulate([9], 200.0, 60.0)                                  # LC4 for 60 ms
+            spikes = []
+            for _ in range(12):
+                fb.step(10.0)
+                spikes.append(fb.brain.spike_counts.detach().cpu().numpy().copy())
+            trains.append(np.stack(spikes))
+        self.assertGreater(trains[0].sum(), 0)
+        np.testing.assert_array_equal(trains[0], trains[1])
+        self.assertEqual(digest(plain), digest(raw))
 
 
 if __name__ == "__main__":
