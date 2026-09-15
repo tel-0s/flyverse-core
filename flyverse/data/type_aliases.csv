@@ -17359,7 +17359,7 @@ R1-R6,R1-6,flywire,alias,,MaleCNS v1.0 body-annotations flywireType='R1-6' on 33
 R1-R6,visual,malecns_class,class,,MaleCNS v1.0 body-annotations class on 3377/3377 cells
 R1-R6,R1-R6,optic_inventory,exact,,"Nern 2025 Supplementary Table 1 row: 2265 cells, group ONIN, predicted NT His"
 R7R8_unclear,visual,malecns_class,class,,MaleCNS v1.0 body-annotations class on 85/85 cells
-R7_unclear,R7,flywire,alias,,MaleCNS v1.0 body-annotations flywireType='R7' on 404/404 cells
+R7_unclear,R7,flywire,alias,backend_primary,MaleCNS v1.0 body-annotations flywireType='R7' on 404/404 cells; FAFB v783 and BANC v888 primary R7/R8 lack spectral subtype: backend uses the existing unclear aggregate; not a p/y/d assignment (CONNECTOME_BACKENDS_SPEC 1.1)
 R7_unclear,visual,malecns_class,class,,MaleCNS v1.0 body-annotations class on 404/404 cells
 R7d,R7,flywire,alias,,MaleCNS v1.0 body-annotations flywireType='R7' on 82/82 cells
 R7d,visual,malecns_class,class,,MaleCNS v1.0 body-annotations class on 82/82 cells
@@ -17370,7 +17370,7 @@ R7p,R7p,optic_inventory,exact,,"Nern 2025 Supplementary Table 1 row: 95 cells, g
 R7y,R7,flywire,alias,,MaleCNS v1.0 body-annotations flywireType='R7' on 482/482 cells
 R7y,visual,malecns_class,class,,MaleCNS v1.0 body-annotations class on 482/482 cells
 R7y,R7y,optic_inventory,exact,,"Nern 2025 Supplementary Table 1 row: 244 cells, group ONIN, predicted NT His"
-R8_unclear,R8,flywire,alias,,MaleCNS v1.0 body-annotations flywireType='R8' on 442/442 cells
+R8_unclear,R8,flywire,alias,backend_primary,MaleCNS v1.0 body-annotations flywireType='R8' on 442/442 cells; FAFB v783 and BANC v888 primary R7/R8 lack spectral subtype: backend uses the existing unclear aggregate; not a p/y/d assignment (CONNECTOME_BACKENDS_SPEC 1.1)
 R8_unclear,visual,malecns_class,class,,MaleCNS v1.0 body-annotations class on 442/442 cells
 R8d,R8,flywire,alias,,MaleCNS v1.0 body-annotations flywireType='R8' on 76/76 cells
 R8d,visual,malecns_class,class,,MaleCNS v1.0 body-annotations class on 76/76 cells
@@ -22200,3 +22200,7 @@ vpoIN,Cachero 2010: aSP-k,literature,alias,,"MaleCNS Cell Type Explorer (neuPrin
 vpoIN,Wang 2020b: vpoIN,literature,alias,,"MaleCNS Cell Type Explorer (neuPrint male-cns:v1.0 synonyms, 2026-09-09)"
 vpoIN,Yu 2010: aSP8,literature,alias,,Schlegel 2024 SD1 v3.1.0 synonyms of FlyWire type CB1385
 w-cHIN,w-cHIN,manc,exact,,MaleCNS v1.0 body-annotations mancType='w-cHIN' on 14/14 cells
+PS196_a,PS196a,flywire,alias,,"FAFB v783 consolidated_cell_types and BANC v888 Primary Cell Type; corresponding MaleCNS v1.0 named subtype, notation only; docs/audits/flywire_banc_survey.md section 3; CONNECTOME_BACKENDS_SPEC section 3"
+PS196_b,PS196b,flywire,alias,,"FAFB v783 consolidated_cell_types and BANC v888 Primary Cell Type; corresponding MaleCNS v1.0 named subtype, notation only; docs/audits/flywire_banc_survey.md section 3; CONNECTOME_BACKENDS_SPEC section 3"
+PEN_a(PEN1),PEN_a/PEN1,flywire,alias,,"FAFB v783 consolidated_cell_types and BANC v888 Primary Cell Type; corresponding MaleCNS v1.0 named subtype, notation only; docs/audits/flywire_banc_survey.md section 3; CONNECTOME_BACKENDS_SPEC section 3"
+PEN_b(PEN2),PEN_b/PEN2,flywire,alias,,"FAFB v783 consolidated_cell_types and BANC v888 Primary Cell Type; corresponding MaleCNS v1.0 named subtype, notation only; docs/audits/flywire_banc_survey.md section 3; CONNECTOME_BACKENDS_SPEC section 3"

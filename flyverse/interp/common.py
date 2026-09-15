@@ -462,7 +462,7 @@ def unit_kinds(c: cn.Connectome, fb=None) -> np.ndarray:
     optic rate units; without one, the static rule (superclass ol_intrinsic)."""
     out = np.full(c.n, "spiking", dtype=object)
     sc = c.neurons.superclass.fillna("").to_numpy()
-    graded = sc == "ol_intrinsic"
+    graded = (sc == "ol_intrinsic") & c.has_optic_columns
     fr = frozen_indices(fb) if fb is not None else None
     if fr is not None:
         graded = np.zeros(c.n, bool); graded[fr] = True
@@ -839,8 +839,11 @@ def source_fingerprint(git: dict | None = None, force: bool = False) -> dict:
     return fp
 
 
-def dataset_release() -> dict:
+def dataset_release(c=None) -> dict:
     """The MaleCNS release and its four file hashes from flyverse/data/manifest.json."""
+    if c is not None and c.dataset != "malecns":
+        return {"name": c.dataset, "release": c.release, "files": c._manifest.get("sources", []),
+                "pair_threshold": c._manifest.get("pair_threshold"), "edges": c._manifest.get("edges")}
     with open(ROOT / "flyverse" / "data" / "manifest.json", encoding="utf-8") as f:
         m = json.load(f)
     files = [{"path": x["path"], "sha256": x.get("sha256")} for x in m["malecns"]["files"]]
@@ -875,6 +878,11 @@ def connectome_fingerprint(c: cn.Connectome, cache_dir=None) -> dict:
     fp["type_nt_override"] = dict(cn.TYPE_NT_OVERRIDE) if cn.TYPE_NT_OVERRIDE_DEFAULT else {}
     fp["unknown_nt_override_regex"] = dict(cn.UNKNOWN_NT_OVERRIDE_REGEX)
     fp["subset"] = None if ref is c else {"n": int(c.n), "of": int(ref.n)}
+    # Section 4.1 pins the entire legacy MaleCNS fingerprint, including its keys.
+    # New releases carry their namespace and compile rules alongside the CSR hashes.
+    if c.dataset != "malecns":
+        fp.update(dataset=c.dataset, release=c.release, manifest=c._manifest,
+                  type_nt_override={}, unknown_nt_override_regex={})
     if c._extension is not None:
         fp["extension"] = to_jsonable(c._extension)
     return fp
@@ -975,14 +983,21 @@ def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, see
         lif = lif or (candidate_lif if dataclasses.is_dataclass(candidate_lif) else None)
         optic = optic or (candidate_optic if dataclasses.is_dataclass(candidate_optic) else None)
     model = model_record(lif, optic)
+    model.update(dataset=c.dataset, release=c.release)
+    if not c.has_optic_columns or (fb is not None and getattr(fb, "optic", None) is None):
+        model["optic"] = None
     model["hooks"] = getattr(fb, "hooks", [])
     model["modules"] = fb.module_records() if hasattr(fb, "module_records") else []
-    return {"flyverse_commit": git, "source_fingerprint": source_fingerprint(git), "dataset_release": dataset_release(),
+    return {"flyverse_commit": git, "source_fingerprint": source_fingerprint(git), "dataset_release": dataset_release(c),
             "compiled_connectome": connectome_fingerprint(c, cache_dir), "model": model,
             "execution": execution_record(fb, device, seeds, env_seeds, batch, backend, replicate_unit),
             "stimulus": to_jsonable(stimulus) if stimulus is not None else {"protocol": None, "params": {}, "control": None},
             "retina": to_jsonable(retina) if retina is not None else {"file": None, "n_columns": None, "column_to_bodies": None},
-            "units": UNITS}
+            "units": UNITS if c.dataset == "malecns" else [
+                {"item": "node_set", "rule": f"{c.dataset} {c.release}; retained release neurons; see compiled_connectome.manifest"},
+                {"item": "graded", "rule": "ol_intrinsic rate units where an optic module exists; otherwise LIF"},
+                {"item": "photoreceptor", "rule": "anatomical photoreceptor identity; optical drive exists only with a retina and optic module"},
+                *UNITS[3:]]}
 
 
 REQUIRED_PROVENANCE = ("flyverse_commit", "dataset_release", "compiled_connectome", "model", "execution", "stimulus", "retina", "units")

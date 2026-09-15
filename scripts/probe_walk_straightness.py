@@ -34,6 +34,13 @@ ARMS = {
 }
 
 
+def on_table(pos, extent, top_z):
+    """World bounds are (xmin, xmax, ymin, ymax), not half-extents."""
+    x0, x1, y0, y1 = extent
+    return (x0 - 1e-3 <= pos[0] <= x1 + 1e-3 and
+            y0 - 1e-3 <= pos[1] <= y1 + 1e-3 and abs(pos[2] - top_z) < 0.01)
+
+
 def patch_lif(receptor, gains):
     """Every brain.LIFParams built from here on (BatchSim's included) carries the arm's receptor model and type gains."""
     L = brain.LIFParams
@@ -51,6 +58,7 @@ def patch_lif(receptor, gains):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", choices=["malecns", "fafb", "banc"], default=None)
     ap.add_argument("--arm", choices=sorted(ARMS), default="default")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--batch", type=int, default=16)
@@ -73,7 +81,7 @@ def main():
     assert torch.cuda.is_available(), "no CUDA device (run this on the cluster)"
     arm = ARMS[args.arm]
     L0 = patch_lif(arm["receptor"], arm["gains"])
-    c = connectome.load(cache_dir=Path(args.cache_dir), verbose=False) if args.cache_dir else None
+    c = connectome.load(cache_dir=args.cache_dir, dataset=args.dataset, verbose=False) if args.cache_dir or args.dataset else None
     seeds = list(range(args.seed * 100, args.seed * 100 + args.batch))
     sim = BatchSim(args.batch, seed=args.seed, seeds=seeds, c=c, program=args.program, fruit_set="all", fence=args.fence,
                    cuda_graphs=True, cuda_kernels=True, event_driven=True, cuda_sparse=args.cuda_sparse,
@@ -95,7 +103,7 @@ def main():
         sim.step()
         for i, f in enumerate(sim.flies):
             heading[k, i] = float(f.heading); pos[k, i] = f.pos; airborne[k, i] = bool(f.airborne)
-            on_top[k, i] = (abs(f.pos[0]) <= ext[0] + 1e-3) and (abs(f.pos[1]) <= ext[1] + 1e-3) and abs(f.pos[2] - top_z) < 0.01 if len(ext) >= 2 else abs(f.pos[2] - top_z) < 0.01
+            on_top[k, i] = on_table(f.pos, ext, top_z)
             cmd = sim.commands[i] if sim.commands else {}
             r = cmd.get("rates", {}) if isinstance(cmd, dict) else {}
             dna02[k, i] = float(r.get("DNa02 R-L", r.get("DNa02_R-L", np.nan))) if r else np.nan
@@ -127,6 +135,7 @@ def main():
     summary = {k: agg(k) for k in ("yaw_sd_deg_s", "yaw_mean_abs_deg_s", "straightness", "path_m", "left_table_s", "frac_on_table", "min_fruit_cm", "frames_within_2cm", "hops", "dna02_abs_mean", "leg_abs_mean")}
     summary["n_left_table"] = int(sum(r["left_table_s"] is not None for r in rows))
     out = {"arm": args.arm, "seed": args.seed, "seconds": args.seconds, "program": args.program, "fence": args.fence, "cache_dir": args.cache_dir,
+           "metrics_version": 2, "table_extent": list(ext),
            "proprioception": sim.proprioception, "leg_cycle": None if sim.body.leg_cycle is None else {k: v for k, v in vars(sim.body.leg_cycle).items()},
            "lif": {"receptor_model": lp.receptor_model, "receptor_net_rule": lp.receptor_net_rule, "type_path_gain": lp.type_path_gain},
            "sum_abs_W": float(abs(sim.fb.c.W).sum()), "wall_s": time.time() - t0, "summary": summary, "rows": rows,
@@ -135,6 +144,10 @@ def main():
     print(f"\n{args.arm} seed {args.seed}: yaw SD {summary['yaw_sd_deg_s']['median']:.1f} deg/s (median over flies), straightness {summary['straightness']['median']:.2f}, "
           f"left the table {summary['n_left_table']}/{B} (median t {summary['left_table_s']['median'] if summary['left_table_s'] else float('nan'):.0f} s), "
           f"min fruit dist {summary['min_fruit_cm']['median']:.1f} cm, hops {summary['hops']['mean']:.2f}/fly, wall {out['wall_s']:.0f} s")
+    from flyverse.interp import common
+    out["provenance"] = common.provenance(sim.fb.c, fb=sim.fb, device=sim.fb.device, seeds=[args.seed],
+        env_seeds=seeds, batch=args.batch, stimulus={"protocol": "room_plain_walk_straightness", "params": {"seconds": args.seconds, "arm": args.arm}, "control": None},
+        retina={"mode": "unavailable" if sim.fb.retina is None else "room", "n_columns": sim.fb.retina.n_columns if sim.fb.retina is not None else 0})
     if args.out:
         os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
         json.dump(out, open(args.out, "w"), indent=1)

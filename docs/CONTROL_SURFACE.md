@@ -4,6 +4,35 @@
 values; `MotorRates` exposes named rates in Hz. `Locomotion`, `Flight`, and `Metabolism` retain
 their existing behavioral parameters. The demo and batched RL environment both use this interface.
 
+## Connectome datasets
+
+`connectome.load()` retains the MaleCNS v1.0 graph and legacy cache. Select a female release explicitly:
+
+```python
+from flyverse import connectome, FlyBrain
+
+c = connectome.load(dataset="banc")       # female brain + VNC, v888
+fb = FlyBrain(c, optic=None)              # no column map; optic model unavailable
+# Equivalent: FlyBrain(dataset="banc", optic=None)
+female_brain = connectome.load(dataset="fafb")  # complete female brain + both eyes, v783
+```
+
+`c.dataset` and `c.release` survive subsets, saved caches, and synthetic extensions. Female caches live in
+`cache/fafb/` and `cache/banc/` (under `FLYVERSE_CACHE` if set), including raw sign-zero synapse counts,
+source hashes and compilation rules in `manifest.json`. An explicit `cache_dir` is the graph directory itself;
+`load(cache_dir=...)` reads its dataset from the manifest. Changing a cached NT confidence threshold requires
+`rebuild=True` or a new directory. FAFB's optional `edges="no_threshold"` uses `cache/fafb/no_threshold/`.
+
+FAFB has no VNC: `motor_groups`, `wing_groups`, `Proprioception`, and `fb.motor()` raise `NotAvailable`.
+Its brain and optic model can still run. BANC has no optic column map: `build_retina` raises `NotAvailable`,
+and `FlyBrain` leaves `optic` and `retina` unset. `optic=None` also explicitly disables the optic module on
+other graphs. Cells otherwise assigned to that module run in the LIF graph. This is a capability difference,
+not an assertion that an uncalibrated BANC optic circuit matches the graded model.
+
+The sweet-taste body-ID table remains MaleCNS-specific; female controllers report taste unavailable.
+Inspect `available_senses` before applying inputs. No female gains or transmitter overrides are tuned.
+See [the backend audit](audits/connectome_backends.md) for mapping coverage and limitations.
+
 ## A controller without a room
 
 ```python

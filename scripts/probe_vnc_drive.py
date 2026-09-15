@@ -59,6 +59,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy"); os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 from flyverse.interp import common  # noqa: E402
+from flyverse import connectome  # noqa: E402
 from flyverse.interp.common import Recording  # noqa: E402
 
 ARMS = {"A": None, "B": "all", "C": "chordotonal,hair_plate,campaniform", "D": "haltere", "E": "all+haltere_coriolis"}
@@ -177,7 +178,8 @@ def cmd_room(args) -> int:
     # scripts/probe_walk_straightness.py's protocol: BatchSim default start (-0.5, 0.05, table top), heading 5 deg, program
     # none, fruit all, NO fence, default energy; the only addition is the opt-in sense of the arm (and, under a 'leg_cycle'
     # spec, the opt-in body.LegCycle attached to the batch body -- a readout of the realised speed / yaw the walk never reads)
-    sim = BatchSim(B, seed=args.seed, seeds=seeds, program="none", fruit_set="all", fence=False,
+    source = connectome.load(dataset=args.dataset, verbose=False) if getattr(args, "dataset", None) else None
+    sim = BatchSim(B, seed=args.seed, seeds=seeds, c=source, program="none", fruit_set="all", fence=False,
                    cuda_graphs=gpu, cuda_kernels=True if gpu else None, event_driven=True if gpu else None,
                    cuda_sparse=args.cuda_sparse, device=args.device, proprioception=spec)
     c, fb, brain = sim.fb.c, sim.fb, sim.fb.brain
@@ -622,6 +624,12 @@ def cmd_plan(args) -> int:
     the block is the SEED -- all five arms of seed s (the reference A with its treatments) run on the same target -- and
     each compass job (its arms sequential inside one python process each) is its own block."""
     fam = family_of(args); arms, _, compass_arms = FAMILIES[fam]
+    if getattr(args, "dataset", None) == "banc":
+        # No retinal/wedge annotations for the original compass protocols. The
+        # requested whole-animal replicate packs five room arms plus the plain
+        # walking probe per seed: five scheduler jobs, one statistical batch.
+        from replicate_connectome_walk import write_plan
+        return write_plan(args)
     d = args.dir.rstrip("/")
     name = args.name or ("vncd" if fam == "vncd" else "vncd3")
     pre = f"mkdir -p {d} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && "
@@ -1276,6 +1284,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     fam_help = "arm family: 'vncd' (round 2: B all / C legs / D haltere / E coriolis) or 'body' (round 3: C + leg cycle / D + side-split haltere / E + coriolis; docs/audits/body_sided_state.md)"
     r = sub.add_parser("room", help="one plain-fly room run (GPU)")
+    r.add_argument("--dataset", choices=["malecns", "banc"], default=None)
     r.add_argument("--arm", required=True, choices=sorted(ARMS)); r.add_argument("--seed", type=int, default=0); r.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
     r.add_argument("--batch", type=int, default=16); r.add_argument("--seconds", type=float, default=60.0); r.add_argument("--skip", type=float, default=5.0)
     r.add_argument("--every", type=int, default=2, help="capture the watch / afferent Recorder every N frames"); r.add_argument("--mean-every", type=int, default=5)
@@ -1292,6 +1301,7 @@ def main(argv=None):
     b.add_argument("--fast", action="store_true"); b.add_argument("--eager", action="store_true"); b.add_argument("--device", default=None); b.add_argument("--out", required=True)
     b.add_argument("--block", default=None, help="inert: the cluster_run --arm-block key (recorded)")
     p = sub.add_parser("plan", help="write the one cluster submission")
+    p.add_argument("--dataset", choices=["malecns", "banc"], default=None)
     p.add_argument("--dir", default="out/vncd"); p.add_argument("--runs", type=int, default=5); p.add_argument("--compass-seeds", type=int, default=3)
     p.add_argument("--draws", type=int, default=2, help="benchmark draws per arm (0 = no bench jobs)"); p.add_argument("--minutes", type=int, default=60)
     p.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help); p.add_argument("--name", default=None, help="cluster_run --name (default vncd / vncd3 by family)")

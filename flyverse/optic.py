@@ -197,6 +197,7 @@ class OpticLobe:
         _output() like inference, so the per-stream hooks above act on it identically, and with the hooks off the two
         paths evaluate identical expressions (bit-identical; tests/test_surrogate.py). Only the storage differs (state
         tensors are rebuilt rather than written in place)."""
+        c.require("optic_columns")
         self.c, self.r, self.p = c, retina, params or OpticParams()
         self.receptor = receptor
         self.slow = slow if (slow is not None and receptor is not None and slow.gain) else None

@@ -66,7 +66,7 @@ class MultiplierLandsOnTheRightEdges(unittest.TestCase):
         f = _nt_factor(self.c, {"gaba": 0.5, "glutamate": 0.25})
         np.testing.assert_array_equal(f, [1, 0.25, 0.5, 1, 1, 1])
         with self.assertRaises(ValueError):
-            _nt_factor(self.c, {"tyramine": 1.0})
+            _nt_factor(self.c, {"not-a-transmitter": 1.0})
         with self.assertRaises(ValueError):
             _nt_factor(self.c, {"gaba": -1.0})
 

@@ -90,6 +90,7 @@ class Retina:
 
 
 def build_retina(c: Connectome, geometry: EyeGeometry | None = None) -> Retina:
+    c.require("optic_columns")
     g = geometry or EyeGeometry()
     if c.reference is not c:
         # Pruning columns must not recenter the remaining eye's viewing directions.
@@ -110,6 +111,11 @@ def build_retina(c: Connectome, geometry: EyeGeometry | None = None) -> Retina:
 
     keys = list(zip(pr.hex_side, pr.hex1.astype(int), pr.hex2.astype(int)))
     uniq = sorted(set(keys))
+    if c.dataset == "fafb":
+        # The release supplies the complete column grid independently of R-cell
+        # reconstruction. Keep annotated columns even if no R axon reaches them.
+        columns = nrn[nrn.hex1.notna() & nrn.hex2.notna() & nrn.hex_side.notna()]
+        uniq = sorted(set(uniq) | set(zip(columns.hex_side, columns.hex1.astype(int), columns.hex2.astype(int))))
     col_of = {k: i for i, k in enumerate(uniq)}
     pr_column = np.array([col_of[k] for k in keys])
     col_side = np.array([k[0] for k in uniq])

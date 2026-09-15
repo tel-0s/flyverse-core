@@ -15,6 +15,8 @@ Empirically the top-3 hexed partners of a photoreceptor agree on the column 94-9
 from __future__ import annotations
 
 import os
+import json
+from datetime import datetime, timezone
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,6 +25,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.feather as pf
 import scipy.sparse as sp
+
+from .backends import RELEASES, NotAvailable, backend
 
 DATA_DIR = Path(os.environ.get("FLYVERSE_DATA", r"D:\Datasets\male-cns-connectome-v1.0\flat-connectome"))
 CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
@@ -42,7 +46,7 @@ NT_SIGN = {
     "gaba": -1.0, "glutamate": -1.0, "histamine": -1.0,
     # Monoamines act through GPCRs on 100s-of-ms timescales; as fast +1 synapses (Shiu's convention) the
     # KC<->PAM dopamine loop (KCs synapse directly onto DAN axons) is a positive-feedback runaway.
-    "dopamine": 0.0, "octopamine": 0.0, "serotonin": 0.0, "unknown": 0.0,
+    "dopamine": 0.0, "octopamine": 0.0, "serotonin": 0.0, "tyramine": 0.0, "unknown": 0.0,
 }
 # Type-name overrides applied when the prediction is unknown: antennal-lobe local neurons are GABAergic
 # as a class (a minority are glutamatergic/cholinergic, which the prediction would normally have caught).
@@ -234,6 +238,10 @@ def receptor_signs(c: "Connectome", table_path=None, net_rule: str = "class", nt
     fast_gain = np.where(matched, fg[i2], 0).astype(np.int8)
     slow_gain = np.where(matched, sg[i2], 0).astype(np.int8)
     unknown_pre = (pre_nt == len(TRANSMITTERS)) if labelled else np.zeros(len(pre), dtype=bool)
+    if labelled and c.dataset != "malecns":
+        # Tyramine is known but has no receptor-table column. Keep its explicit
+        # sign-zero fallback distinct from an unidentified transmitter.
+        unknown_pre &= n.nt.to_numpy()[pre] != "tyramine"
     tier = np.where(matched, tr[i2], np.where(unknown_pre, tier_code["pre_unknown"], 0)).astype(np.int8)
 
     if nt_class_fallback:
@@ -271,13 +279,25 @@ def receptor_signs(c: "Connectome", table_path=None, net_rule: str = "class", nt
                          str(RECEPTOR_TABLE if table_path is None else table_path), slow_class)
 
 
-def build_sign0_counts(ref: "Connectome", cache_dir: Path = CACHE_DIR, verbose: bool = True) -> Path:
+def build_sign0_counts(ref: "Connectome", cache_dir: Path | None = None, verbose: bool = True) -> Path:
     """Raw synapse counts of the reference graph's explicit-zero entries (sign-0 presynaptic cells: monoamines
     and unknown transmitter), keyed by (post, pre) row index of the reference graph, from the raw weights table.
     Written once to cache/sign0_counts.npz; the cache's W stores 0 for these synapses, so the slow term needs it."""
     log = print if verbose else (lambda *a, **k: None)
     if ref.reference is not ref:
         raise ValueError("build_sign0_counts needs the reference (full) graph")
+    cache_dir = Path(cache_dir or ref.cache_dir or default_cache_directory(ref.dataset, ref._manifest.get("edges", "threshold")))
+    manifest = cache_dir / "manifest.json"
+    owner = json.loads(manifest.read_text(encoding="utf-8"))["dataset"] if manifest.exists() else "malecns"
+    if ((cache_dir / "W_post_pre.npz").exists() or manifest.exists()) and owner != ref.dataset:
+        raise ValueError("sign-0 counts cannot overwrite another dataset's cache")
+    if ref.dataset != "malecns":
+        if ref._sign0 is None:
+            raise ValueError("female sign-0 counts must travel with the compiled cache; rebuild that dataset")
+        path = Path(cache_dir) / SIGN0_COUNTS_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(path, **ref._sign0)
+        return path
     t0 = time.time()
     w = pf.read_table(DATA_DIR / WEIGHTS_FILE, columns=["body_pre", "body_post", "weight"]).to_pandas()
     pre = ref.body_to_index.reindex(w.body_pre.to_numpy()).to_numpy()
@@ -305,7 +325,7 @@ def build_sign0_counts(ref: "Connectome", cache_dir: Path = CACHE_DIR, verbose: 
     return out
 
 
-def sign0_counts(c: "Connectome", W: sp.csr_matrix | None = None, cache_dir: Path = CACHE_DIR,
+def sign0_counts(c: "Connectome", W: sp.csr_matrix | None = None, cache_dir: Path | None = None,
                  build: bool = True) -> np.ndarray | None:
     """Raw synapse counts aligned with the stored entries of `W` (default c.W), non-zero only where W.data == 0 and the
     raw table has the edge. Reads cache/sign0_counts.npz (built from the raw weights table if absent and the table
@@ -331,14 +351,19 @@ def sign0_counts(c: "Connectome", W: sp.csr_matrix | None = None, cache_dir: Pat
         out = np.zeros(coo.nnz, dtype=np.float32)
         out[zero] = [counts.get((int(ids[r]), int(ids[q])), 0.) for r, q in zip(coo.row[zero], coo.col[zero])]
         return out
-    path = Path(cache_dir) / SIGN0_COUNTS_FILE
-    if not path.exists():
+    path = Path(cache_dir or c.reference.cache_dir or c.cache_dir or CACHE_DIR) / SIGN0_COUNTS_FILE
+    z = c.reference._sign0
+    if z is None and not path.exists():
+        if c.dataset != "malecns":
+            raise ValueError(f"{path} is missing; rebuild dataset {c.dataset} to recover its raw counts")
         if not build or not (DATA_DIR / WEIGHTS_FILE).exists():
             warnings.warn(f"{path} is absent and the raw weights table is not available at {DATA_DIR}: "
                           "sign-0 (monoamine / unknown) synapses carry no slow term")
             return None
-        build_sign0_counts(c.reference, cache_dir)
-    z = np.load(path)
+        build_sign0_counts(c.reference, path.parent)
+    if z is None:
+        with np.load(path) as f:
+            z = {k: f[k] for k in f.files}
     key, cnt, n_ref = z["key"], z["count"], int(z["n"])
     if n_ref != c.reference.n:
         warnings.warn(f"{path} was built for a graph of {n_ref} neurons, this reference has {c.reference.n}; ignored")
@@ -347,6 +372,8 @@ def sign0_counts(c: "Connectome", W: sp.csr_matrix | None = None, cache_dir: Pat
     coo = W.tocoo()
     ref_idx = c.reference.index_of(c.neurons.bodyId.to_numpy()) if c.reference is not c else np.arange(c.n)
     out = np.zeros(W.nnz, dtype=np.float32)
+    if not len(key):
+        return out
     zero = coo.data == 0
     if not zero.any():
         return out
@@ -372,6 +399,25 @@ class Connectome:
     _extension: dict | None = field(default=None, repr=False)
     _extension_base: Connectome | None = field(default=None, repr=False)
     _cache_dir: Path | None = field(default=None, repr=False)
+    dataset: str = "malecns"
+    release: str = "v1.0"
+    _manifest: dict = field(default_factory=dict, repr=False)
+    _sign0: dict | None = field(default=None, repr=False)
+    _nt_scores: pd.DataFrame | None = field(default=None, repr=False)
+
+    @property
+    def has_vnc(self):
+        return self.dataset != "fafb"
+
+    @property
+    def has_optic_columns(self):
+        return self.dataset != "banc"
+
+    def require(self, capability):
+        if capability == "vnc" and not self.has_vnc:
+            raise NotAvailable(f"dataset {self.dataset} has no VNC")
+        if capability == "optic_columns" and not self.has_optic_columns:
+            raise NotAvailable(f"dataset {self.dataset} has no optic column map")
 
     def __post_init__(self):
         # Fast synapse magnitudes; sign-zero neuromodulatory contacts contribute zero.
@@ -412,7 +458,9 @@ class Connectome:
         neurons = self.neurons.iloc[idx].copy().reset_index(drop=True)
         return Connectome(neurons, self.W[idx][:, idx].tocsr(),
                           pd.Series(np.arange(len(idx)), index=neurons.bodyId.to_numpy()), self.reference,
-                          _extension=self._extension, _extension_base=self._extension_base)
+                          _extension=self._extension, _extension_base=self._extension_base,
+                          _cache_dir=self._cache_dir, dataset=self.dataset, release=self.release,
+                          _manifest=self._manifest)
 
     def prune(self, selection) -> Connectome:
         """Remove selected cells (an induced subgraph); removing an extension restores its base reference.
@@ -485,7 +533,8 @@ class Connectome:
         def append(base):
             old = base.neurons.copy()
             # Preserve the interchange identity of every biological cell.
-            for key, default in (("dataset", DATASET_NAME), ("release", DATASET_RELEASE)):
+            for key, default in (("dataset", DATASET_NAME if base.dataset == "malecns" else base.dataset),
+                                 ("release", DATASET_RELEASE if base.dataset == "malecns" else base.release)):
                 old[key] = old[key].fillna(default) if key in old else default
             n = pd.concat([old, nodes], ignore_index=True)
             mapping = pd.Series(np.arange(len(n)), index=n.bodyId.to_numpy())
@@ -498,7 +547,7 @@ class Connectome:
             for key in ("in_syn", "in_syn_l2"):
                 if key in n:
                     n = n.drop(columns=key)
-            return Connectome(n, W, mapping)
+            return Connectome(n, W, mapping, dataset=base.dataset, release=base.release, _manifest=base._manifest)
 
         c2 = append(self)
         if self.reference is not self:
@@ -552,37 +601,41 @@ class Connectome:
         return self.neurons.iloc[np.asarray(idx)][["bodyId", "type", "instance", "superclass", "somaSide", "nt"]]
 
 
-def _nt_table() -> pd.DataFrame:
-    nt = pd.read_feather(DATA_DIR / NT_FILE)
-    # best available label: consensus -> cell-type prediction -> per-body prediction
-    best = nt.consensus_nt.where(nt.consensus_nt != "unclear")
-    best = best.fillna(nt.celltype_predicted_nt.where(nt.celltype_predicted_nt != "unclear"))
-    best = best.fillna(nt.predicted_nt.where(nt.predicted_nt != "unclear"))
-    return pd.DataFrame({"bodyId": nt.body, "nt": best.fillna("unknown")})
+def data_directory(dataset):
+    if dataset == "malecns":
+        return DATA_DIR
+    default = {"fafb": r"D:\Datasets\flywire\Female Adult Fly Brain v783", "banc": r"D:\Datasets\flywire\BANC v888"}
+    return Path(os.environ.get(f"FLYVERSE_DATA_{dataset.upper()}", default[dataset]))
 
 
-def compile_connectome(min_weight: int = 1, verbose: bool = True, type_nt_override: dict | None = None) -> Connectome:
-    """type_nt_override: {type: nt} applied to the type's sign-0 cells after the consensus (None = TYPE_NT_OVERRIDE if
-    TYPE_NT_OVERRIDE_DEFAULT else nothing; pass {} for none, TYPE_NT_OVERRIDE to force it)."""
+def _nt_table():
+    from .backends.malecns import nt_table
+    return nt_table(DATA_DIR)
+
+
+def compile_connectome(min_weight: int = 1, verbose: bool = True, type_nt_override: dict | None = None,
+                       *, dataset="malecns", edges="threshold", nt_threshold=0.5, data_dir=None) -> Connectome:
+    """Compile a release without altering its source labels with another dataset's overrides."""
+    reader = backend(dataset)
+    _validate_options(dataset, edges, nt_threshold)
+    if min_weight < 1:
+        raise ValueError("min_weight must be at least 1")
+    if dataset != "malecns" and type_nt_override:
+        raise ValueError("female backends do not accept MaleCNS type NT overrides")
     t0 = time.time()
     log = print if verbose else (lambda *a, **k: None)
-
-    ann = pd.read_feather(DATA_DIR / ANNOT_FILE)
-    is_pr = ann.type.isin(PHOTORECEPTOR_TYPES)
-    keep = (ann.status == "Traced") | is_pr
-    neurons = ann.loc[keep, KEEP_COLS].reset_index(drop=True)
-    log(f"nodes: {len(neurons)} (traced {int((ann.status == 'Traced').sum())}, "
-        f"+untraced photoreceptors {int((is_pr & (ann.status != 'Traced')).sum())})")
-
-    neurons = neurons.merge(_nt_table(), on="bodyId", how="left")
+    neurons, w = reader.read(Path(data_dir) if data_dir is not None else data_directory(dataset),
+                            edges=edges, nt_threshold=nt_threshold, log=log)
+    manifest = neurons.attrs.pop("manifest", {})
+    scores = neurons.attrs.pop("nt_scores", None)
     neurons["nt"] = neurons.nt.fillna("unknown")
     neurons.loc[neurons.type.isin(PHOTORECEPTOR_TYPES), "nt"] = "histamine"  # photoreceptors are histaminergic
-    for pat, nt in UNKNOWN_NT_OVERRIDE_REGEX.items():
+    for pat, nt in (UNKNOWN_NT_OVERRIDE_REGEX if dataset == "malecns" else {}).items():
         m = (neurons.nt == "unknown") & neurons.type.fillna("").str.match(pat)
         neurons.loc[m, "nt"] = nt
         log(f"unknown-NT override {pat} -> {nt}: {int(m.sum())} neurons")
     if type_nt_override is None:
-        type_nt_override = TYPE_NT_OVERRIDE if TYPE_NT_OVERRIDE_DEFAULT else {}
+        type_nt_override = TYPE_NT_OVERRIDE if dataset == "malecns" and TYPE_NT_OVERRIDE_DEFAULT else {}
     no_fast_label = neurons.nt.map(NT_SIGN).fillna(0.0) == 0.0          # unknown or monoamine: sign 0
     for t, nt in type_nt_override.items():
         m = (neurons.type == t) & no_fast_label & (neurons.nt != nt)
@@ -593,11 +646,8 @@ def compile_connectome(min_weight: int = 1, verbose: bool = True, type_nt_overri
     neurons["sign"] = neurons.nt.map(NT_SIGN).fillna(0.0).astype(np.float32)
     log("nt counts:", neurons.nt.value_counts().to_dict())
 
-    body_to_index = pd.Series(np.arange(len(neurons)), index=neurons.bodyId.to_numpy())
 
-    log("loading weights ...")
-    w = pf.read_table(DATA_DIR / WEIGHTS_FILE).to_pandas()
-    log(f"  {len(w):,} rows in {time.time() - t0:.1f}s")
+    body_to_index = pd.Series(np.arange(len(neurons)), index=neurons.bodyId.to_numpy())
     pre = body_to_index.reindex(w.body_pre.to_numpy()).to_numpy()
     post = body_to_index.reindex(w.body_post.to_numpy()).to_numpy()
     m = ~np.isnan(pre) & ~np.isnan(post) & (w.weight.to_numpy() >= min_weight)
@@ -606,23 +656,45 @@ def compile_connectome(min_weight: int = 1, verbose: bool = True, type_nt_overri
     cnt = w.weight.to_numpy()[m].astype(np.float32)
     del w
     log(f"edges kept: {len(pre):,}  synapses: {int(cnt.sum()):,}")
-
     sign = neurons.sign.to_numpy()
     W = sp.csr_matrix((cnt * sign[pre], (post, pre)), shape=(len(neurons), len(neurons)), dtype=np.float32)
     W.sum_duplicates()
+    z = None
+    if dataset != "malecns":
+        raw = sp.csr_matrix((cnt, (post, pre)), shape=W.shape, dtype=np.float32)
+        raw.sum_duplicates()
+        coo = raw.tocoo()
+        zero = W.data == 0
+        z = {"key": coo.row[zero].astype(np.int64) * len(neurons) + coo.col[zero],
+             "count": coo.data[zero], "n": np.int64(len(neurons))}
+        manifest.update(n_neurons=len(neurons), nnz=W.nnz, raw_synapses=int(raw.sum(dtype=np.float64)),
+            nt_counts={str(k): int(v) for k, v in neurons.nt.value_counts().items()}, min_weight=min_weight,
+            compile_date=datetime.now(timezone.utc).isoformat(), type_nt_override={}, unknown_nt_override_regex={})
+    if dataset == "banc":
+        for name in ("hex1", "hex2", "hex_side", "hex_source"):
+            neurons[name] = np.nan
+    else:
+        _assign_photoreceptor_columns(neurons, W, log, preserve_annotation=dataset != "malecns")
+    log(f"compiled {dataset}: N={len(neurons):,}, nnz={W.nnz:,} in {time.time() - t0:.1f}s")
+    return Connectome(neurons, W, body_to_index, dataset=dataset, release=RELEASES[dataset],
+                      _manifest=manifest, _sign0=z, _nt_scores=scores)
 
-    _assign_photoreceptor_columns(neurons, W, log)
 
-    log(f"compiled in {time.time() - t0:.1f}s")
-    return Connectome(neurons=neurons, W=W, body_to_index=body_to_index)
+def _validate_options(dataset, edges, nt_threshold):
+    backend(dataset)
+    if edges not in ("threshold", "no_threshold") or (edges == "no_threshold" and dataset != "fafb"):
+        raise ValueError("edges='no_threshold' is available only for fafb; otherwise use 'threshold'")
+    if not np.isfinite(nt_threshold) or not 0 <= nt_threshold <= 1:
+        raise ValueError("nt_threshold must lie in [0, 1]")
 
 
-def _assign_photoreceptor_columns(neurons: pd.DataFrame, W: sp.csr_matrix, log) -> None:
+def _assign_photoreceptor_columns(neurons: pd.DataFrame, W: sp.csr_matrix, log, preserve_annotation=False) -> None:
     """Fill hex1/hex2/hex_side for every neuron; photoreceptors inherit the column of their strongest
     hexed postsynaptic partner (synapse counts summed over partners sharing a column)."""
     neurons["hex1"] = neurons.assignedOlHex1
     neurons["hex2"] = neurons.assignedOlHex2
-    neurons["hex_side"] = neurons.somaSide.where(neurons.assignedOlHex1.notna())
+    sides = neurons.hex_side if preserve_annotation and "hex_side" in neurons else neurons.somaSide
+    neurons["hex_side"] = sides.where(neurons.assignedOlHex1.notna())
     neurons["hex_source"] = np.where(neurons.assignedOlHex1.notna(), "annotation", "")
 
     hexed = neurons.assignedOlHex1.notna().to_numpy()
@@ -633,6 +705,8 @@ def _assign_photoreceptor_columns(neurons: pd.DataFrame, W: sp.csr_matrix, log) 
     hs = neurons.hex_side.to_numpy(dtype=object)
     n_ok = 0
     for i in pr_idx:
+        if preserve_annotation and hexed[i]:
+            continue
         lo, hi = Wc.indptr[i], Wc.indptr[i + 1]
         posts = Wc.indices[lo:hi]
         wts = np.abs(Wc.data[lo:hi])
@@ -656,13 +730,21 @@ def _scratch_only(path):
         raise ValueError("synthetic extensions must use a scratch cache outside the shared cache")
 
 
-def save(c: Connectome, cache_dir: Path = CACHE_DIR, *, clear_extension: bool = False) -> None:
+def save(c: Connectome, cache_dir: Path | None = None, *, clear_extension: bool = False) -> None:
     """Write `c` to `cache_dir`. `clear_extension` is needed to save a graph with no synthetic extension over a
     cache that has one: the reverse direction is already guarded, and without this a plain save of an unextended
     graph silently removed `extension.json` and left `extension_base/` behind, so `load()` read the result back as
     an ordinary biological graph."""
     import json
-    cache_dir = Path(cache_dir)
+    cache_dir = Path(cache_dir) if cache_dir is not None else default_cache_directory(c.dataset, c._manifest.get("edges", "threshold"))
+    manifest_path = cache_dir / "manifest.json"
+    existing = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    if ((cache_dir / "W_post_pre.npz").exists() or existing) and existing.get("dataset", "malecns") != c.dataset:
+        raise ValueError("a cache cannot be overwritten by another dataset")
+    if c._extension is None and (cache_dir / "extension.json").exists() and not clear_extension:
+        raise ValueError("saving would strip an extension; pass clear_extension=True deliberately")
+    if c.dataset != "malecns" and c._extension is None and c.reference._sign0 is None:
+        raise ValueError("female graphs require their raw sign-0 counts when saved")
     if c._extension is not None:
         _scratch_only(cache_dir)
         if (cache_dir / "W_post_pre.npz").exists() and not (cache_dir / "extension.json").exists():
@@ -679,6 +761,19 @@ def save(c: Connectome, cache_dir: Path = CACHE_DIR, *, clear_extension: bool = 
             raise ValueError(f"{cache_dir / 'extension.json'} describes a synthetic graph extension; saving a graph "
                              "without one would strip it. Pass clear_extension=True to remove it deliberately.")
         (cache_dir / "extension.json").unlink()
+    if c.dataset != "malecns":
+        manifest = dict(c._manifest, dataset=c.dataset, release=c.release)
+        (cache_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        z = c.reference._sign0
+        if z is None and c._extension_base is not None:
+            z = c._extension_base.reference._sign0
+        if z is not None:
+            np.savez(cache_dir / SIGN0_COUNTS_FILE, **z)
+        elif c._extension is None:
+            raise ValueError("female graphs require their raw sign-0 counts when saved")
+        scores = c._nt_scores if c._nt_scores is not None else c.reference._nt_scores
+        if scores is not None:
+            scores.to_parquet(cache_dir / "nt_scores.parquet", index=False)
     # A saved subset must retain normalization under custom LIF parameters as well.
     if c.reference is not c:
         c.reference.neurons.to_parquet(cache_dir / "reference_neurons.parquet")
@@ -688,21 +783,69 @@ def save(c: Connectome, cache_dir: Path = CACHE_DIR, *, clear_extension: bool = 
             (cache_dir / name).unlink(missing_ok=True)
 
 
-def load(cache_dir: Path = CACHE_DIR, rebuild: bool = False, verbose: bool = True,
-         type_nt_override: dict | None = None) -> Connectome:
+def default_cache_directory(dataset="malecns", edges="threshold"):
+    root = Path(os.environ.get("FLYVERSE_CACHE", CACHE_DIR))
+    if dataset == "malecns":
+        return root
+    path = root / dataset
+    return path if edges == "threshold" else path / edges
+
+
+def load(cache_dir: Path | None = None, rebuild: bool = False, verbose: bool = True,
+         type_nt_override: dict | None = None, *, dataset: str | None = None, edges="threshold",
+         nt_threshold=0.5, data_dir=None) -> Connectome:
+    """Load MaleCNS by default, or a release-specific female cache.
+
+    An explicit cache directory denotes the graph itself, not its parent. Its manifest
+    identifies the dataset when dataset is omitted. Variant caches never alias defaults.
+    """
+    explicit_dataset = dataset
+    if cache_dir is not None and (Path(cache_dir) / "manifest.json").exists() and dataset is None:
+        dataset = json.loads((Path(cache_dir) / "manifest.json").read_text(encoding="utf-8"))["dataset"]
+    dataset = dataset or "malecns"
+    _validate_options(dataset, edges, nt_threshold)
+    if dataset != "malecns" and type_nt_override:
+        raise ValueError("female backends do not accept MaleCNS type NT overrides")
+    if cache_dir is None:
+        cache_dir = default_cache_directory(dataset, edges)
     cache_dir = Path(cache_dir)
+    manifest_path = cache_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    if manifest and manifest["dataset"] != dataset:
+        raise ValueError(f"cache belongs to {manifest['dataset']}, not {dataset}; choose a separate directory")
+    if dataset != "malecns" and (cache_dir / "W_post_pre.npz").exists() and not manifest:
+        raise ValueError("a female cache must have a manifest; choose a new cache directory")
+    if manifest and not rebuild:
+        for key, value in (("edges", edges), ("nt_threshold", nt_threshold)):
+            if key in manifest and manifest[key] != value:
+                # A path-only load means exactly the persisted graph, including its variant.
+                if explicit_dataset is None and edges == "threshold" and nt_threshold == 0.5:
+                    continue
+                raise ValueError(f"cached {key}={manifest[key]!r}, requested {value!r}; use rebuild=True or another cache")
     if rebuild or not (cache_dir / "W_post_pre.npz").exists():
-        c = compile_connectome(verbose=verbose, type_nt_override=type_nt_override)
+        c = compile_connectome(verbose=verbose, type_nt_override=type_nt_override, dataset=dataset,
+                              edges=edges, nt_threshold=nt_threshold, data_dir=data_dir)
         save(c, cache_dir)
+        # Preserve the legacy newly-compiled MaleCNS object's cache_dir behaviour.
+        if dataset != "malecns":
+            c._cache_dir = cache_dir.resolve()
         return c
     neurons = pd.read_parquet(cache_dir / "neurons.parquet")
     W = sp.load_npz(cache_dir / "W_post_pre.npz").tocsr()
+    identity = dict(dataset=dataset, release=manifest.get("release", RELEASES[dataset]), _manifest=manifest,
+                    _cache_dir=cache_dir.resolve())
+    sign0 = None
+    scores = pd.read_parquet(cache_dir / "nt_scores.parquet") if dataset == "fafb" and (cache_dir / "nt_scores.parquet").exists() else None
+    if dataset != "malecns":
+        if not (cache_dir / SIGN0_COUNTS_FILE).exists():
+            raise ValueError(f"female cache lacks {SIGN0_COUNTS_FILE}; rebuild it")
+        with np.load(cache_dir / SIGN0_COUNTS_FILE) as z:
+            sign0 = {k: z[k] for k in z.files}
     reference = None
     if (cache_dir / "reference_W.npz").exists():
         rn = pd.read_parquet(cache_dir / "reference_neurons.parquet")
         reference = Connectome(rn, sp.load_npz(cache_dir / "reference_W.npz").tocsr(),
-                              pd.Series(np.arange(len(rn)), index=rn.bodyId.to_numpy()))
-    import json
+                              pd.Series(np.arange(len(rn)), index=rn.bodyId.to_numpy()), _sign0=sign0, _nt_scores=scores, **identity)
     extension_file = cache_dir / "extension.json"
     extension = json.loads(extension_file.read_text(encoding="utf-8")) if extension_file.exists() else None
     base = load(cache_dir / "extension_base", verbose=False) if extension is not None and (cache_dir / "extension_base/W_post_pre.npz").exists() else None
@@ -711,10 +854,18 @@ def load(cache_dir: Path = CACHE_DIR, rebuild: bool = False, verbose: bool = Tru
         reference._extension_base = base.reference if base is not None else None
     return Connectome(neurons=neurons, W=W,
                       body_to_index=pd.Series(np.arange(len(neurons)), index=neurons.bodyId.to_numpy()),
-                      _reference=reference, _extension=extension, _extension_base=base, _cache_dir=cache_dir.resolve())
+                      _reference=reference, _extension=extension, _extension_base=base,
+                      _sign0=sign0 if reference is None else None, _nt_scores=scores, **identity)
 
 
 if __name__ == "__main__":
-    c = load(rebuild=True)
+    import argparse
+    ap = argparse.ArgumentParser(description="Compile a release into its independent connectome cache")
+    ap.add_argument("--dataset", choices=list(RELEASES), default="malecns")
+    ap.add_argument("--edges", choices=["threshold", "no_threshold"], default="threshold")
+    ap.add_argument("--nt-threshold", type=float, default=0.5)
+    ap.add_argument("--cache-dir", type=Path)
+    args = ap.parse_args()
+    c = load(args.cache_dir, rebuild=True, dataset=args.dataset, edges=args.edges, nt_threshold=args.nt_threshold)
     print(c.neurons.head())
     print("N =", c.n, " nnz =", c.W.nnz)
