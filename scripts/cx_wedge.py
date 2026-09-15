@@ -30,6 +30,11 @@ Round 2 of the receptor integration (docs/audits/cx_glno.md, driver scripts/cx_g
 out/cache_<hash>/ (`--scratch-cache` does so without an override), `--receptor-model` / `--receptor-net-rule` thread
 LIFParams.receptor_model, and every row records the rate of GLNO (4 cells, 19 % of PEN's raw input, NT unknown).
 
+Round 6A (docs/audits/compass_dc_balance.md): `--hold-edges PRE_REGEX:POST_REGEX` (repeatable, default None) holds one
+class of edges at 0 through the existing `type_path_gain` stage -- an `edges`-kind LABELLED COUNTERFACTUAL
+(docs/INTERP.md 10.1 step 5), not a candidate default; with the flag absent the installed gain list is entry-for-entry
+the previous one. Every row records the hold and the cells / entries / synapses it silenced.
+
 Findings (docs/audits/cx_wedge.md): the tuned structure is there (PEN excitation local, Delta7 inhibition
 cosine-shaped with own-wedge / opposite = 0.10); the loop is shut at gain x1 by the untuned EPG -> ExR6 / ExR4 /
 ER6 / ER4m -> EPG, PEN feedback, not by Delta7; a persistent, confined bump exists in the LIF for gE 1.75-2 with
@@ -77,6 +82,48 @@ def parse_nt_override(items) -> dict:
             raise SystemExit(f"--nt-override {it!r}: transmitter must be one of {sorted(connectome.NT_SIGN)}")
         ov[t.strip()] = nt
     return ov
+
+
+def parse_hold_edges(items) -> list:
+    """--hold-edges PRE_REGEX:POST_REGEX (repeatable) -> [(pre_re, post_re, 0.0)], an `edges`-kind HOLD in the sense of
+    docs/INTERP.md 2 / 10.1 step 5: every edge from a cell whose type matches PRE_REGEX onto a cell whose type matches
+    POST_REGEX is multiplied by 0 in `brain._shaped_weights` (the existing `LIFParams.type_path_gain` machinery, the
+    same stage that carries gE / gD here), so the class is silenced in the weight matrix the LIF installs. The split is
+    on the FIRST ':' (neither regex may contain one). A LABELLED COUNTERFACTUAL, never a default: with the flag absent
+    the type_path_gain list is the one the previous code built, entry for entry.
+
+    e.g. --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)'  (thread 6A, docs/audits/compass_dc_balance.md)"""
+    out = []
+    for it in items or []:
+        if ":" not in it:
+            raise SystemExit(f"--hold-edges expects PRE_REGEX:POST_REGEX, got {it!r}")
+        pre, post = it.split(":", 1)
+        if not pre or not post:
+            raise SystemExit(f"--hold-edges expects PRE_REGEX:POST_REGEX, got {it!r}")
+        for r in (pre, post):
+            try:
+                re.compile(r)
+            except re.error as e:
+                raise SystemExit(f"--hold-edges {it!r}: bad regex {r!r} ({e})")
+        out.append((pre, post, 0.0))
+    return out
+
+
+def hold_edge_counts(c, holds) -> list:
+    """Per hold (pre_re, post_re, factor): the cells it matches and the W entries / raw synapses it silences -- recorded
+    in the row so a run's own JSON proves the hold was installed."""
+    ty = c.neurons.type.fillna("").to_numpy()
+    W = c.W.tocsr()
+    rows = []
+    for pre_re, post_re, factor in holds or []:
+        pre = np.flatnonzero([bool(re.match(pre_re, t)) for t in ty])
+        post = np.flatnonzero([bool(re.match(post_re, t)) for t in ty])
+        B = W[post][:, pre] if len(pre) and len(post) else None
+        rows.append(dict(pre=pre_re, post=post_re, factor=float(factor), n_pre_cells=int(len(pre)), n_post_cells=int(len(post)),
+                         pre_types=sorted(set(ty[pre].tolist())), post_types=sorted(set(ty[post].tolist())),
+                         n_entries=int(B.nnz) if B is not None else 0,
+                         synapses=float(np.abs(B.data).sum()) if B is not None and B.nnz else 0.0))
+    return rows
 
 
 def override_table(extra: dict | None) -> dict:
@@ -424,7 +471,7 @@ def structure(out_dir: Path, gamma_nominal=6.0, verbose=True, c=None):
 
 def gained_blocks(c, cells, gE, gD, delta7_pen=True, gR=1.0, with_ring=True):
     """Effective matrix among the compass cells (mV per spike) with the gains applied as Brain would apply
-    type_path_gain (before the fan-in scale, which stays 1.00 for these cells up to gains of ~x1.7 on EPG)."""
+    type_path_gain (before the fan-in scale, which is 0.9806-1.00 for these cells shipped (one EPG above the 5,000 reference), 0.71-1.00 under the receptor tier and 0.68-1.00 with the damping off (skeptic pass on compass_dc_balance.md) up to gains of ~x1.7 on EPG)."""
     tpg = list(brain.DEFAULT_TYPE_PATH_GAIN) + [(r"^EPG$", r"^PEN_", gE), (r"^PEN_", r"^EPG$", gE),
                                                 (r"^EPG$", r"^PEG$", gE), (r"^PEG$", r"^EPG$", gE),
                                                 (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD),
@@ -509,7 +556,7 @@ def rate_grid(c, cells, gEs, gDs, delta7_pen, log=print, **kw):
 def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, pulse_hz=40.0, start_wedge=0, width=4, seed=0,
              thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, gR=1.0, verbose=True,
              receptor_model=None, receptor_net_rule="class", nt_override=None,
-             lif_overrides=None, ledger=False, arm=None, block=None, device=None, ledger_npz=None):
+             lif_overrides=None, ledger=False, arm=None, block=None, device=None, ledger_npz=None, hold_edges=None):
     """FlyBrain on the full connectome; drive `width` contiguous wedges (of 16) of the EPG ring from `start_wedge`;
     report persistence and confinement after the pulse. receptor_model / receptor_net_rule thread
     LIFParams.receptor_model (the optional receptor-expression sign stage); nt_override is recorded in the row (the
@@ -523,7 +570,11 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
     (+ frac_confined_post), with `common.provenance` and the realised device in the row and the per-frame record in
     `ledger_npz` (survival = end of the last confined post-pulse frame minus the pulse end, so a bump confined through
     the whole free period scores exactly `seconds`); arm / block are labels carried into the row; device is passed to
-    FlyBrain."""
+    FlyBrain.
+
+    Thread 6A (docs/audits/compass_dc_balance.md): hold_edges = [(pre_re, post_re, factor), ...] from
+    `parse_hold_edges` -- an `edges`-kind HOLD appended to type_path_gain, a LABELLED COUNTERFACTUAL. Default None
+    leaves the gain list exactly as before (bit-identical shipped path)."""
     from flyverse.fly import FlyBrain
     log = print if verbose else (lambda *a, **k: None)
     epg = cells["EPG"]
@@ -539,6 +590,7 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                                                     (r"^EPG$", r"^PEG$", gE), (r"^PEG$", r"^EPG$", gE),
                                                     (r"^Delta7$", r"^(EPG$|PEN_)" if delta7_pen else r"^EPG$", gD),
                                                     (RING_RE, r"^(EPG$|PEN_|PEG$)", gR)]
+        tpg += [(pre, post, float(f)) for pre, post, f in (hold_edges or [])]   # 6A: the `edges`-kind hold, last (a factor 0 is order-free)
         params = brain.LIFParams(adapt_by_type={COMPASS_RE: 0.0}, type_path_gain=tpg,
                                  receptor_model=receptor_model, receptor_net_rule=receptor_net_rule, **(lif_overrides or {}))
         t0 = time.time()
@@ -567,7 +619,9 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                    receptor_model=receptor_model, receptor_net_rule=receptor_net_rule if receptor_model else None,
                    nt_override=dict(nt_override or {}), n_glno=int(len(glno_idx)),
                    glno_nt=sorted(set(c.neurons.nt.to_numpy()[glno_idx].tolist())),
-                   lif_overrides=dict(lif_overrides or {}), arm=arm, block=block, device=str(fb.brain.device))
+                   lif_overrides=dict(lif_overrides or {}), arm=arm, block=block, device=str(fb.brain.device),
+                   hold_edges=[[p_, q_, float(f_)] for p_, q_, f_ in (hold_edges or [])],
+                   hold_edges_resolved=hold_edge_counts(c, hold_edges) if hold_edges else [])
         marks = (0.5, 1.0, 2.0, 3.0, 5.0)
         if not ledger:
             fb.step(1000.0)                                             # 1 s settle on background
@@ -644,7 +698,8 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                 stimulus={"protocol": "cx_wedge.simulate (ledger)", "params": {"gE": gE, "gD": gD, "gR": gR, "delta7_pen": delta7_pen,
                           "background_hz": background_hz, "pulse_hz": pulse_hz, "pulse_s": pulse_s, "seconds_after": seconds, "width": width,
                           "start_wedge": start_wedge, "settle_s": settle_s, "nt_override": dict(nt_override or {}),
-                          "lif_overrides": dict(lif_overrides or {}), "receptor_model": receptor_model, "receptor_net_rule": receptor_net_rule},
+                          "lif_overrides": dict(lif_overrides or {}), "receptor_model": receptor_model, "receptor_net_rule": receptor_net_rule,
+                          "hold_edges": row["hold_edges"], "hold_edges_resolved": row["hold_edges_resolved"]},
                           "control": "arm shipped (gE 1 / gD 1, LIFParams() on the shipped cache)"}))
             if ledger_npz:
                 Path(ledger_npz).parent.mkdir(parents=True, exist_ok=True)
@@ -658,9 +713,11 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
             return (f"in {row[f'{tag}_in_mean']:.1f} ({row[f'{tag}_in_above']}/{row['n_in']}) out {row[f'{tag}_out_mean']:.1f} "
                     f"({row[f'{tag}_out_above']}/{row['n_out']}) PEN {row[f'{tag}_pen']:.1f} D7 {row[f'{tag}_delta7']:.1f} GLNO {row[f'{tag}_glno']:.1f} R {row[f'{tag}_ring']:.1f} vs {row[f'{tag}_vector_strength']:.2f}")
         have = [m for m in marks if row.get(f"t{m}_in_mean") is not None]
+        hold_txt = "; ".join("{} -> {} x{:g} ({} entries, {:.0f} syn)".format(h["pre"], h["post"], h["factor"], h["n_entries"], h["synapses"])
+                             for h in row["hold_edges_resolved"]) or "none"
         log(f"gE {gE} gD {gD} gR {gR} (D7->PEN {'x gD' if delta7_pen else 'x1'}, bg {background_hz} Hz, width {width}, seed {seed}, "
             f"receptor {receptor_model or 'off'}{'/' + receptor_net_rule if receptor_model else ''}, GLNO nt {row['glno_nt']}, "
-            f"lif {row['lif_overrides']}, arm {arm}): pre {fmt('pre')}; "
+            f"lif {row['lif_overrides']}, hold {hold_txt}, arm {arm}): pre {fmt('pre')}; "
             f"during {fmt('during')}; " + "; ".join(f"{m}s {fmt(f't{m}')}" for m in have)
             + (f"; PEG {row['t5.0_peg']:.1f} rest {row['t5.0_rest']:.2f} Hz" if row.get("t5.0_peg") is not None else "") + f"; {row['wall_s']} s")
         out.append(row)
@@ -732,6 +789,10 @@ def main():
     ap.add_argument("--block", default=None, help="scheduling-block token recorded in every row (cluster_run --arm-block fam reads fam_<x> from the command)")
     ap.add_argument("--device", default=None, help="FlyBrain device (default: auto)")
     ap.add_argument("--pulse-s", type=float, default=2.0, help="pulse duration (s)")
+    # thread 6A (docs/audits/compass_dc_balance.md): one new flag, default None, the shipped path bit-identical with it absent
+    ap.add_argument("--hold-edges", action="append", default=None, metavar="PRE_REGEX:POST_REGEX",
+                    help="repeatable; hold one class of edges at 0 in the weight matrix (an `edges`-kind LABELLED COUNTERFACTUAL, "
+                         "docs/INTERP.md 10.1 step 5), e.g. --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)'")
     a = ap.parse_args()
     out_dir = Path(a.out)
     if (a.nt_override or (a.receptor_model and a.receptor_model != 'off')) and Path(a.out).resolve() == AUDIT_DIR.resolve() and not a.no_structure:
@@ -741,6 +802,7 @@ def main():
         plot_sim(Path(a.plot_sim), out_dir / "cx_wedge_sim_profiles.png")
         return
     nt_override = parse_nt_override(a.nt_override)
+    hold_edges = parse_hold_edges(a.hold_edges)
     c, cache_dir, table = load_connectome(nt_override, scratch=a.scratch_cache)
     if cache_dir is not None:
         print(f"connectome from scratch cache {cache_dir} (TYPE_NT_OVERRIDE = {table})")
@@ -779,7 +841,8 @@ def main():
             rows += simulate(c, cells, [(gE, gD)], seconds=a.seconds, pulse_s=a.pulse_s, background_hz=a.background, pulse_hz=a.pulse_hz,
                              start_wedge=a.start_wedge, width=a.width, seed=a.seed, cuda_graphs=not a.no_graphs, delta7_pen=not a.no_delta7_pen,
                              gR=a.ring_gain, receptor_model=receptor_model, receptor_net_rule=receptor_net_rule, nt_override=nt_override,
-                             lif_overrides=lif_overrides, ledger=a.ledger, arm=a.arm, block=a.block, device=a.device, ledger_npz=npz)
+                             lif_overrides=lif_overrides, ledger=a.ledger, arm=a.arm, block=a.block, device=a.device, ledger_npz=npz,
+                             hold_edges=hold_edges)
         if a.sim_out:
             path = Path(a.sim_out)
             old = json.load(open(path)) if path.exists() else []

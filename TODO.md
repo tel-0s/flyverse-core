@@ -152,16 +152,36 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           C v K is an **upper bound**; the hair-plate route is sized from the level model (**-0.070 Hz/Hz**) and the
           single cell (**-0.149**) instead -- it **accounts for +0.72 Hz, 14 %, of the +5.22 Hz pooled C-over-L
           AN04B003 difference**, and the per-phase modulation owns the remaining ~4.49 Hz.
-    - [ ] **the next-round arm: M at the cycle's own realised amplitude 0.948** (`level_controls.md` 10 item 2):
-          `flat_amplitude` with the per-leg amplitude set to the cycle's realised mean (or an `mn_ref`-style
+    - [x] **the next-round arm: M at the cycle's own realised amplitude 0.948 -- RUN** (`level_controls.md` 10 item
+          2): `flat_amplitude` with the per-leg amplitude set to the cycle's realised mean (or an `mn_ref`-style
           compensation) instead of 1, so that M and C sit at ONE chordotonal level. As run, M buys +6.0 Hz and F4 /
           F6 cannot be read as level contrasts; at 0.948 they become the clean contrasts they were meant to be and
           the open question "does the amplitude law add drive?" gets an answer.
-    - [ ] **the next-round predeclaration: a Holm family that can be satisfied** (`level_controls.md` 10 item 1): at
-          n v n the exact-U floor is `p_floor(n, n)` and a family of m members can only be called if
+          **Outcome** (`vncd6-2ad71d`, `docs/audits/level_controls_r2.md` F1): the new opt-in
+          `body.LegCycle.flat_amplitude_value` = 0.948 put M2 at C's level on all three leg channels (-0.76 / -0.41 /
+          +0.03 Hz) with |amp L-R| 0.000000, and **M2 v C is `null` on all seven primaries** -- the amplitude / turn
+          law adds NO drive at the relay or at DNa02 beyond the per-phase modulation, so **F4 is closed**.
+    - [x] **the next-round predeclaration: a Holm family that can be satisfied -- DONE** (`level_controls.md` 10 item
+          1): at n v n the exact-U floor is `p_floor(n, n)` and a family of m members can only be called if
           `p_floor x m <= alpha` -- **m <= 6 at 5 v 5** (0.0079365 x 6 = 0.0476) and **m <= 23 at 6 v 6**
           (0.0021645 x 23 = 0.0498). Round 4b declared m = 7 at 5 runs and called nothing, which `docs/INTERP.md`
           10.2 already forbade. Either size the family to m <= 6, or run **6 runs per arm**.
+          **Outcome** (round 4c): **6 runs per arm** at m = 7, floor `2/C(12, 6)` = 0.0021645 and 0.0021645 x 7 =
+          **0.0152 <= 0.05** -- rows were CALLED for the first time in this thread (F2 four of seven, F3 four,
+          F4 all seven; F1 calls none, which is the answer).
+    - [ ] **derive `mn_ref_hz`, `hair_plate_max_hz` and `campaniform_load_hz` together as one fixed point**
+          (`level_controls.md` 10, `level_controls_r2.md` 9 item 2): the structure term over the level control
+          (**+4.60 +- 0.31 Hz** without the amplitude law, **+4.72 +- 0.32** with it) still carries a -9.5 Hz
+          hair-plate and -24.7 Hz campaniform mismatch, corrected at cross-batch slopes extrapolated about 9.5 Hz off
+          their calibration manifold; a within-batch calibration is not available while L is the only steady-input arm
+          in the batch (two arm-side means against the model's four parameters). One three-parameter fixed point turns
+          the correction into a matched pair, and C v K from an upper bound into a measurement.
+    - [ ] **more runs of the REFERENCE arm for DNa02_R / the clean yaw SD** (`level_controls_r2.md` 9 item 6): both
+          rows reproduce as DIFFERENCES in all three batches (DNa02_R +0.103 / +0.107 / +0.094 Hz; clean yaw SD
+          +0.572 / +0.490 / +0.588 deg/s) and as verdicts only sometimes (DNa02_R `result` in rounds 4 and 4b at
+          z +16.6 / +7.8, `null` at 6 v 6 at z +2.9; the yaw SD `result` only in round 4), because L's own between-run
+          SD is the denominator every time (0.081 -> 0.172 -> 0.224 deg/s). A claim on either row needs more runs of
+          **L**, not of C.
     - [x] **the single-cell AN04B003 check** (CPU, `interp_atlas`-style, no room run): AN04B003 under (i) steady vs -- RUN 2026-09-15 (`scripts/probe_an04b003_single_cell.py`, `docs/audits/level_controls.md` section 13): +1.63 Hz at a matched per-cell mean with IN13B001 clamped (z +7.2), hair plate -1.00 Hz per +6.7 Hz (z -5.9), campaniform null; reproduced bit-for-bit on an independent rerun.
           8 Hz-modulated chordotonal input at the same mean with IN13B001's rate clamped, and (ii) the hair-plate
           level varied alone at a fixed chordotonal level. The two together settle whether the C-over-L AN04B003
@@ -216,15 +236,25 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           exists, park the compass at "no attractor at shipped gains" and run the free-walking compass room under
           the transducer at the experiment gains once (4 seeds, one block, bump metrics + `circ_corr_heading`) to
           close `body_sided_state.md` 8 item 5 -- expected negative: the report is gone by GLNO.
-    - [ ] **the ExR6 / ER6 / ER4m -> PEN, EPG hold arm** (`compass_ring_mechanism.md` 4 and the 5A skeptic's closing
-          paragraph; the one arm round 5 named and did not run): an `edges`-kind hold of those three types at 0 onto PEN
-          and EPG -- with the ER/ExR term removed the decomposition puts the driven PEN at +9.7 - 0.6 = **+9.1 mV**
-          during the pulse, above the 7 mV gap (f ~ 30 Hz) -- which turns "the DC inhibition keeps the relays below
-          threshold" from a decomposition into a tested attribution. **First fix `scripts/cx_ring_structure.py`'s two
-          owned defects**: enter the forced drive as a **current**, not as a rate (today `rate_fixed_point` adds it as a
-          rate, so gamma_EPG = 0 by construction), and **keep the one-step EPG -> EPG term** the two-step reduction
-          computes and drops (undamped k = 1 coefficient +59.76 mV, gamma_crit 3.35 Hz/mV, predicting 145 Hz against the
-          observed 151-156). Then re-derive the section 1.3 ranking, which is presently computed at a zero-gain state.
+    - [x] **the ExR6 / ER6 / ER4m -> PEN, EPG hold arm** (2026-09-15, round 6: `compass_dc_balance.md`, batch
+          `cx6-995cd5`, 10 jobs / 0 failed / 40 runs, skeptic pass mostly sound) -- **necessary but not sufficient**:
+          the hold lifts the driven PEN from 0.29-0.66 to 40.2-48.3 Hz (`result`, Holm 0.0317) and buys no bump
+          (survival 0.00, confined 0.000 in 5/5) because the same DC term also holds the unstimulated ring at rest, with
+          ExR6 carrying most of it, ER6 some and ER4m `null` on PEN; the structure tool's defects were fixed first
+          (`--legacy` reproduces 5A), and **nothing was adopted** -- `--hold-edges` defaults to `None`.
+    - [ ] **record per-type ring rates (ExR6 / ER6 / ER4m) in `cx_wedge`'s recorded groups** (`compass_dc_balance.md`
+          3.2 and its skeptic's closing paragraph): the rate model's weakest link is its ring rates (2.1-2.6x high on
+          H3's PEN, 3.5-4.6x on H_ER6's), and no arm of round 5 or round 6 measures them -- the protocol records only
+          the 308-cell `Ring` population mean.
+    - [ ] **measure the spiking LIF's effective input noise sigma** (the rate model assumes 2 mV: `SIGMA_MV` in
+          `scripts/cx_ring_structure.py` is hard-coded and has never been measured, and no arm varies it). Every slope
+          bound the compass rounds quote is a property of it: the maximum slope of the smoothed f-I is 8.00 Hz/mV at
+          sigma 2 mV, 11.0 at 1 mV and 25.3 at 0.25 mV, and the shipped ring's gamma_crit 33.3 would be reached at
+          sigma 0.17 mV -- so "unreachable" is a statement about an assumption until this is measured.
+    - [ ] **the hold PLUS a wedge-local recurrence** -- H3 with `same_type_gain` 1, or a per-type EPG -> EPG field --
+          to ask whether the ring can hold a bump AT THE DRIVEN TILE once both the DC brake is off and the local
+          recurrence is on (H3G already gets within 1 of 5 seeds of it). That arm is **two labelled instruments**, so it
+          decides a mechanism question, not an adoption.
     - [ ] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate,
           sign -1, no `receptors_by_type.csv` row (tier fallback = NT_SIGN), and the -1 onto EPG rides on the E-PG row's
           GluClalpha (Davis 2020 PB_2, tier alias). **No published transmitter or function for ExR6 could be verified**

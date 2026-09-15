@@ -2710,6 +2710,185 @@ the list is in `TODO.md` B: the ExR6 / ER6 / ER4m hold arm (after the structure 
 transmitter as a relabel-with-sources question, the room rate-half if adoption is ever wanted, the inverted
 `struct.GLNO_PEN.sign` ledger row, and the body-model question at PS196_b, where the self-turn report actually breaks.
 
+### Session 12 addendum: round 4c, the modulation-only arm at the realised amplitude (2026-09-15)
+
+**What ran.** ONE house submission, `vncd6-2ad71d`: **24 job(s), 0 failed (21.5 min)** on B200 -- the
+`probe_vnc_drive` room at `--family level3`, **four arms x six brain seeds** (16 flies x 55 s window, blocks
+`fam_r0..fam_r5`), no compass job. Arms: **A** shipped (no sense); **L** round 4's level-matched control (`all`,
+`mn_ref_hz` 8.84), re-run inside this batch as the level reference; **M2** the MODULATION-ONLY control at the cycle's
+OWN realised amplitude (`all+leg_cycle+leg_cycle_flat` with `body.LegCycle(flat_amplitude=True,
+flat_amplitude_value=0.948)`: the phase / stance-swing modulation kept, the amplitude law removed, the afferent LEVEL
+the cycle's); **C** the cycle arm. Six runs per arm so that the predeclared Holm family of m = 7 is satisfiable at all
+(the 6 v 6 exact-U floor is `2/C(12, 6)` = 0.0021645 and 0.0021645 x 7 = **0.0152 <= 0.05**), which round 4b's m = 7
+at 5 v 5 was not. One new mechanism, **opt-in and off the default path**: `body.LegCycle.flat_amplitude_value`
+(default **1.0**, read only under `flat_amplitude`; one dataclass field and one line inside the flat branch, with the
+amplitude law and every timing / tripod / load line untouched) -- `pytest tests/test_body_cycle.py
+tests/test_proprioception.py tests/test_bit_identity.py` = **36 passed, 5 subtests**, including three new
+`rtol=0, atol=0` `BatchSim` tests pinning that the default cycle with the value unread, and round 4b's flat cycle with
+`=1.0`, are bit-identical, and the shipped golden unchanged. The value 0.948 is a summary statistic of round 4b's
+recordings, derived on CPU before submission: the per-leg amplitude of `out/vncd5`'s cycle arm on walking frames, per
+run [0.947665 0.947714 0.947744 0.947786 0.947730], run mean **0.947728 +- 0.000044**, rounded to three decimals (the
+law at the recorded mean walking speed of 9.794 mm/s at yaw 0 gives 0.947396, so the recorded mean is the law and not
+an artefact of the mask). Nothing about behaviour enters it. Predeclaration stamped **07:47:38Z** (archived
+byte-identical) against the earliest run's own `started_utc` **07:48:15Z**; submission receipt 07:47:47Z.
+`docs/audits/level_controls_r2.md`.
+
+**The headline.** **F4 is CLOSED.** With M2 level-matched to C on all three leg channels (chordotonal -0.76, hair
+plate -0.41, campaniform +0.03 Hz) and its per-leg amplitude exactly 0.948000 with |amp L-R| 0.000000, **M2 v C is
+`null` on all seven primaries** (AN04B003_L -0.20, AN04B003_R -0.27, DNa02_L -0.037, DNa02_R +0.000, clean yaw SD
++0.07, straightness +0.031, DNa02 L-R -0.037) -- and at 6 v 6 a row is called only at |z| >= 3, i.e. at three times
+C's own between-run SD (1.26 / 1.44 Hz of AN04B003, 0.055 / 0.041 of DNa02, 0.60 deg/s of clean yaw SD, 0.114 of
+straightness, 0.071 of DNa02 L-R), every one of which round 4b's M-over-C excess (+1.62 / +1.65 Hz of AN04B003,
++0.093 of DNa02_L) clears. So the amplitude / turn law adds **no drive** at the relay or at DNa02, round 4b's excess
+was its +6.0 Hz of level, and the +0.66 / +0.75 Hz structure-residual excess its skeptic pass found is -0.12 / -0.13
+Hz and `null` at the right level. **The structure term is the modulation**: M2 v L is CALLED (Holm 0.015) on
+AN04B003 +3.92 / +6.85 Hz, DNa02_L +0.111 and straightness +0.339 with an arm that cannot carry a turn term, and the
+level-corrected pooled structure term is **+4.60 +- 0.31 Hz without the amplitude law against the cycle's
++4.72 +- 0.32** -- the same number. **The turn term owns the sided DNa02 signal, and owns it as a sidedness rather
+than a rate**: `E[DNa02 L-R | chord L-R > 0] - E[. | < 0]` is -0.338 under C against -0.091 under M2 (z +7.9,
+`result`), and the two arms do NOT see the same afferent waveform -- the alternation SIZE is the same (12.36 vs 12.16
+Hz) and so is the fast tripod term (SD 14.02 vs 13.99), but the SLOW, yaw-locked component is 2.6x larger under C
+(mean |slow chord L-R| 1.65 vs 0.63 Hz, corr with yaw -0.78 vs +0.01) and DNa02's sidedness follows that component
+alone while the relay follows the fast one and is identical in both arms. No window rate, yaw SD, straightness or
+behavioural primary moves with it.
+
+**The sanctioned reading is the independent skeptic pass's closing paragraph, verbatim** (verdict **mostly sound**;
+its thirteen corrections were applied to the audit):
+
+**What rounds 4, 4b and 4c jointly say about the leg cycle.** Three batches of the same protocol now agree on an
+attribution and on its size: against a level-matched round-2 transducer at the same chordotonal level, the leg cycle
+raises the ascending relay AN04B003 by **+3.7 to +7.1 Hz per side** (`result`, CALLED in the one batch whose Holm
+family was satisfiable) and DNa02_L by **+0.09 to +0.15 Hz** (`result` in all three) -- a replicated attribution, not a
+single-batch finding. Round 4c splits that term cleanly in two. The rate part is the **per-phase modulation**: an arm
+that keeps the phase/stance structure and holds the amplitude at the cycle's own realised 0.948 reproduces the cycle
+arm on every rate row (fractions 0.94-1.00 against the level control's 0.69-0.88) and is `null` against it on all seven
+primaries, with a level-corrected structure term of +4.60 +- 0.31 Hz against the cycle's +4.72 +- 0.32 -- so round 4b's
+M-over-C excess was its +6.0 Hz of level, and the amplitude / turn law adds **no drive** at the relay or at DNa02. The
+sided part is the **amplitude / turn law**, and it is a sidedness, not a rate: the law writes a slow, yaw-locked L-R
+asymmetry into the afferents (mean |slow chord L-R| 1.65 Hz against the flat arm's 0.63, corr with yaw -0.78 against
++0.01) which DNa02 integrates into a -0.34 Hz tripod-conditioned L-R swing (against -0.09), while the relay, which
+follows the fast tripod term, sees nothing of it -- and no window rate, yaw SD, straightness or behavioural primary
+moves. Two rows stay unsettled across all three batches: DNa02_R (+0.09-0.11 Hz) and the clean yaw SD (+0.49-0.59
+deg/s) over the level control reproduce as differences every time and as verdicts only sometimes, because the
+denominator is the control arm's own between-run scatter. Nothing is adopted; `LegCycle.flat_amplitude_value` is an
+opt-in labelled-control parameter whose default path is bit-identical to the shipped one, and the structure term still
+carries a -9.5 Hz hair-plate and -24.7 Hz campaniform mismatch that is corrected at slopes extrapolated ~9.5 Hz off
+their calibration manifold, and an unmeasured `half_width_m` that scales the one row the turn term owns.
+
+**Integrity.** Round 4b's defect does not recur. **All 39 per-seed lists** quoted in the audit's prose and tables (28
+in section 5, 4 in section 7, 7 in section 8.3) were machine-extracted and checked by the skeptic against their named
+sources -- 33 against `analysis/per_seed.csv` column `value` and 6 against
+`analysis/level_model_r2_residual_runs.csv` column `residual` -- with **zero mismatches**, so `docs/INTERP.md` 10.4
+item 28 (any per-run or per-seed scatter quoted in prose is emitted by the analysis script into a named file and
+pasted from that file, the file and column named beside the list) was followed. One predeclared reducer changed after
+the first `pairs` run -- a one-line dedupe of `cmd_pairs`' key list in `scripts/probe_vnc_drive.py`, which had listed
+`DNa02_L_hz` / `DNa02_R_hz` as both a room key and a watch key and written 48 duplicate rows into `per_seed.csv` --
+and it was handled the way **`docs/INTERP.md` 10.4 item 11** requires: the whole `pairs` step was re-run on the same
+fetch and every derived artefact re-emitted, `decision_table.csv` is byte-identical before and after (both files
+kept), and `pairwise.csv` equals the before-file with its two duplicate rows dropped. The shipped analysis artefacts
+therefore carry the POST-change reducer hash (`5a288184...`, recorded in `post_analysis_sha.json`) while the 24 room
+jobs ran the stamped one (`f636d330...`), which every run JSON confirms independently through its 52-file
+`source_fingerprint`.
+
+**Next, and nothing adopted.** No default moved and no mechanism was adopted: `flat_amplitude_value` is an opt-in
+labelled-control parameter whose default path is bit-identical to the shipped one, `leg_cycle`, `leg_cycle_flat` and
+`unsided` all stay opt-in and OFF, and M2 is a LABELLED CONTROL. What the round leaves on the list (`TODO.md` B):
+**`mn_ref_hz`, `hair_plate_max_hz` and `campaniform_load_hz` derived TOGETHER as one three-parameter fixed point**, so
+that the +4.6 / +4.7 Hz structure term over L stops carrying a -9.5 Hz hair-plate and -24.7 Hz campaniform mismatch
+corrected at slopes extrapolated about 9.5 Hz off their calibration manifold -- a within-batch calibration is not
+available here, L being the only steady-input arm in the batch (two arm-side means against the model's four
+parameters), so the cross-batch application is the only option rather than a preference; **more runs of the REFERENCE
+arm** for DNa02_R and the clean yaw SD, whose differences replicate across all three batches while the z does not,
+because L's own between-run scatter is the denominator every time; ledger values for `half_width_m` and
+`lit.walk.outer_leg_step_ratio_in_turn`, which scale the one row the turn term owns; the FeCO walking-mean rate as a
+ledger number (86-87 Hz and the cycle's realised amplitude 0.948 are both consequences of the laws, not measurements);
+the suite under `all+leg_cycle`; and a free-walking compass room under the cycle.
+
+## Session 12, compass round 6: the DC-balance test (2026-09-15)
+
+One thread, one house submission, one independent skeptic pass; **nothing adopted and no default moved.**
+
+**What ran (`docs/audits/compass_dc_balance.md`, batch `cx6-995cd5`).** ONE `cluster_run.py` call, **10 job(s), 0
+failed (5.0 min)** on the house B200s, **40 runs** (8 arms x 5 seeds) at the **shipped gains** (gE 1 / gD 1), 40/40
+consoles `device cuda`, 0 provenance problems, predeclaration stamped **08:09:25Z** and never amended. The arm is an
+`edges`-kind LABELLED COUNTERFACTUAL: **ExR6 + ER6 + ER4m held at 0 onto PEN and EPG** -- 17 presynaptic cells (2 + 4 +
+11) onto 88 postsynaptic (46 EPG + 42 PEN), **1,149 weight entries, 37,256 synapses**, with the three single-type arms
+partitioning the entries exactly (174 + 287 + 688) and EPGt excluded by the post regex. It is installed by ONE new
+flag, `scripts/cx_wedge.py --hold-edges PRE_REGEX:POST_REGEX`, **default `None`**, which appends `(pre, post, 0.0)` to
+`LIFParams.type_path_gain`: with the flag absent the gain list is the previous one entry for entry and the shipped path
+is **bit-identical** (the CPU default-path smoke against the pre-6A run, and S / F / R reproducing cx5's seeds 0-3 at
+max |diff| 0.0). `scripts/cx_ring_structure.py` was fixed first -- the forced drive entered as a **current**, the
+one-step EPG -> EPG term **kept**, per-cell gains at the realised fixed point -- with **`--legacy` reproducing 5A
+exactly**, and was validated against the cx5 batch it had missed before the predeclaration was written.
+
+**The call, in the predeclared words: NECESSARY BUT NOT SUFFICIENT.** The hold lifts the driven PEN population from S's
+**0.29-0.66 Hz to 40.2-48.3 Hz during the pulse** (+43.53 Hz, z 294.0, p 0.0079, Holm 0.0317, `result`) and to
+49.3-54.0 Hz after release -- the 5A attribution, tested -- and **buys no bump**: `bump_survival_s` **0.00** and
+`frac_confined_post` 0.000 in **5 of 5 seeds**, a structural zero-vs-zero null against a reference that is also 0.00.
+The ring does not settle into a confined bump, it **saturates**: at 5 s the EPG hump is centred at wedge **5.71-6.11**
+rather than the driven 1.5, with 17-19 of the 35 off-block cells above 22 Hz. And **the hold also removes the resting
+state** -- on the 10 Hz background alone, before any pulse, H3 sits at EPG 19.7-62.9 Hz, PEN 8.8-42.7, Delta7
+28.3-103.5 and GLNO 32.5-131.4, against S's 8.7-10.0 / 0.00-0.02 / 8.4-11.8 / 0.00. Per type, **ExR6 carries most of
+the PEN DC** (held alone: PEN 8.9-14.9 Hz, +10.37, z 70.0, `result`), **ER6 some** (2.4-3.1 Hz, +2.25, z 15.2,
+`result`) and **ER4m none on PEN** (0.29-0.70 Hz, +0.03, z 0.22, p 0.69, **`null`**) -- ER4m is a -125.3 mV-per-volley
+term onto EPG and only -2.0 onto PEN. The closest configuration to a bump at the shipped gains without a global
+instrument is **H3G**, the hold with the GLNO relabel: survival 4.76-5.00 s, 159.0-164.2 Hz, width 3.85-4.00, confined
+in 11-49 % of post-pulse frames -- but **at the driven tile in only 1 of 5 seeds** (centre 0.92; the others 5.30, 5.43,
+10.01, 10.03), which is cx5's R175 caveat again. **No arm meets the predeclared working-compass rule in any seed**, and
+every surviving bump fails `compass.EPG.bump_rate_hz` by 2.5-3.4x.
+
+The independent 6A pass (Opus, verdict **mostly sound**, corrections 1-13, all applied) reproduced every measurement in
+the batch from the raw `.npz` with max |diff| 0.0 and closes with this, quoted verbatim:
+
+**What compass rounds 5 and 6 jointly say.** At the shipped gains the compass question is **closed as a null and opened
+as an attribution**: 5A showed that no data-implied type-level change -- the GLNO relabel, the receptor tier, the
+monoamine slow class, the fan-in, the cap -- moves the shipped ring off its uniform state, and that the binding
+constraint is a DC balance on the relays rather than a missing k = 1 mode; 6A fixed the three tool defects 5A's skeptic
+named and then ran the one `edges`-kind counterfactual that decision implied, and the answer is that the DC term is
+**real and insufficient**: holding 2 ExR6 + 4 ER6 + 11 ER4m off PEN and EPG lifts the driven PEN from 0.29-0.66 Hz to
+40.2-48.3 Hz (`result`, Holm 0.0317) -- ExR6 and ER6 carrying it, ER4m a `null` on PEN -- and buys zero seconds of
+confined bump in 5 of 5 seeds, because the same term is what keeps the unstimulated ring near its drive, so removing it
+saturates the ring instead of releasing it. Everything that holds a bump across both rounds is a **labelled instrument
+or a labelled reference** (`same_type_gain` 1, gE 2 / gD 15, or the hold with the GLNO relabel), every one of them
+fails `compass.EPG.bump_rate_hz` by 2.5-3.4x, and three of the four drift off the driven tile -- so
+`compass.EPG.bump_survival_s` stays FAIL and the rate and width rows stay NOT_APPLICABLE, and **nothing in either round
+licenses an adoption**. What the two rounds jointly license is one measurement and one data question: record per-type
+ring rates in the protocol (the rate model's weakest link, 2.1-2.6x high on H3 and 3.5-4.6x on H_ER6, is its ring
+rates, and no arm in either round measures them), and settle ExR6's transmitter, receptor and modulatory status in the
+animal, which is `UNKNOWN` at the type level and is the single largest term in the balance both rounds are about.
+
+**The corrections.** The slope question 5A and 6A had each answered differently is settled at **8.00 Hz/mV, not 8.27
+and not 25.8**: the right comparison is the maximum slope of the *smoothed* f-I at the sigma the rate model **assumes**
+(8.00 at u 8.61 by adaptive quadrature, where `lif_fi_prime`'s Gauss-Hermite estimate is not converged and
+`SIGMA_MV = 2.0` has never been measured, while the 15-node `cx_wedge.lif_fi` the fixed point actually iterates is not
+smooth near threshold), so the comparison's **sign** is earned, the word **"unreachable" is not**, and it is the
+measurement -- no bump in S / G / C / CG in 4 of 4 seeds -- that carries the conclusion; the other twelve corrections
+read "7 of 8 arms" as **3 of 4 distinct predictions** from a one-bit classifier that tracks `same_type_gain`, restate
+the receptor tier's fall as a criterion change rather than a rank move (its tail is ordered by float underflow), fix
+three pre-pulse EPG ranges against `state.csv`, withdraw a `silent` claim the protocol's group means cannot decide,
+name the hold's one unnamed side effect (`input_norm` re-scaling one EPG cell's surviving inputs by 2 %), note that
+`scripts/cx_ring_structure.py` was edited at 08:18:29Z after the `tree_state.json` stamp though nothing on the
+simulated path changed, confine the predeclared call's three phrases to H3 where the rule defines them, and record that
+the ExR6 -> EPG sign reproduces the presynaptic NT_SIGN rather than being created by the E-PG GluClalpha row.
+
+**An incident, recorded.** An argument-less run of the fixed `scripts/cx_ring_structure.py` -- whose default `--out` is
+`out/cx5/structure` -- **overwrote 5A's structure artefacts** (`structure.json`, `structure.md`, `matrices.npz`,
+`evidence_glno.json`). `out/` is git-ignored, so they were regenerated at **2026-09-15T08:20:39Z** with `--legacy`,
+reproducing every number `compass_ring_mechanism.md` quotes from that file **to the printed digit** (u_PEN -15.785 /
+-11.057 mV, lambda_1 +10,019, gamma_crit(k1) 1.998, ExR6 -14.78 @ 183.2 Hz, ER6 -9.77 @ 116.3, ER4m -0.25 @ 22.3, and
+the b / b+f / c / f rows), with `out/cx5/structure/REGENERATED_BY_6A.txt` alongside them. The overwrite's own time is
+in no surviving file (between 08:03 and 08:05Z per the thread's log), because the only file that carried it was itself
+overwritten by the regeneration; **making `--out` required** is the open item that leaves.
+
+**Nothing adopted.** A hold is a counterfactual and can never be a default: `--hold-edges` defaults to `None`, the
+shipped path is bit-identical with it absent, no gain, cache, receptor table or `TYPE_NT_OVERRIDE` entry moved, and
+`compass.EPG.bump_survival_s` stays FAIL with the rate and width rows NOT_APPLICABLE. H3G's near-bump is a
+counterfactual arm, so the GLNO relabel's status is unchanged and stays with `docs/audits/glno_relabel.md` -- what 6A
+adds there is only that the sign is no longer untestable at the shipped gains (GLNO fires 135.9-137.6 Hz in H3 and
+64.0-83.2 in H3G, against 0.01-0.34 in S). What the round leaves on the list is in `TODO.md` B: per-type ring rates in
+`cx_wedge`'s recorded groups, a measurement of the spiking LIF's effective input noise, and the hold PLUS a
+wedge-local recurrence as a mechanism question rather than an adoption.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
