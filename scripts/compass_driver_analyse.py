@@ -188,10 +188,68 @@ def scheduler(original, updated):
     print(json.dumps(data,indent=2))
 
 
+def difference(left,right):
+    a,b=np.load(left),np.load(right);assert a.files==b.files
+    rows={}
+    for key in a.files:
+        mismatch=a[key]!=b[key]
+        rows[key]=dict(exact=bool(np.array_equal(a[key],b[key])),different_values=int(np.count_nonzero(mismatch)),
+                       max_abs=float(np.max(np.abs(a[key].astype(float)-b[key].astype(float)))) if a[key].size else 0.,
+                       first_index=np.argwhere(mismatch)[0].tolist() if np.any(mismatch) else None)
+    return rows
+
+
+def captured(original,updated):
+    original=Path(original);updated=Path(updated);out=updated/'analysis';out.mkdir(exist_ok=True)
+    frozen=read(updated/'predeclared.json');checks=[];rows=[];exact={}
+    def verify(p,label):
+        assert p['execution']['device']=='cuda',label
+        assert p['compiled_connectome']['md5']=='ef23cc27bea13be7f6a96f3c04fd3737',label
+        fp=p['source_fingerprint'];assert fp['computed'],label
+        files=fp['files_lf'];wanted=frozen['source_sha256_lf'];shared=[k for k in wanted if k in files]
+        assert len(shared)>30 and all(files[k]==wanted[k] for k in shared),label
+        checks.append(dict(record=label,matched_files=len(shared)))
+    for seed in range(10,16):
+        stem=f'instrumented_s{seed}';record=read(updated/(stem+'.json'));verify(record['provenance'],stem)
+        assert record['module_graphs']>0 and record['batch']==8 and record['seconds']==12,stem
+        exact[stem]=difference(original/(stem+'.npz'),updated/(stem+'.npz'))
+        for r in measure(updated/(stem+'.npz')):rows.append(dict(seed=seed,**r,failed_gates=gates(r)))
+    timing={};identities={}
+    for name in ('profile_native','profile_eager'):
+        r=read(updated/(name+'.json'));timing[name]=profile(updated/(name+'.json'));identities[name]=r['identity']
+        for i,p in enumerate(r['controllers']):verify(p,f'{name}:{i}')
+        for step in r['records']:
+            if step['mode']=='instrumented':assert (step['module_graphs']>0)==(name=='profile_native')
+    fixture=read(updated/'cuda_checks.json');assert len(fixture['checks'])==13;verify(fixture['provenance'],'cuda fixture')
+    traces=read(updated/'trace/summary.json')['records'];trace_rows=[]
+    for r in traces:
+        verify(r['provenance'],'trace '+r['mode'])
+        assert r['local_scalar_dense']==(40 if r['mode']=='checked' else 0),r['mode']
+        trace_rows.append({k:r[k] for k in ('mode','frames','module_graphs','local_scalar_dense')})
+    rooms={}
+    for name in ('room_eager_a','room_eager_b','room_instrumented','room_native_raw','room_native_instrumented'):
+        r=read(updated/(name+'.json'));verify(r['provenance'],name)
+        assert r['seconds']==60 and r['batch']==6
+        if name in ('room_instrumented','room_native_instrumented'):assert r['module_graphs']>0
+        rooms[name]={k:r[k] for k in ('rows','frame_ms_median','frame_ms_p95','module_graphs')}
+    room_compare={}
+    for a,b in (('room_eager_a','room_eager_b'),('room_eager_a','room_instrumented')):
+        room_compare[a+' vs '+b]=difference(updated/(a+'.npz'),updated/(b+'.npz'))
+    data=dict(functional_rows=len(rows),functional_pass=sum(not r['failed_gates'] for r in rows),
+              failed_rows=[r for r in rows if r['failed_gates']],contract_arrays=exact,timings=timing,
+              matched_input_identity=identities,cuda_checks=fixture['checks'],trace=trace_rows,
+              rooms=rooms,room_comparisons=room_compare,verified_records=len(checks))
+    csv_write(out/'contract_rows.csv',rows);csv_write(out/'source_checks.csv',checks)
+    (out/'summary.json').write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
+    print(json.dumps(data,indent=2))
+
+
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--runs',default='out/compass_standin')
     ap.add_argument('--profile-only',action='store_true');ap.add_argument('--scheduler',help='directory of scheduler rerun')
+    ap.add_argument('--captured',help='directory of successful capture validation')
     a=ap.parse_args()
-    if a.scheduler:scheduler(a.runs,a.scheduler)
+    if a.captured:captured(a.runs,a.captured)
+    elif a.scheduler:scheduler(a.runs,a.scheduler)
     elif a.profile_only:print(json.dumps(profile(Path(a.runs)/'profile.json'),indent=2))
     else:analyse(a.runs)
