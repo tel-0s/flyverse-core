@@ -5,7 +5,7 @@
   "qualification": "synthetic input layer on a candidate lattice",
   "eye": "R",
   "anatomically_validated": false,
-  "functional_gate": "pending one predeclared house comparison; shelve if any of eight motion directions fails",
+  "functional_gate": "recorded engineering acceptance below; anatomical gates remain closed",
   "columns_sha256": "60181451e52435ff31ca950d63d71833eb43740c470ab32d78721c2c74716e3d",
   "base_csr_md5": "27e330891b62641686f64fd7a1b66138",
   "base_annotations_sha256": "21a1fad1b4dac8531df6d02b77d359e11becdaac5401a5f9d96f16be889d0884",
@@ -3885,5 +3885,57 @@
     "assumption": "unmeasured synthetic weights: MaleCNS per-edge median times global DNa02 input-yield ratio; not a local lamina calibration",
     "native_synapses_modified": 0,
     "missing_targets": "left missing; no borrowed FAFB graph or imputed biological edges"
+  },
+  "functional_validation": {
+    "status": "pass",
+    "summary": {
+      "status": "functional gates passed",
+      "qualification": "synthetic input layer on a candidate lattice",
+      "motion_pass": true,
+      "loom_pass": true,
+      "measurements": {
+        "malecns_motion": {
+          "correct_subtypes": 8,
+          "all_eight_correct": true
+        },
+        "malecns_loom": {
+          "walk_gf_max_hz": 0.0,
+          "loom_gf_peak_hz": 44.096458435058594,
+          "loom_ttm_peak_hz": 38.3608283996582,
+          "gf_threshold_hz": 33.0,
+          "escape": true,
+          "first_escape": {
+            "t_s": 0.5300000000000002,
+            "distance_m": 0.034999999999999996,
+            "gf_hz": 35.530277252197266,
+            "ttm_hz": 30.35202407836914
+          },
+          "gf_gate_pass": true
+        },
+        "banc_motion": {
+          "correct_subtypes": 8,
+          "all_eight_correct": true
+        },
+        "banc_loom": {
+          "walk_gf_max_hz": 0.0,
+          "loom_gf_peak_hz": 53.29866409301758,
+          "loom_ttm_peak_hz": 0.0,
+          "gf_threshold_hz": 33.0,
+          "escape": true,
+          "first_escape": {
+            "t_s": 0.46000000000000024,
+            "distance_m": 0.04999999999999977,
+            "gf_hz": 33.86454772949219,
+            "ttm_hz": 0.0
+          },
+          "gf_gate_pass": true
+        }
+      },
+      "anatomically_validated": false
+    },
+    "result_run_id": "ledger-20260915T052149Z-8463cebe",
+    "result_sha256": "f1201775d7a5e0e7bec15fa100010fc2474bff047ce3e082fdecbec22e829f18",
+    "source": "docs/audits/banc_candidate_experiment.md",
+    "scope": "one fixed right-eye motion/loom protocol; not a replicated behavioural claim or anatomical validation"
   }
 }

@@ -81,5 +81,85 @@ The controls and the DRA gate's interpretation are recorded in the sibling
 
 ## Results
 
-Pending the single predeclared house submission. Candidate integration is not accepted
-by the existence of the opt-in implementation. Functional outcomes will be appended here.
+**Both functional gates passed**, on the first and only submission. The tested code
+is `59edac0`, descended from main `b4ebf9a` through the review-fix commit `3deec1b`.
+House run `banc-candidate-gate-3b6b23`, job `205215ec9038`, ran on **<cluster-node> / NVIDIA B200 /
+PyTorch 2.11.0+cu128**: one job, four sequential probe processes, zero job failures.
+No parameter was changed after seeing these results. These are functional results
+for a **synthetic input layer on a candidate lattice**.
+
+| Subtype | Male right cells | BANC right cells | Preferred direction, both | Male DSI | BANC DSI |
+|---|---:|---:|---|---:|---:|
+| T4a | 849 | 811 | front→back | 0.228987 | 0.128753 |
+| T4b | 846 | 816 | back→front | 0.330266 | 0.111756 |
+| T4c | 883 | 807 | up | 0.309110 | 0.126262 |
+| T4d | 859 | 804 | down | 0.334832 | 0.123962 |
+| T5a | 838 | 801 | front→back | 0.430114 | 0.089971 |
+| T5b | 852 | 813 | back→front | 0.420194 | 0.056832 |
+| T5c | 858 | 797 | up | 0.307647 | 0.042548 |
+| T5d | 808 | 763 | down | 0.244265 | 0.058681 |
+
+All eight directions are correct in both graphs. BANC's modulation is weaker,
+especially T5: **all four BANC T5 DSIs are below 0.1**. The owner's gate was preferred
+direction, not equal selectivity strength or the older ledger's DSI≥0.1 criterion.
+This passes that restricted functional gate; it does not recover male-like motion
+coding or resolve the per-column assignment errors. Counts include all right-side
+cells of each subtype, including those without a candidate home column: their native
+inputs still connect them to the rest of BANC's optic lobe.
+
+| Loom readout (seed 0) | MaleCNS | BANC candidate |
+|---|---:|---:|
+| Walking GF maximum, Hz | 0 | 0 |
+| Loom GF peak, Hz | 44.096458 | 53.298664 |
+| GF threshold, Hz | 33 | 33 |
+| First GF-triggered escape readout, s | 0.53 | 0.46 |
+| Object distance at that readout, cm | 3.5 | 5.0 |
+| Loom TTM peak, Hz | 38.360828 | 0 |
+
+Both GF rows pass. **BANC TTM remains silent**: the GF result does not establish
+recovery of the downstream jump motor pathway. The earlier threshold crossing and
+larger GF peak are single-run observations under this synthetic model, not evidence
+of a female/male behavioural difference. No food-finding or walking improvement is
+claimed, and the anatomical DRA/mirror validation remains unresolved.
+
+The fetched Results are at `out/banc_candidate_gate/results/`. The durable house copy
+is `<cluster-fs>/neurome/runs/banc-candidate-gate-3b6b23/out/banc_candidate_gate/results/`.
+Each Result passed `Result.check()`. An independent read of the saved response
+vectors reproduced all sixteen direction decisions and both GF peaks. Male/BANC
+LIF, optic, body and receptor-table parameters match within each probe. The cluster
+snapshot has no `.git`, so each Result carries source-content fingerprints; the
+local committed source used for shipping is `59edac0`.
+`export.match_sources` verified every loaded source for all five Results (19–21
+files each, no differing or missing files). After attaching the completed evidence,
+a fresh CPU build reproduced the same candidate CSR and unchanged biological block.
+
+```
+MaleCNS CSR MD5       ef23cc27bea13be7f6a96f3c04fd3737
+BANC biological MD5  27e330891b62641686f64fd7a1b66138
+BANC candidate MD5   9281a7fb3586cce55bc90a906ab09416
+
+Result JSON SHA-256
+acceptance      f1201775d7a5e0e7bec15fa100010fc2474bff047ce3e082fdecbec22e829f18
+malecns_motion  2dcbca008c20b55d5fec6806867898516c73ee3cd4f2ff69c265581d6fcdfe32
+banc_motion     60f161720d5318753b94532b75d7642b489e0cbe17d07e09ef829f436e8cbffd
+malecns_loom    6850e37657c64eeebbec6771e54a649ccf201cff51e152ce460a94afd338cda8
+banc_loom       a8cd7f470faf693eaac1f078dd5550069fed5952ecd88e394b487b504770901d
+```
+
+The post-run metadata includes this functional evidence without changing the map,
+weights or dynamics. Regenerate that metadata with:
+
+```powershell
+python scripts/build_banc_candidate.py out/banc_candidate_source --acceptance out/banc_candidate_gate/results/acceptance.json
+```
+
+The generator rejects evidence whose map, biological identity, checks or input layer
+differs. The original Results retain the pre-run metadata; they have not been rewritten.
+Future candidate Results carry the recorded functional outcome as well as the failed
+anatomical checks and approximate 80–85% exact-column estimate.
+
+The full CPU suite passed **385 tests / 19 skipped / 215 subtests**. The seven focused
+candidate/bit-identity tests also passed. All three MaleCNS cache MD5s remain exactly
+the values in the column-reconstruction audit. Tests cover synthetic IDs/transmitter,
+column-local edges, missing targets and left-eye exclusion, preservation of explicit
+zero entries, save/load/prune restoration, provenance and source-identity guards.

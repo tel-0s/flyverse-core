@@ -23,6 +23,11 @@ from flyverse.interp.common import connectome_fingerprint, raw_counts
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("diagnostic", type=Path)
+    ap.add_argument(
+        "--acceptance",
+        type=Path,
+        help="attach completed functional evidence for this exact candidate",
+    )
     args = ap.parse_args()
     report = json.loads((args.diagnostic / "report.json").read_text(encoding="utf-8"))
     if (
@@ -107,6 +112,31 @@ def main():
             "missing_targets": "left missing; no borrowed FAFB graph or imputed biological edges",
         },
     }
+    if args.acceptance:
+        accepted = json.loads(args.acceptance.read_text(encoding="utf-8"))
+        tested = accepted["provenance"]["model"]["vision"]
+        for key in (
+            "columns_sha256",
+            "base_csr_md5",
+            "base_annotations_sha256",
+            "input_layer",
+            "checks",
+        ):
+            if tested[key] != meta[key]:
+                raise ValueError(
+                    f"functional evidence belongs to a different candidate: {key}"
+                )
+        meta["functional_gate"] = (
+            "recorded engineering acceptance below; anatomical gates remain closed"
+        )
+        meta["functional_validation"] = {
+            "status": accepted["validation"]["status"],
+            "summary": accepted["summary"],
+            "result_run_id": accepted["run_id"],
+            "result_sha256": hashlib.sha256(args.acceptance.read_bytes()).hexdigest(),
+            "source": "docs/audits/banc_candidate_experiment.md",
+            "scope": "one fixed right-eye motion/loom protocol; not a replicated behavioural claim or anatomical validation",
+        }
     (DATA / "banc_candidate_columns.csv").write_bytes(content)
     (DATA / "banc_candidate_vision.json").write_text(
         json.dumps(meta, indent=2) + "\n", encoding="utf-8"
