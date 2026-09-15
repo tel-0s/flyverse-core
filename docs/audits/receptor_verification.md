@@ -2459,3 +2459,177 @@ tests `d < 1e-9` and drops those cells. Recomputed by integer column identity on
 
 The error direction *strengthens* the audit's own conclusion ("annotation depth is not the cause"). The same
 table also prints `p90_full_vs_malecns_set_deg = 8.5e-7` for Tm5Y, which is this noise, not a distance.
+
+## Level-matched control (2026-09-15)
+
+`docs/audits/level_matched_control.md` (TODO.md B, the leg cycle's per-leg / per-phase structure against the
+afferent level; one house submission `vncd4-8dd183`, 24 jobs, 0 failed, B200), checked by an independent Opus
+skeptic pass whose sixteen corrections were applied to that audit. Verdict **mostly sound**. The skeptic's Verdict
+section and Refuted list verbatim (heading levels demoted to fit this document); the full pass, including its
+Confirmed list, its level-fraction and sidedness-confound analysis and its sixteen corrections, is in
+`docs/audits/level_matched_control.md` under `## Skeptic pass (independent, 2026-09-15)`.
+
+### Verdict
+
+**Mostly sound.** The engineering is clean and the arithmetic is honest: one submission, correct provenance on every
+room run, a predeclaration whose families and decision rule match what was analysed, two genuine reducer fixes that
+reproduce the round-3 skeptic's numbers to three decimals, a derivation (`mn_ref_hz` 8.84) that I reproduced to four,
+a level match verified from the recordings (86.22 +- 0.50 vs 87.41 +- 1.04, inside a 10 Hz tolerance), and **every one
+of the fifteen family comparisons reproducing to the printed precision with my own exact Mann-Whitney, my own z and
+my own Holm -- not one verdict flips**. The audit also self-reports its own two defects (the `watch_of` edit, the
+`rate_hz` column) rather than hiding them.
+
+What is unsound is the **attribution**, which is the round's decisive question. The decision rests on the claim that
+the C-over-L excess "is the whole" of the per-phase structure, and that claim rests in turn on dismissing the two
+unmatched channels because "more drive and less DNa02 cannot produce the excess". The audit's own paths output
+contradicts that: the hair plate's dominant route into DNa02 is sign-negative, its intermediate IN13B001 is 11.1 Hz
+higher under L exactly as that route predicts, and an additive level model with an inhibitory hair plate reproduces
+the whole AN04B003 gap with no structure term at all. A second called row -- straightness -- is 82-92 % explained by
+the round-2 law's DC sidedness, and a third -- DNa02_R -- is confounded by an 8.3 Hz per-side chordotonal deficit that
+the whole-channel match hides. Six further numbers do not match their own named files. None of this touches the
+DNa02_L call, which is the one row that survives every confound I could apply.
+
+**What the round can now say.** With the CHORDOTONAL channel matched to 1.2 Hz (precondition met, `null`), **C v L is
+`result` on DNa02_L (+0.127 Hz, z +9.2), DNa02_R (+0.103, z +16.7) and the clean yaw SD (+0.57 deg/s, z +7.1),
+Holm-called at m 5** -- so **something other than the chordotonal mean separates the leg cycle from the round-2
+transducer**, in the direction "more DNa02". The DNa02_L row is the robust one: arm L's left side carries *more*
+chordotonal, hair-plate and campaniform drive than arm C's and still fires DNa02_L less, so no under-drive or
+sidedness account of it survives. But **"the per-leg / per-phase STRUCTURE contributes beyond the LEVEL" is not yet
+supported**: L differs from C in three ways at once -- per-phase modulation, a +9.7 / -24.8 Hz mismatch on the two
+unmatched leg channels whose dominant route into DNa02 is sign-negative, and a +13.6 Hz DC chordotonal L-R -- and no
+arm in this batch separates them. The straightness row is `result` but reads as the DC sidedness, not as structure;
+the DNa02_R row is `result` but is partly a per-side level deficit; the DNa02 L-R row is `null`. `L v A` is `result`
+on all five primaries and the afferent level (as delivered by the round-2 law, sidedness included) reaches 76 % / 67 %
+/ 89 % of the cycle's DNa02_L / DNa02_R / yaw-SD rise over the shipped path, with tight per-seed scatter -- that part
+of the framing is fair, and it is the round's solid finding. **D v C** stands as reported (DNa02_L -0.036 called, no
+behavioural row). The compass answer stands at 4 v 4: no arm moves the bump, and AN04B003's signed report of the turn
+(-10.5 Hz) exists under the cycle and not under the level control. Nothing is adopted, and adoption now needs three
+controls, not two: the unsided level control, the modulation-only arm, **and a channel-matched level control**.
+
+### Refuted
+
+**R1. The hair-plate dismissal is wrong, and it is the load-bearing one.**
+Audit section 0 (lines 63-66): *"L has MORE hair-plate and campaniform drive than C and still less DNa02, so neither
+can account for the C-over-L excess in the direction found."* That inference needs the hair-plate -> DNa02 transfer to
+be net positive. The audit's own paths output says it is net **negative**:
+
+`out/vncd4/analysis/paths_afferents_to_DNa02_nfA.json` -> `summary.top_silent_walk_per_k["3"]`:
+
+```
+path   "a:SNpp45 -> IN13B001 -> AN04B003 -> b"
+signs  "+,-,+"          link_mv "+119.533,-16.500,+15.285"
+gain_if_signed  -30145.98        (the strongest 3-step afferent->DNa02 walk; also row 1 of paths_summary.csv, k3_top_signed)
+```
+
+`SNpp45` **is** the hair-plate afferent (`flyverse/senses.py` line 106: `hair_plate subclass 'hair plate'
+(SNpp45, SNpp19 ...)`), 53 of the channel's 113 cells. The direct SNpp45->DNa02 link is only +2.003 mV/volley
+(`strongest_silent_link_per_k["1"]`); the dominant route is the disynaptic **inhibitory** one through IN13B001 onto
+AN04B003 -- the very cell the audit's decomposition says carries the whole C-over-L excess.
+
+And the intermediate moves exactly as that route predicts. From `trace_L_vs_A.json` / `trace_C_vs_A.json`
+(`tables.per_type`, `stim_level`, 5 runs each):
+
+| cell | A | **L** | **C** | L - C |
+|---|---|---|---|---|
+| SNpp45 (hair plate) | 0.00 | **55.83** | **46.17** | **+9.65** |
+| IN13B001 | 8.53 | **76.36** | **65.24** | **+11.12** |
+| AN04B003 | 0.45 | **17.82** | **23.36** | -5.55 |
+
+(AN04B003 side-split from the room watch: L 19.096 / 16.542, C 23.132 / 23.623 -- the audit's 19.1 / 16.5 vs
+23.1 / 23.6, confirmed; the pooled 17.82 / 23.36 is their mean.)
+
+A purely additive **level** model with an inhibitory hair plate fits both constraints with **zero** structure term.
+Solve simultaneously (i) the within-L left-vs-right side contrast (Deltachord +13.62, Deltahair +9.24 -> DeltaAN04B003 +2.56) and
+(ii) the whole C-over-L pooled gap (Deltachord +1.19, Deltahair -9.69 -> DeltaAN04B003 +5.56):
+**w_chord = +0.533, w_hair = -0.508 Hz/Hz.** Both are of the size the IN13B001 route supplies
+(dIN13B001/dHair = 11.12/9.65 = 1.15, so it needs only -0.44 Hz/Hz from IN13B001 to AN04B003).
+
+So the sentence at lines 49-51 -- *"A threshold unit fed a modulated Poisson input fires more than one fed a steady
+input of the same mean; that is the structure's contribution, and it is the whole of the C-over-L excess on the named
+rows"* -- is **not supported by this batch**. The temporal modulation and the unmatched +9.7 Hz hair plate (and the
+unmatched -24.8 Hz campaniform, whose route into DNa02 was never examined at all) are not separated by any arm that
+was run. The audit's own recommendation 6 (a single-cell modulation check) concedes the mechanism is untested; section
+0 nevertheless asserts it as established.
+
+**R2. The straightness row of family F1 is a sidedness row, not a structure row.**
+Per fly within arm L (n = 80): `straightness = 0.9872 - 0.14244 x |signed yaw|`, r = -0.776. Extrapolated to arm C's
+own mean signed drift (1.270 deg/s) it predicts **0.806** against C's observed **0.833** -- i.e. **92 % of the +0.3357
+C-over-L straightness gap** is the drift difference alone. The reverse fit inside C (`1.0656 - 0.18300 x`, r -0.667)
+extrapolated to L's drift predicts 0.437 against L's observed 0.498 -- **82 %**. The drift itself is the round-2 law's
++13.6 Hz DC chordotonal L-R, which is the control's construction, not the cycle's structure. Listing straightness
+among the CALLED rows that show "the structure contributes beyond the level" (section 0, lines 25-31, and the Report's
+`summary` / `key_claims`) overstates it; the audit says the right thing at 4.2 item 2 and then contradicts itself at
+the top. (Restricting straightness to on-table, post-skip trajectory does **not** rescue it: L 0.645 +- 0.026 vs C
+0.931 +- 0.009, still `result`, so it is not a leaving-the-table artefact either -- it is a drift artefact.)
+
+**R3. "76 % of its DNa02-active fraction (0.044 of 0.060)" (line 36) is 73 %.**
+`room_table.csv` key `DNa02_active_frac`: A 0.00679, L 0.05080, C 0.06732 -> (L-A)/(C-A) = 0.04401/0.06052 = **0.727**.
+Even the audit's own rounded 0.044/0.060 is 0.733.
+
+**R4. "29 % of its variance in the 5-12 Hz step band" cannot be reproduced.**
+Recomputed from `room_<arm>_r<s>_body.npz` `commandedg__chordotonal:<leg>` on window non-airborne frames, per leg per
+fly then run mean, 5 seeds: **L 0.076 +- 0.002** (audit 0.07 ok) but **C 0.814 +- 0.030** (audit 0.29). Welch nperseg
+256 / 512 gives C 0.94 / 0.93; including the DC bin gives 0.098. No estimator reproduces 0.29 next to an L value of
+0.07. The audit names no file and no estimator for this pair, and it appears in the Report's `key_claims`. (The
+per-leg SD, p90 and the qualitative contrast all reproduce: L 23.86 +- 0.20 Hz, C 46.53 +- 0.56 Hz vs the audit's
+23.9 / 46.4; C p10/p90 19.5 / 142.7 vs 19.6 / 142.5. L's p10/p90 I get 57.0 / 118.7 against the audit's 62.6 / 125.4.)
+
+**R5. Two of the four compass bump-drift ranges in section 5 are wrong.**
+From `compass_table.csv` `drift_runs` (4 runs x 4 phases per arm):
+
+| arm | recomputed per-run range | audit |
+|---|---|---|
+| A | -0.0071 .. +0.0068 | "(all within -0.006 .. +0.006)" -- **wrong** |
+| L | -0.0087 .. +0.0093 | "(-0.0087 .. +0.0093)" ok |
+| C | -0.0049 .. **+0.0094** | "(-0.006 .. +0.007)" -- **wrong** |
+| D | -0.0062 .. +0.0072 | "(-0.006 .. +0.007)" ok (rounded) |
+
+The global bound in section 0 ("inside -0.0087 .. +0.0093 w/s in every phase of every run of every arm") should be
+**-0.0087 .. +0.0094** (arm C, rest phase, run 3). Conclusion unaffected; the number is wrong.
+
+**R6. Section 4.1's `|DNa02 L-R| per frame` levels do not match the file.**
+Audit row: `0.28 | 0.86 | 1.07 | 1.05`. `room_table.csv` / `pairwise.csv` key `DNa02_abs_LR_hz`:
+**A 0.0963, L 0.6759, C 0.8822, D 0.8628**. The quoted difference (+0.21) and z (+12.2) *do* match the file
+(0.8822 - 0.6759 = 0.2063; 0.2063/0.0169 = 12.2), so only the four level cells are wrong -- offset by ~+0.19 each.
+
+**R7. Section 4.4's "DNa02_L rate in the decompose window" row is incoherent.**
+Audit row: `| 0.6 | 19.1 x 1e-2 (0.44) | 0.56 | 0.52 |`. `dna02_decompose_summary.csv` `rate_hz` is
+0.5964 / 19.0919 / 23.1204 / 23.0642 (post DNa02_L) and 0.3080 / 16.5417 / 23.6095 / 23.4963 (post DNa02_R) -- those
+are **AN04B003's** rates in every arm including A, as the audit's own parenthetical says. DNa02_L's actual window
+rates are 0.017 / 0.431 / 0.558 / 0.522. The row as written takes A and L from AN04B003 and C and D from DNa02, and
+"19.1 x 1e-2 (0.44)" is not a number (19.1e-2 = 0.191, not 0.44).
+
+**R8. "the whole difference is AN04B003" is true only on DNa02_R.**
+From `dna02_decompose_summary.csv`, C - L:
+DNa02_L: net **+44.28** mV/s; AN04B003 **+62.23**; SNpp45 **-39.2**; I_total **+17.98** (41 % of the net gap);
+other E rows +3.3. DNa02_R: net **+114.15**; AN04B003 **+106.88** (94 %); SNpp45 -6.2; I_total +2.34.
+On DNa02_L the accounting is a +62 against a -39 plus +21 elsewhere, not a single term.
+
+**R9. "Every JSON carries provenance (... the sense's `mn_ref_hz` and spec)" (section 8) is false for the compass.**
+All 16 `compass_*_r?_run.json` record `mn_ref_hz: null`, the four L runs included; the 64 phase JSONs
+(`compass_*_rest.json` etc.) carry no `arm`, `family`, `proprioception` or `mn_ref_hz` at all. The flag *was* applied
+(L's pinned chordotonal is 85.5-92.1 Hz against the ~23 Hz the default 30 would give), but the compass provenance does
+not record it, so the compass arm-L configuration is verifiable only from the job line in `out/vncd4_cluster.log`.
+(The 20 room JSONs *do* record it correctly -- see Confirmed C2.)
+
+**R10. "stamped ... before the submission" rests on local mtimes only.**
+`out/vncd4_cluster.log` contains **no absolute timestamp of any kind** -- only the 24 queued-job lines and relative
+`[ 11s]` marks. No room or compass JSON carries a `submitted_at` / `created_utc` / scheduler receipt. The only
+evidence is: `predeclared.json` mtime 2026-09-14 19:00:02.355 -0700 = **02:00:02Z** (matching its own
+`stamped_utc`), and the log's mtime 02:33:12Z minus its own reported 32.3 min => a first-job start no earlier than
+~02:00:55Z. That is consistent with the claim but it is *self-certified*, and `written_before_submission: true` is a
+field in the file it certifies. Note also that **`out/vncd4/batch.sh` was written at 02:00:01Z, one second *before*
+the predeclaration** -- the plan (arms, 24 jobs, blocks) preceded the stamp.
+
+**R11 (minor). Path error.** Section 8 and line 5 place `analysis_console.txt` in `out/vncd4/analysis/`. It is at
+`out/vncd4/analysis_console.txt`; only `pairs_console.txt` is inside `analysis/`.
+
+**R12 (minor). The critique's "~3.5 Hz would give 110-145 Hz" (section 2) is 143-150 Hz.**
+Recomputed on the vncd3 C leg-MN distribution: mn_ref 3.0 / 3.5 / 4.0 -> open-loop 146.3 / 145.5 / 143.6 Hz,
+self-consistent 150.0 / 149.8 / 149.2. The clip at 150 makes the lower end unreachable. The conclusion stands.
+
+**R13 (minor). PS196_b compass rates.** Audit: "6.7-7.6 / 3.3-4.2 Hz (L / R) in every phase of L, C and D".
+`compass_chain_{L,C,D}.csv`: L side 6.57-7.57, R side 3.21-4.18. Also section 5's prose lists
+"PS059 flips +6.0 (C, result) / +4.5 (D) / +3.7 (L, result) / +2.8 (A, result)" -- **D is not a result**
+(flip +4.464 +- 2.236, z +3.98 but p 0.0571 > 0.05, verdict blank in `compass_flip_chain.csv`); the parallel phrasing
+implies it is.

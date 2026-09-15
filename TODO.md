@@ -107,12 +107,42 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
         `mn_ref_hz` ~3.5), `lit.walk.*` ledger rows, hops + room at >= 6 runs/arm, `half_width_m` measured,
         `MotorRates.haltere_L/_R` (owner -- **deferred**, session 11). Both mechanisms ship opt-in, default OFF;
         nothing adopted and no default changed.
-    - [ ] **the level-matched control** (next-round item 1; house, ONE submission, ~20 jobs, blocks
-          `fam_r<seed>`): shipped / `all` at `mn_ref_hz` ~3.5 so the window-mean chordotonal rate is 88 Hz (a
-          LABELLED control) / `all+leg_cycle` / `all+leg_cycle+haltere_sided`, 5 seeds x 16 flies x 60 s plus the
-          same 4 arms on the efferent compass at 4 seeds. Decides whether the per-leg / per-phase structure
-          contributes anything beyond the afferent level. First, on CPU: add the `lit.walk.*` rows and fix the
-          `sided_frames` lag and the DNa02 frame mask.
+    - [x] **the level-matched control -- RUN** (`docs/audits/level_matched_control.md`; ONE house submission
+          `vncd4-8dd183`, 24 jobs, 0 failed, 32.3 min, B200; 4 arms x 5 seeds in the room + the same 4 arms x 4
+          seeds on the efferent compass; the `lit.walk.*` rows, the `sided_frames` lag and the DNa02 frame mask
+          done first on CPU). `mn_ref_hz` is **8.84**, not ~3.5: 8.84 is the fixed point of the afferent -> leg-MN
+          loop, while ~3.5 ignores the clip and the loop and would have saturated at **143-150 Hz**. The
+          chordotonal level matched -- L **86.2 +- 0.5** vs C **87.4 +- 1.0 Hz** (C v L +1.2, `null`, inside the
+          predeclared 10 Hz tolerance) -- and C v L is `result` on **DNa02_L +0.127 Hz** (z +9.2), **DNa02_R
+          +0.103** (z +16.7) and the **clean yaw SD +0.57 deg/s** (z +7.1), Holm-called at m 5: SOMETHING other
+          than the chordotonal mean separates the cycle from the round-2 transducer. But an independent Opus
+          skeptic pass (verdict **mostly sound**, 16 corrections applied; not one of the 15 family verdicts flips)
+          shows **"the per-leg / per-phase STRUCTURE contributes beyond the LEVEL" is NOT yet supported**: L differs
+          from C in three ways at once -- per-phase modulation, a **+9.7 / -24.8 Hz** hair-plate / campaniform
+          mismatch whose dominant route into DNa02 is **sign-negative** (`SNpp45 -> IN13B001 -| AN04B003`, and an
+          additive level model with an inhibitory hair plate reproduces the whole AN04B003 gap with a zero structure
+          term), and a **+13.6 Hz DC chordotonal L-R**. DNa02_L is the robust row (L's left side is over-driven on
+          all three channels and still fires less); straightness reads as sidedness (82-92 % of it is the drift);
+          DNa02_R is partly an 8.3 Hz per-side level deficit. The level, sidedness included, reaches **76 / 67 /
+          89 %** of the cycle's DNa02_L / DNa02_R / yaw-SD rise. **Nothing adopted, no default changed.**
+    - [ ] **the UNSIDED level control** (control (a) of `level_matched_control.md` 7.1): the round-2 law reading the
+          side-MEAN leg-MN rate on every cell at `mn_ref_hz` 8.84. Removes the +13.6 Hz DC chordotonal L-R and the
+          +9.2 Hz hair-plate L-R at the same means; the control that separates the round-2 law's sidedness from its
+          level, and the one that says whether the level alone still makes DNa02_L > DNa02_R and the fly drift left.
+    - [ ] **the MODULATION-ONLY cycle arm** (control (b)): the cycle's per-phase law with the per-leg amplitude held
+          at 1 (no turn kinematics in the afferents). Separates the temporal modulation (the part that raises
+          AN04B003 from 19 to 23 Hz) from the amplitude turn term (|amp L-R| 0.016) -- but it keeps the cycle's own
+          hair-plate / campaniform values, so it does not close the channel confound.
+    - [ ] **the CHANNEL-MATCHED level control** (control (c), added by the skeptic and not in the audit's original
+          list): the round-2 law at `mn_ref_hz` 8.84 with `hair_plate_max_hz` / `campaniform_load_hz` set so the
+          realised hair-plate and campaniform commanded means match C's **47.1 / 24.9 Hz** at the same chordotonal
+          86-88 Hz. The control the C-over-L attribution actually needs; neither (a) nor (b) matches those two
+          channels, so without it the DNa02 excess stays jointly attributable to per-phase modulation and to the
+          unmatched hair plate.
+    - [ ] **the single-cell AN04B003 check** (CPU, `interp_atlas`-style, no room run): AN04B003 under (i) steady vs
+          8 Hz-modulated chordotonal input at the same mean with IN13B001's rate clamped, and (ii) the hair-plate
+          level varied alone at a fixed chordotonal level. The two together settle whether the C-over-L AN04B003
+          difference (19.1 / 16.5 -> 23.1 / 23.6 Hz) is modulation or hair-plate disinhibition.
     - [ ] **the adoption-licensing run for the module** (next-round item 2; ONE submission, one block `fam_lic`):
           shipped vs `all+leg_cycle+haltere_sided` on `--sections hops` x 6 draws and the `batch_sustain` room
           take-off protocol x 6 batches at seed-matched seeds, plus the 29-check suite x 3 for the record (28 of
