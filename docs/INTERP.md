@@ -1017,6 +1017,18 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
     that file -- never retyped, never reconstructed from a published mean. A quantity no file carries is not
     quoted.**
 
+29. **A literature claim in prose carries its source at the page / figure level or the word "unverified", and a
+    novelty claim is preceded by a search that includes dissertations and preprints.** Round 5B: "the hemibrain name
+    GLNO encodes glutamate" was written from memory, could not be sourced and was withdrawn
+    (`docs/audits/glno_relabel.md`). The same week a public MaleCNS mining project (Wang, `fly-circuit-exploration`,
+    2026-09) listed its own failures: results stated as facts that were wrong, two Rockefeller dissertations (Janke
+    2025, Avritzer 2026) that had already established what a finding presented as new, and misattributed work.
+    **RULE: (i) every sentence of the form "X shows / reports / encodes Y" in an audit or a NOTES entry names the
+    paper and page or figure, the dataset table, or the file it comes from, or carries "unverified"; (ii) a novelty
+    claim ("nobody has recorded ...", "no model includes ...") is preceded by a search that covers institutional
+    thesis repositories, bioRxiv and the pages of the labs that own the circuit, and the search is named in the
+    sentence; (iii) a withdrawn claim stays in the record as withdrawn, in the audit and in NOTES, never deleted.**
+
 ### 10.3 The minimal command sequence (an odour-to-DN question, as an example)
 
 ```bash

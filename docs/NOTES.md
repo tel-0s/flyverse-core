@@ -2889,6 +2889,55 @@ adds there is only that the sign is no longer untestable at the shipped gains (G
 `cx_wedge`'s recorded groups, a measurement of the spiking LIF's effective input noise, and the hold PLUS a
 wedge-local recurrence as a mechanism question rather than an adoption.
 
+## Session 12, literature note: Wang's fly-circuit-exploration and two Rockefeller theses (2026-09-15)
+
+Peter Wang's `fly-circuit-exploration` (github.com/pwang724/fly-circuit-exploration; findings index at
+pwang724.github.io/fly-circuit-exploration/findings/) is an LLM-driven mining of the MaleCNS v1.0 type-aggregated
+graph with hemibrain v1.2 as the replication -- no simulation, four findings, a confirmations page and a self-audit
+(`audit-2026-09-13.md`). His own account of the project (X post, 2026-09-15): the first pass stated things as facts
+that were wrong, missed two Rockefeller dissertations that had already done the work, and misattributed results;
+Thornquist's criticism of the same. The theses: Janke 2025, "A Neuronal Circuit Motif for Leaky Vector
+Integration" (Maimon lab; an hDeltaG bump built by integrating vDeltaE synaptic input) and Avritzer 2026, "An
+Angular Working-Memory Signal that Guides Drosophila Navigational Trajectories" (hDeltaA integrates travel
+direction over ~7-10 s; embargoed to 2027-05-30, abstract only).
+
+**What checks against our graph** (CPU, `connectome.load()`, `abs(W)[post, pre]` summed over the cells of each
+type, 2026-09-15). His finding 3, "the velocity signals come from cells nobody has named", gives PS196_b -> GLNO
+1,801 syn (19 % of GLNO's input), -> LPsP 942, -> ExR2 899, -> ExR4 686, -> FB3A 195; AN07B037 -> PS196_b; FB3A
+(4 glutamatergic tangentials) -> PFNd 5,765, -> hDeltaB 883. **Every count reproduces to the synapse in our
+cache** (PS196_b -> GLNO 1,801 = 20.9 % of GLNO's 8,623 non-sign-0 input; AN07B037_a / _b -> PS196_b 419 / 52 --
+the two numbers the compass-room entry above already quotes). His finding 4, "the compass has a built-in brake", is
+the EPG -> PEN write-position recurrence (hemibrain PENa 3,844 syn at the write tile vs 1,281 at the read tile,
+3 : 1, which he reports holds in MaleCNS) that "turns the shifters into anchors", with Delta7 / ExR4 / ExR6 named as
+the inhibition "the models leave out" that might cancel it. Our cache stores no per-ROI split, so the 3 : 1 is not
+checkable here (EPG -> PEN_a 6,100 / PEN_b 6,230 in total; PEN_a -> EPG 14,398 / PEN_b 9,671); 5A's per-side wedge
+table (`compass_ring_mechanism.md`, the EPG -> PEN rows) is the same loop read by wedge -- EPG writes +2.16 / -2.18
+wedges through PEN and returns to its own tile.
+
+**Where it lands on ours.** (a) *The same unmapped cell, reached from the other side.* Rounds 1-4 reached PS196_b
+from the body: AN04B003 -> PS196_b is where the self-turn report breaks, and PS196_b's L-R moves the same way in
+both turn directions under the Coriolis stop-gap (unsigned by construction). Wang reaches it from the compass: it
+is GLNO's largest input outside the ring. Both readings say the turn signal into PEN has to come up through
+PS196_b, and nobody has recorded PS196_b. That is TODO B's "PS196_b body-model question" with a second,
+independent argument behind it, and it makes PS196_b the cell to put an imaging question on if we ever write one.
+(b) *The brake.* His is the EPG -> PEN recurrence; ours (5A / 6A) is the ExR6 / ER6 / ER4m DC term on the relays,
+and in 6A the two meet: lifting our brake (the hold) does not give a bump, it gives a saturated ring (H3, 144-160
+Hz, a five-wedge hump) -- the "anchor" his loop predicts once nothing brakes it -- and only the GLNO sign on top
+gets it to a 159-164 Hz near-bump, at the driven tile in 1 of 5 seeds. The two readings are the two terms of one
+balance, not competitors, and neither of us has the gains that make it a compass. (c) *hDelta path integration*
+(his findings 1-2, both theses) is downstream of a heading bump we do not have, so it is not on the critical path;
+it goes on the expectation side of the ledger -- a working compass room should show hDeltaB / hDeltaG / hDeltaA
+activity that integrates, and the theses give the time constants to expect.
+
+**The process lesson, and what is not taken.** His failures were literature failures -- facts without a source,
+theses and preprints not searched, results attributed to the wrong lab -- the same class as our withdrawn "the
+hemibrain name GLNO encodes glutamate" (5B, `glno_relabel.md`). `docs/INTERP.md` 10.4 items 25-27 govern sources
+for model changes but said nothing about prose claims about the literature; item 29 now does. Nothing here is a
+physiology result and his audit marks the functional claims "proposed here, untested", so no model change follows;
+one TODO B item is added (PS196_b from the compass side). Pages read: `findings/03-velocity-sources.html`,
+`findings/04-compass-brake.html`, `findings/index.html`, the two thesis records (Rockefeller Digital Commons 808
+and 837). The tooling behind his project is his, and nothing here is a claim about it.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all
