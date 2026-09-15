@@ -3535,8 +3535,29 @@ problems, 972 measurements and 52 source hashes verified independently on CPU. V
 (+2.2183 Hz, Holm p 0.0130); HGV has 0/6 eligible follow runs, so primaries 1/2 are undetermined.
 PEN and DNa02 L-R are null. PEN-only confinement is zero, but its contrast is null under the z>=3
 rule despite Holm p 0.0130. No joint ledger successes or gain selected. Nothing adopted; the declared
-GLNO-to-PEN follow-up is next, and the suite/room milestone is not unlocked.
+GLNO-to-PEN follow-up is completed below, and the suite/room milestone is not unlocked.
 
 Initial cx8 remains invalid due to Astra's class/abs declaration error, never used for inference.
 The full replacement ran identical physical commands. Submitted-tree CPU 469 passed / 19 skipped,
 220 subtests, unchanged golden and cache. Review correction is in `instruments_review.md` section 5.
+
+## Compass round 7, single direct GLNO transfer follow-up (2026-09-15)
+
+**Independent skeptic pending (Fable, when accounts reset).** `compass_velocity_route.md` sections
+6.4-6.7; Astra's self-review is labelled. One house submission, 36 runs, six per condition, four
+predeclared contrasts. All pass the frozen protocol checks; 648 trace measurements agree, all 72
+frozen and 58 recorded source hashes match the submitted commit. Three recorded files were outside
+the freeze and are explicitly checked retrospectively. H0 reproduces HG's 138 metrics and 31 arrays
+exactly in all six seeds.
+
+GLNO engagement HL-HR is +149.0748 Hz and PEN side transfer +2.9939 Hz (z 3.1904), both results,
+Holm p 0.008658. All HL PEN L-R values are positive, all HR negative. This is a strong imposed-input
+result under HG, not a following compass or a physiological gain. Side-balanced PEN mean falls
+from H0 24.0426 Hz to HL 5.0211 / HR 3.6345 Hz. The GLNO-PEN cut shifts the baseline to C0 L-R
+-11.0738 Hz and PEN mean 54.1743 Hz. HL-CL +12.5861 and HR-CR +9.7340 are positive results;
+the latter **fails the predeclared negative sign prediction**. Both contrasts include the changed
+operating state, not an isolated path effect at matched rates. No extra interaction test is claimed.
+
+No joint ledger success; DNa02 side rates are zero in every challenge-window mean. Nothing adopted,
+the one authorized follow-up is complete, and the conditional suite and odour room remain gated.
+Submitted-tree and final closeout CPU suites each have 473 passed / 19 skipped, 220 subtests; golden and cache unchanged.

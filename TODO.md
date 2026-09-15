@@ -256,8 +256,11 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           **Round 7 answered the afferent budget / sided-input item** (`compass_velocity_route.md`, cx8r):
           AN07B037 drives a signed PS196_b report and V-S GLNO L-R is +2.2183 Hz, result. HGV has 0/6
           eligible follow runs, so following/sign reversal are undetermined; PEN and DNa02 L-R are null.
-          No compass room unlocked, no gain selected or default changed. One predeclared GLNO-to-PEN
-          transfer follow-up remains; independent skeptic pending.
+          No compass room unlocked, no gain selected or default changed. The one predeclared GLNO-to-PEN
+          transfer follow-up is complete (cx8t, audit section 6): direct 90 Hz forcing gives PEN L-R
+          HL-HR +2.9939 Hz, result, while lowering PEN mean. The cut changes the baseline; the right-edge
+          contrast has the opposite sign to prediction. Transfer at this strong challenge is established,
+          but a stable following bump remains open. No second batch; independent skeptic pending.
     - [ ] **the room rate-half for GLNO, if adoption is ever wanted** (`glno_relabel.md` 4.3(b);
           `guard_suites_r3.md` 4): the room take-off protocol on `out/cache_glno_glu` at **>= 6 runs per arm** in ONE
           submission (`guard_suites.sh`'s room jobs with `FLYVERSE_CACHE` / `--cache-dir`). The suite half is already met
