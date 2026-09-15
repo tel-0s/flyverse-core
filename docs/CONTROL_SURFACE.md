@@ -18,8 +18,11 @@ female_brain = connectome.load(dataset="fafb")  # complete female brain + both e
 ```
 
 `c.dataset` and `c.release` survive subsets, saved caches, and synthetic extensions. Female caches live in
-`cache/fafb/` and `cache/banc/` (under `FLYVERSE_CACHE` if set), including raw sign-zero synapse counts,
-source hashes and compilation rules in `manifest.json`. An explicit `cache_dir` is the graph directory itself;
+`cache/fafb/` and `cache/banc/`, or under `$FLYVERSE_CACHE` if it is set: that variable is the parent of the
+non-MaleCNS caches only. `connectome.load()` and `save(c)` with no `cache_dir` are pinned to this checkout's
+`cache/` for MaleCNS and never read `FLYVERSE_CACHE`; pass `cache_dir` explicitly to put a MaleCNS graph
+elsewhere. The female caches carry raw sign-zero synapse counts, source hashes and compilation rules in
+`manifest.json`. An explicit `cache_dir` is the graph directory itself;
 `load(cache_dir=...)` reads its dataset from the manifest. Changing a cached NT confidence threshold requires
 `rebuild=True` or a new directory. FAFB's optional `edges="no_threshold"` uses `cache/fafb/no_threshold/`.
 

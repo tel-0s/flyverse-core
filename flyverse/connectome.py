@@ -238,9 +238,11 @@ def receptor_signs(c: "Connectome", table_path=None, net_rule: str = "class", nt
     fast_gain = np.where(matched, fg[i2], 0).astype(np.int8)
     slow_gain = np.where(matched, sg[i2], 0).astype(np.int8)
     unknown_pre = (pre_nt == len(TRANSMITTERS)) if labelled else np.zeros(len(pre), dtype=bool)
-    if labelled and c.dataset != "malecns":
-        # Tyramine is known but has no receptor-table column. Keep its explicit
-        # sign-zero fallback distinct from an unidentified transmitter.
+    if labelled:
+        # Tyramine is known but has no receptor-table column. Keep its explicit sign-zero fallback distinct from an
+        # unidentified transmitter. Keyed on the value, not on the dataset name: no MaleCNS cell carries tyramine,
+        # so this is a no-op there, but a synthetic extension of a MaleCNS graph that does carry it is tiered the
+        # same way a female graph's cell is (connectome_backends_review nit 3).
         unknown_pre &= n.nt.to_numpy()[pre] != "tyramine"
     tier = np.where(matched, tr[i2], np.where(unknown_pre, tier_code["pre_unknown"], 0)).astype(np.int8)
 
@@ -742,7 +744,10 @@ def save(c: Connectome, cache_dir: Path | None = None, *, clear_extension: bool 
     if ((cache_dir / "W_post_pre.npz").exists() or existing) and existing.get("dataset", "malecns") != c.dataset:
         raise ValueError("a cache cannot be overwritten by another dataset")
     if c._extension is None and (cache_dir / "extension.json").exists() and not clear_extension:
-        raise ValueError("saving would strip an extension; pass clear_extension=True deliberately")
+        # The only guard for this case: it fires before anything is written, so an accidental save cannot
+        # half-overwrite the cache it is about to be refused (connectome_backends_review nit 1).
+        raise ValueError(f"{cache_dir / 'extension.json'} describes a synthetic graph extension; saving a graph "
+                         "without one would strip it. Pass clear_extension=True to remove it deliberately.")
     if c.dataset != "malecns" and c._extension is None and c.reference._sign0 is None:
         raise ValueError("female graphs require their raw sign-0 counts when saved")
     if c._extension is not None:
@@ -750,6 +755,11 @@ def save(c: Connectome, cache_dir: Path | None = None, *, clear_extension: bool 
         if (cache_dir / "W_post_pre.npz").exists() and not (cache_dir / "extension.json").exists():
             raise ValueError("an extension cannot overwrite an existing biological graph cache; use a scratch cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
+    if c.dataset != "malecns":
+        # The manifest goes down before the big files: an interrupted save then leaves a cache `load()` recompiles
+        # rather than one it refuses with "a female cache must have a manifest" (connectome_backends_review nit 12).
+        manifest = dict(c._manifest, dataset=c.dataset, release=c.release)
+        (cache_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     c.neurons.to_parquet(cache_dir / "neurons.parquet")
     sp.save_npz(cache_dir / "W_post_pre.npz", c.W, compressed=False)
     if c._extension is not None:
@@ -757,13 +767,8 @@ def save(c: Connectome, cache_dir: Path | None = None, *, clear_extension: bool 
         if c._extension_base is not None:
             save(c._extension_base, cache_dir / "extension_base")
     elif (cache_dir / "extension.json").exists():
-        if not clear_extension:
-            raise ValueError(f"{cache_dir / 'extension.json'} describes a synthetic graph extension; saving a graph "
-                             "without one would strip it. Pass clear_extension=True to remove it deliberately.")
-        (cache_dir / "extension.json").unlink()
+        (cache_dir / "extension.json").unlink()      # guarded above; reaching here means clear_extension=True
     if c.dataset != "malecns":
-        manifest = dict(c._manifest, dataset=c.dataset, release=c.release)
-        (cache_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         z = c.reference._sign0
         if z is None and c._extension_base is not None:
             z = c._extension_base.reference._sign0
@@ -784,10 +789,15 @@ def save(c: Connectome, cache_dir: Path | None = None, *, clear_extension: bool 
 
 
 def default_cache_directory(dataset="malecns", edges="threshold"):
-    root = Path(os.environ.get("FLYVERSE_CACHE", CACHE_DIR))
+    """Where a dataset lives when no `cache_dir` is given -- for `load()` and, symmetrically, for `save()`.
+
+    The shipped MaleCNS path is pinned to this checkout's `CACHE_DIR` and never reads the environment:
+    `load()` / `save(c)` with no `cache_dir` mean the repository cache whatever `$FLYVERSE_CACHE` says
+    (connectome_backends_review B2). `$FLYVERSE_CACHE` is the parent of the *non-MaleCNS* caches only; to put a
+    MaleCNS graph somewhere else, pass `cache_dir` explicitly."""
     if dataset == "malecns":
-        return root
-    path = root / dataset
+        return CACHE_DIR
+    path = Path(os.environ.get("FLYVERSE_CACHE", CACHE_DIR)) / dataset
     return path if edges == "threshold" else path / edges
 
 

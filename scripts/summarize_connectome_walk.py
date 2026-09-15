@@ -40,6 +40,20 @@ def stats(values):
                 run_sd=float(v.std(ddof=1)) if len(v) > 1 else None, runs=v.tolist())
 
 
+def submission_of(provenance):
+    """The submission that produced a Result: the last component of the run root its source fingerprint records."""
+    return str(provenance["source_fingerprint"]["root"]).replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+
+
+def check_submission(path, provenance, batch_name):
+    """`--malecns-batch` / `--banc-batch` are declared labels; verify each against the JSON that carries it, so a
+    cohort assembled from two submissions cannot be reported as one (connectome_backends_review nit 14)."""
+    recorded = submission_of(provenance)
+    if recorded != batch_name:
+        raise ValueError(f"submission mismatch in {path}: the Result was produced by {recorded!r}, "
+                         f"the declared batch is {batch_name!r}")
+
+
 def cohort(root, dataset, seeds, batch_name):
     """Read exact summary names and require complete arms, provenance and body traces."""
     root = Path(root)
@@ -56,6 +70,7 @@ def cohort(root, dataset, seeds, batch_name):
             name = provenance["dataset_release"]["name"]
             if name != ("male-cns" if dataset == "malecns" else dataset):
                 raise ValueError(f"dataset mismatch in {p}: {name}")
+            check_submission(p, provenance, batch_name)
             values = dict(d["run"])
             values.update(robust_room(body, skip_f=round(d["skip_s"] * 100)))
             rows.append({k: values.get(k) for k in METRICS})
@@ -86,6 +101,7 @@ def generate(args):
         d = json.loads(p.read_text(encoding="utf-8"))
         if d["provenance"]["model"]["dataset"] != "banc" or d["seed"] != seed or len(d["rows"]) != 16 or d["seconds"] != 60:
             raise ValueError(f"unexpected plain-walking protocol: {p}")
+        check_submission(p, d["provenance"], args.banc_batch)
         cohorts["banc"]["sources"][p.name] = dict(sha256=sha256(p), provenance=d["provenance"])
         for row in d["rows"]:
             for sample in row["track"]:
@@ -112,7 +128,8 @@ def generate(args):
             interpretation="retained trajectory samples under current room bounds; not full-frame exit counters"),
         caveats=["Cross-dataset differences are descriptive: sex, individual, annotation, reconstruction, threshold, optic capability and hardware differ.",
                  "Only within-dataset arm comparisons use common.compare; independent process seeds, not flies, are the replicate unit.",
-                 "Historical MaleCNS seeds 0,1,3,4 share vncd3b-c2eeaf; seed 2 from vncd3-f3bb50 is excluded.",
+                 "Historical MaleCNS seeds 0,1,3,4 share vncd3b-c2eeaf; seed 2 from vncd3-f3bb50 is excluded. Each "
+                 "declared batch is verified against every Result's own source_fingerprint.root, not taken on trust.",
                  "Room yaw uses the existing clean-frame mask after 5 s. Plain-walking yaw includes edge/landing jumps and is not compared to clean yaw.",
                  "Legacy plain-probe table counters are excluded; body-arm table counters use the correct bounds and remain valid. Original result JSONs are retained.",
                  "Body arms B-E are opt-in controls; no parameter was tuned for BANC."])

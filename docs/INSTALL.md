@@ -99,7 +99,10 @@ connectome.load(dataset="banc")
 ```
 
 These compile into separate `cache/fafb/` and `cache/banc/` directories. The MaleCNS files remain intact.
-`FLYVERSE_CACHE` overrides the cache parent. BANC supports body experiments without an optic module;
+`FLYVERSE_CACHE` sets the parent of the **non-MaleCNS** caches only (`$FLYVERSE_CACHE/fafb/`,
+`$FLYVERSE_CACHE/banc/`). The default MaleCNS path never reads it: `connectome.load()` and `save(c)` with no
+`cache_dir` always mean this checkout's `cache/`, whatever the variable is set to; pass `cache_dir` explicitly
+to read or write a MaleCNS graph anywhere else. BANC supports body experiments without an optic module;
 FAFB supplies vision but lacks VNC motor/proprioceptive populations. See `docs/CONTROL_SURFACE.md`.
 
 ## 3. Build the cache

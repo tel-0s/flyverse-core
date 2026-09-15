@@ -27,6 +27,7 @@ FILE_MARKS: dict[str, tuple[str, ...]] = {
     "test_cuda.py": ("gpu",),                    # opt-in FLYVERSE_CUDA_TESTS=1, compiles kernels with nvcc
     "test_metal.py": ("gpu",),                   # needs an MPS device
     "test_integration.py": ("gpu", "data"),      # opt-in FLYVERSE_INTEGRATION=1: full connectome cache + CUDA
+    "test_connectome_data.py": ("data",),        # compiled cache/ and the female caches cache/fafb, cache/banc
 }
 
 

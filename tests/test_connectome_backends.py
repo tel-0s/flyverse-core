@@ -174,3 +174,49 @@ def test_unavailable_capabilities_are_explicit(tmp_path):
     from flyverse.optic import OpticLobe
     with pytest.raises(cn.NotAvailable, match="column"):
         OpticLobe(c, None, device="cpu")
+
+
+def wing_motor_graph(types):
+    """A minimal VNC graph whose only cells are wing motor neurons carrying `types`."""
+    import scipy.sparse as sp
+    n = pd.DataFrame(dict(bodyId=np.arange(10, 10 + len(types), dtype=np.int64), type=list(types),
+                          instance=[f"{t}_L" for t in types], superclass=["vnc_motor"] * len(types),
+                          **{"class": [""] * len(types)}, subclass=["wm"] * len(types),
+                          somaSide=["L"] * len(types), nt=["acetylcholine"] * len(types)))
+    w = sp.csr_matrix((len(n), len(n)), dtype=np.float32)
+    return cn.Connectome(n, w, pd.Series(np.arange(len(n)), index=n.bodyId.to_numpy()), dataset="banc")
+
+
+def test_empty_wing_group_raises_instead_of_reading_zero():
+    """B1 / spec 2.3: wing motor neurons the steering (or power) selection does not recognise mean an unaliased type
+    vocabulary, not an absent muscle. Naming them the MaleCNS way makes both groups resolve."""
+    from flyverse.motor import wing_groups
+    unaliased = wing_motor_graph(["b1", "b2", "DLM1-4", "DVM1a-c"])          # BANC v888 notation, no aliases applied
+    with pytest.raises(cn.NotAvailable, match="dataset banc has no steering wing motor neurons"):
+        wing_groups(unaliased)
+    with pytest.raises(cn.NotAvailable, match=r"DLM1-4, DVM1a-c, b1, b2"):
+        wing_groups(unaliased, allow_missing_vnc=True)
+    with pytest.raises(cn.NotAvailable, match="dataset banc has no power wing motor neurons"):
+        wing_groups(wing_motor_graph(["b1 MN", "b2 MN", "DLM1-4", "DVM1a-c"]))
+    named = wing_groups(wing_motor_graph(["b1 MN", "b2 MN", "DLMn c-f", "DVMn 1a-c"]))
+    assert (len(named.steer_L), len(named.steer_R), len(named.power)) == (2, 0, 2)
+    # A graph with no wing motor neurons at all is a capability question, not a vocabulary one: it stays quiet.
+    quiet = wing_groups(wing_motor_graph([]))
+    assert (len(quiet.steer_L), len(quiet.power)) == (0, 0)
+
+
+def test_flyverse_cache_never_moves_the_default_malecns_cache(tmp_path, monkeypatch):
+    """B2: $FLYVERSE_CACHE is the parent of the non-MaleCNS caches only. The shipped MaleCNS default stays pinned to
+    CACHE_DIR for load() and, symmetrically, for save()."""
+    repo, env = tmp_path / "repo_cache", tmp_path / "env_cache"
+    monkeypatch.setattr(cn, "CACHE_DIR", repo)
+    monkeypatch.setenv("FLYVERSE_CACHE", str(env))
+    assert cn.default_cache_directory() == repo and cn.default_cache_directory("malecns") == repo
+    assert cn.default_cache_directory("banc") == env / "banc"
+    assert cn.default_cache_directory("fafb", "no_threshold") == env / "fafb" / "no_threshold"
+    female_files(tmp_path)
+    f = cn.compile_connectome(dataset="fafb", data_dir=tmp_path, verbose=False)
+    male = cn.Connectome(f.neurons.copy(), f.W.copy(), f.body_to_index.copy())
+    cn.save(male)                                       # no cache_dir: the pinned default, never the env root
+    assert (repo / "W_post_pre.npz").exists() and not (env / "W_post_pre.npz").exists()
+    assert cn.load(verbose=False).cache_dir == repo.resolve()

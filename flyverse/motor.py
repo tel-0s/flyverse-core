@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
 import numpy as np
-from .connectome import Connectome
+from .connectome import Connectome, NotAvailable
 
 @dataclass
 class MotorGroups:
@@ -81,15 +81,46 @@ class WingGroups:
     haltere: np.ndarray
 
 
+STEERING_MN_TYPES = "~^(b[123]|i[12]|iii[13]|hg[1-4]|ps[12]|tp[12]|tpn) MN$"   # MaleCNS names; other releases alias into them
+POWER_MN_TYPES = "~^(DLMn|DVMn)"
+
+
+def _no_silent_empty_wing_group(c: Connectome, wm, **groups) -> None:
+    """A wing group that is empty while the graph carries wing motor neurons whose type names this selection does not
+    recognise is a type-vocabulary mismatch, not an absent population: raise rather than read zero rates for it
+    (CONNECTOME_BACKENDS_SPEC section 2.3, "rather than a silent empty group"; connectome_backends_review B1 --
+    BANC v888 names the steering and power MNs without the MaleCNS ' MN' / 'DLMn' notation, so both groups came back
+    empty and `read_motor` reported zero wing rates on a graph that has every one of those cells). Graphs with no
+    `vnc_motor`/`wm` cells at all (the synthetic test graphs, small subsets, FAFB) are not this case and pass."""
+    if not len(wm):
+        return
+    known = np.unique(np.concatenate([np.intersect1d(g, wm) for g in groups.values()] or [np.empty(0, np.int64)]))
+    unnamed = np.setdiff1d(wm, known)
+    if not len(unnamed):
+        return
+    for name, idx in groups.items():
+        if len(idx):
+            continue
+        names = sorted(set(c.neurons.type.fillna("?").to_numpy()[unnamed].tolist()))
+        raise NotAvailable(
+            f"dataset {c.dataset} has no {name} wing motor neurons under the MaleCNS type names: "
+            f"{len(unnamed)} of {len(wm)} vnc_motor/wm cells carry type names this selection does not recognise "
+            f"({', '.join(names[:8])}{', ...' if len(names) > 8 else ''}). Map them to their MaleCNS type names in "
+            "flyverse/data/type_aliases.csv (CONNECTOME_BACKENDS_SPEC section 3); never by a regex here.")
+
+
 def wing_groups(c: Connectome, *, allow_missing_vnc=False) -> WingGroups:
     if not allow_missing_vnc:
         c.require("vnc")
-    steer = c.select(superclass="vnc_motor", subclass="wm", type="~^(b[123]|i[12]|iii[13]|hg[1-4]|ps[12]|tp[12]|tpn) MN$")
+    wm = c.select(superclass="vnc_motor", subclass="wm")
+    steer = c.select(superclass="vnc_motor", subclass="wm", type=STEERING_MN_TYPES)
+    power = c.select(type=POWER_MN_TYPES)
+    _no_silent_empty_wing_group(c, wm, steering=steer, power=power)
     side = c.neurons.somaSide.to_numpy()
     return WingGroups(
         gf=c.select(type="DNp01"),
         ttm=c.select(type="TTMn"),
-        power=c.select(type="~^(DLMn|DVMn)"),
+        power=power,
         steer_L=steer[side[steer] == "L"], steer_R=steer[side[steer] == "R"],
         haltere=c.select(superclass="vnc_motor", subclass="hm"),
     )
