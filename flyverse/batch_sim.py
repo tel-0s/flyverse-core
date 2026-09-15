@@ -91,7 +91,7 @@ class BatchSim:
                  event_driven=None, cuda_sparse="torch", cuda_compact=True, weight_dtype="float32",
                  sensory_cuda_graphs=None, dt_by_module=None, prune_frozen=True, modules=None,
                  wind_speed=.3, wind_dir=180., fruit_set="all", fence=False,
-                 program="none", escape_gating=False, proprioception=None):
+                 program="none", escape_gating=False, proprioception=None, preset="raw", instruments=None):
         if not isinstance(batch,(int,np.integer)) or batch<1:
             raise ValueError("batch must be a positive integer")
         self.B = int(batch)
@@ -108,7 +108,7 @@ class BatchSim:
                            cuda_kernels=cuda_kernels,cuda_sparse=cuda_sparse,cuda_compact=cuda_compact,
                            lif_params=brain.LIFParams(dt=brain_dt,weight_dtype=weight_dtype,event_driven=event_driven,
                                                       dt_by_module=dt_by_module,prune_frozen=prune_frozen),
-                           optic_params=optic.OpticParams(dt_ms=optic_dt))
+                           optic_params=optic.OpticParams(dt_ms=optic_dt),preset=preset,instruments=instruments)
         self.c,self.r,self.optic,self.brain = self.fb.c,self.fb.retina,self.fb.optic,self.fb.brain
         # Opt-in proprioception (senses.Proprioception; default None = the shipped path, no sense attached). The
         # transducer reads the previous frame's motor readout and the body state in step().
@@ -116,6 +116,9 @@ class BatchSim:
         self.motor = None
         if self.proprioception is not None:
             self.fb.proprioception_sense = senses.Proprioception(self.c,self.proprioception)
+            # preset 'instrumented' (docs/PRESETS_SPEC.md): a stand-in that rides on the sense re-installs onto this one
+            for inst in self.fb.instruments.values():
+                if callable(getattr(inst,"install",None)): inst.install(self.fb)
         if self.optic is not None: self.optic.diagnostics = False
         self.sensory_cuda_graphs = cuda_graphs if sensory_cuda_graphs is None else sensory_cuda_graphs
         pairs = [world.make_room(s,fruit_set) for s in self.seeds]

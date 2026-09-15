@@ -996,8 +996,13 @@ def provenance(c: cn.Connectome, lif=None, optic=None, fb=None, device=None, see
         coverage = live_retina.coverage()
         if coverage["without_photoreceptors"] and isinstance(retina_record, dict):
             retina_record["coverage"] = coverage
+    # docs/PRESETS_SPEC.md 1: which preset the controller ran under and the describe() of every instrument, beside the
+    # compiled-connectome fingerprint; 'raw' / [] when no FlyBrain is given or the FlyBrain predates the keyword
+    preset = getattr(fb, "preset", "raw") if fb is not None else "raw"
+    instruments = fb.instrument_records() if hasattr(fb, "instrument_records") else []
     return {"flyverse_commit": git, "source_fingerprint": source_fingerprint(git), "dataset_release": dataset_release(c),
-            "compiled_connectome": connectome_fingerprint(c, cache_dir), "model": model,
+            "compiled_connectome": connectome_fingerprint(c, cache_dir), "preset": preset, "instruments": instruments,
+            "model": model,
             "execution": execution_record(fb, device, seeds, env_seeds, batch, backend, replicate_unit),
             "stimulus": to_jsonable(stimulus) if stimulus is not None else {"protocol": None, "params": {}, "control": None},
             "retina": retina_record,

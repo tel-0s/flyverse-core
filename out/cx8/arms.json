@@ -1,0 +1,135 @@
+{
+ "batch": "cx8",
+ "seeds": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "turn_deg_s": 90.0,
+ "turn_window_s": "0.5:3.5",
+ "hold": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+ "arms": {
+  "S": {
+   "glutamate": false,
+   "hold": false,
+   "instrument": null,
+   "role": "raw reference",
+   "preset": "raw",
+   "instruments": []
+  },
+  "V": {
+   "glutamate": false,
+   "hold": false,
+   "instrument": "sided_turn_afferent:k=0.5",
+   "role": "the afferent alone",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent"
+   ]
+  },
+  "HG": {
+   "glutamate": true,
+   "hold": true,
+   "instrument": null,
+   "role": "ring_dc_hold + glno_sign (6A's H3G)",
+   "preset": "instrumented",
+   "instruments": [
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGV": {
+   "glutamate": true,
+   "hold": true,
+   "instrument": "sided_turn_afferent:k=0.5",
+   "role": "the arm",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGV-": {
+   "glutamate": true,
+   "hold": true,
+   "instrument": "sided_turn_afferent:k=0.5:sign=-1",
+   "role": "the sign control",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGVk025": {
+   "glutamate": true,
+   "hold": true,
+   "instrument": "sided_turn_afferent:k=0.25",
+   "role": "descriptive: k 0.25 on HGV",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  },
+  "HGVk1": {
+   "glutamate": true,
+   "hold": true,
+   "instrument": "sided_turn_afferent:k=1.0",
+   "role": "descriptive: k 1.0 on HGV",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent",
+    "ring_dc_hold",
+    "glno_sign"
+   ]
+  }
+ },
+ "family": [
+  [
+   "1_bump_follow_HGV_vs_HG",
+   "bump_follow_wedges_per_s",
+   "HGV",
+   "HG"
+  ],
+  [
+   "2_bump_follow_HGV_vs_HGV-",
+   "bump_follow_wedges_per_s",
+   "HGV",
+   "HGV-"
+  ],
+  [
+   "3_GLNO_LR_V_vs_S",
+   "GLNO_LR_hz",
+   "V",
+   "S"
+  ],
+  [
+   "4_PEN_LR_HGV_vs_HG",
+   "PEN_LR_hz",
+   "HGV",
+   "HG"
+  ],
+  [
+   "5_DNa02_LR_HGV_vs_HG",
+   "DNa02_LR_hz",
+   "HGV",
+   "HG"
+  ]
+ ],
+ "primary_arms": [
+  "S",
+  "V",
+  "HG",
+  "HGV",
+  "HGV-"
+ ],
+ "follow_gate_confined_frac": 0.5,
+ "generated_utc": "2026-09-15T19:35:36Z",
+ "status": "DRAFT, not submitted"
+}
