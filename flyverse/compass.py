@@ -52,6 +52,7 @@ class CompassDriver:
     # User inputs are checked on CPU. A nonfinite output is an internal invariant failure;
     # on CUDA it may abort the CUDA context at a later kernel launch, without a per-frame host wait.
     cuda_async_validation = True
+    cuda_graph_safe = True  # fixed Torch operations; held input tensors; state restored around capture
 
     def __init__(self, c, *, peak_hz=50., width_deg=35., initial_phase_deg=0., velocity_gain=1.):
         values = (peak_hz, width_deg, initial_phase_deg, velocity_gain)

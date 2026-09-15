@@ -26,6 +26,8 @@ def run(a):
                  cuda_graphs=a.device=='cuda',program='none',fruit_set='apple',fence=True,
                  start=(-.15,.15,.75),preset=a.mode,instruments=['compass'] if a.mode=='instrumented' else [],
                  cuda_kernels=True if a.native else None,event_driven=True if a.native else None)
+    if a.scheduler=='eager' and sim.fb.instruments:
+        sim.fb.instruments['compass'].cuda_graph_safe=False
     idx,w=epg_columns(sim.c);rec=[];rates=[];timings=[]
     hops=np.zeros(a.batch,int);previous=np.array([f.airborne for f in sim.flies])
     for frame in range(round(a.seconds*100)):
@@ -45,7 +47,7 @@ def run(a):
                            mean_abs_yaw_deg_s=float(np.rad2deg(abs(values[:,i,4])).mean()),
                            mean_epg_hz=float(rt[:,i].mean())) for i in range(a.batch)],
                 frame_ms_median=float(np.median(timings[100:])*1000),frame_ms_p95=float(np.percentile(timings[100:],95)*1000),
-                graphs=len(sim.fb._graphs))
+                graphs=len(sim.fb._graphs),module_graphs=sum(isinstance(g,tuple) for g in sim.fb._graphs.values()))
     dest.with_suffix('.json').write_text(json.dumps(to_jsonable(result),indent=2)+'\n',encoding='utf-8')
     print('device',sim.fb.device,'graphs',len(sim.fb._graphs),'median ms',result['frame_ms_median'],flush=True)
     print(result['rows'],flush=True)
@@ -57,6 +59,7 @@ if __name__=='__main__':
     ap.add_argument('--seed',type=int,default=0);ap.add_argument('--batch',type=int,default=6)
     ap.add_argument('--seconds',type=float,default=60.);ap.add_argument('--device',choices=['cpu','cuda'],default='cuda')
     ap.add_argument('--native',action='store_true')
+    ap.add_argument('--scheduler',choices=['captured','eager'],default='captured',help='eager is the previous module scheduler for reproducibility controls')
     ap.add_argument('--out',required=True);a=ap.parse_args()
     if a.seconds<2:ap.error('seconds must be >=2')
     run(a)

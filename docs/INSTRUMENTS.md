@@ -109,5 +109,6 @@ the analogue of the 90 deg/s imposed visual rotation of `audits/deficit_rotation
 
 Not a default, not a tuned constant, not a way to move a suite row (PRESETS_SPEC 4). The `raw` column stays the
 model's own behaviour; an `instrumented` column is reported beside it with the instrument list in the caption, and an
-instrument that moves a row its gap does not cover is rejected (PRESETS_SPEC 2.5, not yet run for any instrument:
-round 7 has to return first).
+instrument that changes a row's status outside its gap fails admission (PRESETS_SPEC 2.5). The compass candidate's
+three-draw comparison has no passing-row regression, but a taste row changes FAIL to PASS and the full room
+rate-half has not been run. It remains an explicitly experimental option; that is not default adoption.

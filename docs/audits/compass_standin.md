@@ -119,3 +119,43 @@ The body's yaw upload also used a blocking copy. No gain or dynamical law is cha
 
 The first submission stays intact. Its full benchmark pairs are still running at this declaration;
 no suite outcome or compass gain has been used to select the scheduler correction.
+
+### Capture declaration (before the third submission)
+
+The second submission completed 11/11 jobs. All six instrumented turn traces reproduce every first-batch
+NPZ array exactly, and the nine small-graph CUDA lifecycle checks pass. Its **room replay is not exact**.
+The matched-input profile also fails exact equality on voltage/conductance, and on additional spike-state
+tensors at native B=32. These failed gates are retained, not rounded away. The room repeat control below
+will test whether this is specific to the scheduler change; no numerical tolerance is chosen from them.
+
+Native median frame timings (raw/instrumented) are 0.5776/0.9371, 3.0920/3.4978,
+12.7838/13.1810 ms at B=1,8,32. The native B=1 and B=8 <=10% targets still fail. The plain Torch
+profile is visibly affected by changing contention (B=8 raw repeat times 185.6,185.6,173.7,23.3 ms).
+The remaining small-batch cost motivates capturing the explicit, read-free compass module together with
+the existing neural frame. This does not fuse or change its arithmetic or gains. Timed pulses, hooks and
+general modules retain the eager scheduler; cache replay must restore the correct module input buffers.
+
+`out/compass_standin_r3/` freezes **one sequential house job**, after this experiment's other jobs end:
+
+- Extended CUDA lifecycle fixture: compare captured and checked paths, including returning from a timed
+  pulse, new external drive, different frame lengths, module-input snapshots, partial reset and checkpoint.
+  Also run the existing opt-in CUDA test file. Any error stops the job before performance claims.
+- Native paired profiles with and without module capture, same B=1,8,32 and four alternating repeats;
+  target remains <=10%. Use an external held 50 Hz setter in both arms instead of an unexpired 100 s
+  pulse, because a live timed pulse deliberately disables module capture. The represented forcing is
+  identical throughout the 4.5 s profile. Record per-tensor maximum differences as well as exact equality.
+- CPU/CUDA traces for raw, synchronous-check control, eager-module and captured-module frames. Verify
+  actual module capture and count scalar readbacks; all modes receive the same tonic input. The check
+  control also uses the original blocking yaw upload. This identifies work independently of wall time.
+- Repeat all six fixed turn seeds under capture and report every original functional gate and array
+  equality result. No parameter is fitted and no failed row is dropped.
+- Two **same-code eager** 60 s B=6 instrumented rooms, then a captured room, same neural/environment
+  seeds and no program. Report exactness, maximum differences and first divergence for the repeat and
+  capture comparisons. Repeat native raw/instrumented rooms for actual integrated timing. These are
+  reproducibility/timing controls, not additional draws for an adoption or food-finding claim.
+
+The initial suite has 87 paired check rows with no passing-row regression, but a taste row changes
+FAIL to PASS. That passes the initial declaration's narrower screen but **fails PRESETS_SPEC's stricter
+no-status-change-outside-the-gap rule**. This is an author self-review correction of the acceptance
+interpretation, not a retroactive change to data or thresholds. The driver remains experimental and
+the raw default remains unchanged regardless of the timing outcome.

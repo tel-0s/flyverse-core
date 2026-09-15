@@ -89,6 +89,7 @@ def run(args):
                     'initial_phase_rad':offsets.tolist(),'speeds_deg_s':SPEEDS[:args.batch].tolist()})
     result=dict(mode=args.mode,seed=args.seed,batch=args.batch,seconds=args.seconds,device=str(fb.device),
                 wall_s=wall,records=records,provenance=prov,graphs=len(fb._graphs),
+                module_graphs=sum(isinstance(g,tuple) for g in fb._graphs.values()),
                 source_sha256_lf=hashlib.sha256(Path(__file__).read_bytes().replace(b'\r\n',b'\n')).hexdigest())
     out.with_suffix('.json').write_text(json.dumps(to_jsonable(result),indent=2)+'\n',encoding='utf-8')
     print('device',fb.device,'graphs',len(fb._graphs),'wall',wall,flush=True)

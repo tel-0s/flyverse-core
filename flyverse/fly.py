@@ -385,6 +385,11 @@ class FlyBrain:
         while remaining:
             count = min(remaining, frame_steps)
             dt_ms = count * self.brain.p.dt
+            if self.cuda_graphs and runtime.can_capture_frame() and not self._pulses:
+                self._graph_frame(count, modules=True)
+                self._activity_ms += dt_ms
+                remaining -= count
+                continue
             runtime.run_modules(dt_ms)
             before = self.brain.spike_counts.clone()
             # _step_plain handles pulses and capture; preserve the caller's fractional remainder.
@@ -449,25 +454,32 @@ class FlyBrain:
         elif self._extensions is not None:
             self.brain.drive.copy_(self._extensions.drive)
 
-    def _frame(self, steps):
+    def _frame(self, steps, modules=False):
+        if modules:
+            self._extensions.run_modules(steps * self.brain.p.dt)
+            before = self.brain.spike_counts.clone()
         self._vision_frame(steps * self.brain.p.dt)
         self.brain.step(steps)
+        if modules:
+            self._extensions.previous_spikes = self.brain.spike_counts - before
 
-    def _graph_frame(self, steps):
+    def _graph_frame(self, steps, modules=False):
         b, o = self.brain, self.optic
+        if modules:
+            b._poisson_on = True  # can_capture_frame proves the next full output keeps RNG active
         if getattr(self, "_graph_weights_version", None) != b._weights_version:
             self._graphs.clear()
             self._graph_weights_version = b._weights_version
         optic_pending = o._pending_ms if o is not None else 0.0
         key = (steps, b.buf_pos, b.step_count % b.K, b._poisson_on, b.record_activity, b.cuda_compact,
-               self._radiance is not None, round(optic_pending, 9))
+               self._radiance is not None, round(optic_pending, 9), modules)
         if steps % b.K:
-            self._frame(steps)          # a frame that is not a whole number of clock periods is not capturable
+            self._frame(steps, modules)  # a frame that is not a whole number of clock periods is not capturable
             return
         if key not in self._graphs:
             # Bound memory when a caller supplies arbitrarily many frame lengths.
             if len(self._graphs) >= 8:
-                self._frame(steps)
+                self._frame(steps, modules)
                 return
             names = self.BRAIN_TENSORS
             saved = {name: getattr(b, name).clone() for name in names}
@@ -476,6 +488,9 @@ class FlyBrain:
             rng = b.gen.get_state()
             scalars = b.t, b.step_count, b.buf_pos
             diagnostics = o.diagnostics if o is not None else False
+            module_states = {name: m.state_dict() for name, m in self._extensions.modules.items()} if modules else {}
+            extension_states = ({name: getattr(self._extensions, name).clone()
+                                 for name in ('previous_spikes', 'drive', 'sensory_drive')} if modules else {})
 
             def restore():
                 for name, value in saved.items():
@@ -488,6 +503,11 @@ class FlyBrain:
                 if o is not None:
                     o._pending_ms = optic_pending
                 b.gen.set_state(rng)
+                if modules:
+                    for name, state in module_states.items():
+                        self._extensions.modules[name].load_state_dict(state)
+                    for name, value in extension_states.items():
+                        getattr(self._extensions, name).copy_(value)
 
             stream = torch.cuda.Stream(device=self.device)
             stream.wait_stream(torch.cuda.current_stream(self.device))
@@ -497,14 +517,22 @@ class FlyBrain:
                 if o is not None:
                     o.diagnostics = False
                 with torch.cuda.stream(stream):
-                    self._frame(steps)  # warm allocator and sparse kernels on a side stream
+                    self._frame(steps, modules)  # warm allocator and sparse kernels on a side stream
                 torch.cuda.current_stream(self.device).wait_stream(stream)
                 restore()
                 with torch.cuda.graph(graph, stream=stream):
-                    self._frame(steps)
+                    self._frame(steps, modules)
                 torch.cuda.current_stream(self.device).wait_stream(stream)
                 restore()
-                self._graphs[key] = graph
+                if modules:
+                    # Each graph owns its output buffers. An eager pulse frame or a different frame
+                    # length may replace the runtime dictionaries; rebind the right buffers on replay.
+                    bound = {name: (dict(getattr(self._extensions, name)) if name in ('poisson', 'applied_inputs')
+                                    else getattr(self._extensions, name))
+                             for name in ('poisson', 'applied_inputs', 'previous_spikes')}
+                    self._graphs[key] = (graph, bound)
+                else:
+                    self._graphs[key] = graph
             except Exception:
                 torch.cuda.current_stream(self.device).wait_stream(stream)
                 restore()
@@ -512,7 +540,14 @@ class FlyBrain:
             finally:
                 if o is not None:
                     o.diagnostics = diagnostics
-        self._graphs[key].replay()
+        cached = self._graphs[key]
+        if modules:
+            graph, bound = cached
+            for name, value in bound.items():
+                setattr(self._extensions, name, dict(value) if isinstance(value, dict) else value)
+            graph.replay()
+        else:
+            cached.replay()
         b.t += steps * b.p.dt
         b.step_count += steps
         b.buf_pos = (b.buf_pos + steps) % b.n_delay
