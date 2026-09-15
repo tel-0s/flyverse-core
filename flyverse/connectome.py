@@ -414,8 +414,13 @@ class Connectome:
 
     @property
     def has_optic_columns(self):
-        """Whether the source release supplies an optic column map."""
-        return "optic_columns" in capabilities(self.dataset)
+        """Whether an annotated map or an explicitly opted-in candidate is present."""
+        return "optic_columns" in capabilities(self.dataset) or self.vision is not None
+
+    @property
+    def vision(self):
+        """Candidate checks/provenance, or None for a biological release graph."""
+        return (self._extension or {}).get("vision")
 
     def require(self, capability):
         if capability not in set().union(*CAPABILITIES.values()):
@@ -808,12 +813,23 @@ def default_cache_directory(dataset="malecns", edges="threshold"):
 
 def load(cache_dir: Path | None = None, rebuild: bool = False, verbose: bool = True,
          type_nt_override: dict | None = None, *, dataset: str | None = None, edges="threshold",
-         nt_threshold=0.5, data_dir=None) -> Connectome:
+         nt_threshold=0.5, data_dir=None, vision=None, vision_cache_dir=None) -> Connectome:
     """Load MaleCNS by default, or a release-specific female cache.
 
     An explicit cache directory denotes the graph itself, not its parent. Its manifest
     identifies the dataset when dataset is omitted. Variant caches never alias defaults.
+    ``vision='candidate'`` explicitly adds the experimental BANC right-eye map and
+    synthetic R1-R6 layer in a separate scratch cache (``vision_cache_dir``).
     """
+    if vision is not None:
+        if vision != "candidate":
+            raise ValueError("vision must be None or 'candidate'")
+        from .banc_vision import extend_candidate
+        base = load(cache_dir, rebuild, verbose, type_nt_override, dataset=dataset,
+                    edges=edges, nt_threshold=nt_threshold, data_dir=data_dir)
+        return extend_candidate(base, cache_dir=vision_cache_dir)
+    if vision_cache_dir is not None:
+        raise ValueError("vision_cache_dir requires vision='candidate'")
     explicit_dataset = dataset
     if cache_dir is not None and (Path(cache_dir) / "manifest.json").exists() and dataset is None:
         dataset = json.loads((Path(cache_dir) / "manifest.json").read_text(encoding="utf-8"))["dataset"]
