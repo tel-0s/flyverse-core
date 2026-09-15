@@ -43,10 +43,16 @@ def _check_instrument(inst):
         raise ValueError(f"instrument {name!r}: `kind` must be one of {sorted(INSTRUMENT_KINDS)}")
     if not callable(getattr(inst, "describe", None)):
         raise ValueError(f"instrument {name!r} must implement describe()")
+    if not callable(getattr(inst, "install", None)):
+        raise ValueError(f"instrument {name!r} must implement install()")
     d = inst.describe()
     for key in ("name", "kind", "law", "gap", "removal", "audits"):
         if key not in d:
             raise ValueError(f"instrument {name!r}: describe() lacks {key!r} (PRESETS_SPEC section 2)")
+    if d["name"] != name or d["kind"] != inst.kind:
+        raise ValueError(f"instrument {name!r}: describe() disagrees with its name or kind")
+    if any(not d[key] for key in ("law", "gap", "removal", "audits")):
+        raise ValueError(f"instrument {name!r}: law, gap, removal and audits must be nonempty")
     return name
 
 
@@ -263,8 +269,8 @@ class EdgeHold:
     The default name `ring_dc_hold` is the 6A hold `^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)` -- the ExR6 / ER6 / ER4m DC term
     on PEN / EPG that removes the ring's resting state. `resolved` is the caller's count record
     (``cx_wedge.hold_edge_counts``: cells, entries, synapses silenced). Removal: receptor rows at the EB / GA contacts
-    of the three types (compass_dc_balance.md 5: is ExR6 glutamatergic and does it open a chloride conductance on
-    E-PG and PEN?), or a transmitter call for ExR6 that is not one EM classifier."""
+    of the three types. ExR6 glutamate and ER6 GABA now have type-linked evidence (exr6_evidence.md);
+    receptor placement and kinetics at their EB / GA contacts remain open."""
     kind = "edges"
     law = "counterfactual"
 
@@ -279,10 +285,10 @@ class EdgeHold:
                 "parameters": {"pre": self.pre_re, "post": self.post_re, "factor": self.factor},
                 "resolved": self.resolved, "trainable": False, "checkpoint_hash": None,
                 "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); "
-                       "the transmitter and receptor of those contacts are open",
+                       "receptor placement and kinetics at those contacts are open",
                 "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
-                "removal": "receptor rows at the EB / GA contacts of ExR6 / ER6 / ER4m, or a sourced ExR6 transmitter call",
-                "audits": ["docs/audits/compass_dc_balance.md", "docs/audits/compass_ring_mechanism.md"]}
+                "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
+                "audits": ["docs/audits/compass_dc_balance.md", "docs/audits/compass_ring_mechanism.md", "docs/audits/exr6_evidence.md"]}
 
     def install(self, fb):
         gains = [(str(p), str(q), float(f)) for p, q, f in (getattr(fb.brain.p, "type_path_gain", None) or [])]
@@ -355,16 +361,20 @@ def parse_instrument(spec, c):
     if name not in REGISTRY:
         raise ValueError(f"unknown instrument {name!r}; choose from {sorted(REGISTRY)}")
     kwargs = {}
+    seen = set()
     for item in kv:
         if "=" not in item:
             raise ValueError(f"instrument option {item!r} is not key=value: {SPEC_HELP}")
         key, value = item.split("=", 1)
         key = key.strip()
+        if key in seen:
+            raise ValueError(f"duplicate instrument option {key!r}")
+        seen.add(key)
         if name == "sided_turn_afferent":
             if key == "k":
                 kwargs["k_hz_per_deg_s"] = float(value)
             elif key == "sign":
-                kwargs["sign"] = int(float(value))
+                kwargs["sign"] = float(value)
             elif key == "cells":
                 kwargs["cells"] = value.strip()
             elif key == "max_hz":

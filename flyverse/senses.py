@@ -250,6 +250,8 @@ class Proprioception:
         inst = SidedTurnAfferent(self.c) if instrument is None else instrument
         if not isinstance(inst, SidedTurnAfferent):
             raise TypeError("turn_afferent must be an instruments.SidedTurnAfferent")
+        if not np.array_equal(inst.c.neurons.bodyId.to_numpy(), self.c.neurons.bodyId.to_numpy()):
+            raise ValueError("turn_afferent belongs to a different cell ordering; construct it on this sense's connectome")
         if "turn_afferent" not in self.channels:
             self.channels = tuple(self.channels) + ("turn_afferent",)
         self.turn_afferent = inst

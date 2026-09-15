@@ -17,7 +17,10 @@ provenance(c, fb=fb)["preset"], provenance(c, fb=fb)["instruments"]   # 'instrum
 ```
 
 `BatchSim(..., preset="instrumented", instruments=[inst], proprioception="all")` forwards both and re-installs the
-stand-in onto its own sense (the spec grows `+turn_afferent`). On the CLI (`scripts/cx_wedge.py`):
+stand-in onto its own sense (the spec grows `+turn_afferent`). Naming `all+turn_afferent` with the instrumented
+preset also registers the token's default stand-in; raw refuses that token. Construct the instrument on the
+effective connectome: a different cell ordering is refused. Checkpoints require the same preset and descriptions,
+including sign and gain, before loading. On the CLI (`scripts/cx_wedge.py`):
 
 ```
 --preset raw|instrumented            default raw (byte-identical to no flag); --instrument implies instrumented
@@ -27,16 +30,21 @@ stand-in onto its own sense (the spec grows `+turn_afferent`). On the CLI (`scri
 
 Under `--preset instrumented` the 6A hold (`--hold-edges`), the GLNO relabel (`--nt-override GLNO=glutamate`) and a 6B
 edge gain are also recorded as instruments (`ring_dc_hold`, `glno_sign`, `edge_gain_<i>`; PRESETS_SPEC 2.4) beside
-the flags that install them; without the preset flag those flags behave and record exactly as in 6A / 6B. The five
-predeclared arms of [audits/compass_velocity_route.md](audits/compass_velocity_route.md) are each one command line
-(`scripts/cx_velocity_route.py --plan-batch out/cx8` writes them; `out/cx8/batch.sh` is a DRAFT, not submitted).
+the flags that install them; without the preset flag those flags behave and record exactly as in 6A / 6B. The eight
+predeclared arms (six primary arms plus two descriptive gain levels) of [audits/compass_velocity_route.md](audits/compass_velocity_route.md) are each one command line
+(`scripts/cx_velocity_route.py --plan-batch out/cx8` writes them). After review and merge, run
+`python scripts/cx_velocity_route.py --predeclare out/cx8` to freeze the protocol, family, gate, source hashes and
+resolved model parameters before submission. Neither the plan nor declaration can be overwritten after freezing.
+The wrapper explicitly selects house in both calls and stops on a failed client. Submission and results are recorded
+in the round-7 audit; the generated wrapper's draft comment describes its status at generation.
 
 ## The inventory
 
 | instrument | kind | class | stands in for | law | retired by |
 |---|---|---|---|---|---|
 | `sided_turn_afferent` | stop-gap | `instruments.SidedTurnAfferent` | PS196_b's signed turn input: Poisson spikes on its named ascending afferents (AN07B037_a / _b by default; `cells=` CB0675 / GNG580 / PS047_b / all) at `k * max(0, +-yaw_deg_s)` on the side the graph implies. In the shipped body the report reaching PS196_b is unsigned (`audits/vnc_drive.md` 6, NOTES compass round 2); Wang 2026 finding 3 makes PS196_b GLNO's largest non-ring input. | **unverified**: no PS196_b / AN07B037 recording exists (searched 2026-09-15: Wang's audit, Hulse 2021, the two Rockefeller theses). `k` is a declared level, `sign` the HGV- control. | a recording of PS196_b / AN07B037 during turning (then a `mechanism` with a source, or dropped); a sided ascending report that reaches PS196_b on its own; a round-7 `null` on measure 3 at every declared `k` |
-| `ring_dc_hold` | edges | `instruments.EdgeHold` | the ExR6 / ER6 / ER4m DC term on PEN / EPG held at 0 (6A's `--hold-edges '^(ExR6\|ER6\|ER4m)$:^(PEN_\|EPG$)'`: 17 pre cells onto 88, 1,149 entries, 37,256 synapses) | a counterfactual: no transfer claimed | receptor rows at the EB / GA contacts of the three types; a sourced ExR6 transmitter call (`audits/compass_dc_balance.md` 5) |
+| `ring_dc_hold` | edges | `instruments.EdgeHold` | the ExR6 / ER6 / ER4m DC term on PEN / EPG held at 0 (6A's `--hold-edges '^(ExR6\|ER6\|ER4m)$:^(PEN_\|EPG$)'`: 17 pre cells onto 88, 1,149 entries, 37,256 synapses) | a counterfactual: no transfer claimed | sourced receptor placement / kinetics at the EB / GA contacts and a physiological operating state. ExR6 glutamate and ER6 GABA already have type-level support (`audits/exr6_evidence.md`); neither label is changed here |
+| `ring_dc_hold_pen` | edges | `instruments.EdgeHold` | the same 17 pre cells held only onto 42 PEN cells: `^(ExR6\|ER6\|ER4m)$:^PEN_`, 402 entries, 7,893 synapses; EPG keeps its ring input | a counterfactual: no transfer claimed | the same receptor / operating-state evidence as the full hold; round 7 tests whether retaining EPG's DC input changes confinement |
 | `glno_sign` | relabel | `instruments.TypeRelabel` | GLNO compiled as glutamate in a scratch cache (`--nt-override GLNO=glutamate`) | **unverified**: the stronger of two disagreeing EM predictions (`audits/glno_relabel.md`) | a transmitter source for GLNO that is not one EM classifier (then a `TYPE_NT_OVERRIDE` row) |
 
 ### `sided_turn_afferent`: where it lives and why

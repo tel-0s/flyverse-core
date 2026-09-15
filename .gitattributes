@@ -1,0 +1,2 @@
+# This reviewed submission wrapper is executed with Bash from Windows and Linux.
+out/cx8/batch.sh text eol=lf

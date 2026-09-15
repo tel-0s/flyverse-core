@@ -244,6 +244,9 @@ class RawPresetTests(unittest.TestCase):
             with self.subTest(stage=stage):
                 self.assertEqual(got[stage], GOLDEN[stage], f"preset='raw' moved the default path at stage {stage!r}")
 
+    def test_empty_instrument_list_matches_the_pre_branch_golden(self):
+        self.assertEqual(scenario(preset="instrumented", instruments=[]), GOLDEN)
+
     @staticmethod
     def _weights_md5(fb) -> str:
         W = fb.brain._W_cpu.tocsr()
