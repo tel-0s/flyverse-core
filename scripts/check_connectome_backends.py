@@ -1,7 +1,10 @@
 """Reproduce backend acceptance: CPU anatomy/columns or a house-GPU room frame.
 
-The DRA check tests orientation by enrichment, and separately reports off-rim labels.
-It does not pretend every community DRA annotation is a correctly assigned rim cell.
+Every column check is named for the spec 2.5 validation it performs and every one is in `checks`, including the
+strict per-cell rim membership of 2.5 (i), which does NOT hold: it is carried as a recorded expected failure
+(EXPECTED_CHECKS) and asserted to be exactly that, rather than being reported one level up where the gate never
+looked (connectome_backends_review B4). The DRA check therefore tests orientation by enrichment AND records that it
+does not pretend every community DRA annotation is a correctly assigned rim cell.
 """
 from pathlib import Path
 import argparse
@@ -16,7 +19,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from flyverse import connectome as cn, regions
 from flyverse.backends.common import sha256
 from flyverse.interp import common
+from flyverse.motor import wing_groups
 from flyverse.retina import build_retina
+from flyverse.senses import Proprioception
+
+# Spec 2.5 validations whose documented value is not True. 2.5 (i) strict: 100/126 non-putative community DRA labels
+# sit in the flat height band and 118/126 within two rows of the curved dorsal envelope, so per-cell rim membership
+# fails while the population orientation passes by a 24:1 margin (docs/audits/connectome_backends.md).
+EXPECTED_CHECKS = {"i_dra_all_labels_on_rim": False}
+
+# Spec 2.3: "make the mapping's cell counts part of the acceptance test". These are the MaleCNS *selections*
+# Proprioception makes (LEG_NERVES-gated), not the labelled-cell counts the spec's prose quotes; the audit records
+# both readings. BANC's are recorded beside them, not asserted: an independent release has its own populations.
+SPEC_2_3_MALECNS_SELECTED = {"chordotonal": 615, "hair_plate": 113, "campaniform": 12, "haltere": 201}
+# Spec 2.3 again: the wing motor groups must not be silently empty on a release that has those cells (B1).
+WING_GROUPS_MALECNS = {"steer_L": 16, "steer_R": 16, "power": 24}
+
+
+def wing_group_counts(c):
+    wg = wing_groups(c)
+    return {name: int(len(getattr(wg, name))) for name in ("steer_L", "steer_R", "power", "haltere", "ttm", "gf")}
 
 
 def t4_offsets(c):
@@ -75,21 +97,31 @@ def columns(c, male):
     shared = sorted(set(eye["L"]) & set(eye["R"]))
     dots = [np.dot(eye["L"][key], eye["R"][key] * [1, -1, 1]) for key in shared]
     error = np.degrees(np.arccos(np.clip(dots, -1, 1)))
+    all_on_rim = all(not v["dorsal_envelope"]["deeper_cells"] for v in dra.values())
     return dict(n_columns=r.n_columns, per_side={s: int((r.col_side == s).sum()) for s in ("L", "R")},
         dra=dict(source=str(labels_path.name), sha256=sha256(labels_path), selection="non-putative DRA community labels on photoreceptors",
-                 sides=dra, all_labels_on_rim=all(not v["dorsal_envelope"]["deeper_cells"] for v in dra.values())),
+                 sides=dra, all_labels_on_rim=all_on_rim),
         mirror=dict(shared_columns=len(shared), max_error_deg=float(error.max()), mean_error_deg=float(error.mean())),
-        t4=a, checks=dict(dra_orientation=all(v["orientation_pass"] for v in dra.values()),
-                         mirror=bool(error.max() < r.geometry.interommatidial_deg),
-                         t4_direction=all(v["cosine"] > .95 for v in a.values()), column_count=1500 <= r.n_columns <= 1650))
+        # One entry per spec 2.5 validation, named for it. 2.5 (i) is two questions and both are in the gate: the
+        # population-orientation one it passes, and the strict per-cell one it does not (EXPECTED_CHECKS).
+        t4=a, checks=dict(i_dra_population_orientation=all(v["orientation_pass"] for v in dra.values()),
+                         i_dra_all_labels_on_rim=bool(all_on_rim),
+                         ii_lr_mirror=bool(error.max() < r.geometry.interommatidial_deg),
+                         iii_t4_direction=all(v["cosine"] > .95 for v in a.values()),
+                         iv_column_count=1500 <= r.n_columns <= 1650))
 
 
 def cpu():
     from flyverse.brain import Brain
     from flyverse.fly import FlyBrain
-    from flyverse.senses import Proprioception
     male = cn.load(verbose=False)
-    report = {"malecns_fingerprint": common.connectome_fingerprint(male), "datasets": {}}
+    proprio = Proprioception(male).counts()
+    report = {"malecns_fingerprint": common.connectome_fingerprint(male), "datasets": {},
+              # Spec 2.3 reference selections, recorded so the gate can assert them rather than only print them.
+              "malecns_selections": dict(proprioception=proprio,
+                                         proprioception_selected={k: v["n"] for k, v in proprio.items()},
+                                         expected_proprioception_selected=SPEC_2_3_MALECNS_SELECTED,
+                                         wing_groups=wing_group_counts(male), expected_wing_groups=WING_GROUPS_MALECNS)}
     for dataset in ("fafb", "banc"):
         c = cn.load(dataset=dataset, verbose=False)
         post = c.select(type="DNa02")[0]
@@ -107,7 +139,10 @@ def cpu():
             d["columns"] = columns(c, male)
         else:
             d["proprioception"] = Proprioception(c).counts()
+            d["proprioception_selected"] = {k: v["n"] for k, v in d["proprioception"].items()}
             d["motor_subclasses"] = c.neurons.loc[c.neurons.superclass.eq("vnc_motor"), "subclass"].value_counts().to_dict()
+            # B1: the selected wing groups, not only the subclass census that hid their emptiness.
+            d["wing_groups"] = wing_group_counts(c)
             fb = FlyBrain(sub, device="cpu", optic=None); fb.step(10)
             d["optic_none"] = fb.optic is None
         report["datasets"][dataset] = d
@@ -150,5 +185,14 @@ if __name__ == "__main__":
         assert report["finite"]
     else:
         assert all(d["cpu_smoke"]["finite"] for d in report["datasets"].values())
-        print("Column checks:", report["datasets"]["fafb"]["columns"]["checks"])
-        assert all(report["datasets"]["fafb"]["columns"]["checks"].values())
+        checks = report["datasets"]["fafb"]["columns"]["checks"]
+        for name, value in checks.items():
+            want = EXPECTED_CHECKS.get(name, True)
+            print(f"  {name}: {value}" + ("" if want else f"  (EXPECTED FAILURE, documented value {want})"))
+            assert value == want, f"spec 2.5 check {name} is {value}, documented value {want}"
+        selections = report["malecns_selections"]
+        print("  MaleCNS spec 2.3 selections:", selections["proprioception_selected"], selections["wing_groups"])
+        print("  BANC spec 2.3 selections:", report["datasets"]["banc"]["proprioception_selected"],
+              report["datasets"]["banc"]["wing_groups"])
+        assert selections["proprioception_selected"] == SPEC_2_3_MALECNS_SELECTED
+        assert {k: selections["wing_groups"][k] for k in WING_GROUPS_MALECNS} == WING_GROUPS_MALECNS

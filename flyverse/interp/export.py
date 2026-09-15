@@ -241,8 +241,12 @@ def write_table(df: pd.DataFrame, out_dir: Path, name: str, parquet_rows: int = 
 
 
 # ------------------------------------------------------------------------------------------- which code actually ran
-SOURCE_PATTERNS = ("flyverse/*.py", "flyverse/interp/*.py", "flyverse/data/receptors_by_type.csv",
-                   "scripts/probe_object_sweep.py", "scripts/interp_export.py")
+# flyverse/backends/*.py, the alias table and the data manifest are the code and tables that build a non-MaleCNS
+# graph: without them the static half of a female Result's source_fingerprint named none of it
+# (connectome_backends_review nit 9).
+SOURCE_PATTERNS = ("flyverse/*.py", "flyverse/interp/*.py", "flyverse/backends/*.py",
+                   "flyverse/data/receptors_by_type.csv", "flyverse/data/type_aliases.csv",
+                   "flyverse/data/manifest.json", "scripts/probe_object_sweep.py", "scripts/interp_export.py")
 TEXT_SUFFIXES = (".py", ".csv", ".md", ".txt", ".json", ".toml", ".cfg")
 LINE_ENDING_NOTE = ("text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 "
                     "equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` "
