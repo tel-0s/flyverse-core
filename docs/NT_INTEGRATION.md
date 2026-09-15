@@ -643,3 +643,41 @@ The default compiler retains unclassified BANC rows: only the explicitly named g
 classes are excluded. All NT totals and input budgets therefore use the resulting 157,789-cell graph.
 See `docs/audits/connectome_backends.md` for counts, alias decisions, and the distinction between missing
 type matches and independently established sex-specific circuits.
+
+### 8.1. ExR6 / ER6 evidence check (2026-09-15; nothing adopted)
+
+The compass data handoff is answered in
+[`audits/exr6_evidence.md`](audits/exr6_evidence.md). Reproduce the cell-level
+records with `python scripts/exr6_evidence.py --external <data/external>`;
+`out/exr6_evidence/report.json` pins the release tables and source worksheets.
+
+| Type | MaleCNS v1.0 | FAFB v783 compiled / maintained `known_nt` | BANC v888 verified-first |
+|---|---|---|---|
+| ExR6 | Glu 2/2; `ground_truth=glutamate` | unknown 2/2 / glutamate 2/2, Wolff EASI-FISH | Glu 2/2, verified |
+| ER6 | GABA 4/4; `ground_truth=gaba` | GABA 4/4 / GABA 4/4, Wolff EASI-FISH plus a broad Xie citation | GABA 4/4, verified |
+| ER4m | GABA 11/11; `ground_truth` blank | GABA 11/11 / GABA plus dopamine, Wolff EASI-FISH | GABA 4/4; full verified string `dopamine,gaba`, peptide Dh31 |
+
+FAFB's probabilities and its maintained Schlegel annotation TSV are distinct
+snapshots. The ExR6 Codex rows have GLUT/0.49 and blank/0.00; the latter still
+has nonzero probabilities (GABA 0.37, Glu 0.32, ACh 0.27). The TSV's `known_nt`
+is not consumed by the backend, so compiled `unknown` does not mean the type's
+transmitter is unknown experimentally. BANC's verified annotations and MaleCNS's
+ground-truth annotations lack per-row citations; their agreement should not be
+counted as additional independent assays.
+
+[Wolff et al., 2025](https://doi.org/10.7554/eLife.104764.3), Figure 9 and its
+source worksheet, gives ExR6/SS53617 strong vGlut and ER6/SS58833 weak Gad1
+expression, supporting the existing labels. Both used only the classical NT
+probe set and have no peptide experiment recorded. Their monoamine/peptide
+co-transmission remains unknown. The assay appeared as a 2024 preprint, hence
+the older year in the annotation strings.
+
+The family comparison also finds FAFB ExR1 predicted GABA versus known ACh,
+BANC ExR7 predicted dopamine versus verified ACh, and discordant ExR4 predictions
+without a verified alternative. None changes a label here. Existing PEN receptor
+rows use a contaminated pooled PB_3 driver. A
+[2026 primary preprint](https://doi.org/10.64898/2026.01.18.700161) reports EPG
+inhibition and PENb excitation by glutamate in the PB, but does not settle ExR6
+contacts in EB/GA or supply a global fast PEN receptor rule. The audit retains
+both focus transmitters and leaves edge-specific sign, gain and kinetics open;
+no `TYPE_NT_OVERRIDE`, receptor row, cache, or model change is adopted.
