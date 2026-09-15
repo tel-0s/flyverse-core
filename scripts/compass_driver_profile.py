@@ -18,14 +18,17 @@ from flyverse.fly import FlyBrain
 from flyverse.interp.common import provenance,to_jsonable
 
 
-def run(out):
+def run(out, native=False):
     out=Path(out)
     if out.exists():raise FileExistsError(out)
     if not torch.cuda.is_available():raise RuntimeError('run this profile on house CUDA')
-    c=connectome.load(verbose=False);records=[];controllers=[]
+    c=connectome.load(verbose=False);records=[];controllers=[];identity=[]
     for batch in (1,8,32):
+        flags=dict(cuda_kernels=True,cuda_sparse='warp' if batch==1 else 'torch') if native else {}
+        from flyverse.brain import LIFParams
+        params=LIFParams(event_driven=True) if native else None
         brains={mode:FlyBrain(c,batch=batch,device='cuda',optic=None,cuda_graphs=True,seed=0,
-                              preset=mode,instruments=['compass'] if mode=='instrumented' else [])
+                              preset=mode,instruments=['compass'] if mode=='instrumented' else [],lif_params=params,**flags)
                 for mode in ('raw','instrumented')}
         # Same external sensory forcing establishes comparable Poisson work in both controllers.
         for fb in brains.values():
@@ -48,12 +51,15 @@ def run(out):
                 for _ in range(1000):module.step(10.,{})
                 end.record();end.synchronize()
                 records.append(dict(batch=batch,mode='module_only',cuda_ms_per_frame=start.elapsed_time(end)/1000))
+        a,b=brains['raw'].brain,brains['instrumented'].brain
+        identity.append(dict(batch=batch,tensors={name:torch.equal(getattr(a,name),getattr(b,name)) for name in FlyBrain.BRAIN_TENSORS}))
         del brains,fb;torch.cuda.empty_cache()
     out.parent.mkdir(parents=True,exist_ok=True)
-    out.write_text(json.dumps(to_jsonable(dict(records=records,controllers=controllers,
+    out.write_text(json.dumps(to_jsonable(dict(records=records,controllers=controllers,identity=identity,native=native,
                    protocol='four alternating repeats of 100 frames after 50 warmup frames; identical tonic EPG external forcing in both arms; module-only timing is separate')),indent=2)+'\n',encoding='utf-8')
     print('device cuda',records,flush=True)
 
 
 if __name__=='__main__':
-    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--out',required=True);a=ap.parse_args();run(a.out)
+    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--out',required=True)
+    ap.add_argument('--native',action='store_true');a=ap.parse_args();run(a.out,a.native)

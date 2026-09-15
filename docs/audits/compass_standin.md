@@ -87,4 +87,35 @@ default adoption or mechanistic receptor inference is licensed by a pass.
 
 ## Results
 
-Pending. The immutable declaration and all generated records stay under `out/compass_standin/`.
+The immutable declaration and all generated records stay under `out/compass_standin/`.
+
+### Scheduler correction declaration (before the second submission)
+
+The first paired profile missed the <=10% target: median synchronized frame overhead was
+91.80%, 85.44%, 16.76% at B=1,8,32; the formula alone cost 114.76,119.48,132.87 CUDA microseconds.
+The shared-device timings are noisy, but they do not support calling the first scheduler integration fast.
+Two explicit host waits sit in the module path: finite-output checking and reduction of Poisson activity.
+The body's yaw upload also used a blocking copy. No gain or dynamical law is changed in the correction.
+
+`out/compass_standin_r2/` freezes the following correction tests before running them:
+
+- The compass opts into an asynchronous CUDA invariant assertion. Its ordinary user inputs (shape,
+  finite yaw and representable gain/width, 0-10 ms frame, checkpoint shape/range) are still validated.
+  A nonfinite internal CUDA output is a bug and may abort the CUDA context on a later launch; other
+  modules keep synchronous error checking. The known positive Gaussian lower bound, including dt,
+  avoids reading back whether Poisson forcing is active. The proof is used only after a full output,
+  cleared on any reset/load/detach, and unavailable for a narrow profile whose bound underflows.
+  Host yaw copies are nonblocking; fields retain clone ownership, but stop allocating an unused zero tensor.
+- Rerun all six instrumented contract seeds with unchanged parameters. Require **every saved array
+  to equal the first submission exactly**, then apply its original engineering gates without changes.
+- Repeat the 60 s, B=6 instrumented room with the original backend and require identical saved body
+  and EPG trajectories and hop counts. CPU tests also cover matched raw/compass forcing and all-row
+  partial resets. A house EPG-subgraph fixture compares the asynchronous and original checked paths
+  through pulse expiry, partial reset, checkpoint replay and detach, every brain tensor exactly.
+- Repeat the original paired profile, and add a paired native-CUDA profile (CUDA kernels, event driven,
+  graphs, warp sparse at B=1 and torch CSR in batches). Four alternating repeats, B=1,8,32, same <=10%
+  median overhead target. Matched-input final brain tensors must agree exactly. Native room arms at
+  B=6, 60 s add actual body/sensory timing; they remain observations, not the 300 s admission rate-half.
+
+The first submission stays intact. Its full benchmark pairs are still running at this declaration;
+no suite outcome or compass gain has been used to select the scheduler correction.

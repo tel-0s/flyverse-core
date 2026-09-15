@@ -49,6 +49,9 @@ class CompassDriver:
     quantity_in = 'rate_hz'
     channel_out = 'poisson_hz'
     required_preset = 'instrumented'
+    # User inputs are checked on CPU. A nonfinite output is an internal invariant failure;
+    # on CUDA it may abort the CUDA context at a later kernel launch, without a per-frame host wait.
+    cuda_async_validation = True
 
     def __init__(self, c, *, peak_hz=50., width_deg=35., initial_phase_deg=0., velocity_gain=1.):
         values = (peak_hz, width_deg, initial_phase_deg, velocity_gain)
@@ -56,6 +59,10 @@ class CompassDriver:
             raise ValueError('compass parameters must be finite; peak positive and width in (0,180) degrees')
         if velocity_gain == 0:
             raise ValueError('velocity_gain must be nonzero (negative is an explicit sign-control arm)')
+        if peak_hz > np.finfo(np.float32).max or abs(velocity_gain) > np.finfo(np.float32).max:
+            raise ValueError('compass peak and gain must be representable in float32')
+        if math.radians(width_deg) < np.finfo(np.float32).tiny:
+            raise ValueError('compass width must be representable in float32 radians')
         self.idx, self.columns = epg_columns(c)
         self.source_body_ids = c.neurons.bodyId.to_numpy().copy()
         self.body_ids = self.source_body_ids[self.idx].copy()
@@ -70,6 +77,11 @@ class CompassDriver:
             raise ValueError('compass was built for a different connectome row order')
         if self.peak_hz * fb.brain.p.dt > 1000:
             raise ValueError('compass peak exceeds the Poisson probability bound at this dt')
+        # Even the farthest target is at most pi from phase. A strictly positive representable
+        # probability at that distance proves that this held Poisson field keeps RNG enabled.
+        distance = math.pi/math.radians(self.width_deg)
+        floor = self.peak_hz * math.exp(-.5*distance**2) if distance < 40 else 0.
+        self.poisson_always_on = floor * fb.brain.p.dt / 1000 > np.finfo(np.float32).tiny
 
     def install(self, fb):
         self.validate_parent(fb)
@@ -94,9 +106,13 @@ class CompassDriver:
             value = np.full(self.B, value, dtype=np.float32)
         if value.shape != (self.B,) or not np.isfinite(value).all():
             raise ValueError(f'compass yaw_rate must be finite and scalar or shape ({self.B},)')
-        self.yaw_rate.copy_(torch.as_tensor(value[:, None], device=self.device))
+        if np.any(np.abs(value.astype(np.float64)*self.velocity_gain)>np.finfo(np.float32).max):
+            raise ValueError('compass yaw_rate * velocity_gain overflows float32')
+        self.yaw_rate.copy_(torch.from_numpy(value[:, None]), non_blocking=self.device.type=='cuda')
 
     def step(self, dt_ms, inputs):
+        if not math.isfinite(dt_ms) or not 0 <= dt_ms <= 10.000001:
+            raise ValueError('compass expects a finite module frame of 0-10 ms')
         self.phase.add_(self.yaw_rate * (self.velocity_gain * dt_ms / 1000)).remainder_(2 * math.pi)
         error = torch.remainder(self.angles - self.phase + math.pi, 2 * math.pi) - math.pi
         return {'epg': self.peak_hz * torch.exp(-.5 * (error / math.radians(self.width_deg)).square())}
@@ -105,9 +121,13 @@ class CompassDriver:
         return {'phase': self.phase.clone(), 'yaw_rate': self.yaw_rate.clone()}
 
     def load_state_dict(self, state):
-        values = {k: torch.as_tensor(state[k], device=self.device) for k in ('phase', 'yaw_rate')}
+        values = {k: torch.as_tensor(state[k], device=self.device, dtype=torch.float32) for k in ('phase', 'yaw_rate')}
         if any(v.shape != (self.B, 1) or not bool(torch.isfinite(v).all()) for v in values.values()):
             raise ValueError('invalid compass checkpoint shape or values')
+        if not bool(((values['phase']>=0)&(values['phase']<=2*math.pi)).all()):
+            raise ValueError('compass checkpoint phase must be wrapped to [0, 2*pi]')
+        if bool((values['yaw_rate'].double().abs()*abs(self.velocity_gain)>np.finfo(np.float32).max).any()):
+            raise ValueError('compass checkpoint yaw_rate * velocity_gain overflows float32')
         self.phase.copy_(values['phase']); self.yaw_rate.copy_(values['yaw_rate'])
 
     def describe(self):

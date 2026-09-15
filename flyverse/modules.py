@@ -334,6 +334,7 @@ class ExtensionRuntime:
         self.hooks, self.modules, self.bindings = {}, {}, {}
         self.origin = None
         self.drives, self.poisson = {}, {}
+        self._positive_poisson = set()  # ephemeral activity proofs; rebuilt by full module writes
         # brain.drive splits into the part the caller injected (base_drive: held, and additive from here on) and the
         # part the sensory frame owns (sensory_drive: overwritten by every optic frame). Before the first optic frame
         # the whole drive is the caller's; after one, the optic frame has overwritten the whole tensor
@@ -368,7 +369,8 @@ class ExtensionRuntime:
                 self.refresh_poisson()
             return
         fields = self.drives if channel == "drive_mv" else self.poisson
-        field = fields.get(self.origin, torch.zeros_like(b.drive)).clone()
+        previous = fields.get(self.origin)
+        field = torch.zeros_like(b.drive) if previous is None else previous.clone()
         field[:, idx] = v if channel == "drive_mv" else v.clamp_min(0)
         fields[self.origin] = field
 
@@ -478,12 +480,21 @@ class ExtensionRuntime:
                     v = outputs[k]
                     if not isinstance(v, torch.Tensor) or v.device != b.drive.device or v.shape != (b.B, len(idx)):
                         raise ValueError(f"output {k!r} must be a tensor on {b.device} with shape {(b.B, len(idx))}")
-                    if not bool(torch.isfinite(v).all()):
+                    finite = torch.isfinite(v).all()
+                    if b.device.type == 'cuda' and getattr(m, 'cuda_async_validation', False):
+                        # Explicit built-in invariant check, not regular user-input validation. A failure
+                        # is asynchronous and aborts the CUDA context; arbitrary modules keep the old check.
+                        torch._assert_async(finite, f"module {name!r} output {k!r} must be finite")
+                    elif not bool(finite):
                         raise ValueError(f"output {k!r} must be finite")
                     values[k] = v
                 self.origin = "module:" + name
                 for k, idx in writes.items():
                     self.input(m.channel_out, idx, values[k])
+                if m.channel_out == 'poisson_hz' and getattr(m, 'poisson_always_on', False):
+                    self._positive_poisson.add(self.origin)
+                else:
+                    self._positive_poisson.discard(self.origin)
             except Exception as e:
                 raise RuntimeError(f"module {name!r} failed: {e}") from e
             finally:
@@ -514,7 +525,11 @@ class ExtensionRuntime:
             p = torch.maximum(p, value * (b.p.dt / 1000))
         with torch.no_grad():
             b.poisson_p.copy_(p)
-        b._poisson_on = bool((p > 0).any())
+        # An opt-in module may prove a strictly positive probability for its held output, including dt.
+        # Only use the proof while that module's field exists: before first output, reset, and detach
+        # must still inspect the actual combined tensor. This preserves RNG activation at zero input.
+        always_on = bool(self._positive_poisson.intersection(self.poisson))
+        b._poisson_on = True if always_on else bool((p > 0).any())
 
     def remove(self, name, *, hook=False):
         collection = self.hooks if hook else self.modules
@@ -524,10 +539,12 @@ class ExtensionRuntime:
         if not hook:
             del self.bindings[name]
         key = ("hook:" if hook else "module:") + name
+        self._positive_poisson.discard(key)
         self.drives.pop(key, None); self.poisson.pop(key, None)
         self.refresh_poisson()
 
     def reset(self, rows=None):
+        self._positive_poisson.clear()  # partial resets can also clear every row of a held field
         if rows is None:
             for m in self.modules.values():
                 m.reset(self.fb.B, self.fb.device)
@@ -564,6 +581,7 @@ class ExtensionRuntime:
             raise ValueError("checkpoint modules differ; attach matching modules before loading")
 
     def load_state_dict(self, d):
+        self._positive_poisson.clear()  # restored fields are checked normally until the next module output
         for k, m in self.modules.items():
             m.load_state_dict(snapshot(d["states"][k], self.fb.device))
         for k, v in d["inputs"].items():

@@ -134,3 +134,26 @@ def test_batch_body_feeds_realized_turn_without_enabling_afferents():
     sim.flies[0].yaw_rate=1.;sim.flies[1].yaw_rate=-2.
     sim.step()
     np.testing.assert_allclose(sim.fb.instruments['compass'].phase.numpy().ravel(),[.01,2*np.pi-.02],atol=1e-6)
+
+
+def test_poisson_activity_proof_reset_and_narrow_profile_fallback():
+    fb=make(preset='instrumented',instruments=['compass'])
+    assert not fb.brain._poisson_on
+    fb.step(10);assert fb.brain._poisson_on
+    fb.reset();assert not fb.brain._poisson_on
+    fb.step(10);fb.reset(rows=[0]);assert not fb.brain._poisson_on
+    fb.step(10);fb.detach('compass');assert not fb.brain._poisson_on
+    narrow=make(preset='instrumented',instruments=[CompassDriver(graph(),width_deg=.001,initial_phase_deg=1.)])
+    assert not narrow.instruments['compass'].poisson_always_on
+    narrow.step(10);assert not narrow.brain._poisson_on
+    with pytest.raises(ValueError,match='frame'):
+        narrow.instruments['compass'].step(100.,{})
+
+
+def test_matched_tonic_input_preserves_every_brain_tensor():
+    a=make(batch=3,seed=10);b=make(batch=3,seed=10,preset='instrumented',instruments=['compass'])
+    for fb in (a,b):fb.stimulate(np.arange(48),50.,1000.)
+    for _ in range(20):
+        a.step(10);b.proprioception(0,0,0,False,yaw_rate=[-1.,0.,2.]);b.step(10)
+    for name in FlyBrain.BRAIN_TENSORS:
+        torch.testing.assert_close(getattr(a.brain,name),getattr(b.brain,name),rtol=0,atol=0)
