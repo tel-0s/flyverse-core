@@ -215,7 +215,14 @@ def build_instruments(c, instrument_specs, preset, hold_edges=None, nt_override=
     for i, ((pre, post, f), rec) in enumerate(zip(holds, resolved)):
         name = ("ring_dc_hold" if (pre, post) == RING_DC_HOLD and f == 0.0 else
                 "ring_dc_hold_pen" if (pre, post) == RING_DC_HOLD_PEN and f == 0.0 else f"edge_hold_{i}")
-        out.append(fi.EdgeHold(pre, post, f, name=name, resolved=rec))
+        description = None
+        if (pre, post, f) == (r"^GLNO$", r"^PEN_", 0.0):
+            name = "glno_pen_hold"
+            description = dict(gap="the transfer of a GLNO side signal into PEN in round 7",
+                               source="an explicit pathway-removal control, not a physiological receptor model",
+                               removal="retire after the diagnostic; this hold is not an adoption candidate",
+                               audits=["docs/audits/compass_velocity_route.md"])
+        out.append(fi.EdgeHold(pre, post, f, name=name, resolved=rec, description=description))
     for t, nt in (nt_override or {}).items():
         out.append(fi.TypeRelabel(t, nt))
     gains = list(edge_gains or [])
@@ -254,6 +261,33 @@ def bump_follow(centre, confined, tt, t_on, t_off, turn_deg_s):
     unwrapped = np.unwrap(cen[ok] * (2 * np.pi / 16.0)) * (16.0 / (2 * np.pi))
     slope = float(np.polyfit(tt[m][ok], unwrapped, 1)[0])
     out["bump_follow_wedges_per_s"] = slope * float(np.sign(turn_deg_s))
+    return out
+
+
+def prepare_neural_stimuli(c, events, total_s):
+    """Resolve explicit assay pulses for the ledger loop; nothing installed when events is None.
+
+    This is a stimulus protocol, not a physiological stand-in. Each event names indices on the supplied
+    connectome, an unverified or sourced law, Hz, and frame-aligned onset/duration in recording seconds.
+    The existing FlyBrain.stimulate surface owns application and expiry. No parent synapse is modified.
+    """
+    out = []
+    for e in events or []:
+        allowed = {"name", "idx", "poisson_hz", "start_s", "duration_s", "law"}
+        if set(e) != allowed or not e["name"] or not e["law"]:
+            raise ValueError("neural stimulus needs name, idx, poisson_hz, start_s, duration_s and law")
+        idx = np.asarray(e["idx"])
+        if (idx.ndim != 1 or not len(idx) or idx.dtype.kind not in "iu" or
+                np.any(idx < 0) or np.any(idx >= c.n) or len(np.unique(idx)) != len(idx)):
+            raise ValueError("neural stimulus indices must be unique cells in this connectome")
+        hz, start, duration = (float(e[k]) for k in ("poisson_hz", "start_s", "duration_s"))
+        if (not np.isfinite([hz, start, duration]).all() or hz < 0 or start < 0 or duration <= 0 or
+                start + duration > total_s + 1e-9):
+            raise ValueError("invalid neural stimulus rate or recording window")
+        if any(abs(t/.01 - round(t/.01)) > 1e-7 for t in (start, duration)):
+            raise ValueError("neural stimulus timing must align with 10 ms ledger frames")
+        out.append(dict(name=e["name"], idx=idx.tolist(), body_ids=c.neurons.bodyId.iloc[idx].astype(str).tolist(),
+                        poisson_hz=hz, start_s=start, duration_s=duration, law=e["law"]))
     return out
 
 
@@ -713,7 +747,8 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
              thresh_hz=22.0, cuda_graphs=True, delta7_pen=True, gR=1.0, verbose=True,
              receptor_model=None, receptor_net_rule="class", nt_override=None,
              lif_overrides=None, ledger=False, arm=None, block=None, device=None, ledger_npz=None, hold_edges=None,
-             edge_gains=None, preset="raw", instrument_specs=None, turn_deg_s=None, turn_window=(0.5, 3.5), settle_s=1.0):
+             edge_gains=None, preset="raw", instrument_specs=None, turn_deg_s=None, turn_window=(0.5, 3.5), settle_s=1.0,
+             neural_stimuli=None):
     """FlyBrain on the full connectome; drive `width` contiguous wedges (of 16) of the EPG ring from `start_wedge`;
     report persistence and confinement after the pulse. receptor_model / receptor_net_rule thread
     LIFParams.receptor_model (the optional receptor-expression sign stage); nt_override is recorded in the row (the
@@ -752,12 +787,15 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
     log = print if verbose else (lambda *a, **k: None)
     if turn_deg_s is not None and not ledger:
         raise ValueError("--turn needs --ledger (the per-frame loop feeds the yaw)")
+    if neural_stimuli is not None and not ledger:
+        raise ValueError("scheduled neural stimuli need the ledger loop")
     if turn_deg_s is not None and (not np.isfinite(turn_deg_s)):
         raise ValueError("--turn must be finite (deg/s; positive = a left turn)")
     if not np.isfinite(settle_s) or settle_s < 0:
         raise ValueError("settle_s must be finite and >= 0")
     if preset not in PRESETS:
         raise ValueError(f"preset must be one of {PRESETS}")
+    stimuli = prepare_neural_stimuli(c, neural_stimuli, settle_s + pulse_s + seconds)
     epg = cells["EPG"]
     wedge_of = np.asarray(np.round(epg["pos"]), int) % 16
     inside = np.isin(wedge_of, [(start_wedge + j) % 16 for j in range(width)])
@@ -858,10 +896,18 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                 if 0 <= k < frames:
                     sample_at[k] = f"t{mark}"
             pulsed = False
+            stimuli_applied = []
+            stimulus_hz = np.zeros((frames, len(stimuli)), np.float32)
             for k in range(frames):
                 if not pulsed and tt[k] >= settle_s - 1e-9:
                     fb.stimulate(idx_epg[inside], background_hz + pulse_hz, pulse_s * 1000)
                     pulsed = True
+                for j, event in enumerate(stimuli):
+                    if k == int(round(event["start_s"]/.01)):
+                        fb.stimulate(np.asarray(event["idx"], dtype=int), event["poisson_hz"], event["duration_s"]*1000)
+                        stimuli_applied.append(dict(name=event["name"], start_s=float(tt[k])))
+                    if event["start_s"] - 1e-9 <= tt[k] < event["start_s"] + event["duration_s"] - 1e-9:
+                        stimulus_hz[k, j] = event["poisson_hz"]
                 if turn_deg_s is not None:
                     yaw_deg[k] = turn_deg_s if (tt[k] >= t_on - 1e-9 and tt[k] < t_off - 1e-9) else 0.0
                     if feed_turn and (k == 0 or yaw_deg[k] != yaw_deg[k - 1]):
@@ -939,11 +985,15 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
                           "preset": preset, "instruments": row["instruments"], "instrument_specs": row["instrument_specs"],
                           "turn_deg_s": row["turn_deg_s"], "turn_window_s": row["turn_window_s"], "turn_fed": bool(feed_turn)},
                           "control": "arm shipped (gE 1 / gD 1, LIFParams() on the shipped cache)"}))
+            if neural_stimuli is not None:
+                row["neural_stimuli"], row["neural_stimuli_applied"] = stimuli, stimuli_applied
+                row["provenance"]["stimulus"]["params"]["neural_stimuli"] = stimuli
             if ledger_npz:
                 Path(ledger_npz).parent.mkdir(parents=True, exist_ok=True)
                 np.savez_compressed(ledger_npz, t=tt, epg=rec_epg, wedge_of=wedge_of, inside=inside, yaw_deg_s=yaw_deg,
                                     **{f"g__{k}": v for k, v in rec_grp.items()},
-                                    **{f"cells__{k}": v for k, v in rec_cells.items()})
+                                    **{f"cells__{k}": v for k, v in rec_cells.items()},
+                                    **({"neural_stimulus_hz": stimulus_hz} if neural_stimuli is not None else {}))
                 row["ledger_npz"] = str(ledger_npz)
             log(f"ledger: confined pre {m['frac_confined_pre']:.2f} post {m['frac_confined_post']:.2f}, survival {survival:.2f} s, bump {m['bump_hz_post']:.1f} Hz, "
                 f"width {m['width_half_post']:.1f}; {[(k, v['status']) for k, v in led.items()]}; device {row['device']}")

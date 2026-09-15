@@ -274,10 +274,13 @@ class EdgeHold:
     kind = "edges"
     law = "counterfactual"
 
-    def __init__(self, pre_re, post_re, factor=0.0, *, name="ring_dc_hold", resolved=None):
+    def __init__(self, pre_re, post_re, factor=0.0, *, name="ring_dc_hold", resolved=None, description=None):
         self.name = name
         self.pre_re, self.post_re, self.factor = str(pre_re), str(post_re), float(factor)
         self.resolved = resolved
+        self.description = dict(description or {})
+        if set(self.description) - {"gap", "source", "removal", "audits"}:
+            raise ValueError("hold description may only specialize gap, source, removal and audits")
 
     def describe(self):
         return {"name": self.name, "class": identifier(self), "kind": self.kind, "law": self.law,
@@ -288,7 +291,8 @@ class EdgeHold:
                        "receptor placement and kinetics at those contacts are open",
                 "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
                 "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
-                "audits": ["docs/audits/compass_dc_balance.md", "docs/audits/compass_ring_mechanism.md", "docs/audits/exr6_evidence.md"]}
+                "audits": ["docs/audits/compass_dc_balance.md", "docs/audits/compass_ring_mechanism.md", "docs/audits/exr6_evidence.md"],
+                **self.description}
 
     def install(self, fb):
         gains = [(str(p), str(q), float(f)) for p, q, f in (getattr(fb.brain.p, "type_path_gain", None) or [])]
