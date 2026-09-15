@@ -255,7 +255,7 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           to ask whether the ring can hold a bump AT THE DRIVEN TILE once both the DC brake is off and the local
           recurrence is on (H3G already gets within 1 of 5 seeds of it). That arm is **two labelled instruments**, so it
           decides a mechanism question, not an adoption.
-    - [ ] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate,
+    - [x] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate, -- ANSWERED by Astra (2026-09-16, `docs/audits/exr6_evidence.md`, merged 4fcfdf7): ExR6 glutamate and ER6 GABA have direct EASI-FISH support (Wolff et al. 2025 eLife 104764 Fig. 9 source data: SS53617 vGlut strong, SS58833 Gad1 weak -- worksheet rows verified locally); the model's labels stand; peptide / monoamine co-transmission untested; the open question is receptor placement and kinetics at the EB/GA contacts (a 2026 Turner-Evans-lab preprint reports glutamate inhibiting E-PG but exciting P-EN in the PB -- not isolated to ExR6). Nothing adopted.
           sign -1, no `receptors_by_type.csv` row (tier fallback = NT_SIGN), and the -1 onto EPG rides on the E-PG row's
           GluClalpha (Davis 2020 PB_2, tier alias). **No published transmitter or function for ExR6 could be verified**
           (Hulse et al. 2021 defines ExR1-ExR8 morphologically and by connectivity; ExR2 is the dopaminergic PPM3 class;
