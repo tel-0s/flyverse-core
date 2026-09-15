@@ -3165,3 +3165,28 @@ per-seed lists and follow traces. CPU 469 passed / 19 skipped, 220 subtests; gol
 Nothing adopted. Primary 3 result with no demonstrated follow selects the one authorized GLNO-to-PEN
 transfer diagnostic; the conditional suite and odour room remain gated. **Independent skeptic pending
 (Fable, when accounts reset).**
+
+## Session 12, compass round 7 follow-up: direct GLNO input reaches PEN (2026-09-15)
+
+The single authorized follow-up is complete: one house submission, six seeds in each of six conditions.
+Under HG (ring DC held, GLNO signed), a fixed **unverified 90 Hz direct GLNO challenge** gives
+HL-HR GLNO L-R **+149.0748 Hz** and PEN L-R **+2.9939 Hz** (z 3.1904), both results, Holm p 0.008658
+in the four-test family. Every HL PEN L-R is positive and every HR value negative. This establishes
+side transfer under the strong imposed input. Side-balanced PEN mean also falls from H0's 24.0426 Hz
+to 5.0211 / 3.6345 Hz under left / right forcing. It is not a following compass.
+
+The edge control is a substantial operating-state change: holding GLNO -> PEN gives C0 a PEN L-R
+of -11.0738 Hz and mean 54.1743 Hz before adding either challenge. HL-CL +12.5861 Hz and HR-CR
++9.7340 Hz are both positive results, so the **right-edge negative sign prediction failed**.
+The intact/cut contrasts do not isolate unitary transfer at matched presynaptic rates. No extra
+interaction test or receptor mechanism is inferred. DNa02 L/R challenge-window means are zero in
+all 36 runs; no run passes the joint compass ledger and no stimulated arm has a run above 50%
+challenge-window confinement. The suite/odour-room gate from the afferent experiment remains unmet.
+
+All 36 runs match the frozen declaration and all 648 trace checks pass. The source/control verifier
+checks 72 frozen and 58 recorded source hashes against submitted commit dc98bfe; the three recorded
+files outside the frozen list are identified as retrospective checks. All six H0 controls reproduce
+the earlier HG metrics and arrays exactly. Every per-seed row and the operating-state plot are in
+`docs/audits/compass_velocity_route.md` section 6. Nothing adopted; no second follow-up submitted.
+Final CPU 473 passed / 19 skipped, 220 subtests; original golden and MaleCNS cache bytes unchanged.
+**Independent skeptic pending (Fable, when accounts reset).**

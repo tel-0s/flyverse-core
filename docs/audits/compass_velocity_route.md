@@ -112,9 +112,17 @@ survival/rate/width criteria, and nothing is adopted.
 This result uses 48 CUDA runs in cx8r, six per arm, with zero analysis problems. An independent
 CPU trace calculation reproduces 972 measurements and 52 source hashes. The first cx8 attempt
 is retained as invalid because Astra's frozen receptor rule was wrong; it is not used for inference.
-Primary 3's result, with no demonstrated follow, selects the single predeclared GLNO-to-PEN transfer
-follow-up. The suite and odour-room milestone are not unlocked. Independent skeptic pending
-(Fable, when accounts reset).
+The selected single follow-up, cx8t, finds a correctly signed PEN side response to a strong direct
+GLNO challenge: HL-HR +2.9939 Hz (result, z 3.1904, Holm p 0.00866), with GLNO engagement +149.0748 Hz.
+This is transfer under the artificial input, with side-balanced PEN mean falling from H0's 24.0426 Hz
+to 5.0211 / 3.6345 Hz in HL / HR. It does not demonstrate a following compass.
+
+The GLNO-PEN edge hold changes the operating state: C0 already has PEN L-R -11.0738 Hz. Both edge
+contrasts are positive results; HR-CR +9.7340 Hz is opposite the predeclared negative prediction.
+That prediction failed. The controls cannot isolate unitary transfer at matched presynaptic rates.
+All 36 follow-up runs pass the frozen checks, including 648 reconstructed trace measurements.
+Nothing is adopted; the single follow-up is complete and the suite/odour-room gate remains unmet.
+Independent skeptic pending (Fable, when accounts reset).
 
 ### 5.2 The six primaries
 
@@ -126,9 +134,9 @@ The first two rows retain the family slots despite having no eligible HGV observ
 | 1_bump_follow_HGV_vs_HG | 0 v 2 | undetermined | NA | NA | NA | NA |
 | 2_bump_follow_HGV_vs_HGV- | 0 v 1 | undetermined | NA | NA | NA | NA |
 | 3_GLNO_LR_V_vs_S | 6 v 6 | result | 2.2183 | 1671.8089 | 0.0022 | 0.0130 |
-| 4_PEN_LR_HGV_vs_HG | 6 v 6 | nan | 0.7813 | 0.4221 | 0.5887 | 1.0000 |
-| 5_DNa02_LR_HGV_vs_HG | 6 v 6 | nan | 0.0000 | NA | 1.0000 | 1.0000 |
-| 6_frac_confined_post_HGVp_vs_HGV | 6 v 6 | nan | -0.2637 | -2.3613 | 0.0022 | 0.0130 |
+| 4_PEN_LR_HGV_vs_HG | 6 v 6 | null | 0.7813 | 0.4221 | 0.5887 | 1.0000 |
+| 5_DNa02_LR_HGV_vs_HG | 6 v 6 | null | 0.0000 | NA | 1.0000 | 1.0000 |
+| 6_frac_confined_post_HGVp_vs_HGV | 6 v 6 | null | -0.2637 | -2.3613 | 0.0022 | 0.0130 |
 
 Primary 3's large z (1671.8) is a +2.2183 Hz effect divided by the nearly zero raw-reference SD
 (0.0013269 Hz); it is not a claim of a huge absolute signal. All six V values exceed all six S values.
@@ -426,7 +434,283 @@ family and decision rules, and wrapper/manifest byte hashes. Submission is from 
 Analysis verifies these records and independently reconstructs the saved trace metrics and commanded
 pulse windows. Every per-seed value is emitted to `out/cx8t/analysis/per_seed.csv` with filenames and run ids.
 
-(cx8t results pending)
+### 6.4 Result: side transfer with a large operating-state change
+
+The 90 Hz direct challenge engages GLNO and gives the correctly signed PEN L-R difference in the
+intact-path arms. HL-HR is +149.0748 Hz at GLNO and +2.9939 Hz at PEN; both are results in the
+predeclared four-test family. All six HL PEN L-R values are positive, and all six HR values negative.
+This establishes that a strong imposed GLNO side signal can bias PEN under the HG condition.
+It does not establish that the smaller signed afferent signal suffices, that the gain is physiological,
+or that a confined bump follows a turn. There is no afferent or body in this follow-up.
+
+Source: `out/cx8t/analysis/compare.csv` and `analysis.json`; six fresh-brain runs per arm, one Holm
+family of four. All four comparisons separate every run by rank (U=36, two-sided exact p=0.0021645).
+The transfer z=3.1904 only modestly clears the additional |z|>=3 threshold; the measured size is
+about 3 Hz. A statistical result is distinct from agreement with its directional prediction.
+
+| test / measure | contrast | verdict | difference Hz | z | p | Holm p | prediction |
+|---|---|---|---:|---:|---:|---:|---|
+| 1_engagement / GLNO_LR_hz | HL-HR | result | +149.0748 | 16.8905 | 0.0021645 | 0.0086580 | positive: met |
+| 2_transfer / PEN_LR_hz | HL-HR | result | +2.9939 | 3.1904 | 0.0021645 | 0.0086580 | positive: met |
+| 3_left_edge_dependency / PEN_LR_hz | HL-CL | result | +12.5861 | 12.6558 | 0.0021645 | 0.0086580 | positive: met |
+| 4_right_edge_dependency / PEN_LR_hz | HR-CR | result | +9.7340 | 9.0518 | 0.0021645 | 0.0086580 | negative: FAILED |
+
+The fourth contrast is **positive**, +9.7340 Hz, contrary to the predeclared negative prediction.
+It is not recoded as a null, nor described as confirmation of both directional edge tests. The
+unforced cut control C0 already has a large negative PEN L-R (-11.0738 Hz); CL and CR stay near it
+(-10.8016 / -10.9434 Hz). Thus removing the path shifts the operating state, even without the
+direct challenge. The two held-path contrasts mix that shift with the stimulus response; they
+do not identify a receptor mechanism or a unitary transfer at matched presynaptic firing rates.
+
+### 6.5 Actual rates and descriptive baselines
+
+All rates below are recorded firing-rate estimates on [3.5,6.5) s, averaged over the cells of each
+somaSide; means +/- sample SD across six runs. The 90 Hz command is Poisson input, not a clamp on
+these observed rates. Both PEN sides fall below H0 under either intact-path challenge. The stimulated
+GLNO side stays near 90 Hz while the opposite side falls to 13-19 Hz, illustrating the network response.
+
+| arm | GLNO L Hz | GLNO R Hz | PEN L Hz | PEN R Hz |
+|---|---:|---:|---:|---:|
+| H0 | 76.6175 +/- 6.5084 | 74.0470 +/- 7.6132 | 24.2055 +/- 1.9572 | 23.8796 +/- 2.3955 |
+| HL | 90.2214 +/- 6.1247 | 18.5214 +/- 15.3470 | 5.9134 +/- 4.7243 | 4.1289 +/- 3.6925 |
+| HR | 12.7386 +/- 11.7137 | 90.1134 +/- 4.4860 | 3.0298 +/- 2.8563 | 4.2392 +/- 3.7737 |
+| C0 | 151.1239 +/- 1.7265 | 119.7201 +/- 0.8452 | 48.6374 +/- 0.3345 | 59.7112 +/- 1.1748 |
+| CL | 176.0093 +/- 1.6088 | 120.0910 +/- 0.6838 | 48.8020 +/- 0.3342 | 59.6036 +/- 0.7632 |
+| CR | 151.0628 +/- 1.1583 | 144.6279 +/- 0.8108 | 48.6628 +/- 0.4951 | 59.6063 +/- 0.8490 |
+
+The side-balanced PEN mean, (L+R)/2, is 24.0426 Hz in H0, 5.0211 in HL and 3.6345 in HR;
+it is about 54.1-54.2 Hz in all three cut conditions. GLNO itself is also in a different operating
+state after the cut: C0 has L/R 151.1239 / 119.7201 Hz versus H0's 76.6175 / 74.0470 Hz. Comparisons
+between H and C therefore cannot be read as isolated synapse removal at equal presynaptic drive.
+No extra verdict is assigned to C0-H0, CL-CR, or a difference of differences.
+
+![All direct-challenge seed values and the PEN operating state](assets/compass7_transfer.png)
+
+Generated by `scripts/cx8_transfer_plot.py` from all 36 checked runs. Colors identify seeds 0-5;
+black lines are means and gray marks the GLNO-PEN hold. The third panel uses the side-balanced
+mean above, not a population-weighted average over unequally sized side groups.
+
+For the original wedge protocol, group pre/pulse/post rates below refer to [0,1), [1,3), [3,8) s.
+Here `pulse` is the EPG wedge input, not the later GLNO challenge. Full per-seed group rates appear
+in section 6.6; the post interval includes the challenge and the final 1.5 seconds after it ends.
+
+| arm | GLNO pre / pulse / post Hz | PEN pre / pulse / post Hz |
+|---|---|---|
+| H0 | 19.5834 / 90.3411 / 75.5029 | 4.8960 / 27.3312 / 24.2029 |
+| HL | 19.5834 / 90.3411 / 53.5461 | 4.8960 / 27.3312 / 9.1168 |
+| HR | 19.5834 / 90.3411 / 45.7609 | 4.8960 / 27.3312 / 6.5520 |
+| C0 | 109.0801 / 129.7427 / 135.7800 | 35.4646 / 44.1855 / 53.7296 |
+| CL | 109.0801 / 129.7427 / 143.4403 | 35.4646 / 44.1855 / 53.8002 |
+| CR | 109.0801 / 129.7427 / 142.9689 | 35.4646 / 44.1855 / 53.5924 |
+
+The compass diagnostics remain descriptive. No follow contrast was declared for this direct neural
+challenge, and the nominal turn is not fed. H0 has two runs above the earlier 50% turn-window
+confinement threshold; HL/HR and all cut arms have zero. DNa02 L and R are exactly zero in the
+recorded challenge-window means of all 36 runs. No run passes the joint survival/rate/width ledger.
+
+| arm | post confined fraction | challenge-window confined fraction | survival s | confined bump Hz | width wedges |
+|---|---:|---:|---:|---:|---:|
+| H0 | 0.2980 +/- 0.1608 | 0.2894 +/- 0.2148 | 4.7750 +/- 0.2857 | 162.5186 +/- 2.6709 | 3.9419 +/- 0.0739 |
+| HL | 0.1483 +/- 0.1113 | 0.0711 +/- 0.1216 | 4.1633 +/- 1.7813 | 155.6432 +/- 15.8822 | 3.8622 +/- 0.1814 |
+| HR | 0.1037 +/- 0.0814 | 0.0456 +/- 0.0555 | 2.8350 +/- 2.4105 | 158.3997 +/- 14.2927 | 3.9778 +/- 0.0497 |
+| C0 | 0.0000 +/- 0.0000 | 0.0000 +/- 0.0000 | 0.0000 +/- 0.0000 | NA +/- NA | NA +/- NA |
+| CL | 0.0003 +/- 0.0008 | 0.0006 +/- 0.0014 | 0.4233 +/- 1.0370 | 209.0891 +/- NA | 5.0000 +/- NA |
+| CR | 0.0000 +/- 0.0000 | 0.0000 +/- 0.0000 | 0.0000 +/- 0.0000 | NA +/- NA | NA +/- NA |
+
+Survival is the end of the last confined frame minus the EPG pulse end, not uninterrupted persistence.
+Rate and width use only confined post-pulse frames: HR has five contributing runs, CL only one,
+and C0/CR none. CL's one frame at 5.53 s produces survival 2.54 s in seed 1, width 5 and rate
+209.0891 Hz; this is not a sustained bump. `NA` marks unavailable means or SDs, never a zero rate.
+
+### 6.6 Per-seed record
+
+Pasted from the script-emitted `out/cx8t/analysis/per_seed.csv`, columns `arm,key,seeds,values`.
+All 114 rows are retained, including unqualified centre slopes. Values are in seed order, not sorted.
+The same file's `files` and `run_ids` columns map every value to its source below. `nan` in a value
+list means no qualifying measurement; it is distinct from the literal statistical verdict `null`.
+
+| arm | files | run ids |
+|---|---|---|
+| H0 | H0_s0.json,H0_s1.json,H0_s2.json,H0_s3.json,H0_s4.json,H0_s5.json | H0_s0.json#0,H0_s1.json#0,H0_s2.json#0,H0_s3.json#0,H0_s4.json#0,H0_s5.json#0 |
+| HL | HL_s0.json,HL_s1.json,HL_s2.json,HL_s3.json,HL_s4.json,HL_s5.json | HL_s0.json#0,HL_s1.json#0,HL_s2.json#0,HL_s3.json#0,HL_s4.json#0,HL_s5.json#0 |
+| HR | HR_s0.json,HR_s1.json,HR_s2.json,HR_s3.json,HR_s4.json,HR_s5.json | HR_s0.json#0,HR_s1.json#0,HR_s2.json#0,HR_s3.json#0,HR_s4.json#0,HR_s5.json#0 |
+| C0 | C0_s0.json,C0_s1.json,C0_s2.json,C0_s3.json,C0_s4.json,C0_s5.json | C0_s0.json#0,C0_s1.json#0,C0_s2.json#0,C0_s3.json#0,C0_s4.json#0,C0_s5.json#0 |
+| CL | CL_s0.json,CL_s1.json,CL_s2.json,CL_s3.json,CL_s4.json,CL_s5.json | CL_s0.json#0,CL_s1.json#0,CL_s2.json#0,CL_s3.json#0,CL_s4.json#0,CL_s5.json#0 |
+| CR | CR_s0.json,CR_s1.json,CR_s2.json,CR_s3.json,CR_s4.json,CR_s5.json | CR_s0.json#0,CR_s1.json#0,CR_s2.json#0,CR_s3.json#0,CR_s4.json#0,CR_s5.json#0 |
+
+| arm | key | seeds | values |
+|---|---|---|---|
+| H0 | GLNO_LR_hz | 0,1,2,3,4,5 | 4.0459,1.6952,1.9251,1.6793,4.2543,1.8230 |
+| H0 | PEN_LR_hz | 0,1,2,3,4,5 | 1.8186,0.8305,0.0555,-3.2348,1.5721,0.9135 |
+| H0 | DNa02_LR_hz | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| H0 | GLNO_L_hz_turn | 0,1,2,3,4,5 | 69.9647,83.8093,74.7806,78.9522,68.8034,83.3947 |
+| H0 | GLNO_R_hz_turn | 0,1,2,3,4,5 | 65.9188,82.1141,72.8555,77.2729,64.5491,81.5717 |
+| H0 | PEN_L_hz_turn | 0,1,2,3,4,5 | 23.2635,26.8027,23.2548,22.9397,22.3819,26.5906 |
+| H0 | PEN_R_hz_turn | 0,1,2,3,4,5 | 21.4448,25.9722,23.1993,26.1746,20.8098,25.6771 |
+| H0 | frac_confined_post | 0,1,2,3,4,5 | 0.4880,0.2000,0.3640,0.1080,0.4600,0.1680 |
+| H0 | bump_follow_confined_frac | 0,1,2,3,4,5 | 0.5067,0.2333,0.1633,0.0833,0.6067,0.1433 |
+| H0 | bump_follow_wedges_per_s | 0,1,2,3,4,5 | 1.1605,0.0277,2.0798,-2.8925,-0.2563,-0.0145 |
+| H0 | survival_s | 0,1,2,3,4,5 | 5.0000,4.7600,4.9100,4.9800,4.7700,4.2300 |
+| H0 | bump_hz_post | 0,1,2,3,4,5 | 160.7983,163.5748,161.2387,164.1680,158.9786,166.3532 |
+| H0 | width_half_post | 0,1,2,3,4,5 | 4.0000,3.9600,3.9945,3.8519,4.0000,3.8452 |
+| H0 | GLNO_mean_pre | 0,1,2,3,4,5 | 10.5360,58.7765,5.0611,28.5962,10.5492,3.9811 |
+| H0 | GLNO_mean_during | 0,1,2,3,4,5 | 90.7722,93.5089,89.3758,87.2937,90.3835,90.7126 |
+| H0 | GLNO_mean_post | 0,1,2,3,4,5 | 70.7637,83.2262,73.2103,78.7218,64.0467,83.0485 |
+| H0 | PEN_mean_pre | 0,1,2,3,4,5 | 2.1287,16.4631,1.0283,6.5778,2.1496,1.0286 |
+| H0 | PEN_mean_during | 0,1,2,3,4,5 | 27.1746,28.9964,26.9063,26.4866,27.2386,27.1844 |
+| H0 | PEN_mean_post | 0,1,2,3,4,5 | 23.3643,26.4658,23.0894,24.9302,21.0156,26.3519 |
+| HL | GLNO_LR_hz | 0,1,2,3,4,5 | 55.5454,81.5729,75.7738,77.5214,82.9416,56.8453 |
+| HL | PEN_LR_hz | 0,1,2,3,4,5 | 3.3384,0.7482,2.5359,1.0169,0.7081,2.3593 |
+| HL | DNa02_LR_hz | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| HL | GLNO_L_hz_turn | 0,1,2,3,4,5 | 91.2239,87.1194,101.1371,85.0600,84.8969,91.8914 |
+| HL | GLNO_R_hz_turn | 0,1,2,3,4,5 | 35.6785,5.5465,25.3633,7.5386,1.9553,35.0461 |
+| HL | PEN_L_hz_turn | 0,1,2,3,4,5 | 11.1901,1.9819,7.8031,2.5780,0.7870,11.1401 |
+| HL | PEN_R_hz_turn | 0,1,2,3,4,5 | 7.8517,1.2337,5.2671,1.5612,0.0789,8.7808 |
+| HL | frac_confined_post | 0,1,2,3,4,5 | 0.3460,0.1580,0.1500,0.0140,0.1420,0.0800 |
+| HL | bump_follow_confined_frac | 0,1,2,3,4,5 | 0.3133,0.0033,0.0667,0.0033,0.0000,0.0400 |
+| HL | bump_follow_wedges_per_s | 0,1,2,3,4,5 | 3.8909,4.5323,-7.8043,-0.0030,-5.0826,-4.3147 |
+| HL | survival_s | 0,1,2,3,4,5 | 4.8700,4.9700,4.9200,0.5300,4.9200,4.7700 |
+| HL | bump_hz_post | 0,1,2,3,4,5 | 147.2908,151.2521,138.6564,183.8354,149.7922,163.0321 |
+| HL | width_half_post | 0,1,2,3,4,5 | 3.9827,4.0000,3.5333,3.8571,4.0000,3.8000 |
+| HL | GLNO_mean_pre | 0,1,2,3,4,5 | 10.5360,58.7765,5.0611,28.5962,10.5492,3.9811 |
+| HL | GLNO_mean_during | 0,1,2,3,4,5 | 90.7722,93.5089,89.3758,87.2937,90.3835,90.7126 |
+| HL | GLNO_mean_post | 0,1,2,3,4,5 | 67.3041,49.0672,63.9249,39.4239,45.3565,56.1999 |
+| HL | PEN_mean_pre | 0,1,2,3,4,5 | 2.1287,16.4631,1.0283,6.5778,2.1496,1.0286 |
+| HL | PEN_mean_during | 0,1,2,3,4,5 | 27.1746,28.9964,26.9063,26.4866,27.2386,27.1844 |
+| HL | PEN_mean_post | 0,1,2,3,4,5 | 14.9685,7.0406,11.4242,4.4774,5.7220,11.0683 |
+| HR | GLNO_LR_hz | 0,1,2,3,4,5 | -85.2411,-75.8310,-67.9343,-83.0309,-86.1279,-66.0836 |
+| HR | PEN_LR_hz | 0,1,2,3,4,5 | -0.5974,-0.6349,-2.5636,-0.6042,-0.5908,-2.2656 |
+| HR | DNa02_LR_hz | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| HR | GLNO_L_hz_turn | 0,1,2,3,4,5 | 5.7061,7.1412,27.7327,6.5172,1.7385,27.5959 |
+| HR | GLNO_R_hz_turn | 0,1,2,3,4,5 | 90.9473,82.9722,95.6670,89.5481,87.8663,93.6795 |
+| HR | PEN_L_hz_turn | 0,1,2,3,4,5 | 1.2855,1.7378,6.5084,1.8153,0.0837,6.7479 |
+| HR | PEN_R_hz_turn | 0,1,2,3,4,5 | 1.8828,2.3728,9.0720,2.4195,0.6745,9.0136 |
+| HR | frac_confined_post | 0,1,2,3,4,5 | 0.1260,0.1300,0.2160,0.0160,0.0000,0.1340 |
+| HR | bump_follow_confined_frac | 0,1,2,3,4,5 | 0.0200,0.0167,0.0967,0.0067,0.0000,0.1333 |
+| HR | bump_follow_wedges_per_s | 0,1,2,3,4,5 | 6.2042,-2.4405,5.2123,-0.4214,3.1903,-11.8990 |
+| HR | survival_s | 0,1,2,3,4,5 | 5.0000,4.9900,5.0000,0.6000,0.0000,1.4200 |
+| HR | bump_hz_post | 0,1,2,3,4,5 | 146.0752,147.5869,154.9643,181.2637,nan,162.1085 |
+| HR | width_half_post | 0,1,2,3,4,5 | 3.8889,4.0000,4.0000,4.0000,nan,4.0000 |
+| HR | GLNO_mean_pre | 0,1,2,3,4,5 | 10.5360,58.7765,5.0611,28.5962,10.5492,3.9811 |
+| HR | GLNO_mean_during | 0,1,2,3,4,5 | 90.7722,93.5089,89.3758,87.2937,90.3835,90.7126 |
+| HR | GLNO_mean_post | 0,1,2,3,4,5 | 53.9029,44.3451,58.2836,38.5960,30.5379,48.9000 |
+| HR | PEN_mean_pre | 0,1,2,3,4,5 | 2.1287,16.4631,1.0283,6.5778,2.1496,1.0286 |
+| HR | PEN_mean_during | 0,1,2,3,4,5 | 27.1746,28.9964,26.9063,26.4866,27.2386,27.1844 |
+| HR | PEN_mean_post | 0,1,2,3,4,5 | 8.4553,6.2307,10.9473,4.1973,1.2439,8.2376 |
+| C0 | GLNO_LR_hz | 0,1,2,3,4,5 | 29.8869,32.6911,30.3560,30.8815,31.4147,33.1926 |
+| C0 | PEN_LR_hz | 0,1,2,3,4,5 | -9.1059,-11.7190,-10.2529,-11.3614,-11.1618,-12.8418 |
+| C0 | DNa02_LR_hz | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| C0 | GLNO_L_hz_turn | 0,1,2,3,4,5 | 148.4696,152.7042,149.6721,151.0997,152.3758,152.4222 |
+| C0 | GLNO_R_hz_turn | 0,1,2,3,4,5 | 118.5827,120.0131,119.3160,120.2182,120.9611,119.2296 |
+| C0 | PEN_L_hz_turn | 0,1,2,3,4,5 | 48.7241,48.6558,48.5174,48.6400,49.1619,48.1253 |
+| C0 | PEN_R_hz_turn | 0,1,2,3,4,5 | 57.8300,60.3748,58.7703,60.0014,60.3237,60.9672 |
+| C0 | frac_confined_post | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| C0 | bump_follow_confined_frac | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| C0 | bump_follow_wedges_per_s | 0,1,2,3,4,5 | 0.4133,0.1433,0.2109,0.1448,0.0387,0.1116 |
+| C0 | survival_s | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| C0 | bump_hz_post | 0,1,2,3,4,5 | nan,nan,nan,nan,nan,nan |
+| C0 | width_half_post | 0,1,2,3,4,5 | nan,nan,nan,nan,nan,nan |
+| C0 | GLNO_mean_pre | 0,1,2,3,4,5 | 129.9327,125.1782,32.1891,115.8105,120.4698,130.9001 |
+| C0 | GLNO_mean_during | 0,1,2,3,4,5 | 128.6062,129.3197,117.1816,140.3660,133.0743,129.9086 |
+| C0 | GLNO_mean_post | 0,1,2,3,4,5 | 134.3837,136.4193,135.6588,136.0668,136.7215,135.4300 |
+| C0 | PEN_mean_pre | 0,1,2,3,4,5 | 42.5349,41.0964,8.8371,35.2628,42.1287,42.9278 |
+| C0 | PEN_mean_during | 0,1,2,3,4,5 | 43.7213,43.9228,38.9926,47.9348,46.3704,44.1711 |
+| C0 | PEN_mean_post | 0,1,2,3,4,5 | 52.9700,53.9653,53.5967,53.9396,54.1641,53.7417 |
+| CL | GLNO_LR_hz | 0,1,2,3,4,5 | 54.1659,55.4505,59.3179,54.4219,55.5876,56.5657 |
+| CL | PEN_LR_hz | 0,1,2,3,4,5 | -9.7918,-10.7050,-10.5520,-10.5957,-10.4444,-12.7209 |
+| CL | DNa02_LR_hz | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| CL | GLNO_L_hz_turn | 0,1,2,3,4,5 | 174.4912,176.1892,178.6621,174.1973,176.5403,175.9757 |
+| CL | GLNO_R_hz_turn | 0,1,2,3,4,5 | 120.3253,120.7387,119.3442,119.7754,120.9527,119.4100 |
+| CL | PEN_L_hz_turn | 0,1,2,3,4,5 | 49.1189,48.9809,48.5455,48.6969,49.1472,48.3224 |
+| CL | PEN_R_hz_turn | 0,1,2,3,4,5 | 58.9107,59.6859,59.0974,59.2927,59.5915,61.0433 |
+| CL | frac_confined_post | 0,1,2,3,4,5 | 0.0000,0.0020,0.0000,0.0000,0.0000,0.0000 |
+| CL | bump_follow_confined_frac | 0,1,2,3,4,5 | 0.0000,0.0033,0.0000,0.0000,0.0000,0.0000 |
+| CL | bump_follow_wedges_per_s | 0,1,2,3,4,5 | 0.4031,0.2456,0.2725,0.1623,0.1037,0.1328 |
+| CL | survival_s | 0,1,2,3,4,5 | 0.0000,2.5400,0.0000,0.0000,0.0000,0.0000 |
+| CL | bump_hz_post | 0,1,2,3,4,5 | nan,209.0891,nan,nan,nan,nan |
+| CL | width_half_post | 0,1,2,3,4,5 | nan,5.0000,nan,nan,nan,nan |
+| CL | GLNO_mean_pre | 0,1,2,3,4,5 | 129.9327,125.1782,32.1891,115.8105,120.4698,130.9001 |
+| CL | GLNO_mean_during | 0,1,2,3,4,5 | 128.6062,129.3197,117.1816,140.3660,133.0743,129.9086 |
+| CL | GLNO_mean_post | 0,1,2,3,4,5 | 142.7549,144.1700,144.3496,143.1951,143.4552,142.7171 |
+| CL | PEN_mean_pre | 0,1,2,3,4,5 | 42.5349,41.0964,8.8371,35.2628,42.1287,42.9278 |
+| CL | PEN_mean_during | 0,1,2,3,4,5 | 43.7213,43.9228,38.9926,47.9348,46.3704,44.1711 |
+| CL | PEN_mean_post | 0,1,2,3,4,5 | 53.4648,54.1251,53.7510,53.8875,53.6823,53.8903 |
+| CR | GLNO_LR_hz | 0,1,2,3,4,5 | 5.4873,8.5991,4.1262,5.6854,6.5193,8.1922 |
+| CR | PEN_LR_hz | 0,1,2,3,4,5 | -9.6011,-10.4489,-11.1327,-10.6967,-10.9302,-12.8510 |
+| CR | DNa02_LR_hz | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| CR | GLNO_L_hz_turn | 0,1,2,3,4,5 | 149.9236,151.8005,149.6678,150.8829,151.3673,152.7346 |
+| CR | GLNO_R_hz_turn | 0,1,2,3,4,5 | 144.4363,143.2014,145.5416,145.1975,144.8480,144.5424 |
+| CR | PEN_L_hz_turn | 0,1,2,3,4,5 | 48.8376,49.2653,47.9733,48.8797,48.8732,48.1479 |
+| CR | PEN_R_hz_turn | 0,1,2,3,4,5 | 58.4387,59.7142,59.1060,59.5764,59.8034,60.9989 |
+| CR | frac_confined_post | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| CR | bump_follow_confined_frac | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| CR | bump_follow_wedges_per_s | 0,1,2,3,4,5 | 0.3931,0.1320,0.2399,0.1502,0.0009,0.0747 |
+| CR | survival_s | 0,1,2,3,4,5 | 0.0000,0.0000,0.0000,0.0000,0.0000,0.0000 |
+| CR | bump_hz_post | 0,1,2,3,4,5 | nan,nan,nan,nan,nan,nan |
+| CR | width_half_post | 0,1,2,3,4,5 | nan,nan,nan,nan,nan,nan |
+| CR | GLNO_mean_pre | 0,1,2,3,4,5 | 129.9327,125.1782,32.1891,115.8105,120.4698,130.9001 |
+| CR | GLNO_mean_during | 0,1,2,3,4,5 | 128.6062,129.3197,117.1816,140.3660,133.0743,129.9086 |
+| CR | GLNO_mean_post | 0,1,2,3,4,5 | 142.6288,143.3593,143.4666,143.3115,142.0955,142.9515 |
+| CR | PEN_mean_pre | 0,1,2,3,4,5 | 42.5349,41.0964,8.8371,35.2628,42.1287,42.9278 |
+| CR | PEN_mean_during | 0,1,2,3,4,5 | 43.7213,43.9228,38.9926,47.9348,46.3704,44.1711 |
+| CR | PEN_mean_post | 0,1,2,3,4,5 | 53.2564,54.1079,53.5328,53.8579,53.1342,53.6650 |
+
+### 6.7 Provenance, self-review and handback
+
+The declaration was frozen at **2026-09-15 21:46:49 UTC** on merged/pushed main `dc98bfe`.
+The one house submission began at **21:47:13.104742 UTC**; all six seed jobs completed, zero failures,
+and all 36 JSON/NPZ/console triplets were fetched. The local `submitted_at.txt`, `client_stdout.txt`
+and unchanged `predeclared_archive.json` preserve the submission record.
+
+Fingerprint block (byte SHA-256 unless labelled LF):
+
+```text
+declaration 16a9230d07d87ba73bb1dc252d4ce4306d228450f43b1a61a6466e0fd3e88295
+batch.sh    27c0af904808220eadffecc672defe078923ec0dc7faf8dc262f82ed692c8a03
+arms.json   981214f34ce27c91b14733a7f91eccf74f50354ad2bd8b67f0dcc5d2bb44b0cd
+generator/reducer LF ee06dbde3973414c1873e01fe3837fd5a53a1c4e3aad6decaa5904e148abace5
+trace verifier LF    15c65c60d23fb8a895c834c648801b8167e14f99c416a23257751d647cdf1f76
+MaleCNS CSR MD5      ef23cc27bea13be7f6a96f3c04fd3737
+GLNO scratch CSR MD5 7a10d93ba2086f2c76bcdabdca79b4ec
+```
+
+Reproduction, CPU only after fetch:
+
+```text
+python scripts/cx8_transfer.py analyse --out out/cx8t
+python scripts/cx8_transfer_verify.py --runs out/cx8t --reference out/cx8r --commit dc98bfe
+python scripts/cx8_transfer_plot.py --runs out/cx8t/analysis/runs.csv --out out/cx8t/analysis/transfer.png
+```
+
+The reducer reports **36 runs, zero problems, 648 trace checks**. It checks full resolved LIF,
+hold counts/descriptions, GLNO target bodyIds and transmitter override, event onset and all 800
+command frames, CUDA consoles, preset, recorded source hashes and frozen protocol. The command
+matrix is empty for H0/C0, and exactly 90 Hz on frames 350-649 for the four stimulated arms.
+The recorded turn clock is never fed. The independent trace calculation uses the original
+confinement rule and a 5e-5 absolute / 1e-6 relative float32 reduction tolerance, not a fitted rule.
+
+The separate source/control verifier ties **all 72 frozen source hashes and all 58 recorded source
+hashes** to the submitted commit. Three recorded files were not in the frozen source list:
+`flyverse/data/manifest.json`, `scripts/interp_export.py`, `scripts/probe_object_sweep.py`; their
+hashes agree with `dc98bfe` as a retrospective source check. They are not described as frozen.
+All six H0 seeds exactly reproduce the earlier HG run's **138 metrics and 31 NPZ arrays per seed**.
+Output: `out/cx8t/verification/sources_and_control.json`. The separate verifier and plot generator
+were added after submission and do not change any simulation or analysis result.
+
+**Astra self-review:** all four directional predictions are visible, including the failed fourth.
+The table preserves statistical `result` versus directional failure; baseline and actual side rates
+travel with the interpretation. There is no fitted level, causal receptor claim, or result-versus-null
+interaction claim. Section 5.2 also corrects three rendered `nan` verdict cells to `null`: pandas'
+CSV NA parsing caused that documentation error; the saved verdicts and prose were already `null`.
+Every per-seed row and the Report summary are checked against their sources. Final full CPU suite: **473 passed / 19 skipped,
+220 subtests**, 217.19 s (`out/compass7/cx8t_closeout_cpu.log`), including the unchanged golden.
+All three MaleCNS cache file MD5s remain unchanged in main and the worktree.
+
+The single authorized follow-up is complete. Direct challenge establishes a PEN side response under
+HG, while the round-7 afferent experiment still has no qualifying following/sign-reversal result.
+The conditional benchmark suite and odour room are therefore **not run**. No default, gain or
+receptor row is adopted; `raw` remains unchanged. No second follow-up is submitted. Independent
+skeptic pending (Fable, when accounts reset); this self-review does not replace it.
 
 ## Report
 
@@ -446,25 +730,37 @@ summary: |-
   This result uses 48 CUDA runs in cx8r, six per arm, with zero analysis problems. An independent
   CPU trace calculation reproduces 972 measurements and 52 source hashes. The first cx8 attempt
   is retained as invalid because Astra's frozen receptor rule was wrong; it is not used for inference.
-  Primary 3's result, with no demonstrated follow, selects the single predeclared GLNO-to-PEN transfer
-  follow-up. The suite and odour-room milestone are not unlocked. Independent skeptic pending
-  (Fable, when accounts reset).
+  The selected single follow-up, cx8t, finds a correctly signed PEN side response to a strong direct
+  GLNO challenge: HL-HR +2.9939 Hz (result, z 3.1904, Holm p 0.00866), with GLNO engagement +149.0748 Hz.
+  This is transfer under the artificial input, with side-balanced PEN mean falling from H0's 24.0426 Hz
+  to 5.0211 / 3.6345 Hz in HL / HR. It does not demonstrate a following compass.
+
+  The GLNO-PEN edge hold changes the operating state: C0 already has PEN L-R -11.0738 Hz. Both edge
+  contrasts are positive results; HR-CR +9.7340 Hz is opposite the predeclared negative prediction.
+  That prediction failed. The controls cannot isolate unitary transfer at matched presynaptic rates.
+  All 36 follow-up runs pass the frozen checks, including 648 reconstructed trace measurements.
+  Nothing is adopted; the single follow-up is complete and the suite/odour-room gate remains unmet.
+  Independent skeptic pending (Fable, when accounts reset).
 key_claims:
 - The signed afferent changes GLNO L-R in V; the absolute primary effect is +2.2183 Hz.
 - HGV has zero eligible follow runs. Both follow contrasts are undetermined; no eligible sign reversal is demonstrated.
-- PEN and DNa02 L-R contrasts are null under the declared rule.
-- PEN-only hold removes measured confinement, but its primary contrast fails the z requirement and remains null.
-- The k sweep selects no gain; every arm fails the joint ledger compass criteria.
+- The round-7 PEN and DNa02 L-R contrasts are null under the declared rule.
+- The PEN-only confinement contrast fails the z requirement; the k sweep selects no gain.
+- Direct GLNO forcing gives a correctly signed PEN side response of +2.9939 Hz at the declared strong challenge.
+- PEN mean falls under direct forcing; the edge hold changes the baseline, and the right-edge sign prediction fails.
+- Neither batch produces a joint ledger compass success or an adoption.
 validation:
-- 48 valid CUDA runs, six per arm, zero primary-analysis and independent-verifier problems.
-- 972 saved-trace measurements and 52 source hashes checked on CPU.
-- Submitted-tree CPU suite 469 passed, 19 skipped, 220 subtests; golden and cache unchanged.
+- cx8r has 48 valid CUDA runs, zero problems, 972 measurements and 52 source hashes checked on CPU.
+- cx8t has 36 valid CUDA runs, zero problems and 648 independently reconstructed measurements.
+- All 72 frozen and 58 recorded cx8t source hashes agree with the submitted commit; three recorded files were not frozen.
+- Every H0 seed exactly reproduces the earlier HG metrics and arrays.
+- Submitted and closeout CPU suites each passed 473 tests, with 19 skipped and 220 subtests; golden and cache unchanged.
 - Initial cx8 invalidated for a declaration error, retained separately without inference.
 - Independent skeptic pending (Fable, when accounts reset).
 recommendations:
 - Nothing adopted; raw remains the default.
-- Execute the single predeclared GLNO-to-PEN diagnostic; do not run the conditional suite/room milestone yet.
+- The one authorized follow-up is complete. The following/sign-reversal gate remains unmet, so no suite or room is run.
 open_questions:
-- Whether a directly imposed GLNO side signal transfers into PEN under the held operating state.
-- A physiological receptor/kinetic account and a stable following bump remain unresolved.
+- How to obtain a stable confined bump that tracks a signed afferent input without suppressing relay activity.
+- A physiological receptor and kinetic account remains unresolved; the direct challenge does not identify one.
 ```
