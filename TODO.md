@@ -275,23 +275,27 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
 ## F. Cross-connectome: FlyWire FAFB v783 and BANC v888 (female brain; female brain + VNC)
 
 Survey: `docs/audits/flywire_banc_survey.md` (2026-09-14); implementation spec: `docs/CONNECTOME_BACKENDS_SPEC.md`
-(handed to Astra, 2026-09-14: items 1-3 below and, time allowing, the BANC walking replicate). Both releases are public; type names overlap MaleCNS
+(Astra, 2026-09-14: items 1-3 and the BANC walking replicate delivered on `feat/connectome-backends`, merged as 34c2eb0.
+Headline: the female CNS walks straighter than the male at the shipped defaults (clean yaw SD 0.28 vs 2.64 deg/s,
+DNa02 silent bilaterally); the leg-cycle yaw increase replicates qualitatively (0.38 -> 2.65 deg/s, `result`
+within-dataset) but the neural pattern does not (BANC DNa02_L stays silent, PS059 ~0 Hz vs 20 Hz) -- descriptive,
+not a sex test; `docs/audits/connectome_backends.md`.) Both releases are public; type names overlap MaleCNS
 exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` already bridges the rest.
 
-- [ ] `scripts/cross_connectome.py`: every anatomical claim of rounds 1-3 (DNa02's inhibitory budget, PS049 /
+- [x] `scripts/cross_connectome.py` (merged 34c2eb0): every anatomical claim of rounds 1-3 (DNa02's inhibitory budget, PS049 /
       PS059 / VES051 / AOTU019, AN04B003 and LT51 excitation, IN12B014's symmetric contralateral pair, the
       PS196a -> PS059 loop, the haltere-afferent route, LC11 / LC10a inputs) printed MaleCNS / FAFB / BANC side by
       side with a per-release synapse scale (counts run ~1 : 0.6 : 0.3). CPU, a day. The README's "not a
       reconstruction artefact" table.
-- [ ] `Connectome.load(dataset="fafb" | "banc")`: `root_id` -> `bodyId` (int64 fits), alias-normalised types,
+- [x] `Connectome.load(dataset="fafb" | "banc")` (merged 34c2eb0; review `docs/audits/connectome_backends_review.md`, merge with fixes B1-B4 applied; open nits 2/4/5/6/7/8/10/11 listed there): `root_id` -> `bodyId` (int64 fits), alias-normalised types,
       vocabulary maps for superclass / NT / side / neuropil; the receptor table and ledger transfer by type name.
       BANC = the female CNS as a whole-animal replicate of the walking result (either outcome is a finding);
       FAFB = the complete female optic lobe. ~2 days; the biggest scientific payoff and the best release story.
-- [ ] NT sources 4 and 5 for `docs/NT_INTEGRATION.md`: FAFB per-cell probabilities, BANC verified transmitters
+- [x] NT sources 4 and 5 for `docs/NT_INTEGRATION.md` (section 8, merged 34c2eb0): FAFB per-cell probabilities, BANC verified transmitters
       (65,369 cells). Conflict rows to add: PFL3 (ACh in MaleCNS / FAFB, TYR predicted in BANC; PFL2 verified
       tyramine), Delta7 (`glutamate,serotonin` verified), LAL074; ~400 MaleCNS `unknown` (silenced) cells carry a
       classical-transmitter prediction in BANC; MaleCNS `serotonin` splits SER / DA / tyramine across sources.
-- [ ] FAFB `column_assignment` (45,528 cells, 31 types, hex coordinates) as ground truth for
+- [~] FAFB `column_assignment` (45,528 cells, 31 types, hex coordinates): the transform hex1 = q + 18, hex2 = p + 20 is in (1,581 columns; mirror <= 1.6 deg; T4 offsets cos >= 0.98; DRA strict rim check FAILS 100/126 and is recorded as an expected failure) -- still to use it as ground truth for
       `trace.column_of_cells` and the LC anatomical windows; LC11 / LC10a themselves are not column-assigned there.
 - [ ] Do not: mix counts across releases unscaled; treat BANC's optic lobes as complete (T2 853 vs 1,466);
       prefer BANC predicted monoamine labels to its verified column; assume `fru` / `dsx` circuits are sex-shared.
