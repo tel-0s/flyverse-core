@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use flyverse, please cite it as below, and cite the MaleCNS v1.0 connectome release and Shiu et al. 2024 as well -- flyverse is a simulator built on their data and their neuron model."
+message: "If you use flyverse, please cite it as below, and cite the MaleCNS v1.0 connectome release and Shiu et al. 2024 as well -- flyverse is a simulator built on their data and their neuron model. If you use the female backends, cite the FlyWire FAFB v783 and/or BANC v888 releases and their original reconstruction papers."
 title: "flyverse: the MaleCNS fly connectome in simulations, games and other strange places"
 abstract: "A whole-CNS Drosophila simulation driven by the Janelia FlyEM MaleCNS v1.0 connectome: a graded optic lobe feeding a leaky integrate-and-fire central brain and VNC, embodied in a ray-traced room, with an interpretability toolkit for localizing behavioural deficits to populations, synapses and links."
 type: software
@@ -38,6 +38,27 @@ references:
     url: "https://storage.googleapis.com/flyem-male-cns/"
     repository: "https://male-cns.janelia.org/download/"
     notes: "Janelia Research Campus, HHMI. Release paper DOI to be confirmed (see the TODO above)."
+
+  # The two female releases the optional backends compile (connectome.load(dataset="fafb" | "banc")).
+  # Public Codex releases, CC BY 4.0; the files flyverse reads and their SHA-256 hashes are in
+  # flyverse/data/manifest.json. Cite the original reconstruction papers alongside the release.
+  - type: data
+    title: "FlyWire FAFB v783: the adult Drosophila melanogaster female brain connectome (Codex public release)"
+    authors:
+      - name: "FlyWire Consortium"
+    year: 2024
+    version: "783"
+    url: "https://codex.flywire.ai/"
+    notes: "Princeton / FlyWire. Used as the complete female optic lobe and brain backend."
+
+  - type: data
+    title: "BANC v888: the adult Drosophila melanogaster female brain and ventral nerve cord connectome (Codex public release)"
+    authors:
+      - name: "FlyWire Consortium"
+    year: 2025
+    version: "888"
+    url: "https://codex.flywire.ai/"
+    notes: "Used as the whole-animal female backend, including verified transmitter calls."
 
   # The neuron model flyverse's LIF follows: v_rest = v_reset = -52 mV, v_th = -45 mV, tau_m = 20 ms,
   # tau_syn = 5 ms, refractory 2.2 ms, delay 1.8 ms, w = 0.275 mV x synapse count x sign (docs/NOTES.md).
