@@ -26,7 +26,9 @@ def test_female_cpu_smoke_and_raw_counts(dataset):
     counts = cn.sign0_counts(c)
     assert (counts[c.W.data != 0] == 0).all() and counts.sum() > 0
     if dataset == "fafb":
-        assert build_retina(c).n_columns == 1581
+        coverage = build_retina(c).coverage()
+        assert coverage["n_columns"] == 1581
+        assert coverage["without_photoreceptors"] == 51
     else:
         with pytest.raises(cn.NotAvailable):
             build_retina(c)
@@ -53,3 +55,16 @@ def test_wing_motor_groups_are_populated_on_every_vnc_release():
             pytest.skip(f"compile {dataset} first")
         wg = wing_groups(cn.load(dataset=dataset, verbose=False))
         assert (len(wg.steer_L), len(wg.steer_R), len(wg.power)) == expect
+
+
+def test_banc_haltere_names_normalize_without_changing_selected_cells():
+    from flyverse.motor import wing_groups
+    if not (cn.default_cache_directory("banc") / "W_post_pre.npz").exists():
+        pytest.skip("compile banc first")
+    c = cn.load(dataset="banc", verbose=False)
+    h = c.neurons.iloc[wing_groups(c).haltere]
+    assert len(h) == 25
+    for raw, canonical, count in (("hi1", "hi1 MN", 4), ("hi2", "hi2 MN", 3),
+                                  ("hDVM", "hDVM MN", 2), ("hiii2", "hiii2 MN", 2)):
+        selected = h[h.flywireType == raw]
+        assert len(selected) == count and selected.type.eq(canonical).all()

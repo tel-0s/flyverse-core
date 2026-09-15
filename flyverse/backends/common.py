@@ -26,6 +26,9 @@ def normalize_types(types, path=None):
 
     The CSV documents flags that make an alias unusable. Retain those exclusions here,
     and record every unresolved source name in the compiler manifest for review.
+    `system` names a source vocabulary, not a dataset restriction: FAFB and BANC
+    intentionally share the flywire/banc rows. Release-specific splits must remain
+    unresolved rather than silently choosing a different meaning by dataset.
     """
     a = pd.read_csv(path or ALIASES, comment="#").fillna("")
     a = a[a.system.isin(["flywire", "banc"]) & a.tier.isin(["exact", "alias"])]
