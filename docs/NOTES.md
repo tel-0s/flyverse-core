@@ -3144,3 +3144,24 @@ Nothing adopted. `docs/audits/level_fixed_point.md` records every family and per
 primaries. Sections 4-11 and Report were missing alongside section 0 and are reconstructed from the
 saved batch with all analyses re-run. CPU suite 441 passed / 19 skipped, 215 subtests; golden and cache
 unchanged. **Independent skeptic pending (Fable, when accounts reset).**
+
+## Session 12, compass round 7: the signed afferent reaches GLNO (2026-09-15)
+
+The input arrives with a side: V minus S GLNO L-R is **+2.2183 Hz**, result with Holm p 0.0130.
+The raw SD is only 0.0013269 Hz, so the enormous z is not a large absolute physiological effect.
+The compass still does not follow: HGV has **0/6 eligible runs** at the predeclared 50% confinement
+gate; the two follow contrasts are **undetermined**, not zero and not null. PEN L-R HGV-HG is null
+(+0.7813 Hz, z 0.4221), as is DNa02 L-R (all values zero). The PEN-only hold has no confined frames;
+its contrast is nevertheless null under the full rule (|z| 2.3613 <3 despite Holm p 0.0130).
+The descriptive low/high k levels have one eligible run each and select no gain. No arm passes the
+joint survival/rate/width ledger. The signal reaches GLNO without demonstrating a working compass.
+
+The valid batch is cx8r, 48 CUDA runs, six per arm, zero analysis problems. The initial cx8 attempt
+is retained as invalid: Astra's new frozen record said class, whereas --receptor-model shipped runs
+sign/abs. Fixed the metadata and actual-CLI guard, then repeated the complete unchanged experiment.
+Independent CPU trace verification reproduces 972 measurements and 52 source hashes; every run
+matches the corrected freeze. `docs/audits/compass_velocity_route.md` carries the six tests, all
+per-seed lists and follow traces. CPU 469 passed / 19 skipped, 220 subtests; golden/cache unchanged.
+Nothing adopted. Primary 3 result with no demonstrated follow selects the one authorized GLNO-to-PEN
+transfer diagnostic; the conditional suite and odour room remain gated. **Independent skeptic pending
+(Fable, when accounts reset).**

@@ -3526,3 +3526,17 @@ primaries are null. M2-C is null on all seven. The direct pooled matched structu
 the old level model's residual on L3 reveals its extrapolation limit. Source-stamp differences and
 an unused descriptive rate-column defect are recorded. Nothing adopted; CPU suite 441 passed /
 19 skipped, 215 subtests, including the golden gate; cache MD5s unchanged.
+
+## Compass round 7, signed afferent route (2026-09-15)
+
+**Independent skeptic pending (Fable, when accounts reset).** `compass_velocity_route.md` section 5;
+Astra's self-review is labelled. Valid cx8r has 48 CUDA runs, six per arm, zero protocol or trace-check
+problems, 972 measurements and 52 source hashes verified independently on CPU. V-S GLNO L-R is result
+(+2.2183 Hz, Holm p 0.0130); HGV has 0/6 eligible follow runs, so primaries 1/2 are undetermined.
+PEN and DNa02 L-R are null. PEN-only confinement is zero, but its contrast is null under the z>=3
+rule despite Holm p 0.0130. No joint ledger successes or gain selected. Nothing adopted; the declared
+GLNO-to-PEN follow-up is next, and the suite/room milestone is not unlocked.
+
+Initial cx8 remains invalid due to Astra's class/abs declaration error, never used for inference.
+The full replacement ran identical physical commands. Submitted-tree CPU 469 passed / 19 skipped,
+220 subtests, unchanged golden and cache. Review correction is in `instruments_review.md` section 5.
