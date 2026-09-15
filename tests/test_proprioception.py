@@ -105,8 +105,9 @@ class SelectionTests(unittest.TestCase):
 
     def test_round3_tokens_leg_cycle_and_haltere_sided(self):
         P = Proprioception
-        self.assertEqual(P.parse_flags("all"), (P.CHANNELS, {"haltere_coriolis": False, "leg_cycle": False, "haltere_sided": False}))
-        self.assertEqual(P.parse_flags("all+leg_cycle+haltere_sided+haltere_coriolis")[1], {"haltere_coriolis": True, "leg_cycle": True, "haltere_sided": True})
+        off = {"haltere_coriolis": False, "leg_cycle": False, "haltere_sided": False, "unsided": False, "leg_cycle_flat": False}
+        self.assertEqual(P.parse_flags("all"), (P.CHANNELS, off))                              # every token absent by default
+        self.assertEqual(P.parse_flags("all+leg_cycle+haltere_sided+haltere_coriolis")[1], dict(off, haltere_coriolis=True, leg_cycle=True, haltere_sided=True))
         self.assertEqual(P.parse_spec("all+leg_cycle"), (P.CHANNELS, False))                 # the round-2 view is unchanged
         with self.assertRaises(ValueError): P.parse_flags("haltere+leg_cycle")               # leg_cycle needs a leg channel
         with self.assertRaises(ValueError): P.parse_flags("chordotonal+haltere_sided")       # haltere_sided needs the haltere channel
@@ -119,6 +120,69 @@ class SelectionTests(unittest.TestCase):
         c = s.counts()["chordotonal"]
         self.assertEqual(c["segments"], {"T1": 1, "T2": 2, "T3": 1, "none": 0}); self.assertEqual(c["legs"], {"L1": 1, "R1": 0, "L2": 1, "R2": 1, "L3": 0, "R3": 0})
         np.testing.assert_allclose(s.leg_weights["chordotonal"], [[0, 0, 1, 0, 0, 0], [0, 0, 0, 1, 0, 0], [0, 0, 0, 0, .5, .5], [1, 0, 0, 0, 0, 0]])
+
+
+class UnsidedTokenTests(unittest.TestCase):
+    """Round 5's labelled UNSIDED control (docs/audits/level_controls.md): with the token absent the round-2 law is the
+    round-2 law (the sided values pinned by RateLawTests, and the shipped / 'all' BatchSim paths unchanged); with it every
+    leg cell reads the side-mean leg-MN rate. 'leg_cycle_flat' is a marker for the LegCycle builder (tests/test_body_cycle.py)."""
+
+    def rates(self, s, **kw):
+        args = dict(leg_L=0., leg_R=0., haltere=0., airborne=False, yaw_rate=0., batch=1); args.update(kw)
+        return {ch: hz for ch, _, hz in s.rates(**args)}
+
+    def test_token_absent_is_the_round2_law_and_the_default_flags_are_off(self):
+        s = Proprioception(graph(), "all")
+        self.assertFalse(s.unsided); self.assertFalse(s.leg_cycle_flat); self.assertEqual(s.spec, "all")
+        np.testing.assert_allclose(self.rates(s, leg_L=15., leg_R=0.)["chordotonal"], [[80, 10, 45, 80]])       # L, R, both, L: sided
+        np.testing.assert_allclose(self.rates(s, leg_L=15., leg_R=0.)["hair_plate"], [[52.5, 5]])
+        self.assertNotIn("unsided", s.spec)
+
+    def test_unsided_reads_the_side_mean_on_every_leg_cell(self):
+        s = Proprioception(graph(), "all+unsided")
+        self.assertTrue(s.unsided); self.assertEqual(s.spec, "all+unsided"); self.assertEqual(s.channels, Proprioception.CHANNELS)
+        r = self.rates(s, leg_L=15., leg_R=0., haltere=100.)
+        np.testing.assert_allclose(r["chordotonal"], [[45, 45, 45, 45]])                    # 10 + 140 * (7.5 / 30) on L, R, unsided and SApp23_L alike
+        np.testing.assert_allclose(r["hair_plate"], [[28.75, 28.75]])                      # 5 + 95 * 0.25
+        np.testing.assert_allclose(r["campaniform"], [[50, 50]]); np.testing.assert_allclose(r["haltere"], [[100] * 3])   # the other channels untouched
+        r2 = self.rates(s, leg_L=0., leg_R=15.)                                             # the mirror gives the same values: no sidedness left
+        np.testing.assert_allclose(r2["chordotonal"], r["chordotonal"]); np.testing.assert_allclose(r2["hair_plate"], r["hair_plate"])
+        np.testing.assert_allclose(self.rates(s, leg_L=15., leg_R=0., airborne=True)["chordotonal"], [[10] * 4])      # airborne: tonic as before
+        r3 = self.rates(s, leg_L=[15., 0.], leg_R=[0., 30.], batch=2)
+        np.testing.assert_allclose(r3["chordotonal"], [[45] * 4, [80] * 4])
+        # the same channel MEANS as the sided law when the mean of the two sides is what the law sees on average: a sided
+        # left / right pair (30 / 0) and its unsided form (15 / 15) give the same mean over one L and one R cell
+        sided = self.rates(Proprioception(graph(), "all"), leg_L=30., leg_R=0.)["chordotonal"][0]
+        self.assertAlmostEqual(0.5 * (sided[0] + sided[1]), self.rates(s, leg_L=30., leg_R=0.)["chordotonal"][0][0])
+
+    def test_grammar_of_the_round5_tokens(self):
+        P = Proprioception
+        self.assertEqual(P.parse_flags("chordotonal+unsided")[1]["unsided"], True)
+        self.assertEqual(P.parse_spec("all+unsided"), (P.CHANNELS, False))                    # the round-2 view is unchanged
+        self.assertEqual(P.parse_flags("all+leg_cycle+leg_cycle_flat")[1]["leg_cycle_flat"], True)
+        self.assertEqual(Proprioception(graph(), "all+leg_cycle+leg_cycle_flat").spec, "all+leg_cycle+leg_cycle_flat")
+        with self.assertRaises(ValueError): P.parse_flags("haltere+unsided")                 # needs an MN-rate leg channel
+        with self.assertRaises(ValueError): P.parse_flags("campaniform+unsided")
+        with self.assertRaises(ValueError): P.parse_flags("all+leg_cycle+unsided")           # the cycle does not read the MN rate
+        with self.assertRaises(ValueError): P.parse_flags("all+leg_cycle_flat")              # needs the cycle
+
+    def test_batch_sim_all_is_unchanged_with_the_token_absent_and_differs_with_it(self):
+        """Two BatchSims under 'all' (one built through the default constructor, one with the sense rebuilt as the probe
+        does with no overrides) are bit-identical; 'all+unsided' departs from them only on the sided leg cells."""
+        a = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all")
+        b = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all"); b.fb.proprioception_sense = Proprioception(b.fb.c, "all")
+        u = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+unsided")
+        self.assertEqual(u.fb.proprioception_sense.spec, "all+unsided")
+        for _ in range(4): a.step(); b.step(); u.step()
+        for k, v in snapshot(a.fb).items(): torch.testing.assert_close(v, snapshot(b.fb)[k], rtol=0, atol=0)
+        for sim in (a, b, u):
+            sim.motor = MotorRates(leg_L=np.array([12., 0.]), leg_R=np.array([0., 9.]), haltere=np.array([20., 40.]))
+        a.step(); b.step(); u.step()
+        torch.testing.assert_close(a.brain.poisson_p, b.brain.poisson_p, rtol=0, atol=0)
+        dt = a.brain.p.dt / 1000
+        np.testing.assert_allclose(a.brain.poisson_p[:, [9, 10, 11, 20]].numpy(), np.array([[66., 10., 38., 66.], [10., 52., 31., 10.]]) * dt, rtol=1e-5)
+        np.testing.assert_allclose(u.brain.poisson_p[:, [9, 10, 11, 20]].numpy(), np.array([[38.] * 4, [31.] * 4]) * dt, rtol=1e-5)      # 10 + 140 * 6/30; 10 + 140 * 4.5/30
+        torch.testing.assert_close(u.brain.poisson_p[:, [14, 15, 17, 18, 19]], a.brain.poisson_p[:, [14, 15, 17, 18, 19]], rtol=0, atol=0)   # campaniform / haltere untouched
 
 
 class RateLawTests(unittest.TestCase):

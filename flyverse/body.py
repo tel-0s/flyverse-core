@@ -255,7 +255,11 @@ class LegCycle:
     modelled: one frequency for all six legs. half_width_m is NOT a measured number (see the audit): it scales the
     turn asymmetry linearly and is a reported constant, never tuned.
     Loads: body weight shared equally by the legs in stance; stance_load_L/R = the share on each side's stance legs
-    (2/3 vs 1/3 alternating within the tripod; 1/2 each standing; 0 airborne)."""
+    (2/3 vs 1/3 alternating within the tripod; 1/2 each standing; 0 airborne).
+    `flat_amplitude` (default False; a LABELLED CONTROL construction, docs/audits/level_controls.md): the per-leg
+    amplitude law is replaced by amp_i = 1 for every leg while the cycle runs (walking, on the ground; 0 standing and
+    airborne as before), so the yaw term (half_width_m) and the |amp L-R| turn term are absent and only the phase /
+    stance-swing modulation remains. The timing laws, the tripod and the loads are unchanged by the flag."""
     swing_s: float = 0.030
     stance_coef_s: float = 0.9328
     stance_exp: float = -1.025
@@ -264,6 +268,7 @@ class LegCycle:
     half_width_m: float = 0.0010   # lateral distance of the stance tarsi from the yaw axis: APPROXIMATE, not measured
     v_min: float = 0.0005
     stance_min: float = 0.5
+    flat_amplitude: bool = False   # opt-in: amp_i = 1 while walking (the modulation-only control arm); the default law otherwise
     LEGS = ("L1", "R1", "L2", "R2", "L3", "R3")
     SIDE = (1, -1, 1, -1, 1, -1)              # +1 left, -1 right (the senses' convention)
     SEGMENT = (1, 1, 2, 2, 3, 3)
@@ -293,7 +298,10 @@ class LegCycle:
         # left legs (side +1) travel v - yaw * b, right legs v + yaw * b: yaw > 0 is a left turn, left legs inside
         v_leg = np.maximum(v[:, None] - side[None] * yaw[:, None] * self.half_width_m, 0.0)
         tau_fin = np.where(np.isfinite(tau_st), tau_st, 0.0)
-        amp = np.where(air[:, None], 0.0, v_leg * tau_fin[:, None] / self.step_ref_m)
+        if self.flat_amplitude:                                      # opt-in control: every walking leg at amplitude 1
+            amp = np.where(air[:, None] | ~np.isfinite(tau_st)[:, None], 0.0, np.ones_like(v_leg))
+        else:
+            amp = np.where(air[:, None], 0.0, v_leg * tau_fin[:, None] / self.step_ref_m)
         n_st = stance.sum(1)
         nL = (stance & (side > 0)[None]).sum(1); nR = (stance & (side < 0)[None]).sum(1)
         with np.errstate(divide="ignore", invalid="ignore"):

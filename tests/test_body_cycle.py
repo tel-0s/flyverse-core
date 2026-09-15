@@ -125,6 +125,57 @@ class TurnAsymmetryTests(unittest.TestCase):
         del cells
 
 
+class FlatAmplitudeTests(unittest.TestCase):
+    """Round 5's MODULATION-ONLY control (LegCycle(flat_amplitude=True); docs/audits/level_controls.md): the default is
+    unchanged (bit-identical rollout with the flag at its default), and with the flag the amplitude is 1 for every walking
+    leg whatever the yaw, 0 standing and airborne, while the timing, the tripod and the loads are the default's."""
+
+    def test_default_is_off_and_the_default_cycle_is_unchanged(self):
+        self.assertFalse(body.LegCycle().flat_amplitude)
+        self.assertEqual(vars(body.LegCycle()), vars(body.LegCycle(flat_amplitude=False)))
+        cyc = body.LegCycle()
+        k = cyc.advance(cyc.initial_phase(1), [0.01], [2.0], [False], 0.01)
+        tau = cyc.timing([0.01])[0][0]
+        side = np.asarray(cyc.SIDE, float)
+        np.testing.assert_allclose(k["amp"][0], np.maximum(0.01 - side * 2.0 * cyc.half_width_m, 0.0) * tau / cyc.step_ref_m, rtol=1e-12)   # the amplitude law
+
+    def test_flat_amplitude_is_one_while_walking_and_carries_no_yaw(self):
+        flat, ref = body.LegCycle(flat_amplitude=True), body.LegCycle()
+        for yaw in (2.0, -2.0, 0.0):
+            k = flat.advance(flat.initial_phase(1), [0.01], [yaw], [False], 0.01)
+            k0 = ref.advance(ref.initial_phase(1), [0.01], [yaw], [False], 0.01)
+            np.testing.assert_allclose(k["amp"], 1.0)                                       # every leg, whatever the yaw
+            for key in ("phase", "stance", "freq", "beta", "load_L", "load_R", "n_stance"):
+                np.testing.assert_array_equal(k[key], k0[key])                              # nothing else moved
+        k = flat.advance(flat.initial_phase(1), [0.0], [0.0], [False], 0.01)                # standing: amp 0, as the default
+        np.testing.assert_allclose(k["amp"], 0.0); self.assertTrue(k["stance"].all())
+        k = flat.advance(flat.initial_phase(1), [0.02], [1.0], [True], 0.01)                # airborne: suspended, amp 0
+        np.testing.assert_allclose(k["amp"], 0.0); self.assertFalse(k["stance"].any())
+        k = flat.advance(flat.initial_phase(2), [0.008, 0.0004], [0.5, 0.5], [False, False], 0.01)
+        np.testing.assert_allclose(k["amp"], [[1.0] * 6, [0.0] * 6])
+
+    def test_batch_sim_default_flag_is_bit_identical_and_the_flat_cycle_feeds_amplitude_one(self):
+        a = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+haltere_sided"); a.body.leg_cycle = body.LegCycle()
+        b = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+haltere_sided"); b.body.leg_cycle = body.LegCycle(flat_amplitude=False)
+        m = BatchSim(2, c=graph(), device="cpu", seed=1, proprioception="all+leg_cycle+leg_cycle_flat+haltere_sided"); m.body.leg_cycle = body.LegCycle(flat_amplitude=True)
+        self.assertTrue(m.fb.proprioception_sense.leg_cycle_flat); self.assertFalse(a.fb.proprioception_sense.leg_cycle_flat)
+        for _ in range(12): a.step(); b.step(); m.step()
+        for k, v in snapshot(a.fb).items(): torch.testing.assert_close(v, snapshot(b.fb)[k], rtol=0, atol=0)
+        for fa, fb_ in zip(a.flies, b.flies):
+            np.testing.assert_array_equal(fa.leg_amp, fb_.leg_amp); np.testing.assert_array_equal(fa.leg_phase, fb_.leg_phase)
+        for fm in m.flies:                                                                  # (the walk itself differs from a's through the brain: the afferents differ)
+            if fm.speed >= body.LegCycle().v_min and not fm.airborne:
+                np.testing.assert_allclose(fm.leg_amp, 1.0)
+            self.assertTrue(fm.stance_frac < 1.0 or fm.speed < body.LegCycle().v_min)
+        # the flat sense injects the flat state: the chordotonal command is the phase law at amplitude 1
+        st = body.LegCycle.state(m.flies); sense = m.fb.proprioception_sense
+        state = m.body.proprio_state(m.motor, haltere_sides=sense.haltere_sides(m.brain))
+        m.step()
+        expect = {ch: hz for ch, _, hz in sense.rates(**state, batch=2)}
+        np.testing.assert_allclose(m.brain.poisson_p[:, [9, 10, 11, 20]].numpy(), expect["chordotonal"] * (m.brain.p.dt / 1000), rtol=1e-5)
+        self.assertTrue(np.all(st["amp"][[f.speed >= body.LegCycle().v_min and not f.airborne for f in m.flies]] == 1.0))
+
+
 class BatchAndScalarTests(unittest.TestCase):
     def test_shipped_path_is_bit_identical_with_the_cycle_attached_and_the_sense_off(self):
         a = BatchSim(2, c=graph(), device="cpu", seed=3)

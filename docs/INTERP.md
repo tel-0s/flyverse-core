@@ -1005,6 +1005,17 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
     separately implemented checks, not a second agent, and it had no NOTES entry until the owner wrote one.
     **RULE: one hand-off file per round names every file's owner (done: `docs/HANDOFF_ROUND3_ASTRA.md`,
     git-ignored), and the closing critic covers both workflows or says plainly which one it does not.**
+28. **Per-seed scatter quoted in prose is emitted by the analysis script into a named file, and pasted from
+    that file.** The level-controls audit (`docs/audits/level_controls.md`, round 4b, batch `vncd5-2ffbc3`) printed
+    "per-seed values behind the arms (r0..r4)" for six arms; the DNa02_L lists for **four of them** (U, K, M, C) and
+    the clean-yaw-SD list for U occur nowhere in `out/vncd5` -- they had been built to carry the published means
+    instead of transcribed from `analysis/room_table.csv`'s `*_runs` columns, and an independent skeptic pass caught
+    it while reproducing all 49 rows of the same decision table exactly. The table was right; the prose was typed by
+    hand. The same pass found the sentence naming the wrong file for the per-run values (`pairwise.csv` carries mean,
+    SD and n only). **RULE: any per-run / per-seed list quoted in prose is emitted by the analysis script into a
+    named file, the file and its column are named in the sentence that quotes it, and the values are pasted from
+    that file -- never retyped, never reconstructed from a published mean. A quantity no file carries is not
+    quoted.**
 
 ### 10.3 The minimal command sequence (an odour-to-DN question, as an example)
 

@@ -2633,3 +2633,173 @@ self-consistent 150.0 / 149.8 / 149.2. The clip at 150 makes the lower end unrea
 "PS059 flips +6.0 (C, result) / +4.5 (D) / +3.7 (L, result) / +2.8 (A, result)" -- **D is not a result**
 (flip +4.464 +- 2.236, z +3.98 but p 0.0571 > 0.05, verdict blank in `compass_flip_chain.csv`); the parallel phrasing
 implies it is.
+
+## Level controls, round 4b (2026-09-15)
+
+`docs/audits/level_controls.md` (TODO.md B, the three controls that split the leg cycle's "structure" into the
+per-phase modulation, the unmatched channels and the round-2 law's DC sidedness; ONE house submission
+`vncd5-2ffbc3`, 30 jobs, 0 failed, 22.6 min, B200; six arms x five brain seeds, no compass), checked by an
+independent Opus skeptic pass whose ten corrections were applied to that audit. Verdict **mostly sound**, with one
+**INTEGRITY** finding: the audit's section-5 "Per-seed values behind the arms" sentence printed DNa02_L per-run
+lists for U, K, M and C (and a clean-yaw-SD list for U) that are in no file in `out/vncd5` -- they had been made to
+carry the published means rather than transcribed -- while every mean, SD, diff, z, p and verdict in the same table
+reproduced exactly. The lists were replaced from `analysis/room_table.csv` `*_runs` and the substitution is stated
+in the audit. The skeptic's Verdict section, including its NOTES paragraph, and its Refuted list verbatim (heading
+levels demoted to fit this document); the full pass, including its Confirmed list and its ten corrections, is in
+`docs/audits/level_controls.md` under `## Skeptic pass (independent, 2026-09-15)`.
+
+### Verdict
+
+**Mostly sound.** The batch itself is the cleanest in the thread: one submission, provenance complete and stamped
+before every run, six arms whose realised levels and preconditions I reproduced from the raw recordings, a decision
+table of which all 49 rows recompute exactly, a Holm defect that is correctly diagnosed and honestly refused rather
+than repaired, a control-parameter derivation whose every step checks out, and a single-cell mechanism check that
+reproduces bit-for-bit on an independent rerun. The central scientific claim -- **claim (3), that at its own afferent
+level the cycle's ascending relay fires several Hz more than any steady transducer of that level** -- is the best-
+supported thing in the round and is, if anything, under-defended: it survives twelve specifications, a held-out
+steady arm (0.33 Hz out-of-sample error against a 4-5 Hz residual), and a slope profile that shows no admissible
+hair-plate slope can remove it. Claims (1), (5), (6) and the sign and smallness of the hair-plate route in (2) are
+confirmed as written. What pulls the verdict down from "sound": one section prints per-seed numbers for four of six
+arms that are **not the data** (R1); claim (4)'s "no extra drive" is contradicted at z +3.5 to +4.0 by the author's own
+residual file (R2); the headline decomposition has a sign slip that makes it fail to add up (R3); claim (7)'s framing
+turns a denominator change into a failed replication (R5); and the level model's slopes are quoted with
+pseudo-replicated error bars over a design whose six points do not identify them (R8, R9). None of these is fatal to
+the round's conclusion; all five are fixable in text with the numbers above, and R1 must be fixed before this document
+is relied on.
+
+**For NOTES -- what rounds 4 and 4b jointly say about the leg cycle.** Round 4 found the leg-cycle arm above a
+level-matched steady control on DNa02 and the ascending relay but could not say why; round 4b ran the three controls
+that split the difference and, within one 30-job submission whose predeclaration is stamped 72 s before the first run,
+separated them: the round-2 law's DC sidedness owns the level control's drift and straightness and **none** of its
+DNa02 rate (U v L `null` on DNa02_L, DNa02_R and the clean yaw SD while straightness goes +0.231 and the drift halves);
+the unmatched hair plate is a real, sign-negative and **small** route (-0.07 Hz of AN04B003 per Hz in the room, -0.149
+on an isolated cell, accounting for +0.72 Hz -- 14 % -- of the +5.22 Hz pooled C-over-L relay difference, with the
+campaniform contributing nothing measurable); and the remainder, **~+4.5 Hz, is the per-phase modulation** -- a level
+model fitted on three steady arms predicts a held-out steady arm to 0.33 Hz and under-predicts both cycle arms by
++3.9 to +5.7 Hz, a residual that survives every specification I could build and that no admissible hair-plate slope can
+remove, with the single cell naming the mechanism directly (+1.63 Hz at a matched per-cell mean with IN13B001 clamped,
+z +7.2, reproduced bit-for-bit). Against that, four things are **not** established: no row of either round is
+Holm-called in round 4b, because the predeclared family size m = 7 is arithmetically unsatisfiable at 5 runs per arm
+(0.0079 x 7 = 0.0556) -- a failure to apply a rule already in `docs/INTERP.md` 10.2; the DNa02 story rests on pairs and
+on a level model the audit itself disqualifies, so "the structure raises DNa02" remains a `compare`-level pattern of
++0.09 to +0.18 Hz, not a level-controlled measurement; the amplitude-only control M bought 6.0 Hz of chordotonal and
+still carries a structure residual 0.66-0.75 Hz **larger** than C's (z +3.5 to +3.8), so "the amplitude law adds no
+drive" is not supported and F4 stays open; and the clean-yaw-SD row of C v L flipped from `result` to `null` between
+batches only because the control arm's between-run scatter doubled -- the difference itself replicated (+0.57 then
++0.49, complete rank separation in both, pooled p 1.1e-05), so neither batch is an outlier. Nothing is adopted; the
+next round's arms are named in section 10 and the first of them is a family whose Holm denominator can actually be
+satisfied.
+
+### Refuted
+
+**R1. The per-seed lists in section 5 are not the data (four of six arms wrong).** Section 5 line 302-306 prints
+"Per-seed values behind the arms (r0..r4)". A and L reproduce exactly. U, K, M and C do not:
+
+| arm | audit prints | the data (`room_table.csv` `DNa02_L_hz` `*_runs`, `pairs_console.txt` line 190, the run JSONs' `run.DNa02_L_hz`, and my own recomputation from `cmd__DNa02_L` on the post-skip non-airborne mask -- all three agree) |
+|---|---|---|
+| U | `[0.3917 0.3950 0.3720 0.3859 0.3903]` | `[0.3917 0.3950 0.3720 0.3873 0.3892]` (r3, r4 wrong) |
+| K | `[0.3316 0.3416 0.3549 0.3561 0.3648]` | `[0.3519 0.3632 0.3529 0.3261 0.3548]` (all five wrong) |
+| M | `[0.6104 0.6252 0.6199 0.6224 0.6265]` | `[0.6187 0.6327 0.6227 0.6141 0.6165]` (all five wrong) |
+| C | `[0.5099 0.5307 0.5338 0.5338 0.5316]` | `[0.5155 0.5343 0.5290 0.5144 0.5470]` (all five wrong) |
+
+The same sentence's clean-yaw-SD list is wrong for U in two places too: audit `[6.811 6.628 6.926 6.756 6.619]`
+against `[6.8111 6.6278 6.9263 6.7598 6.6147]` (`room_table.csv`, `pairs_console.txt` line 202, my recomputation).
+None of the printed U/K/M/C values occurs anywhere in `out/vncd5` as a `DNa02_L_hz` per-run value. Each fabricated
+list has been made to carry the published mean to four decimals (K 0.3498, M 0.6209, C 0.5280) and an SD close to but
+not equal to the published one (K: printed list gives 0.0131 against the file's 0.0140). **The means, the SDs, the
+diffs, the z and every verdict in the section-5 table are correct -- I reproduced all 49 rows exactly -- but the
+per-seed scatter quoted in prose is not the data and must be replaced or deleted.** This is the one finding in this
+pass that is an integrity problem rather than a reading problem.
+
+**R2. "M and C carry the SAME structure residual" is refuted by the audit's own file.** Section 0 item 4 and F4
+conclude "the amplitude law contributes no extra drive to DNa02 beyond its own level" from
+"M's structure residual is C's (+4.54 / +5.75 against +3.88 / +5.00)". Those are not the same number. Taking the
+per-run residuals straight out of `out/vncd5/level_model_predictions.csv` and applying the project's own `compare`:
+
+* AN04B003 L side: M +4.537 vs C +3.878, **diff +0.659, z +3.8, p 0.0079, `result`**
+* AN04B003 R side: M +5.749 vs C +5.004, **diff +0.745, z +3.5, p 0.0079, `result`**
+* DNa02 L side: M +0.2181 vs C +0.1488, **diff +0.0693, z +4.0, p 0.0079, `result`**
+
+The difference is 6-7 x the model's own RMSE (0.106 Hz). Decomposed: of M's +1.615 Hz AN04B003 excess over C on the
+L side, the level model attributes +0.956 (0.1921 x 6.174 Hz of chordotonal - 0.0697 x 3.293 Hz of hair plate) and
+leaves **+0.659 Hz unexplained**; of the +0.093 Hz M-over-C DNa02_L difference the level accounts for only +0.020
+(0.0032 x 6.17) and the residual difference is +0.069 -- i.e. essentially the whole of it. **The honest F4 reading is
+"most (about 60 %) of M's excess over C is its extra 6.0 Hz of chordotonal; the rest is not, and this batch cannot say
+whether the remainder is the amplitude law or the fact that a flat amplitude is also a different modulation
+waveform."** Not "no extra drive."
+
+**R3. The section-7 decomposition does not add up, and the hair-plate term has the wrong sign.** Section 7 last
+paragraph: "the chordotonal term is +0.01 ..., the hair-plate term is **-0.72** ..., and the residual **+4.4** Hz is the
+modulation", against an observed +5.22. `0.01 + (-0.72) + 4.4 = 3.69`, not 5.22. The arithmetic that produces 4.4 uses
+**+0.72**: `5.222 - 0.1921 x (+0.057) - (-0.0697) x (-10.276) = 5.222 - 0.011 - 0.716 = +4.495`. L's hair-plate excess
+*suppresses L's own rate* by -0.72 Hz, which *contributes +0.72 Hz to the C-over-L difference*. Section 6 F5 states the
+identical logic correctly ("the hair plate is still +9.42 Hz higher in U, which ... ACCOUNTS FOR -0.66 Hz of AN04B003 in
+U, i.e. works in C's favour and **inflates** the C v U excess by that much") and section 13 adds the two magnitudes
+(`1.44 + 1.63 = 3.07`). So this is a sign slip in two places (section 0 claim 2 and section 7), not a wrong number.
+
+**R4. `pairwise.csv` does not carry per-run values.** Section 5: "the rest are in `pairwise.csv` (every key carries its
+five per-run values)". `out/vncd5/analysis/pairwise.csv` has 51 columns -- `key`, six arms x (`mean`, `sd`, `n`), and
+eight pairs x (`diff`, `z`, `p`, `verdict`). There is no `*_runs` column. The per-run values are in
+`analysis/room_table.csv` (`*_runs`) and in `analysis/pairs_console.txt`'s per-arm block.
+
+**R5. "The clean-yaw-SD row of C v L did not replicate" mischaracterises the two batches.** Recomputing both batches
+with one reducer (`s4_vncd4.py`):
+
+| batch | L (5 runs) | C (5 runs) | diff | z (= diff / SD(L)) | exact MWU p | verdict |
+|---|---|---|---|---|---|---|
+| `out/vncd4` | 7.300 +- 0.081 `[7.392 7.172 7.313 7.296 7.329]` | 7.872 +- 0.160 `[8.055 7.952 7.836 7.892 7.626]` | **+0.572** | +7.1 | 0.0079 (floor) | `result` |
+| `out/vncd5` | 7.235 +- 0.172 `[7.003 7.189 7.228 7.274 7.483]` | 7.725 +- 0.134 `[7.832 7.781 7.674 7.822 7.514]` | **+0.490** | +2.8 | 0.0079 (floor) | `null` |
+
+The **effect replicated to 86 %** and the rank separation is **perfect in both batches** (every C run above every L
+run, so the exact p sits on the 5 v 5 floor in both). What changed is the *denominator*: L's own between-run SD went
+0.081 -> 0.172. Pooling the two batches, 10 v 10: **diff +0.531, p 1.08e-05 (the 10 v 10 floor), min(C) 7.514 >
+max(L) 7.483.** So the audit's open question "which of the two batches is the outlier is unknown" has an answer:
+**neither** -- the two batches agree on the difference and disagree only on one arm's scatter, and jointly they support
+C > L on the clean yaw SD. The verdict flip is real under `compare` and should be reported as such, but "a row that
+does not survive a second batch" overstates it.
+
+**R6. "+5.22 Hz" is this batch's number, not round 4's.** Section 7: "Applied to round 4's unexplained C-over-L
+difference (+5.22 Hz pooled)". Recomputed pooled AN04B003 C-over-L: `out/vncd4` **+5.548**, `out/vncd5` **+5.222**.
+Section 13 uses round 4's +5.55 correctly; section 7's label is wrong (the number is right for `vncd5`).
+
+**R7. Section 10 item 1's 6 v 6 family bound is off by one.** `p_floor(6,6) = 2/C(12,6) = 0.0021645`;
+`0.0021645 x 23 = 0.04978 <= 0.05`, so **m <= 23**, not 22. (The 5 v 5 bound, m <= 6, is right:
+`0.0079365 x 6 = 0.047619`.)
+
+**R8. The level model's "span" is a marginal statement that hides a joint extrapolation.** Section 7 justifies the
+fit with "between them span chordotonal 71.6-93.5 Hz and hair plate 41.0-61.6 Hz per side" and `level_model.json`'s
+caveat says the cycle arms are extrapolations "only in so far as their levels fall outside the fitted range". Both
+marginal ranges contain C and M. But the three steady arms lie on a near-line in the joint plane -- `corr(chord, hair)
+= 0.925` over the 30 side-observations **and 0.925 over the six (arm, side) means**, `hair = 0.974 x chord - 28.35`,
+R^2 0.855 -- and the cycle arms sit far off it:
+
+| point | chord | hair | hair the steady manifold has at that chord | off-manifold | Mahalanobis^2 from the steady cloud |
+|---|---|---|---|---|---|
+| steady points (6) | 72.97 - 92.70 | 41.75 - 61.12 | -- | -- | 0.49 - 3.13 |
+| C L / R | 85.96 / 86.26 | 46.28 / 46.45 | 55.38 / 55.68 | **-9.11 / -9.23 Hz** | **13.84 / 14.27** |
+| M L / R | 92.13 / 92.10 | 49.57 / 49.57 | 61.40 / 61.37 | **-11.83 / -11.80 Hz** | **25.22 / 25.09** |
+
+The prediction for each cycle arm therefore runs ~9-12 Hz of hair plate *perpendicular to the data*. It does **not**
+destroy the conclusion (see C9), but the "spans" sentence should not be read as "the cycle arms are interpolated".
+
+**R9. The published slope SEs are pseudo-replicated.** `b = +0.1921 +- 0.0128`, `c = -0.0697 +- 0.0103` are OLS SEs on
+30 rows with 4 parameters -- but the design has only **six distinct (arm, side) level points**; the 30 rows are five
+runs each of the same six points, and the run-to-run scatter within an arm is far smaller than the between-arm
+spacing. Refitting on the six (arm, side) means (2 residual df) gives **`b = +0.1848 +- 0.0355`, `c = -0.0648 +-
+0.0285`** -- SEs ~2.8 x larger, and the hair-plate slope is then **2.3 sigma from zero, not 6.8**. The residuals are
+unaffected (+3.916 / +5.073 for C). The slope numbers should carry the arm-level SE, and `-0.070 Hz/Hz` should not be
+quoted to two significant figures as if measured.
+
+**R10. The Holm defect is a violation of a rule that was already written down.** Section 0 and section 10 item 1
+present `m = 7 x p_floor(5,5) = 0.0556` as this round's discovery ("the rule for the next round is in section 10 item
+1"). `docs/INTERP.md` 10.2 already says, from object round 2: *"A family member whose statistic is constant by
+construction is not a test ... still inflates the Holm denominator ... **Declare such quantities as reported magnitudes
+outside the family**, and size the family (and therefore the arm count) from the members that can move"* -- and records
+that this is exactly why that round's arms went from 5 to 6 runs. The predeclaration step failed to apply a standing
+house rule. That is worth saying plainly, because "the rule for the next round" implies it did not exist.
+
+**R11. Section 0 item 4 leans on a model sections 7 and 9 disqualify.** "The amplitude / turn term is not what raises
+DNa02 ... the amplitude law contributes no extra drive to DNa02 beyond its own level" is a DNa02 level-model statement.
+Section 7 says the DNa02 fit "is not robust" (dropping U flips C's R residual to -0.176) and section 9 lists it among
+what the batch does not show. A claim cannot rest on a model the same document declares uninterpretable. (Combined
+with R2, the DNa02 residuals in fact separate M from C at z +4.0 on the L side.)

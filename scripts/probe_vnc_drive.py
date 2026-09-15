@@ -34,11 +34,16 @@ attached):
                     flip table, chain rates and bump drift per arm; the benchmark checks A vs B.
     plan     (CPU)  writes the ONE cluster submission (out/vncd/batch.sh).
 
-Families (--family): 'vncd' (round 2, ARMS), 'body' (round 3, ARMS_BODY; docs/audits/body_sided_state.md) and 'level'
+Families (--family): 'vncd' (round 2, ARMS), 'body' (round 3, ARMS_BODY; docs/audits/body_sided_state.md), 'level'
 (round 4, ARMS_LEVEL; docs/audits/level_matched_control.md): A shipped / L the round-2 transducer at the LEVEL-MATCHED
 mn_ref_hz (LEVEL_MN_REF_HZ, a labelled control passed as --mn-ref-hz; the sense's default is untouched) / C all+leg_cycle /
-D all+leg_cycle+haltere_sided. `pairs` reads the pair set from PAIRS_BY_FAMILY; the recorder-based sidedness keys are at
-lag 0 (the round-3 alignment kept as *_lagm1) and DNa02_L / _R share DNa02_LR_hz's frame mask.
+D all+leg_cycle+haltere_sided; and 'level2' (round 5, ARMS_LEVEL2; docs/audits/level_controls.md): A / L / U unsided /
+K channel-matched (--hair-plate-max-hz, --campaniform-load-hz) / M modulation-only (all+leg_cycle+leg_cycle_flat) / C --
+the three labelled controls that split the C-over-L excess into its parts. `pairs` reads the pair set from
+PAIRS_BY_FAMILY (`--predeclared <json>` Holm-calls the stamped families into decision_table.csv); the recorder-based
+sidedness keys are at lag 0 (the round-3 alignment kept as *_lagm1) and DNa02_L / _R share DNa02_LR_hz's frame mask.
+Every run JSON carries a `sense` block (spec, every token, mn_ref_hz, hair_plate_max_hz, campaniform_load_hz, the
+explicit overrides) and started / finished UTC stamps.
 
     PYTHONIOENCODING=utf-8 python scripts/probe_vnc_drive.py plan --runs 5 --compass-seeds 3 --draws 2
     bash out/vncd/batch.sh                       # one cluster_run.py call, --fetch out/vncd/
@@ -91,13 +96,41 @@ ARMS_LEVEL = {"A": None, "L": "all", "C": "all+leg_cycle", "D": "all+leg_cycle+h
 ARM_LABEL_LEVEL = {"A": "shipped (sense off)",
                    "L": f"proprioception all, mn_ref_hz {LEVEL_MN_REF_HZ} (LEVEL-MATCHED LABELLED CONTROL: the round-2 law at the leg-cycle arm's chordotonal level)",
                    "C": "all + leg cycle (per-leg, per-phase leg channels)", "D": "all + leg cycle + side-split haltere"}
-ARM_MN_REF = {"level": {"L": LEVEL_MN_REF_HZ}}      # per family, per arm: the sense's mn_ref_hz when it is not the default (None = the default)
-FAMILIES = {"vncd": (ARMS, ARM_LABEL, "ABE"), "body": (ARMS_BODY, ARM_LABEL_BODY, "ADE"), "level": (ARMS_LEVEL, ARM_LABEL_LEVEL, "ALCD")}     # arms, labels, compass arms
-ARM_ORDER = "ABLCDE"                 # table order across families (L sits between the round-2 transducer and the cycle)
+# Round 5 (thread level controls, docs/audits/level_controls.md): the THREE controls that split "structure" (level_matched_control.md
+# 7 item 1(a)(b)(c)). L differs from C in three ways at once -- per-phase modulation, the unmatched hair plate / campaniform, and
+# the round-2 law's +13.6 Hz DC chordotonal L-R -- and this family separates them, one difference per arm, all LABELLED CONTROLS:
+#   U = 'all+unsided' at mn_ref 8.84: the round-2 law with every leg cell reading the side-MEAN leg-MN rate (no DC L-R, same means)
+#   K = 'all' at mn_ref 8.84 with hair_plate_max_hz / campaniform_load_hz set so the realised hair-plate and campaniform means match
+#       C's (the CHANNEL-MATCHED control; the two values are derived on CPU as fixed points of the afferent -> leg-MN loop, like 8.84)
+#   M = 'all+leg_cycle+leg_cycle_flat': the cycle with the per-leg amplitude held at 1 (the phase modulation kept; the amplitude law,
+#       the half_width_m yaw term and the |amp L-R| turn term removed)
+# No compass arms (rounds 2-4 settled it: nothing moves the bump). The K values are passed on the job line (--hair-plate-max-hz /
+# --campaniform-load-hz, the constructor's own keywords); every sense parameter is recorded in the run JSON's `sense` block.
+# Derived on CPU as the fixed point of the same afferent -> leg-MN loop the round-4 mn_ref derivation solved
+# (out/vncd5/channel_match_derivation.json; generator out/vncd5/derive_channel_match.py): at mn_ref 8.84 these two make
+# the round-2 law's realised hair-plate and campaniform commanded means equal the cycle arm's 47.06 / 24.89 Hz.
+# LABELLED CONTROL parameters: the sense's defaults (100 / 50) are untouched and nothing here was chosen against behaviour.
+LEVEL2_HAIR_PLATE_MAX_HZ = 86.71
+LEVEL2_CAMPANIFORM_LOAD_HZ = 25.05
+ARMS_LEVEL2 = {"A": None, "L": "all", "U": "all+unsided", "K": "all", "M": "all+leg_cycle+leg_cycle_flat", "C": "all+leg_cycle"}
+ARM_LABEL_LEVEL2 = {"A": "shipped (sense off)",
+                    "L": f"proprioception all, mn_ref_hz {LEVEL_MN_REF_HZ} (LEVEL-MATCHED LABELLED CONTROL, re-run within this batch)",
+                    "U": f"proprioception all+unsided, mn_ref_hz {LEVEL_MN_REF_HZ} (UNSIDED level control: every leg cell reads the side-mean leg-MN rate)",
+                    "K": f"proprioception all, mn_ref_hz {LEVEL_MN_REF_HZ}, hair_plate_max_hz / campaniform_load_hz matched to the cycle arm's channel means (CHANNEL-MATCHED level control)",
+                    "M": "all + leg cycle with the per-leg amplitude held at 1 (MODULATION-ONLY control: phase modulation without the amplitude / turn term)",
+                    "C": "all + leg cycle (per-leg, per-phase leg channels)"}
+ARM_MN_REF = {"level": {"L": LEVEL_MN_REF_HZ}, "level2": {"L": LEVEL_MN_REF_HZ, "U": LEVEL_MN_REF_HZ, "K": LEVEL_MN_REF_HZ}}      # per family, per arm: the sense's mn_ref_hz when it is not the default (None = the default)
+# per family, per arm: further Proprioception constructor keywords of a labelled control (None = the sense's own default)
+ARM_SENSE_KW = {"level2": {"K": {"hair_plate_max_hz": LEVEL2_HAIR_PLATE_MAX_HZ, "campaniform_load_hz": LEVEL2_CAMPANIFORM_LOAD_HZ}}}
+FAMILIES = {"vncd": (ARMS, ARM_LABEL, "ABE"), "body": (ARMS_BODY, ARM_LABEL_BODY, "ADE"), "level": (ARMS_LEVEL, ARM_LABEL_LEVEL, "ALCD"),
+            "level2": (ARMS_LEVEL2, ARM_LABEL_LEVEL2, "")}     # arms, labels, compass arms ('' = no compass protocol in the family)
+ARM_ORDER = "ABLUKMCDE"              # table order across families (L / U / K / M sit between the round-2 transducer and the cycle)
 # adjacent-arm pairs `pairs` calls, per family: (treatment, reference)
 PAIRS_BY_FAMILY = {"vncd": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
                    "body": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
-                   "level": (("L", "A"), ("C", "L"), ("D", "C"), ("C", "A"), ("D", "L"))}
+                   "level": (("L", "A"), ("C", "L"), ("D", "C"), ("C", "A"), ("D", "L")),
+                   "level2": (("U", "L"), ("K", "L"), ("C", "K"), ("M", "C"), ("C", "U"), ("M", "K"), ("L", "A"), ("C", "L"))}
+SENSE_KW_FLAGS = (("mn_ref_hz", "mn_ref_hz"), ("hair_plate_max_hz", "hair_plate_max_hz"), ("campaniform_load_hz", "campaniform_load_hz"))   # (argparse dest, constructor keyword)
 
 
 def mn_ref_of(arm, family, override=None):
@@ -105,8 +138,41 @@ def mn_ref_of(arm, family, override=None):
     if override is not None:
         return float(override)
     return ARM_MN_REF.get(family, {}).get(arm)
+
+
+def sense_kwargs_of(arm, family, args=None):
+    """Every non-default Proprioception constructor keyword of an arm: explicit flags (--mn-ref-hz, --hair-plate-max-hz,
+    --campaniform-load-hz) win, else the family tables (ARM_MN_REF, ARM_SENSE_KW), else nothing (the sense's own defaults).
+    {} means the sense is built exactly as BatchSim builds it."""
+    kw = {}
+    mr = mn_ref_of(arm, family, getattr(args, "mn_ref_hz", None) if args is not None else None)
+    if mr is not None:
+        kw["mn_ref_hz"] = float(mr)
+    table = ARM_SENSE_KW.get(family, {}).get(arm, {})
+    for dest, key in SENSE_KW_FLAGS:
+        if key == "mn_ref_hz":
+            continue
+        v = getattr(args, dest, None) if args is not None else None
+        v = table.get(key) if v is None else v
+        if v is not None:
+            kw[key] = float(v)
+    return kw
+
+
+def sense_record(sense, spec, kw):
+    """The `sense` block every run JSON carries: the spec, every token, every rate parameter and the explicit overrides, so a
+    labelled control is verifiable from the JSON alone (vncd4's compass JSONs recorded mn_ref_hz only inside stimulus.params)."""
+    from flyverse.senses import Proprioception
+    return {"spec": spec, "tokens": {f: bool(getattr(sense, f)) for f in Proprioception.FLAGS}, "channels": list(sense.channels),
+            "mn_ref_hz": float(sense.mn_ref_hz), "hair_plate_max_hz": float(sense.params["hair_plate"]["max_hz"]),
+            "campaniform_load_hz": float(sense.params["campaniform"]["load_hz"]), "params": sense.params, "overrides": dict(kw),
+            "defaults_used": {k: (k not in kw) for k in ("mn_ref_hz", "hair_plate_max_hz", "campaniform_load_hz")}}
 WATCH = ["AN04B003", "AN07B035", "AN07B037_a", "AN06A026", "PS196_b", "LAL139", "GLNO", "IN12B014", "IN19A003", "DNa02"]
 WATCH_BODY = WATCH + ["PS059"]
+WATCH_LEVEL2 = WATCH_BODY + ["IN13B001"]           # the relay of the sign-negative hair-plate route (SNpp45 -> IN13B001 -| AN04B003), per frame
+# window-mean rates read from the per-fly recordings (`_flies.npz`, every cell) by `pairs`: the cells of the DNa02 decomposition
+# and of the hair-plate route, per side ('?' = the cells the annotation leaves unsided, e.g. SNpp45)
+CHAIN_RATE_TYPES = ["AN04B003", "IN13B001", "SNpp45", "PS059", "PS049", "IN12B014", "IN19A003", "LT51", "DNa02", "PS196_b", "GLNO", "IN14B003"]
 CHAIN = WATCH_BODY + ["PS047_b", "PS239", "LAL184", "WED040_a", "PEN_a(PEN1)", "PEN_b(PEN2)", "EPG", "Delta7", "PEG", "HSN", "Nod1", "PLP078", "LPsP"]
 CHANNELS = ("chordotonal", "hair_plate", "campaniform", "haltere")
 SUBSAMPLE = 12                       # afferent cells recorded per frame per channel (the channel mean comes from the window accumulator)
@@ -134,7 +200,9 @@ def spec_of(arm, family="vncd"):
 
 def watch_of(family):
     # NOTE: the vncd4 (level family) batch ran with the round-2 watch list (PS059 not recorded per frame; its window mean is
-    # in the decomposition); the level family records PS059 from here on.
+    # in the decomposition); the level family records PS059 from here on, the level2 family PS059 and IN13B001.
+    if family == "level2":
+        return WATCH_LEVEL2
     return WATCH_BODY if family in ("body", "level") else WATCH
 
 
@@ -157,11 +225,12 @@ def afferent_groups(sense):
 
 
 def attach_cycle(sense, target):
-    """Attach body.LegCycle to a BatchBody (`leg_cycle`) or a body.Locomotion (`cycle`) when the sense names 'leg_cycle'."""
+    """Attach body.LegCycle to a BatchBody (`leg_cycle`) or a body.Locomotion (`cycle`) when the sense names 'leg_cycle';
+    'leg_cycle_flat' builds it with flat_amplitude=True (the modulation-only control), the default LegCycle() otherwise."""
     from flyverse import body
     if sense is None or not sense.leg_cycle:
         return None
-    cyc = body.LegCycle()
+    cyc = body.LegCycle(flat_amplitude=True) if getattr(sense, "leg_cycle_flat", False) else body.LegCycle()
     if hasattr(target, "leg_cycle"):
         target.leg_cycle = cyc
     else:
@@ -217,17 +286,20 @@ def cmd_room(args) -> int:
                    cuda_sparse=args.cuda_sparse, device=args.device, proprioception=spec)
     c, fb, brain = sim.fb.c, sim.fb, sim.fb.brain
     lp, op = brain.p, (sim.optic.p if sim.optic is not None else None)
-    mn_ref = mn_ref_of(args.arm, fam, args.mn_ref_hz)
-    if spec is not None and mn_ref is not None:
-        # the level-matched labelled control: the same spec, the sense rebuilt with its mn_ref_hz parameter (the constructor's
-        # own keyword; senses.py and its default are untouched). Replaced before the first step, so every frame reads it.
-        fb.proprioception_sense = senses.Proprioception(c, spec, mn_ref_hz=mn_ref)
+    sense_kw = sense_kwargs_of(args.arm, fam, args) if spec is not None else {}
+    if sense_kw:
+        # a labelled control: the same spec, the sense rebuilt with its own constructor keywords (mn_ref_hz, hair_plate_max_hz,
+        # campaniform_load_hz; senses.py and its defaults are untouched). Replaced before the first step, so every frame reads it.
+        fb.proprioception_sense = senses.Proprioception(c, spec, **sense_kw)
     sense = fb.proprioception_sense if spec is not None else senses.Proprioception(c, "all")   # A: the same cells, recorded
     cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.body)
     counts = sense.counts()
+    srec = sense_record(sense, spec, sense_kw) if spec is not None else {"spec": None, "tokens": {}, "overrides": {}, "note": "the shipped path: no sense attached"}
+    started_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     info = world.make_room(0, "all")[1]; top_z = float(info["table_top_z"]); x0, x1, y0, y1 = [float(v) for v in info["table_extent"]]
-    _log(f"[room {args.arm}] family {fam} spec {spec or 'off'} channels {sense.channels} coriolis {sense.haltere_coriolis} leg_cycle {sense.leg_cycle} "
-         f"haltere_sided {sense.haltere_sided} params {sense.params} mn_ref {sense.mn_ref_hz} cycle {vars(cycle) if cycle else None} block {args.block}")
+    _log(f"[room {args.arm}] started {started_utc}; family {fam} spec {spec or 'off'} channels {sense.channels} coriolis {sense.haltere_coriolis} leg_cycle {sense.leg_cycle} "
+         f"haltere_sided {sense.haltere_sided} unsided {getattr(sense, 'unsided', False)} leg_cycle_flat {getattr(sense, 'leg_cycle_flat', False)} params {sense.params} "
+         f"mn_ref {sense.mn_ref_hz} sense overrides {sense_kw} cycle {vars(cycle) if cycle else None} block {args.block}")
     _log(f"[room {args.arm}] BatchSim B={B} neurons={c.n:,} device={brain.device} env seeds={seeds} brain seed={args.seed} receptor_model {lp.receptor_model} "
          f"type_path_gain {lp.type_path_gain} cuda kernels {brain.cuda} event_driven {brain.event_driven} cuda_graphs {fb.cuda_graphs} fence False")
     n = c.neurons; ty = n.type.fillna("").to_numpy(); side = n.somaSide.fillna("?").to_numpy()
@@ -312,7 +384,7 @@ def cmd_room(args) -> int:
     wall = time.time() - t0
     stim = {"protocol": "room_plain_walk_straightness", "arm": args.arm, "family": fam, "params": {"proprioception": spec, "channels": list(sense.channels),
             "haltere_coriolis": sense.haltere_coriolis, "leg_cycle": sense.leg_cycle, "haltere_sided": sense.haltere_sided, "leg_cycle_params": vars(cycle) if cycle else None,
-            "rate_params": sense.params, "mn_ref_hz": sense.mn_ref_hz, "counts": counts, "haltere_mn_sides": {s: int(len(hm_groups[s])) for s in hm_groups},
+            "rate_params": sense.params, "mn_ref_hz": sense.mn_ref_hz, "sense": srec, "started_utc": started_utc, "counts": counts, "haltere_mn_sides": {s: int(len(hm_groups[s])) for s in hm_groups},
             "batch": B, "seconds": args.seconds, "skip_s": args.skip, "program": "none", "fruit_set": "all", "fence": False,
             "start": "BatchSim default (-0.5, 0.05, table top), heading 5 deg", "energy": "Metabolism default", "wind": "0.3 m/s towards 180 deg (BatchSim default)",
             "capture_every_frames": every, "mean_every_frames": mean_every, "block": args.block},
@@ -337,15 +409,16 @@ def cmd_room(args) -> int:
     summary = summarise_room(c, recording, heading, pos, airborne, on_top, yaw_cmd, speed_cmd, rates_cmd, motor, commanded, chan_measured, all_chan, sub, watch_idx, skip_f, every,
                              commanded_g=commanded_g, group_measured=group_measured, groups=groups, cyc=cyc_t, cycle_on=cycle is not None)
     summary.update(arm=args.arm, arm_label=labels[args.arm], family=fam, proprioception=spec, seed=args.seed, env_seeds=seeds, batch=B, seconds=args.seconds, skip_s=args.skip,
-                   wall_s=round(wall, 1), counts=counts, rate_params=sense.params, mn_ref_hz=sense.mn_ref_hz, channel_names=list(sense.channels),
+                   wall_s=round(wall, 1), counts=counts, rate_params=sense.params, mn_ref_hz=sense.mn_ref_hz if spec is not None else None, channel_names=list(sense.channels),
                    haltere_coriolis=sense.haltere_coriolis, leg_cycle=sense.leg_cycle, haltere_sided=sense.haltere_sided, leg_cycle_params=vars(cycle) if cycle else None,
+                   sense=srec, started_utc=started_utc, finished_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                    block=args.block, device=prov["execution"]["device"], device_name=prov["execution"].get("device_name"),
                    provenance=prov, lif={"receptor_model": lp.receptor_model, "receptor_net_rule": lp.receptor_net_rule, "type_path_gain": lp.type_path_gain},
                    files={"generator": "scripts/probe_vnc_drive.py room " + " ".join(sys.argv[2:]), "recording": str(out) + "_rec.npz", "flies": str(out) + "_flies.npz",
                           "max": str(out) + "_max.npz", "body": str(out) + "_body.npz"})
     Path(str(out) + ".json").write_text(json.dumps(common.to_jsonable(summary), indent=1), encoding="utf-8")
     s = summary["run"]
-    _log(f"[room {args.arm} seed {args.seed}] device {summary['device']} ({summary['device_name']}), {wall:.0f} s wall; yaw SD {s['yaw_sd_deg_s']:.2f} deg/s (median {s['yaw_sd_deg_s_median']:.2f}), "
+    _log(f"[room {args.arm} seed {args.seed}] finished {summary['finished_utc']}; device {summary['device']} ({summary['device_name']}), {wall:.0f} s wall; yaw SD {s['yaw_sd_deg_s']:.2f} deg/s (median {s['yaw_sd_deg_s_median']:.2f}), "
          f"straightness {s['straightness']:.3f}, left the table {s['n_left_table']}/{B} (median {s['left_table_s_median']}), DNa02 L-R {s['DNa02_LR_hz']:+.3f} Hz, "
          f"leg L-R {s['leg_LR_hz']:+.3f} Hz, haltere MN L-R {s['haltere_LR_hz']:+.3f} Hz, power max {s['power_max_hz']:.1f} Hz, airborne {s['airborne_frac']:.3f}")
     _log("  channel / group        n   commanded Hz   measured Hz")
@@ -477,10 +550,12 @@ def cmd_compass(args) -> int:
     c, cdir = rot.load_condition_connectome("default", args.cache_dir, verbose=False)
     sim = rot.build_sim(c, gains, seed, args.device, cpu, sparse=args.sparse)
     fb = sim.fb
-    mn_ref = mn_ref_of(args.arm, fam, args.mn_ref_hz)
+    sense_kw = sense_kwargs_of(args.arm, fam, args) if spec is not None else {}
     if spec is not None:
-        fb.proprioception_sense = senses.Proprioception(c, spec, **({"mn_ref_hz": mn_ref} if mn_ref is not None else {}))
+        fb.proprioception_sense = senses.Proprioception(c, spec, **sense_kw)
     sense = fb.proprioception_sense if spec is not None else senses.Proprioception(c, "all")
+    srec = sense_record(sense, spec, sense_kw) if spec is not None else {"spec": None, "tokens": {}, "overrides": {}, "note": "the shipped path: no sense attached"}
+    started_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     cycle = attach_cycle(fb.proprioception_sense if spec is not None else None, sim.loco)     # scalar body: Locomotion.cycle
     groups = afferent_groups(sense)
     from flyverse.motor import haltere_side_groups
@@ -511,7 +586,7 @@ def cmd_compass(args) -> int:
                               "compass_adaptation": 0.0 if gains else None, "sparse": args.sparse, "proprioception": spec,
                               "channels": list(sense.channels), "haltere_coriolis": sense.haltere_coriolis, "leg_cycle": sense.leg_cycle, "haltere_sided": sense.haltere_sided,
                               "leg_cycle_params": vars(cycle) if cycle else None, "haltere_mn_sides": {s: int(len(hm_groups[s])) for s in hm_groups},
-                              "rate_params": sense.params, "mn_ref_hz": sense.mn_ref_hz, "block": args.block},
+                              "rate_params": sense.params, "mn_ref_hz": sense.mn_ref_hz if spec is not None else None, "sense": srec, "started_utc": started_utc, "block": args.block},
                    "control": "the rest phases of the same run (rest = control, rest2 = control again = the null); arm A = the sense off"}
     prov = common.provenance(c, lif_p, optic_p, fb=fb, device=args.device, seeds=[seed], env_seeds=[seed], batch=1, stimulus=stim_common,
                              retina=tr.retina_record(fb.retina, c), cache_dir=str(cdir) if cdir else args.cache_dir)
@@ -588,6 +663,8 @@ def cmd_compass(args) -> int:
     with open(f"{out}_run.json", "w", encoding="utf-8") as f:
         json.dump(common.to_jsonable({"arm": args.arm, "arm_label": labels[args.arm], "family": fam, "proprioception": spec, "mode": "efferent", "condition": "default", "seed": seed,
                                       "leg_cycle": sense.leg_cycle, "haltere_sided": sense.haltere_sided, "haltere_coriolis": sense.haltere_coriolis,
+                                      "mn_ref_hz": sense.mn_ref_hz if spec is not None else None, "sense": srec, "started_utc": started_utc,
+                                      "finished_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                                       "leg_cycle_params": vars(cycle) if cycle else None, "block": args.block,
                                       "gains": gains, "phases": summary_phases, "device": dev, "device_name": prov["execution"].get("device_name"),
                                       "counts": sense.counts(), "rate_params": sense.params, "files": written, "provenance": prov,
@@ -677,15 +754,18 @@ def cmd_plan(args) -> int:
         from replicate_connectome_walk import write_plan
         return write_plan(args)
     d = args.dir.rstrip("/")
-    name = args.name or {"vncd": "vncd", "body": "vncd3", "level": "vncd4"}[fam]
+    name = args.name or {"vncd": "vncd", "body": "vncd3", "level": "vncd4", "level2": "vncd5"}[fam]
     pre = f"mkdir -p {d} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && "
     fam_flag = f" --family {fam}" if fam != "vncd" else ""
     room_arms = list(arms)
+    flag_of = {"mn_ref_hz": "--mn-ref-hz", "hair_plate_max_hz": "--hair-plate-max-hz", "campaniform_load_hz": "--campaniform-load-hz"}
 
     def arm_flags(arm):
-        # the level-matched labelled control carries its mn_ref_hz explicitly on the job line (self-describing batch.sh)
-        mr = mn_ref_of(arm, fam)
-        return f" --mn-ref-hz {mr}" if mr is not None else ""
+        # a labelled control carries every non-default sense parameter explicitly on the job line (self-describing batch.sh)
+        kw = sense_kwargs_of(arm, fam)
+        if arm in ARM_SENSE_KW.get(fam, {}) and any(v is None for v in ARM_SENSE_KW[fam][arm].values()):
+            raise SystemExit(f"arm {arm} of family {fam} has an underived sense parameter (ARM_SENSE_KW): run the derivation first")
+        return "".join(f" {flag_of[k]} {v}" for k, v in kw.items())
     cmds = []
 
     # The job strings are written into batch.sh inside DOUBLE quotes, so every `$` below is escaped as `\$` there: the
@@ -696,6 +776,8 @@ def cmd_plan(args) -> int:
 
     room_seeds = [int(x) for x in args.only_seeds.split(",")] if args.only_seeds else list(range(args.runs))
     compass_seeds = [int(x) for x in args.only_compass_seeds.split(",")] if args.only_compass_seeds else list(range(args.compass_seeds))
+    if not compass_arms:
+        compass_seeds = []                                   # the family has no compass protocol
     for s in room_seeds:
         for arm in room_arms:
             stem = f"{d}/room_{arm}_r{s}"
@@ -1240,7 +1322,8 @@ def decompose_summary(analysis_dir, target="DNa02", arms=ARM_ORDER, top=12):
     """Per arm and side of `target`: the rate-weighted input totals (E, I, net; mV/s per post cell) from the analyse
     step's decompose_<target>_<side>_per_type.csv, plus the named rows (the PS059 cancellation, the AN04B003 term)."""
     named = ("PS059/L", "PS059/R", "AN04B003/L", "AN04B003/R", "AN06A026/L", "AN06A026/R", "AN07B035/L", "AN07B035/R", "IN12B014/L", "IN12B014/R",
-             "IN19A003/L", "IN19A003/R", "GNG562/L", "GNG562/R", "LT51/L", "LT51/R", "PFL3/L", "PFL3/R")
+             "IN19A003/L", "IN19A003/R", "GNG562/L", "GNG562/R", "LT51/L", "LT51/R", "PFL3/L", "PFL3/R",
+             "PS049/L", "PS049/R", "SNpp45/?", "SNpp45/L", "SNpp45/R", "IN13B001/L", "IN13B001/R")      # round 5: the hair-plate route's rows (NaN where the group is not a direct input)
     rows = []
     for side in "LR":
         f = Path(analysis_dir, f"decompose_{target}_{side}_per_type.csv")
@@ -1265,6 +1348,66 @@ def decompose_summary(analysis_dir, target="DNa02", arms=ARM_ORDER, top=12):
     return pd.DataFrame(rows)
 
 
+def chain_rates(run_json, c, types=CHAIN_RATE_TYPES):
+    """Window-mean rate (Hz) per (type, side) of ONE room run from its per-fly recording (`_flies.npz`: every cell's
+    window-mean rate per fly; the decompose / trace input), mean over the flies. Keys `chain_<type>_<L|R|?>_hz` and
+    `chain_<type>_hz` (all cells of the type). Unlike the `watch` keys (a per-frame Recorder on the watch types) this reads
+    every cell of the type, including the unsided afferents the watch loop skips (SNpp45)."""
+    rec = Recording.load(Path(str(run_json)[:-5] + "_flies.npz"))
+    r = rec.quantities["rate_hz"]                              # (B, n) -- frames are flies
+    r = r.reshape(r.shape[0], -1) if r.ndim == 2 else r.reshape(-1, r.shape[-1])
+    side = c.neurons.somaSide.fillna("?").to_numpy()[rec.idx]; ty = np.asarray(rec.types)
+    out = {}
+    for t in types:
+        m = ty == t
+        if not m.any():
+            continue
+        out[f"chain_{t}_hz"] = float(r[:, m].mean())
+        for s in ("L", "R", "?"):
+            ms = m & (side == s)
+            if ms.any():
+                out[f"chain_{t}_{s}_hz"] = float(r[:, ms].mean())
+    return out
+
+
+def holm_families(pdf, predeclared, out):
+    """The predeclared decision families (a stamped JSON with `primaries.families[<name>] = {pair, keys, m}`) applied to the
+    pairwise table: per family, the compare verdict of each key and its Holm-adjusted p at the declared m; a primary is
+    CALLED only when compare says result AND the adjusted p <= alpha. Written to decision_table.csv and printed."""
+    fam = json.loads(Path(predeclared).read_text(encoding="utf-8"))["primaries"]["families"]
+    rows = []
+    for name, f in fam.items():
+        t, r = f["pair"]; keys = f["keys"]; m = int(f.get("m", len(keys)))
+        recs = []
+        for k in keys:
+            row = pdf[pdf.key == k]
+            if not len(row) or f"{t}v{r}_p" not in row:
+                recs.append({"family": name, "pair": f"{t}v{r}", "key": k, "missing": True}); continue
+            row = row.iloc[0]
+            recs.append({"family": name, "pair": f"{t}v{r}", "key": k, f"{t}_mean": row[f"{t}_mean"], f"{t}_sd": row[f"{t}_sd"], f"{r}_mean": row[f"{r}_mean"], f"{r}_sd": row[f"{r}_sd"],
+                         "diff": row[f"{t}v{r}_diff"], "z": row[f"{t}v{r}_z"], "p": row[f"{t}v{r}_p"], "verdict": row[f"{t}v{r}_verdict"], "m": m})
+        ps = np.array([x.get("p", np.nan) for x in recs], float)
+        order = np.argsort(np.where(np.isfinite(ps), ps, np.inf))
+        adj = np.full(len(ps), np.nan); running = 0.0
+        for rank, i in enumerate(order):
+            if not np.isfinite(ps[i]):
+                continue
+            running = max(running, min(1.0, (m - rank) * ps[i])); adj[i] = running
+        for x, a in zip(recs, adj):
+            x["p_holm"] = float(a) if np.isfinite(a) else np.nan
+            x["called"] = bool(x.get("verdict") == "result" and np.isfinite(a) and a <= 0.05)
+        rows += recs
+    df = pd.DataFrame(rows); df.to_csv(Path(out, "decision_table.csv"), index=False)
+    print(f"\n== predeclared decision families ({predeclared}; Holm within family at the declared m; CALLED = compare result AND p_holm <= 0.05) -> {out}/decision_table.csv")
+    for _, x in df.iterrows():
+        if x.get("missing", False):
+            print(f"  {x.family:14s} {x.pair:5s} {x.key:28s} MISSING"); continue
+        t, r = x.pair.split("v")
+        print(f"  {x.family:14s} {x.pair:5s} {x.key:28s} {t} {x[f'{t}_mean']:9.4f} +- {x[f'{t}_sd']:7.4f} | {r} {x[f'{r}_mean']:9.4f} +- {x[f'{r}_sd']:7.4f} | diff {x['diff']:+9.4f} z {x['z']:+7.1f} p {x['p']:.4f} "
+              f"holm {x['p_holm']:.4f} {x['verdict']:12s} {'CALLED' if x['called'] else ''}")
+    return df
+
+
 def cmd_pairs(args) -> int:
     """CPU: the adjacent-arm comparisons the audit's questions turn on (C vs B: the leg cycle; D vs C: the side-split
     haltere; E vs D: the stop-gap), the per-frame sidedness statistics, the DNa02 decomposition summary and the compass
@@ -1283,9 +1426,14 @@ def cmd_pairs(args) -> int:
     c = connectome.load(cache_dir=Path(args.cache_dir), verbose=False) if args.cache_dir else connectome.load(verbose=False)
     # per-frame sidedness per run (attached to the run dicts so the pairwise table can compare them too)
     sided = {}
+    chain_keys = set()
     for arm, items in runs.items():
         for p, j in items:
             s = sided_frames(p, c); j["run"].update(s); sided.setdefault(arm, []).append((Path(p).name, s))
+            try:
+                ch = chain_rates(p, c); j["run"].update(ch); chain_keys |= set(ch)
+            except Exception as e:                                       # noqa: BLE001 -- an old batch without _flies.npz
+                print(f"  chain_rates failed on {Path(p).name}: {e}")
     sd_rows = []
     for k, label in SIDED_KEYS:
         row = {"key": k, "label": label}
@@ -1303,6 +1451,7 @@ def cmd_pairs(args) -> int:
     j0 = next(iter(runs.values()))[0][1]
     keys += [k for k in sorted(j0["run"]) if k.startswith(("commanded_", "measured_")) and k.endswith("_hz")]
     keys += sorted({f"{w}_hz" for items in runs.values() for _, j in items for w in j["watch"]})
+    keys += sorted(chain_keys)
     rows = []
     for key in keys:
         vals = {a: np.array([j["run"][key] for _, j in items if j["run"].get(key) is not None], float) for a, items in runs.items()}
@@ -1318,13 +1467,24 @@ def cmd_pairs(args) -> int:
         rows.append(row)
     pdf = pd.DataFrame(rows); pdf.to_csv(Path(out, "pairwise.csv"), index=False)
     print(f"\n== adjacent-arm verdicts (common.compare; {'5' if only is None else len(only)} runs per arm) -> {out}/pairwise.csv")
-    show = [k for k, _ in ROOM_KEYS + ROBUST_KEYS + CYCLE_KEYS + SIDED_KEYS] + [k for k in keys if k.startswith("commanded_") and ("_LR_" in k or (k.endswith("_hz") and ":" not in k))] + [k for k in keys if k.endswith("_hz") and any(k.startswith(w) for w in WATCH_BODY)]
+    show = [k for k, _ in ROOM_KEYS + ROBUST_KEYS + CYCLE_KEYS + SIDED_KEYS] + [k for k in keys if k.startswith("commanded_") and ("_LR_" in k or ":L_" in k or ":R_" in k or (k.endswith("_hz") and ":" not in k))] + [k for k in keys if k.endswith("_hz") and any(k.startswith(w) for w in WATCH_LEVEL2)] + sorted(chain_keys)
     for _, r in pdf[pdf.key.isin(show)].iterrows():
         cells = []
         for t, ref in PAIRS:
             if f"{t}v{ref}_verdict" in r and isinstance(r[f"{t}v{ref}_verdict"], str):
                 cells.append(f"{t}v{ref} {r[f'{t}v{ref}_diff']:+.3f} z{r[f'{t}v{ref}_z']:+.1f} p{r[f'{t}v{ref}_p']:.3f} {r[f'{t}v{ref}_verdict']}")
         print(f"  {r.key:36s} " + " | ".join(cells))
+    # per-arm levels with the per-run scatter for the keys the audit tabulates (the same pdf; printed so the console carries them)
+    print("\n== per-arm run mean +- SD [per-run values] for the tabulated keys")
+    for _, r in pdf[pdf.key.isin(show)].iterrows():
+        cells = []
+        for a in arm_order:
+            if f"{a}_mean" in r and np.isfinite(r[f"{a}_mean"]):
+                vals = [j["run"].get(r.key) for _, j in runs[a]]
+                cells.append(f"{a} {r[f'{a}_mean']:.4f} +- {r[f'{a}_sd']:.4f} [" + " ".join(f"{v:.4f}" for v in vals if v is not None) + "]")
+        print(f"  {r.key:36s} " + " | ".join(cells))
+    if getattr(args, "predeclared", None):
+        holm_families(pdf, args.predeclared, out)
     # DNa02 decomposition summary
     dd = decompose_summary(args.analysis or out, "DNa02", "".join(arm_order))
     if len(dd):
@@ -1356,13 +1516,16 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     fam_help = ("arm family: 'vncd' (round 2: B all / C legs / D haltere / E coriolis), 'body' (round 3: C + leg cycle / D + side-split haltere / E + coriolis; "
-                "docs/audits/body_sided_state.md) or 'level' (round 4: L = 'all' at the level-matched mn_ref_hz, a labelled control / C + leg cycle / D + side-split haltere; docs/audits/level_matched_control.md)")
+                "docs/audits/body_sided_state.md), 'level' (round 4: L = 'all' at the level-matched mn_ref_hz, a labelled control / C + leg cycle / D + side-split haltere; docs/audits/level_matched_control.md) "
+                "or 'level2' (round 5: L / U unsided / K channel-matched / M modulation-only / C, the three controls that split 'structure'; docs/audits/level_controls.md)")
     all_arms = sorted({a for arms_, _, _ in FAMILIES.values() for a in arms_})
     mn_help = "the sense's mn_ref_hz for this arm (default: the family table -- the level family's L arm -- else the sense's own default 30 Hz; a LABELLED CONTROL parameter, never a default)"
+    kw_help = "a further senses.Proprioception constructor keyword of a labelled control arm (default: the family table ARM_SENSE_KW -- the level2 family's K arm -- else the sense's own default)"
     r = sub.add_parser("room", help="one plain-fly room run (GPU)")
     r.add_argument("--dataset", choices=["malecns", "banc"], default=None)
     r.add_argument("--arm", required=True, choices=all_arms); r.add_argument("--seed", type=int, default=0); r.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
     r.add_argument("--mn-ref-hz", type=float, default=None, help=mn_help)
+    r.add_argument("--hair-plate-max-hz", type=float, default=None, help=kw_help); r.add_argument("--campaniform-load-hz", type=float, default=None, help=kw_help)
     r.add_argument("--batch", type=int, default=16); r.add_argument("--seconds", type=float, default=60.0); r.add_argument("--skip", type=float, default=5.0)
     r.add_argument("--every", type=int, default=2, help="capture the watch / afferent Recorder every N frames"); r.add_argument("--mean-every", type=int, default=5)
     r.add_argument("--device", default=None); r.add_argument("--cuda-sparse", default="torch"); r.add_argument("--out", required=True)
@@ -1370,6 +1533,7 @@ def main(argv=None):
     k = sub.add_parser("compass", help="the efferent rotation arm under one vnc arm (GPU)")
     k.add_argument("--arm", required=True, choices=all_arms); k.add_argument("--seed", type=int, default=0); k.add_argument("--family", default="vncd", choices=sorted(FAMILIES), help=fam_help)
     k.add_argument("--mn-ref-hz", type=float, default=None, help=mn_help)
+    k.add_argument("--hair-plate-max-hz", type=float, default=None, help=kw_help); k.add_argument("--campaniform-load-hz", type=float, default=None, help=kw_help)
     k.add_argument("--gains", default="2:15"); k.add_argument("--seconds", type=float, default=10.0); k.add_argument("--skip", type=float, default=3.0)
     k.add_argument("--rate", type=float, default=90.0); k.add_argument("--dna02-hz", type=float, default=20.0); k.add_argument("--sparse", default="warp", choices=["warp", "torch"])
     k.add_argument("--quick", action="store_true"); k.add_argument("--device", default=None); k.add_argument("--cache-dir", default=None); k.add_argument("--out", required=True)
@@ -1394,6 +1558,7 @@ def main(argv=None):
     q.add_argument("--dir", default="out/vncd3"); q.add_argument("--out", default="out/vncd3/analysis"); q.add_argument("--analysis", default=None, help="where analyse wrote decompose_* / compass_flip_* (default --out)")
     q.add_argument("--cache-dir", default=None); q.add_argument("--only-seeds", default=None, help="comma list: only these run seeds (e.g. the runs of one submission)")
     q.add_argument("--family", default=None, choices=sorted(FAMILIES), help="the pair set (PAIRS_BY_FAMILY); default: the family the run JSONs record")
+    q.add_argument("--predeclared", default=None, help="the stamped predeclaration JSON: its primaries.families are Holm-called against pairwise.csv (decision_table.csv)")
     args = ap.parse_args(argv)
     return {"room": cmd_room, "compass": cmd_compass, "bench": cmd_bench, "plan": cmd_plan, "analyse": cmd_analyse, "pairs": cmd_pairs}[args.cmd](args)
 
