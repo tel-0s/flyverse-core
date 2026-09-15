@@ -401,5 +401,64 @@ class CacheCountsTests(unittest.TestCase):
         np.testing.assert_array_equal(touched, expected)               # haltere at 0 Hz (no wingbeat), nothing else
 
 
+class ThreeChannelMatchedControlTests(unittest.TestCase):
+    """Round 4d's THREE-CHANNEL-MATCHED level control (docs/audits/level_fixed_point.md; arm L3 of probe_vnc_drive's family
+    level4): 'all+unsided' with mn_ref_hz / hair_plate_max_hz / campaniform_load_hz derived together. No senses.py change: the
+    tests pin the algebra the derivation rests on (one drive on every leg cell, so (hair - 5) / (hp_max - 5) == (chord - 10) / 140
+    exactly, both sides equal, campaniform = load on the ground and 0 airborne) and the family tables that carry the values."""
+
+    def rates(self, s, **kw):
+        args = dict(leg_L=0., leg_R=0., haltere=0., airborne=False, yaw_rate=0., batch=1); args.update(kw)
+        return {ch: hz for ch, _, hz in s.rates(**args)}
+
+    def test_unsided_three_parameter_law_is_one_drive_on_every_leg_cell(self):
+        s = Proprioception(graph(), "all+unsided", mn_ref_hz=8.6, hair_plate_max_hz=81.09, campaniform_load_hz=25.10)
+        self.assertEqual(s.spec, "all+unsided"); self.assertEqual(s.mn_ref_hz, 8.6)
+        self.assertEqual(s.params["hair_plate"]["max_hz"], 81.09); self.assertEqual(s.params["campaniform"]["load_hz"], 25.10)
+        for lL, lR in ((6., 4.), (4., 6.), (0., 0.), (12., 9.), (5.3, 5.3)):
+            r = self.rates(s, leg_L=lL, leg_R=lR)
+            d = min(0.5 * (lL + lR) / 8.6, 1.0)
+            np.testing.assert_allclose(r["chordotonal"], [[10 + 140 * d] * 4], rtol=1e-12)          # every chordotonal cell, L / R / unsided / SApp23_L alike
+            np.testing.assert_allclose(r["hair_plate"], [[5 + (81.09 - 5) * d] * 2], rtol=1e-12)     # every hair-plate cell
+            np.testing.assert_allclose((r["hair_plate"] - 5) / (81.09 - 5), (r["chordotonal"][:, :2] - 10) / 140, rtol=1e-12)   # the identity hp_max is solved from
+            np.testing.assert_allclose(r["campaniform"], [[25.10, 25.10]])
+            mirror = self.rates(s, leg_L=lR, leg_R=lL)                                                # both sides equal: no DC L-R
+            np.testing.assert_allclose(mirror["chordotonal"], r["chordotonal"]); np.testing.assert_allclose(mirror["hair_plate"], r["hair_plate"])
+        air = self.rates(s, leg_L=6., leg_R=4., airborne=True)
+        np.testing.assert_allclose(air["chordotonal"], [[10] * 4]); np.testing.assert_allclose(air["hair_plate"], [[5] * 2]); np.testing.assert_allclose(air["campaniform"], [[0, 0]])
+        r2 = self.rates(s, leg_L=[6., 30.], leg_R=[4., 30.], batch=2)                                 # the clip at mn_ref: the ceiling values
+        np.testing.assert_allclose(r2["chordotonal"][1], [150] * 4); np.testing.assert_allclose(r2["hair_plate"][1], [81.09] * 2)
+        # the sense's own defaults are what a bare 'all+unsided' still gets (the three values travel on the job line, never into senses.py)
+        d0 = Proprioception(graph(), "all+unsided")
+        self.assertEqual((d0.mn_ref_hz, d0.params["hair_plate"]["max_hz"], d0.params["campaniform"]["load_hz"]), (30.0, 100.0, 50.0))
+
+    def test_probe_family_level4_carries_the_three_values_on_the_L3_arm(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("probe_vnc_drive", Path(__file__).resolve().parents[1] / "scripts" / "probe_vnc_drive.py")
+        p = importlib.util.module_from_spec(spec); spec.loader.exec_module(p)
+        self.assertEqual(p.ARMS_LEVEL4, {"A": None, "L3": "all+unsided", "M2": "all+leg_cycle+leg_cycle_flat", "C": "all+leg_cycle"})
+        self.assertEqual(p.FAMILIES["level4"][2], "")                                                  # no compass arms
+        self.assertEqual(p.PAIRS_BY_FAMILY["level4"][0], ("C", "L3"))                                  # the matched structure term is the first pair
+        kw = p.sense_kwargs_of("L3", "level4")
+        self.assertEqual(set(p.ARM_SENSE_KW["level4"]["L3"]), {"mn_ref_hz", "hair_plate_max_hz", "campaniform_load_hz"})
+        if p.LEVEL4_MN_REF_HZ is None:                                                                 # before the derivation: nothing travels, and plan refuses the arm
+            self.assertEqual(kw, {})
+        else:
+            self.assertEqual(kw, {"mn_ref_hz": p.LEVEL4_MN_REF_HZ, "hair_plate_max_hz": p.LEVEL4_HAIR_PLATE_MAX_HZ, "campaniform_load_hz": p.LEVEL4_CAMPANIFORM_LOAD_HZ})
+        self.assertEqual(p.mn_ref_of("L3", "level4"), p.LEVEL4_MN_REF_HZ)
+        for arm in ("A", "M2", "C"):
+            self.assertEqual(p.sense_kwargs_of(arm, "level4"), {})                                    # only the labelled control carries parameters
+        self.assertEqual(p.cycle_kwargs_of("M2", "level4"), {"flat_amplitude_value": p.LEVEL3_FLAT_AMPLITUDE})
+        self.assertEqual(p.cycle_kwargs_of("C", "level4"), {})
+        self.assertEqual(p.sense_kwargs_of("L", "level3"), {"mn_ref_hz": 8.84})                       # the earlier families are untouched
+        self.assertEqual(p.sense_kwargs_of("K", "level2"), {"mn_ref_hz": 8.84, "hair_plate_max_hz": 86.71, "campaniform_load_hz": 25.05})
+        if p.LEVEL4_MN_REF_HZ is not None:                                                             # once derived: the three values build a valid sense, and an explicit flag still wins
+            s = Proprioception(graph(), p.ARMS_LEVEL4["L3"], **kw)
+            self.assertEqual((s.mn_ref_hz, s.params["hair_plate"]["max_hz"], s.params["campaniform"]["load_hz"]), (kw["mn_ref_hz"], kw["hair_plate_max_hz"], kw["campaniform_load_hz"]))
+            self.assertLess(5.0, kw["hair_plate_max_hz"]); self.assertLess(kw["campaniform_load_hz"], 100.0); self.assertGreater(kw["mn_ref_hz"], 0.0)
+            over = type("A", (), {"mn_ref_hz": 9.0, "hair_plate_max_hz": None, "campaniform_load_hz": None})()
+            self.assertEqual(p.sense_kwargs_of("L3", "level4", over), {"mn_ref_hz": 9.0, "hair_plate_max_hz": kw["hair_plate_max_hz"], "campaniform_load_hz": kw["campaniform_load_hz"]})
+
+
 if __name__ == "__main__":
     unittest.main()

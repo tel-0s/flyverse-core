@@ -41,7 +41,9 @@ D all+leg_cycle+haltere_sided; and 'level2' (round 5, ARMS_LEVEL2; docs/audits/l
 K channel-matched (--hair-plate-max-hz, --campaniform-load-hz) / M modulation-only (all+leg_cycle+leg_cycle_flat) / C --
 the three labelled controls that split the C-over-L excess into its parts; and 'level3' (round 4c, ARMS_LEVEL3;
 docs/audits/level_controls_r2.md): A / L / M2 modulation-only AT THE CYCLE'S REALISED AMPLITUDE (body.LegCycle(flat_amplitude=True,
-flat_amplitude_value=0.948), passed as --flat-amplitude-value) / C. `pairs` reads the pair set from
+flat_amplitude_value=0.948), passed as --flat-amplitude-value) / C; and 'level4' (round 4d, ARMS_LEVEL4; docs/audits/level_fixed_point.md):
+A / L3 the level control MATCHED ON ALL THREE LEG CHANNELS ('all+unsided' with mn_ref_hz, hair_plate_max_hz and campaniform_load_hz
+derived together as one fixed point of the afferent -> leg-MN loop, scripts/derive_level_fixed_point.py) / M2 / C. `pairs` reads the pair set from
 PAIRS_BY_FAMILY (`--predeclared <json>` Holm-calls the stamped families into decision_table.csv); the recorder-based
 sidedness keys are at lag 0 (the round-3 alignment kept as *_lagm1) and DNa02_L / _R share DNa02_LR_hz's frame mask.
 Every run JSON carries a `sense` block (spec, every token, mn_ref_hz, hair_plate_max_hz, campaniform_load_hz, the
@@ -136,22 +138,48 @@ ARM_LABEL_LEVEL3 = {"A": "shipped (sense off)",
                     "L": f"proprioception all, mn_ref_hz {LEVEL_MN_REF_HZ} (LEVEL-MATCHED LABELLED CONTROL, the level reference re-run within this batch)",
                     "M2": f"all + leg cycle with the per-leg amplitude held at the cycle's realised walking mean {LEVEL3_FLAT_AMPLITUDE} (MODULATION-ONLY control AT THE CYCLE'S LEVEL: phase modulation without the amplitude / turn term)",
                     "C": "all + leg cycle (per-leg, per-phase leg channels)"}
+# Round 4d (thread level controls round 4d, docs/audits/level_fixed_point.md): the LEVEL CONTROL MATCHED ON ALL THREE LEG CHANNELS.
+# Every structure term over a level control so far was read against L (hair plate -9.5 Hz and campaniform -24.7 Hz off the
+# cycle arm, corrected at slopes extrapolated off their calibration manifold) or K (matched on two channels, chordotonal pulled
+# down 8.7 Hz by the afferent -> leg-MN loop). L3 is ONE steady arm whose three sense parameters are derived TOGETHER as a
+# three-parameter fixed point of that loop (scripts/derive_level_fixed_point.py -> out/vncd7/fixed_point_derivation.json) so
+# that its realised window means sit at the cycle arm's on chordotonal, hair plate AND campaniform, on BOTH sides. Both sides
+# needs the existing 'unsided' token (round 4b's arm U): under the sided MN-rate law the leg-MN side bias puts +13.5 Hz of
+# chordotonal and +9.1 Hz of hair plate between the sides by construction (L: 92.6 / 79.1 against C's 87.2 / 87.6), so no value of
+# the three parameters can land a sided arm inside a per-side tolerance; with every leg cell reading the side-mean leg-MN rate
+# the two channels are side-symmetric and one drive fraction d = mean[clip(legMN_mean / mn_ref, 0, 1) * ground] sets both:
+# chordotonal = 10 + 140 d and hair plate = 5 + (hp_max - 5) d EXACTLY (the same d on every cell), campaniform = load x ground.
+# The three values are LABELLED CONTROL parameters passed on the job line (--mn-ref-hz / --hair-plate-max-hz /
+# --campaniform-load-hz); the sense's defaults (30 / 100 / 50) and senses.py are untouched. M2 (round 4c's modulation-only cycle
+# at 0.948) and C are re-run inside the batch; four arms x 6 seeds so the m = 7 Holm family is satisfiable. No compass arms.
+LEVEL4_MN_REF_HZ = 8.23                 # derived: out/vncd7/fixed_point_derivation.json step_3_fixed_point.chosen (scripts/derive_level_fixed_point.py; the cal runs pass the flags explicitly)
+LEVEL4_HAIR_PLATE_MAX_HZ = 81.09        # = 5 + (47.067 - 5) x 140 / (87.404 - 10): exact under 'unsided' (one drive on every leg cell)
+LEVEL4_CAMPANIFORM_LOAD_HZ = 25.10      # = 24.864 / 0.9908 (the cycle arm's campaniform mean over the steady arms' ground fraction)
+ARMS_LEVEL4 = {"A": None, "L3": "all+unsided", "M2": "all+leg_cycle+leg_cycle_flat", "C": "all+leg_cycle"}
+ARM_LABEL_LEVEL4 = {"A": "shipped (sense off)",
+                    "L3": f"proprioception all+unsided, mn_ref_hz {LEVEL4_MN_REF_HZ}, hair_plate_max_hz {LEVEL4_HAIR_PLATE_MAX_HZ}, campaniform_load_hz {LEVEL4_CAMPANIFORM_LOAD_HZ} "
+                          "(THREE-CHANNEL-MATCHED LABELLED CONTROL: the round-2 law, unsided, with its three parameters derived together as one fixed point of the afferent -> leg-MN loop so that chordotonal / hair plate / campaniform sit at the cycle arm's window means on both sides)",
+                    "M2": f"all + leg cycle with the per-leg amplitude held at the cycle's realised walking mean {LEVEL3_FLAT_AMPLITUDE} (MODULATION-ONLY control AT THE CYCLE'S LEVEL, round 4c's M2, re-run within this batch)",
+                    "C": "all + leg cycle (per-leg, per-phase leg channels)"}
 ARM_MN_REF = {"level": {"L": LEVEL_MN_REF_HZ}, "level2": {"L": LEVEL_MN_REF_HZ, "U": LEVEL_MN_REF_HZ, "K": LEVEL_MN_REF_HZ},
               "level3": {"L": LEVEL_MN_REF_HZ}}      # per family, per arm: the sense's mn_ref_hz when it is not the default (None = the default)
-# per family, per arm: further Proprioception constructor keywords of a labelled control (None = the sense's own default)
-ARM_SENSE_KW = {"level2": {"K": {"hair_plate_max_hz": LEVEL2_HAIR_PLATE_MAX_HZ, "campaniform_load_hz": LEVEL2_CAMPANIFORM_LOAD_HZ}}}
+# per family, per arm: further Proprioception constructor keywords of a labelled control (None = the sense's own default); the level4
+# L3 arm carries all three here (its mn_ref_hz is one of the three jointly derived values, so it lives in the same table)
+ARM_SENSE_KW = {"level2": {"K": {"hair_plate_max_hz": LEVEL2_HAIR_PLATE_MAX_HZ, "campaniform_load_hz": LEVEL2_CAMPANIFORM_LOAD_HZ}},
+                "level4": {"L3": {"mn_ref_hz": LEVEL4_MN_REF_HZ, "hair_plate_max_hz": LEVEL4_HAIR_PLATE_MAX_HZ, "campaniform_load_hz": LEVEL4_CAMPANIFORM_LOAD_HZ}}}
 # per family, per arm: body.LegCycle constructor keywords of a labelled control of the cycle (the flag flat_amplitude itself comes
 # from the spec token 'leg_cycle_flat'; None = LegCycle's own default)
-ARM_CYCLE_KW = {"level3": {"M2": {"flat_amplitude_value": LEVEL3_FLAT_AMPLITUDE}}}
+ARM_CYCLE_KW = {"level3": {"M2": {"flat_amplitude_value": LEVEL3_FLAT_AMPLITUDE}}, "level4": {"M2": {"flat_amplitude_value": LEVEL3_FLAT_AMPLITUDE}}}
 FAMILIES = {"vncd": (ARMS, ARM_LABEL, "ABE"), "body": (ARMS_BODY, ARM_LABEL_BODY, "ADE"), "level": (ARMS_LEVEL, ARM_LABEL_LEVEL, "ALCD"),
-            "level2": (ARMS_LEVEL2, ARM_LABEL_LEVEL2, ""), "level3": (ARMS_LEVEL3, ARM_LABEL_LEVEL3, "")}     # arms, labels, compass arms ('' = no compass protocol in the family)
-ARM_ORDER = ("A", "B", "L", "U", "K", "M", "M2", "C", "D", "E")   # table order across families (L / U / K / M / M2 sit between the round-2 transducer and the cycle)
+            "level2": (ARMS_LEVEL2, ARM_LABEL_LEVEL2, ""), "level3": (ARMS_LEVEL3, ARM_LABEL_LEVEL3, ""), "level4": (ARMS_LEVEL4, ARM_LABEL_LEVEL4, "")}     # arms, labels, compass arms ('' = no compass protocol in the family)
+ARM_ORDER = ("A", "B", "L", "L3", "U", "K", "M", "M2", "C", "D", "E")   # table order across families (L / L3 / U / K / M / M2 sit between the round-2 transducer and the cycle)
 # adjacent-arm pairs `pairs` calls, per family: (treatment, reference)
 PAIRS_BY_FAMILY = {"vncd": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
                    "body": (("B", "A"), ("C", "B"), ("D", "C"), ("E", "D"), ("D", "B")),
                    "level": (("L", "A"), ("C", "L"), ("D", "C"), ("C", "A"), ("D", "L")),
                    "level2": (("U", "L"), ("K", "L"), ("C", "K"), ("M", "C"), ("C", "U"), ("M", "K"), ("L", "A"), ("C", "L")),
-                   "level3": (("M2", "C"), ("M2", "L"), ("C", "L"), ("C", "A"), ("L", "A"), ("M2", "A"))}   # the four decision pairs first; L v A and M2 v A are the fraction bookkeeping
+                   "level3": (("M2", "C"), ("M2", "L"), ("C", "L"), ("C", "A"), ("L", "A"), ("M2", "A")),   # the four decision pairs first; L v A and M2 v A are the fraction bookkeeping
+                   "level4": (("C", "L3"), ("M2", "L3"), ("M2", "C"), ("C", "A"), ("L3", "A"), ("M2", "A"))}   # the four decision pairs first (C v L3 is the matched structure term); L3 v A and M2 v A are the fraction bookkeeping
 SENSE_KW_FLAGS = (("mn_ref_hz", "mn_ref_hz"), ("hair_plate_max_hz", "hair_plate_max_hz"), ("campaniform_load_hz", "campaniform_load_hz"))   # (argparse dest, constructor keyword)
 CYCLE_KW_FLAGS = (("flat_amplitude_value", "flat_amplitude_value"),)                                                                          # (argparse dest, LegCycle keyword)
 
@@ -160,7 +188,8 @@ def mn_ref_of(arm, family, override=None):
     """The sense's mn_ref_hz for an arm: an explicit --mn-ref-hz, else the family table, else None (= the sense's default)."""
     if override is not None:
         return float(override)
-    return ARM_MN_REF.get(family, {}).get(arm)
+    v = ARM_MN_REF.get(family, {}).get(arm)
+    return v if v is not None else ARM_SENSE_KW.get(family, {}).get(arm, {}).get("mn_ref_hz")     # level4's L3 carries its mn_ref_hz beside its two channel parameters
 
 
 def sense_kwargs_of(arm, family, args=None):
@@ -237,7 +266,7 @@ def spec_of(arm, family="vncd"):
 def watch_of(family):
     # NOTE: the vncd4 (level family) batch ran with the round-2 watch list (PS059 not recorded per frame; its window mean is
     # in the decomposition); the level family records PS059 from here on, the level2 family PS059 and IN13B001.
-    if family in ("level2", "level3"):
+    if family in ("level2", "level3", "level4"):
         return WATCH_LEVEL2
     return WATCH_BODY if family in ("body", "level") else WATCH
 
@@ -800,7 +829,7 @@ def cmd_plan(args) -> int:
         from replicate_connectome_walk import write_plan
         return write_plan(args)
     d = args.dir.rstrip("/")
-    name = args.name or {"vncd": "vncd", "body": "vncd3", "level": "vncd4", "level2": "vncd5", "level3": "vncd6"}[fam]
+    name = args.name or {"vncd": "vncd", "body": "vncd3", "level": "vncd4", "level2": "vncd5", "level3": "vncd6", "level4": "vncd7"}[fam]
     pre = f"mkdir -p {d} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && "
     fam_flag = f" --family {fam}" if fam != "vncd" else ""
     room_arms = list(arms)
@@ -1575,7 +1604,8 @@ def main(argv=None):
     fam_help = ("arm family: 'vncd' (round 2: B all / C legs / D haltere / E coriolis), 'body' (round 3: C + leg cycle / D + side-split haltere / E + coriolis; "
                 "docs/audits/body_sided_state.md), 'level' (round 4: L = 'all' at the level-matched mn_ref_hz, a labelled control / C + leg cycle / D + side-split haltere; docs/audits/level_matched_control.md) "
                 "or 'level2' (round 5: L / U unsided / K channel-matched / M modulation-only / C, the three controls that split 'structure'; docs/audits/level_controls.md) "
-                "or 'level3' (round 4c: A / L / M2 modulation-only at the cycle's realised amplitude 0.948 / C; docs/audits/level_controls_r2.md)")
+                "or 'level3' (round 4c: A / L / M2 modulation-only at the cycle's realised amplitude 0.948 / C; docs/audits/level_controls_r2.md) "
+                "or 'level4' (round 4d: A / L3 the level control matched on all three leg channels, all+unsided with mn_ref_hz / hair_plate_max_hz / campaniform_load_hz derived together / M2 / C; docs/audits/level_fixed_point.md)")
     all_arms = sorted({a for arms_, _, _ in FAMILIES.values() for a in arms_})
     mn_help = "the sense's mn_ref_hz for this arm (default: the family table -- the level family's L arm -- else the sense's own default 30 Hz; a LABELLED CONTROL parameter, never a default)"
     kw_help = "a further senses.Proprioception constructor keyword of a labelled control arm (default: the family table ARM_SENSE_KW -- the level2 family's K arm -- else the sense's own default)"

@@ -3497,3 +3497,32 @@ Section 3.2 and `key_claims` 9 state this correctly with the exceptions named; t
 its own data.
 
 ---
+
+## Compass round 6B, hold plus local recurrence (2026-09-15)
+
+Batch cx7 (house B200, 10 completed jobs, 40 runs), `compass_local_recurrence.md`.
+Fable's handoff verdict wording is **"mostly sound"**, 16 claims, one refuted. The independent reviewer
+hit its usage limit before writing a final verdict/CLAIMS block (owner confirmation, 2026-09-15).
+Its completed notes are appended verbatim to the audit with infrastructure placeholders; no final
+verdict is reconstructed or attributed to it. The central completed reviewer heading is quoted exactly:
+
+> ## 12. "What is missing is inhibition of the rest of the ring" -- NOT LICENSED, and contradicted by the data
+
+Corrected closeout: 0/5 joint working-compass successes in each arm; five F/H3G runs nevertheless pass
+the individual survival/width rows and fail rate. H3E's excess is adjacent to the driven block; its far
+half is near background and quieter than H3. Width, rate and systematic offset fail. The previous
+rest-of-ring inhibition inference is explicitly withdrawn in both audit and NOTES. Per-type ring
+rates and never-spiked membrane sigma close 6A's measurement gaps; EPG spiking sigma, the unproven
+11.8 mV bound, windows, Holm counts and source-stamp limits are corrected. Nothing adopted.
+Closeout CPU suite: 441 passed / 19 skipped, 215 subtests; bit-identity gate and cache MD5s unchanged.
+
+## Round 4d, three-channel matched level control (2026-09-15)
+
+**Independent skeptic pending (Fable, when accounts reset).** Astra's self-review is labelled in
+`level_fixed_point.md` section 11 and does not replace the independent pass. All 24 CUDA runs and
+the predeclared channel matches checked; primary families re-emitted with Holm m=7, six runs per arm.
+C-L3 relay +2.6687 / +3.8782 Hz and DNa02-left are results; DNa02-right and the behavioural/sided
+primaries are null. M2-C is null on all seven. The direct pooled matched structure term is +3.2734 Hz;
+the old level model's residual on L3 reveals its extrapolation limit. Source-stamp differences and
+an unused descriptive rate-column defect are recorded. Nothing adopted; CPU suite 441 passed /
+19 skipped, 215 subtests, including the golden gate; cache MD5s unchanged.

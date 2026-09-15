@@ -169,13 +169,11 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           **Outcome** (round 4c): **6 runs per arm** at m = 7, floor `2/C(12, 6)` = 0.0021645 and 0.0021645 x 7 =
           **0.0152 <= 0.05** -- rows were CALLED for the first time in this thread (F2 four of seven, F3 four,
           F4 all seven; F1 calls none, which is the answer).
-    - [ ] **derive `mn_ref_hz`, `hair_plate_max_hz` and `campaniform_load_hz` together as one fixed point**
-          (`level_controls.md` 10, `level_controls_r2.md` 9 item 2): the structure term over the level control
-          (**+4.60 +- 0.31 Hz** without the amplitude law, **+4.72 +- 0.32** with it) still carries a -9.5 Hz
-          hair-plate and -24.7 Hz campaniform mismatch, corrected at cross-batch slopes extrapolated about 9.5 Hz off
-          their calibration manifold; a within-batch calibration is not available while L is the only steady-input arm
-          in the batch (two arm-side means against the model's four parameters). One three-parameter fixed point turns
-          the correction into a matched pair, and C v K from an upper bound into a measurement.
+    - [x] **derive the three-channel matched fixed point** -- round 4d (`level_fixed_point.md`), L3 at
+          8.23 / 81.09 / 25.10 matches C on both sides; direct C-L3 relay +2.6687 / +3.8782 Hz, pooled
+          +3.2734. M2-L3 +2.8521 / +4.0290; M2-C null on all seven primaries. The older level model
+          leaves +1.2028 / +1.2344 Hz in modulation-free L3: its extrapolation overestimated the size.
+          Nothing adopted; independent skeptic pending (Fable, when accounts reset).
     - [ ] **more runs of the REFERENCE arm for DNa02_R / the clean yaw SD** (`level_controls_r2.md` 9 item 6): both
           rows reproduce as DIFFERENCES in all three batches (DNa02_R +0.103 / +0.107 / +0.094 Hz; clean yaw SD
           +0.572 / +0.490 / +0.588 deg/s) and as verdicts only sometimes (DNa02_R `result` in rounds 4 and 4b at
@@ -242,26 +240,19 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           (survival 0.00, confined 0.000 in 5/5) because the same DC term also holds the unstimulated ring at rest, with
           ExR6 carrying most of it, ER6 some and ER4m `null` on PEN; the structure tool's defects were fixed first
           (`--legacy` reproduces 5A), and **nothing was adopted** -- `--hold-edges` defaults to `None`.
-    - [ ] **record per-type ring rates (ExR6 / ER6 / ER4m) in `cx_wedge`'s recorded groups** (`compass_dc_balance.md`
-          3.2 and its skeptic's closing paragraph): the rate model's weakest link is its ring rates (2.1-2.6x high on
-          H3's PEN, 3.5-4.6x on H_ER6's), and no arm of round 5 or round 6 measures them -- the protocol records only
-          the 308-cell `Ring` population mean.
-    - [ ] **measure the spiking LIF's effective input noise sigma** (the rate model assumes 2 mV: `SIGMA_MV` in
-          `scripts/cx_ring_structure.py` is hard-coded and has never been measured, and no arm varies it). Every slope
-          bound the compass rounds quote is a property of it: the maximum slope of the smoothed f-I is 8.00 Hz/mV at
-          sigma 2 mV, 11.0 at 1 mV and 25.3 at 0.25 mV, and the shipped ring's gamma_crit 33.3 would be reached at
-          sigma 0.17 mV -- so "unreachable" is a statement about an assumption until this is measured.
-    - [ ] **the hold PLUS a wedge-local recurrence** -- H3 with `same_type_gain` 1, or a per-type EPG -> EPG field --
-          to ask whether the ring can hold a bump AT THE DRIVEN TILE once both the DC brake is off and the local
-          recurrence is on (H3G already gets within 1 of 5 seeds of it). That arm is **two labelled instruments**, so it
-          decides a mechanism question, not an adoption.
+    - [x] **record per-type ring rates (ExR6 / ER6 / ER4m) in `cx_wedge`** -- closed by compass 6B
+          (`compass_local_recurrence.md`): all 40 runs carry per-type rates and per-cell maxima; S ExR6
+          41.3-42.8 Hz / ER6 23.1-23.9 post-pulse, below the fixed point's 107.7 / 51.9.
+    - [x] **measure the LIF's effective input noise sigma** -- 6B: never-spiked relay membrane 4.638 mV,
+          128 cells in two CPU seeds; state dependent. EPG 5.521 is a spiking-cell reading; input 11.800 is
+          a quasi-static sensitivity scenario, not a measured upper bound. Scalar f-I calibration remains open.
+    - [x] **the hold PLUS a wedge-local recurrence** -- 6B answers NO for these interventions: 0/5 joint
+          working-compass successes in every arm. H3E is wide, high-rate and systematically offset; H3F
+          nearly flat. Withdrawn: missing inhibition everywhere else; the far half is already near background.
+          No default changed or intervention adopted. Independent completed notes and their limits are in the audit.
     - [x] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate, -- ANSWERED by Astra (2026-09-16, `docs/audits/exr6_evidence.md`, merged 4fcfdf7): ExR6 glutamate and ER6 GABA have direct EASI-FISH support (Wolff et al. 2025 eLife 104764 Fig. 9 source data: SS53617 vGlut strong, SS58833 Gad1 weak -- worksheet rows verified locally); the model's labels stand; peptide / monoamine co-transmission untested; the open question is receptor placement and kinetics at the EB/GA contacts (a 2026 Turner-Evans-lab preprint reports glutamate inhibiting E-PG but exciting P-EN in the PB -- not isolated to ExR6). Nothing adopted.
     - [ ] **PS196_b, from the compass side too** (2026-09-15, literature note in `docs/NOTES.md`): Wang's MaleCNS mining (`fly-circuit-exploration`, finding 3) names PS196_b as GLNO's largest input outside the ring (1,801 syn, 19-21 %; every count reproduced to the synapse in our cache) and FB3A as a PFNd input; rounds 1-4 reach the same cell from the body (AN04B003 -> PS196_b is where the self-turn report breaks; its L-R is unsigned under the Coriolis stop-gap). Owed before any compass room is called: PS196_b's afferent budget by side (AN07B037_a/_b 419 / 52, CB0675 / GNG580 / PS047_b) and a sided ascending-stimulus arm, so a signed PS196_b L-R exists to test whether GLNO carries it into PEN -- a labelled diagnostic, never a default. His "compass brake" (the EPG -> PEN write-position recurrence, 3 : 1 in hemibrain; not checkable in our cache, no per-ROI edges) is the other term of 6A's balance: both readings predict the saturated ring H3 gives. hDelta path integration (Janke 2025 hDeltaG / vDeltaE; Avritzer 2026 hDeltaA, ~7-10 s) goes on the expectation side once a bump exists.
-          sign -1, no `receptors_by_type.csv` row (tier fallback = NT_SIGN), and the -1 onto EPG rides on the E-PG row's
-          GluClalpha (Davis 2020 PB_2, tier alias). **No published transmitter or function for ExR6 could be verified**
-          (Hulse et al. 2021 defines ExR1-ExR8 morphologically and by connectivity; ExR2 is the dopaminergic PPM3 class;
-          the classical ER ring neurons are the GABAergic E-PG inhibitors of Omoto 2017 / Fisher 2019 / Kim 2019), so it
-          is **unknown** in the literature and is to be stated as unknown, never as "the ring neurons inhibit EPG".
+          Withdrawn older continuation: ExR6 transmitter wholly UNKNOWN. The checked evidence is in the completed ExR6 item above.
     - [ ] **the room rate-half for GLNO, if adoption is ever wanted** (`glno_relabel.md` 4.3(b);
           `guard_suites_r3.md` 4): the room take-off protocol on `out/cache_glno_glu` at **>= 6 runs per arm** in ONE
           submission (`guard_suites.sh`'s room jobs with `FLYVERSE_CACHE` / `--cache-dir`). The suite half is already met
