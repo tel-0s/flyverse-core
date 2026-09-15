@@ -3126,3 +3126,21 @@ RNG caveat: environment seeds retain their room/air meaning, but the existing
 batched brain uses one generator over (B,N), so changing B changes the neural
 draw layout. These are independent rollouts, not exact replays of B separately
 seeded Sim processes. Program RNGs are now included in BatchSim checkpoints.
+
+## Session 12, round 4d: three-channel matched level control (2026-09-15)
+
+The fixed point landed: L3's realised chordotonal / hair-plate / campaniform means were 87.444 /
+47.091 / 24.978 Hz, inside every per-side tolerance against this batch's cycle arm C. On 24 CUDA runs
+(six per arm, one house submission), **C-L3 AN04B003 +2.6687 / +3.8782 Hz**, pooled **+3.2734**, is a
+direct matched structure term. Both relay sides and DNa02-left (+0.1342 Hz) pass the primary family;
+DNa02-right, clean yaw SD, straightness and DNa02 L-R are null. M2-L3 modulation alone gives +2.8521 /
++4.0290 Hz at the relay and passes DNa02-left and clean yaw too. M2-C is null on all seven primaries,
+replicating round 4c's null; it is not an equivalence test. The sided secondary still separates the
+DNa02 tripod-conditioned swing (-0.3543 C, -0.0884 M2).
+
+The old level model leaves +1.2028 / +1.2344 Hz residual in modulation-free L3, an extrapolation error;
+the earlier corrected +4.49 / +4.60 / +4.72 Hz terms are cross-batch context, not the new matched size.
+Nothing adopted. `docs/audits/level_fixed_point.md` records every family and per-seed list, the three changed source-stamp entries (two scripts and the wrapper), and a misleading descriptive decomposition rate column unused by the
+primaries. Sections 4-11 and Report were missing alongside section 0 and are reconstructed from the
+saved batch with all analyses re-run. CPU suite 441 passed / 19 skipped, 215 subtests; golden and cache
+unchanged. **Independent skeptic pending (Fable, when accounts reset).**
