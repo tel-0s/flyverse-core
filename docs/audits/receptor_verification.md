@@ -3594,3 +3594,13 @@ skipped / 220 subtests; golden/cache unchanged. One house submission passes 26 l
 17 exact captured/eager transition checkpoints and the room interruption gates. Starving
 airborne rows land within 0.52 s; robust food finding remains open. Independent skeptic pending
 (Fable, when accounts reset); no physiological adoption or performance-speedup claim.
+
+## Plume steering correction (Astra, 2026-09-16): independent review pending
+
+`audits/plume_steering.md` records diagnostic source 384898a, correction ef90c23 and scalar
+check 74f64de. Bilateral walking goals and DNa02 feedback onto existing PFL3 inputs are explicit
+unverified engineering. No synapse, receptor, transmitter or raw/body default changed. Twenty-six
+exact CUDA lifecycle checks and five full-brain neural gates pass; six of six compass and five
+of six ring room rows feed >=1 s. Scalar demo feeds 15 s. These functional checks do not establish
+native navigation or broad success rates. CPU 503 passed / 19 skipped / 220 subtests; original
+golden/cache unchanged. Author self-review complete; independent skeptic pending Fable.

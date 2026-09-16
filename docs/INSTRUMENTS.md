@@ -128,7 +128,7 @@ are also accepted by `benchmark.py` and `cx_wedge.py`. In Python, pass the same 
 | name | supplies | dependencies and limitations |
 |---|---|---|
 | `compass_ring` | Wang's reduced recurrent EPG/PEN rate loop, projected onto biological EPGs | Alternative to `compass`; the two together are an error. EB feedback defaults to a declared textbook counterfactual; angular gain is uncalibrated. |
-| `plume` | Odor-gated upwind goal, entry-bearing return memory, published PFL3 comparator, neural PFL3/DNp09 drive | Requires `compass` or `compass_ring`. Reads neural EPG/LH rates and held antennal deflections. Goal memory and output bridge are synthetic; no food-location oracle. |
+| `plume` | Bilateral odor-gradient walking goal; wind/entry-memory fallback; published PFL3 comparator with DNa02 feedback onto PFL3 | Requires `compass` or `compass_ring`, EPG/LH/PFL3/DNa02/DNp09 populations. Reads neural rates and held wind/smell samples. Goal policy and output bridge are synthetic; no food-location oracle. |
 | `hunger` | `(1-energy)*(not sated)` navigation gain | Requires `plume` or `flight`. Explicit engineering modulation, not a hormone/receptor model or fabricated hunger-neuron mapping. |
 | `flight` | Bounded wing-power bouts with reserve/odor interruptions, PFL3-to-wing steering bridge | Requires nonempty wing power/steering and PFL3 populations. Available LH odor groups add the landing cue. The 100 Hz target comes from the current body equations, not measured physiology. |
 
@@ -138,6 +138,7 @@ Direct `FlyBrain` callers must supply sensory/internal inputs themselves:
 
 ```python
 fb.wind(dL, dR)  # signed antennal deflections, not a world wind angle
+fb.smell(cL, cR)  # existing per-glomerulus concentration dictionaries, one per antenna
 fb.interoception(energy, sated=sated, airborne=airborne, feeding=feeding)
 fb.proprioception(0, 0, 0, airborne, yaw_rate=yaw_rad_per_s)
 fb.step(10)
@@ -148,6 +149,17 @@ and each accepts a scalar or one value per batch row. Inputs persist until updat
 and full/partial resets include every instrument. Plume can receive wind on a selected graph
 without JO cells, just as the compass can receive yaw without a proprioceptive afferent module.
 This explicit receiver does not enable other sensory pathways.
+
+Walking `plume` uses the antenna concentration difference to turn toward stronger odor. It
+uses DNa02 feedback to increase or withdraw its existing PFL3 input until the descending
+steering signal follows the comparator's demand. Airborne navigation, or calls without
+nonzero physical smell samples, retain the wind/entry-memory goal. A selected graph without
+ORNs can still expose the named smell receiver; this does not enable biological olfaction.
+Concentration sums, the 1 mm antenna baseline, 0.1 m response length, and feedback gain are
+declared engineering assumptions. This does not implement general odor valence or prove a
+native source-localization circuit. See [the steering audit](audits/plume_steering.md).
+The room and BatchSim already supply both antennae. Start a fresh episode after updating:
+older `plume` checkpoints lack the new sensory/feedback state and are rejected.
 
 The flight-priority policy applies whenever `flight` is attached, including without `hunger`.
 Its timers, reserve/odor hysteresis and landing latch are included in checkpoints and row resets.

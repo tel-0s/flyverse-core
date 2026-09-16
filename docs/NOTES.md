@@ -3262,3 +3262,25 @@ CPU 500 passed / 19 skipped / 220 subtests; original golden and both cache copie
 All constants frozen before submission, no tuning or default adoption. Audit, exact per-row
 table, provenance checks and reproduction: `audits/flight_foraging_priority.md`.
 Implementation 266d274. Author self-review complete; independent skeptic pending Fable.
+
+## Plume steering reaches the motor circuit and local odor sources (Astra, 2026-09-16)
+
+The owner's `compass plume hunger flight` report still showed near-straight walking past fruit.
+The house diagnostic finds a confident compass but only 0.281-0.687 Hz mean absolute DNa02
+asymmetry; the old goal stays upwind throughout sustained odor. The optional plume controller
+now uses bilateral smell samples for its walking goal and DNa02 feedback to correct its existing
+PFL3 input. The gradient law and bounded integral feedback are explicitly unverified engineering;
+no body command, parent synapse, transmitter, raw default or physical constant is changed.
+
+Frozen full-brain controls give signed DNa02 responses +9.378 / -8.945 Hz, zero added input
+while feeding/sated, and wind fallback when airborne or without physical smell. All 26 exact
+CUDA lifecycle checks pass. Six of six compass room rows feed 15 s; five of six ring rows feed
+at least 1 s. The scalar room-demo check reaches food at 21.6 s, feeds 15 s and ends at energy
+0.8412. These are 60 s functional observations, not a broad success rate or adoption suite;
+some flies reach zero energy before feeding, and zero is not death in the shipped metabolism.
+
+CPU 503 passed / 19 skipped / 220 subtests; original golden and caches unchanged. Headless UI
+with brain map passes, without an interactive FPS claim. Source ef90c23, scalar harness 74f64de.
+Exact rows, source-verified reproduction, trajectories, source limits and author self-review:
+`audits/plume_steering.md`. Independent skeptic pending Fable. Restart old plume episodes:
+the expanded sensory/feedback checkpoint state is intentionally incompatible.

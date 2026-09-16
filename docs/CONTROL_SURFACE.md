@@ -117,7 +117,7 @@ behavior will survive the loss of the rest of its recurrent network.
 | input | values |
 |---|---|
 | `vision(radiance)` | Nonnegative radiance `[UV, B, G, R]`, `(columns, 4)` or `(B, columns, 4)`, in `fb.retina` column order. A single frame broadcasts to the batch. |
-| `smell(cL, cR)` | Dictionaries keyed by glomerulus; values are nonnegative concentrations, scalar or `(B,)`. Omitted keys mean zero concentration. |
+| `smell(cL, cR)` | Dictionaries keyed by glomerulus; values are nonnegative concentrations, scalar or `(B,)`. Omitted keys mean zero concentration. Also forwards held samples to an explicitly named instrument receiver (`plume`); such a receiver may expose smell on a subset without ORNs. Raw sensory transduction is unchanged. |
 | `wind(dL, dR)` | Backward antennal deflection, scalar or `(B,)`; `+1` is full backward deflection, `-1` full forward deflection. |
 | `taste(sugar)` | Sugar contact in `[0, 1]`, scalar or `(B,)`; full contact drives the sweet GRNs at 120 Hz. |
 | `interoception(energy, sated=False, airborne=False, feeding=False)` | Explicit named instrument receivers only; energy in `[0,1]`, Boolean flags, scalar or `(B,)`. Does not construct a receptor/hormone model. Listed in `available_senses` only when a receiver exists. |

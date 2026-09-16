@@ -93,7 +93,8 @@ fixed before results. No sweep, data-driven gain fit or preset adoption. Save al
   source-approach check. Apply the same criterion descriptively to `compass_ring`. This is
   not a broad success-rate estimate, three-draw admission study, or proof of native navigation.
 
-Results pending. Independent skeptic pending Fable. No new physiological claim or adoption.
+Results are recorded in section 6. Independent skeptic pending Fable. No new physiological
+claim or adoption.
 
 ## 5. Scalar demo integration declaration
 
@@ -105,3 +106,75 @@ Gate: >=1 s feeding; record position, heading, yaw, energy, distance and contact
 house submission then performs a 1 s headless UI launch with brain map and screenshot. This
 checks scalar integration and rendering availability, not interactive FPS or generalization.
 Freeze both commands before submission; all controller laws remain exactly those of section 3.
+
+## 6. Results and reproduction
+
+All declared correction gates pass. Correction source/protocol `ef90c23`; scalar-only harness
+`74f64de`. The three submissions (diagnostic, correction validation, scalar/UI integration)
+each succeeded on their first attempt. The controller's constants stayed fixed throughout
+validation and the scalar follow-up. All GPU work was on the house B200.
+
+- Twenty-six exact CUDA lifecycle checks pass, including both heading providers, changing
+  held smell/wind/internal inputs, graph replay, pulses, reset, checkpoint and detach.
+- The eight-row neural assay passes all five gates. Left/right walking cues give DNa02 L-R
+  **+9.378 / -8.945 Hz**, against targets +8.944 / -8.944 Hz. The balanced row is +0.061 Hz;
+  feeding/sated added PFL3 input is zero. Airborne wind rows give -6.971 / +7.061 Hz; the
+  absent-smell wind row gives +6.836 Hz. The largest absolute *mean* target error in the
+  five directional rows is 0.434 Hz. This is not a bound on instantaneous fluctuations.
+- All **six compass rows feed for 15 s** in the 60 s room run. First contacts occur at
+  32.0, 37.3, 27.4, 32.9, 20.1, 21.9 s (environment seeds 0-5, 0.1 s sampling).
+  The original diagnostic has two rows above the predeclared >=1 s feeding threshold,
+  plus one 0.76 s contact. These seeds/configurations are observations, not a general
+  success-rate estimate or an independent causal separation of the two corrections.
+- The `compass_ring` comparison has **five of six** rows feed for >=1 s. Seed 3 remains a
+  failure despite passing close to fruit; its complete trajectory and zero feeding are
+  retained. The alternative ring has not acquired a calibrated biological angular gain.
+- The actual single-fly `room_demo.Sim`, seed 0, native warp sparse, reaches first feeding
+  at **21.6 s**, feeds **15 s**, and ends at energy **0.841211**. The separate headless UI
+  launch with brain map succeeds and its screenshot was inspected. No interactive FPS
+  claim follows from this check.
+
+The starting energy is only 0.1 and some trajectories reach zero before finding food.
+The shipped metabolism does not model death at zero; these results establish contact and
+refeeding in that model, not survival or a general starvation-recovery guarantee. Goal
+selection remains a simplified attractive-gradient policy. Mixed odor valence, noisy or
+adversarial plumes, alternate starts, repeated neural draws, wall/ceiling walking and long
+episodes remain validation gaps. Neither the admission suite nor the 300 s room rate-half
+is replaced by these functional checks. No default, native mechanism or physiological gain
+is adopted, and no full-brain eager/captured equality or speedup is claimed.
+
+Every per-environment row is script-emitted in [rooms.md](data/plume_steering/rooms.md).
+Exact numbers, all neural controls, gates and hashes are in
+[summary.json](data/plume_steering/summary.json). The [trajectory figure](data/plume_steering/trajectories.svg)
+shows the full 60 s paths with first feeding marked; it is a top-down projection, including
+walks that leave the table. Declaration snapshots are beside those files.
+
+```sh
+python scripts/plume_steering_analyse.py
+```
+
+The analyzer verifies each of three 79-file freezes against its committed snapshot and the
+exact remote archive, then checks 52 shared source hashes in each of ten runtime provenance
+records. It also asserts identical controller bytes in validation and scalar submissions.
+Raw results, logs, screenshot and `source.tar.gz` archives (extracted under `source/`) stay
+ignored in `out/plume_diagnostic_v1`, `out/plume_validation_v1`, `out/plume_scalar_v1`.
+Public derived artifacts omit host/path-bearing provenance. Keep those raw directories.
+
+## 7. Author self-review (independent skeptic pending)
+
+CPU suite: **503 passed / 19 skipped / 220 subtests**. Targeted navigation/golden:
+27 passed / 10 subtests. New/changed instrument and assay files pass Ruff; diff whitespace
+check passes. Original MaleCNS golden and both worktrees' three cache MD5s are unchanged:
+`c50c598a708b5b373cbaffca7d6a9d82`, `ac131529cebf98decde58d0c227b7954`,
+`bf01d724acf2a1fec8fdb60ef8a9e066`. Compiled CSR: `ef23cc27bea13be7f6a96f3c04fd3737`.
+
+The new receiver sees only existing physical smell arguments, never fruit/world coordinates.
+All neural reads are frame-boundary samples, so no mutable sibling state is read during a
+module step. Only existing PFL3/DNp09 Poisson targets are written; feedback does not overwrite
+DNa02 or body commands. Integrator limits, anti-windup and disabled-state clearing are explicit.
+All added state participates in checkpoint and row reset; old incompatible plume checkpoints
+fail explicitly. Capture uses device tensor arithmetic and persistent held input buffers.
+Finite/nonnegative/shape validation occurs before either antenna state or neural input changes.
+The raw smell path retains the same sensory calculation; raw/golden checks pass.
+
+This is the author's review, not Fable's independent skeptic pass, which remains pending.

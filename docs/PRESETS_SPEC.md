@@ -96,9 +96,15 @@ PFL3 comparator with an engineering neural-output bridge. `hunger` optionally sc
 from normalized energy; `flight` is an explicit wing-MN control experiment. All remain labelled
 `stop-gap`, `law=unverified`: measured parts do not validate the complete composite law.
 
-Named receivers may consume held antennal deflections through `wind()` and normalized energy,
+Named receivers may consume held antennal deflections through `wind()`, bilateral physical
+concentrations through `smell()`, and normalized energy,
 sated/airborne/feeding flags through `interoception()`, as the existing compass consumes held yaw.
 This is explicit body-derived sensory input; no module receives the body object or world geometry.
 These receivers are constructed only when named. General module read/write boundaries and the raw
 default are unchanged. See [the navigation audit](audits/navigation_instruments.md) for exact laws,
 source limits, incompatible combinations, and functional versus admission gates.
+
+The 2026-09-16 plume correction reads its existing smell arguments for a local walking goal
+and closes its PFL3 output using measured DNa02 L-R. Both are explicitly unverified stand-ins;
+no source position, body command or synaptic edit is introduced. Details and admission limits:
+[audits/plume_steering.md](audits/plume_steering.md).

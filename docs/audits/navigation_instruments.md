@@ -8,6 +8,10 @@ Historical flight results below describe the original sustained-power servo. The
 starvation observation led to a separate [flight-priority correction](flight_foraging_priority.md)
 with bounded bouts and reserve/odor interruptions; the original results are preserved here.
 
+The later [plume steering correction](plume_steering.md) adds bilateral walking goals and
+DNa02 feedback onto the existing PFL3 inputs. The original one-way bridge and its observations
+below remain a historical record; they do not describe the corrected controller.
+
 ## 1. Scope and sources
 
 The owner requested a more direct implementation of Wang's ideas and their primary sources,

@@ -489,7 +489,11 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
       comparator, explicit metabolic gain, wing-MN power/steering control. Raw default unchanged.
       Evidence and limits: `docs/audits/navigation_instruments.md`; independent review pending.
 - [ ] Validate plume return with controlled odor/wind ablations and multiple neural draws before
-      claiming robust food finding. One of six 60 s walking observations fed; no admission claim.
+      claiming robust food finding. After the explicit bilateral-goal/feedback correction, six
+      of six compass and five of six ring rows feed in one 60 s family; no admission claim.
+- [x] Close the optional PFL3 -> DNa02 steering bridge with feedback and use bilateral smell for
+      local walking goals. Scalar room demo reaches food; `docs/audits/plume_steering.md` records
+      the unverified laws, controlled neural checks, all trajectories and remaining failures.
 - [x] Interrupt the optional flight servo for low reserves and strong neural odor; bound its bouts
       and allow ground search. Engineering policy only: `docs/audits/flight_foraging_priority.md`.
 - [ ] Source/validate neural flight-state and landing control, altitude/visual/tilt controls and
