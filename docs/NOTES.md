@@ -3218,3 +3218,27 @@ house fixtures. Final CPU 482 passed / 19 skipped / 220 subtests; house 15 exact
 8 existing CUDA tests / 2 skipped / 3 subtests. Original golden and both worktrees' cache MD5s unchanged.
 Experimental opt-in only; raw remains default and no physiology adopted. **Independent skeptic pending
 (Fable, when accounts reset).**
+
+
+## Navigation instruments: recurrent compass, plume, hunger and flight (Astra, 2026-09-15)
+
+Owner-requested experiments now compose as `--preset instrumented --instruments compass plume hunger flight`.
+`compass_ring` is an alternative Wang-style EPG/PEN recurrent rate model, with the EB-count-ratio brake
+as a separate diagnostic. Its angular gain remains uncalibrated. Plume uses the published PFL3 comparator
+plus synthetic goal memory/output mapping; hunger is explicit energy-to-navigation gain, not a claimed
+insulin/sNPF circuit. Flight is a neural wing-MN servo targeting the current body's 100 Hz lift equilibrium.
+No parent weights, receptors, body constants or raw default change. Incompatible/dependent combinations
+fail early. Both room implementations supply held sensory/internal inputs and use normal neural readout.
+
+Full CPU: 496 passed / 19 skipped / 220 subtests, original golden and both cache copies unchanged.
+House: 26 exact multi-module CUDA lifecycle checks; the corrected harness records its actual instrumented
+controllers. Full-brain neural forcing gives signed steering and about 100 Hz power, with sated/feeding
+controls off. Six 60 s rooms with flight remain airborne 59.67 s each; plume+hunger yields one feeding
+row (8.08 s), versus zero with compass alone. This does not establish robust food finding, source
+localization or a recovered native circuit. No flight landing/altitude controller or added energy cost.
+
+All-four brain-frame timing observations: 1.015 / 4.152 / 13.969 ms at B=1/8/32 on B200; the exact-workload
+gate fails, including rate/spike differences at B=8/32, so no clean causal overhead or whole-room equality
+claim. UI smoke with brain map passes. No gains fitted, no preset admission/default adoption; independent
+skeptic pending. Sources, declarations, every per-room row, failures and reproducible derived tables:
+`audits/navigation_instruments.md`. Implementation 3cac3cc; lifecycle provenance correction c7ead86.
