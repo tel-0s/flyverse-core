@@ -248,20 +248,85 @@ def boundary(c):
     }
 
 
+def scalar():
+    from room_demo import Sim
+
+    sim = Sim(
+        seed=0,
+        preset="instrumented",
+        instruments=NAV,
+        cuda_graphs=True,
+        cuda_kernels=True,
+        event_driven=True,
+        cuda_sparse="warp",
+    )
+    sim.metabolism.energy = 0.1
+    samples, feeding = [], 0.0
+    for frame in range(6000):
+        sim.step()
+        feeding += bool(sim.feeding) * 0.01
+        if frame % 10 == 9:
+            samples.append(
+                [
+                    *sim.fly.pos,
+                    sim.fly.heading,
+                    sim.fly.yaw_rate,
+                    sim.metabolism.energy,
+                    sim.nearest_fruit()[1],
+                    bool(sim.feeding),
+                ]
+            )
+    result = {
+        "columns": [
+            "x",
+            "y",
+            "z",
+            "heading",
+            "yaw",
+            "energy",
+            "fruit_distance",
+            "feeding",
+        ],
+        "samples": samples,
+        "feeding_s": feeding,
+        "gates": {"scalar_demo_feeds_for_one_second": feeding >= 1},
+        "provenance": provenance(
+            sim.c,
+            fb=sim.fb,
+            seeds=[0],
+            env_seeds=[0],
+            batch=1,
+            stimulus={
+                "name": "room_demo.Sim scalar integration",
+                "seconds": 60,
+                "initial_energy": 0.1,
+                "start": "default",
+                "fruit": "all",
+                "cuda_sparse": "warp",
+                "rendering": False,
+            },
+        ),
+    }
+    print("scalar feeding", feeding, "end energy", sim.metabolism.energy, flush=True)
+    return result
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--heading", choices=("compass", "compass_ring"), default="compass")
     ap.add_argument("--out", required=True)
     ap.add_argument(
         "--mode",
-        choices=("diagnostic", "room", "boundary", "lifecycle"),
+        choices=("diagnostic", "room", "boundary", "lifecycle", "scalar"),
         default="diagnostic",
     )
     args = ap.parse_args()
     assert torch.cuda.is_available(), "house GPU required"
     print("device cuda", torch.cuda.get_device_name(), args.heading, flush=True)
-    c = connectome.load()
-    if args.mode == "lifecycle":
+    c = None if args.mode == "scalar" else connectome.load()
+    if args.mode == "scalar":
+        result = scalar()
+    elif args.mode == "lifecycle":
         result = lifecycle(c, smell=True)
     elif args.mode == "boundary":
         result = boundary(c)

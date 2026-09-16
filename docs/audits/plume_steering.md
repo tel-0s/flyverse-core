@@ -94,3 +94,14 @@ fixed before results. No sweep, data-driven gain fit or preset adoption. Save al
   not a broad success-rate estimate, three-draw admission study, or proof of native navigation.
 
 Results pending. Independent skeptic pending Fable. No new physiological claim or adoption.
+
+## 5. Scalar demo integration declaration
+
+After the compass B=6 room passes with six feeding rows, separately check the user's actual
+scalar simulator and backend. No controller parameter/code change: `plume_steering_probe.py
+--mode scalar` uses `room_demo.Sim`, seed 0, all fruit/default start, initial energy 0.1,
+`compass plume hunger flight`, native CUDA events, warp sparse and captured frames, for 60 s.
+Gate: >=1 s feeding; record position, heading, yaw, energy, distance and contact. One additional
+house submission then performs a 1 s headless UI launch with brain map and screenshot. This
+checks scalar integration and rendering availability, not interactive FPS or generalization.
+Freeze both commands before submission; all controller laws remain exactly those of section 3.

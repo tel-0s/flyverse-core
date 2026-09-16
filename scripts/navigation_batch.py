@@ -17,6 +17,7 @@ def build(
     flight_priority=False,
     plume_diagnostic=False,
     plume_validation=False,
+    plume_scalar=False,
 ):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
@@ -62,6 +63,11 @@ def build(
             f"python scripts/plume_steering_probe.py --mode room --heading {heading} --out {rel}/{heading}.json"
             for heading in ("compass", "compass_ring")
         ]
+    if plume_scalar:
+        commands = [
+            f"python scripts/plume_steering_probe.py --mode scalar --out {rel}/scalar.json",
+            f"python scripts/room_demo.py --headless --seconds 1 --preset instrumented --instruments compass plume hunger flight --brain-map --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp --screenshot {rel}/ui.png",
+        ]
     chain = " && ".join(commands)
     log = f"{rel}/fam_navigation.txt"
     job = f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( {chain} ) > {log} 2>&1; st=$?; tail -8 {log}; exit $st"
@@ -95,7 +101,7 @@ def build(
                 "docs/audits/flight_foraging_priority.md",
             )
         ]
-    if plume_diagnostic or plume_validation:
+    if plume_diagnostic or plume_validation or plume_scalar:
         paths += [
             ROOT / p
             for p in (
@@ -135,6 +141,12 @@ def build(
         declaration["rules"] = (
             "docs/audits/plume_steering.md section 4; functional engineering checks, no fitting/adoption"
         )
+    if plume_scalar:
+        declaration["rules"] = (
+            "docs/audits/plume_steering.md section 5; scalar integration and UI smoke only"
+        )
+        declaration["neural_seed"] = 0
+        declaration["room_seeds"] = [0]
     (out / "predeclared.json").write_text(
         json.dumps(declaration, indent=2) + "\n", encoding="utf-8"
     )
@@ -156,6 +168,7 @@ if __name__ == "__main__":
     )
     ap.add_argument("--plume-diagnostic", action="store_true")
     ap.add_argument("--plume-validation", action="store_true")
+    ap.add_argument("--plume-scalar", action="store_true")
     args = ap.parse_args()
     if (
         sum(
@@ -164,6 +177,7 @@ if __name__ == "__main__":
                 args.flight_priority,
                 args.plume_diagnostic,
                 args.plume_validation,
+                args.plume_scalar,
             )
         )
         > 1
@@ -175,4 +189,5 @@ if __name__ == "__main__":
         args.flight_priority,
         args.plume_diagnostic,
         args.plume_validation,
+        args.plume_scalar,
     )
