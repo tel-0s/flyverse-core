@@ -11,7 +11,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(out, lifecycle_only=False, flight_priority=False, plume_diagnostic=False):
+def build(
+    out,
+    lifecycle_only=False,
+    flight_priority=False,
+    plume_diagnostic=False,
+    plume_validation=False,
+):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     if (out / "predeclared.json").exists():
@@ -48,6 +54,14 @@ def build(out, lifecycle_only=False, flight_priority=False, plume_diagnostic=Fal
             f"python scripts/plume_steering_probe.py --heading {heading} --out {rel}/{heading}.json"
             for heading in ("compass", "compass_ring")
         ]
+    if plume_validation:
+        commands = [
+            f"python scripts/plume_steering_probe.py --mode {mode} --out {rel}/{mode}.json"
+            for mode in ("lifecycle", "boundary")
+        ] + [
+            f"python scripts/plume_steering_probe.py --mode room --heading {heading} --out {rel}/{heading}.json"
+            for heading in ("compass", "compass_ring")
+        ]
     chain = " && ".join(commands)
     log = f"{rel}/fam_navigation.txt"
     job = f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( {chain} ) > {log} 2>&1; st=$?; tail -8 {log}; exit $st"
@@ -81,7 +95,7 @@ def build(out, lifecycle_only=False, flight_priority=False, plume_diagnostic=Fal
                 "docs/audits/flight_foraging_priority.md",
             )
         ]
-    if plume_diagnostic:
+    if plume_diagnostic or plume_validation:
         paths += [
             ROOT / p
             for p in (
@@ -117,6 +131,10 @@ def build(out, lifecycle_only=False, flight_priority=False, plume_diagnostic=Fal
         declaration["rules"] = (
             "docs/audits/plume_steering.md section 1; diagnostic only, no tuning/adoption"
         )
+    if plume_validation:
+        declaration["rules"] = (
+            "docs/audits/plume_steering.md section 4; functional engineering checks, no fitting/adoption"
+        )
     (out / "predeclared.json").write_text(
         json.dumps(declaration, indent=2) + "\n", encoding="utf-8"
     )
@@ -137,7 +155,24 @@ if __name__ == "__main__":
         help="flight interruption, capture transitions and two room observations",
     )
     ap.add_argument("--plume-diagnostic", action="store_true")
+    ap.add_argument("--plume-validation", action="store_true")
     args = ap.parse_args()
-    if sum((args.lifecycle_only, args.flight_priority, args.plume_diagnostic)) > 1:
+    if (
+        sum(
+            (
+                args.lifecycle_only,
+                args.flight_priority,
+                args.plume_diagnostic,
+                args.plume_validation,
+            )
+        )
+        > 1
+    ):
         ap.error("choose one assay family")
-    build(args.out, args.lifecycle_only, args.flight_priority, args.plume_diagnostic)
+    build(
+        args.out,
+        args.lifecycle_only,
+        args.flight_priority,
+        args.plume_diagnostic,
+        args.plume_validation,
+    )

@@ -264,7 +264,8 @@ class FlyBrain:
         motion = any(callable(getattr(inst, "observe_turn", None)) for inst in self.instruments.values())
         internal = any(callable(getattr(inst, "observe_internal", None)) for inst in self.instruments.values())
         wind = any(callable(getattr(inst, "observe_wind", None)) for inst in self.instruments.values())
-        return tuple(name for name, value in (("vision", self.optic), ("smell", self.olfaction),
+        smell = any(callable(getattr(inst, "observe_smell", None)) for inst in self.instruments.values())
+        return tuple(name for name, value in (("vision", self.optic), ("smell", self.olfaction or (True if smell else None)),
                      ("wind", self.wind_sense or (True if wind else None)), ("taste", self.taste_sense),
                      ("interoception", True if internal else None),
                      ("proprioception", getattr(self, "proprioception_sense", None) or (True if motion else None))) if value is not None)
@@ -321,8 +322,13 @@ class FlyBrain:
             self.brain._poisson_on = any(self._inputs_on.values())
 
     def smell(self, cL, cR):
-        self._require("smell", self.olfaction)
-        self._input("smell", self.olfaction.orn_idx, self.olfaction.rates(cL, cR, self.B))
+        receivers = [inst for inst in self.instruments.values() if callable(getattr(inst, "observe_smell", None))]
+        self._require("smell", self.olfaction or (True if receivers else None))
+        rates = self.olfaction.rates(cL, cR, self.B) if self.olfaction is not None else None
+        for inst in receivers:
+            inst.observe_smell(cL, cR)
+        if rates is not None:
+            self._input("smell", self.olfaction.orn_idx, rates)
 
     def wind(self, dL, dR):
         receivers=[i for i in self.instruments.values() if callable(getattr(i,'observe_wind',None))]

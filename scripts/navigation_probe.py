@@ -33,7 +33,7 @@ def write(path, value):
     path.write_text(json.dumps(to_jsonable(value), indent=2) + "\n", encoding="utf-8")
 
 
-def lifecycle(c):
+def lifecycle(c, *, smell=False):
     """Biological subgraph; tests reads, changing sensory inputs, pulses and graph storage lifetime."""
     selected = set()
     for name in NAV:
@@ -102,6 +102,11 @@ def lifecycle(c):
                     [0.2, 0.8, 0.5], airborne=[True, False, True], feeding=frame >= 50
                 )
                 fb.instruments["plume"].observe_wind([0.6, -0.6, 0.2], [0.2, 0.4, -0.3])
+                if smell:
+                    fb.smell(
+                        {"DM1": [0.1, 0.2, 0.3]},
+                        {"DM1": [0.3, 0.2, 0.1] if frame < 40 else [0.1, 0.2, 0.3]},
+                    )
                 if frame == 20:
                     fb.stimulate(np.arange(8), 100.0, 3.0)
                 if frame == 30:
@@ -149,6 +154,7 @@ def lifecycle(c):
                         "role": role,
                         "heading": heading,
                         "exact_state_comparison": True,
+                        "held_bilateral_smell": smell,
                     },
                 )
             )

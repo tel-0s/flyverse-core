@@ -307,11 +307,11 @@ class HungerGain(NeuralInstrument):
 
 
 class PlumeNavigation(NeuralInstrument):
-    """Odor-gated upwind goal, learned entry bearing, and the published PFL3 comparator.
+    """Wind/odor goals, local walking gradients, and the published PFL3 comparator.
 
-    Reads biological EPG and LH rates plus antennal deflection. The goal memory and
-    translation of model LAL rate difference into Poisson input on biological PFL3 sides
-    are explicitly synthetic. No world wind angle, source position or body heading input.
+    Reads biological EPG/LH/DNa02 rates and held antennal deflection/concentrations.
+    Goal memory, the walking gradient law and DNa02 feedback onto PFL3 Poisson inputs
+    are unverified engineering. No world wind angle, source position or body heading input.
     """
 
     name = "plume"
@@ -326,6 +326,7 @@ class PlumeNavigation(NeuralInstrument):
         "https://doi.org/10.1038/s41467-022-32247-7",
         "https://doi.org/10.1038/s41467-024-46225-8",
         "https://doi.org/10.1016/j.cub.2013.12.023",
+        "https://doi.org/10.1038/nature11747",
     ]
     max_hz = 80.0
     state_bounds: ClassVar[dict] = {
@@ -336,8 +337,14 @@ class PlumeNavigation(NeuralInstrument):
         "heading": (-math.pi, math.pi),
         "turn": (-1, 1),
         "strength": (0, 1.00001),
+        "steer_integral": (-80, 80),
+        "steer_input": (-80, 80),
+        "target_difference": (-40, 40),
+        "odor_L": (0, np.finfo(np.float32).max),
+        "odor_R": (0, np.finfo(np.float32).max),
+        "bilateral": (-1, 1),
     }
-    state_flags = ("inside", "seen", "airborne", "feeding")
+    state_flags = ("inside", "seen", "airborne", "feeding", "smell_observed")
 
     def __init__(self, c):
         super().__init__(c)
@@ -361,6 +368,12 @@ class PlumeNavigation(NeuralInstrument):
             if not len(ix):
                 raise ValueError(f"plume requires PFL3 on side {side}")
             self.writes["pfl_" + side] = ix
+            dn = np.flatnonzero(
+                (c.neurons.type.eq("DNa02") & c.neurons.somaSide.eq(side)).to_numpy()
+            )
+            if not len(dn):
+                raise ValueError(f"plume requires DNa02 on side {side}")
+            self.reads["dna_" + side] = dn
         ix = np.flatnonzero(c.neurons.type.eq("DNp09").to_numpy())
         if not len(ix):
             raise ValueError("plume requires DNp09")
@@ -384,11 +397,25 @@ class PlumeNavigation(NeuralInstrument):
             "lal_difference_scale_hz": 40.0,
             "flight_cast_half_period_s": 1.5,
             "minimum_heading_strength": 0.6,
+            "steering_target_difference_hz": 40.0,
+            "steering_integral_gain_per_s": 5.0,
+            "steering_feedback": "DNa02 L-R; bounded integral correction to PFL3 input",
+            "bilateral_tau_s": 0.25,
+            "antenna_separation_m": 0.001,
+            "gradient_length_m": 0.1,
+            "walking_goal": "heading + atan(length * lateral log-concentration gradient)",
+            "smell_input": "held bilateral concentration sums through smell(); no world geometry",
+            "policy_source": "unverified engineering; bilateral turn sign motivated by Gaudry 2013 Fig 1",
         }
         self.hunger = None
 
     def bind_instruments(self, instruments):
         self.hunger = instruments.get("hunger")
+
+    def describe(self):
+        record = super().describe()
+        record["audits"].append("docs/audits/plume_steering.md")
+        return record
 
     def initialize(self):
         self.epg_weights = torch.as_tensor(
@@ -449,6 +476,13 @@ class PlumeNavigation(NeuralInstrument):
             "heading": 0.0,
             "turn": 0.0,
             "strength": 0.0,
+            "steer_integral": 0.0,
+            "steer_input": 0.0,
+            "target_difference": 0.0,
+            "odor_L": 0.0,
+            "odor_R": 0.0,
+            "bilateral": 0.0,
+            "smell_observed": 0.0,
         }.items():
             self.state(k, v)
 
@@ -461,6 +495,27 @@ class PlumeNavigation(NeuralInstrument):
     def observe_internal(self, airborne, feeding, **kwargs):
         self.upload("airborne", airborne)
         self.upload("feeding", feeding)
+
+    def observe_smell(self, cL, cR):
+        totals = []
+        for concentrations in (cL, cR):
+            if not isinstance(concentrations, dict):
+                raise TypeError(
+                    "concentrations must be dictionaries keyed by glomerulus"
+                )
+            total = np.zeros(self.B, dtype=np.float64)
+            for key, value in concentrations.items():
+                v = batch_values(value, self.B, key)
+                if np.any(v < 0):
+                    raise ValueError("concentrations must be nonnegative")
+                total += v
+            if not np.isfinite(total).all() or np.any(total > np.finfo(np.float32).max):
+                raise ValueError("summed concentrations overflow float32")
+            totals.append(total)
+        # Validate both sides before updating either held input.
+        self.upload("odor_L", totals[0])
+        self.upload("odor_R", totals[1])
+        self.upload("smell_observed", 1.0)
 
     def step(self, dt_ms, inputs):
         dt = _frame_seconds(dt_ms)
@@ -510,6 +565,30 @@ class PlumeNavigation(NeuralInstrument):
         self.goal.copy_(
             torch.where((inside > 0) | (self.lost_s < 0.45), upwind, returning)
         )
+        # A bilateral gradient provides a local walking goal when physical smell samples
+        # are available. The wind/memory policy remains the fallback and airborne policy.
+        # Scale first to avoid overflow in L+R; contrast is invariant to common amplitude.
+        scale = torch.maximum(self.odor_L, self.odor_R).clamp_min(1e-12)
+        l, r = self.odor_L / scale, self.odor_R / scale
+        contrast = (l - r) / (l + r).clamp_min(1e-12)
+        self.bilateral.lerp_(
+            contrast, 1 - math.exp(-dt / self.parameters["bilateral_tau_s"])
+        )
+        # log(L/R) = 2*atanh((L-R)/(L+R)); one-sided input has a bounded limiting goal.
+        gradient = (
+            2
+            * torch.atanh(self.bilateral.clamp(-0.999, 0.999))
+            / self.parameters["antenna_separation_m"]
+        )
+        local_goal = self.heading + torch.atan(
+            self.parameters["gradient_length_m"] * gradient
+        )
+        local = (
+            (self.smell_observed > 0)
+            & (self.airborne == 0)
+            & (torch.maximum(self.odor_L, self.odor_R) > 1e-12)
+        )
+        self.goal.copy_(torch.where(local, local_goal, self.goal))
         rates = _pfl3(self.heading, self.goal, self.hpref, self.gpref)
         # With the paper's negated preferred-angle arrays, R-L follows positive goal error.
         # This frame convention is tested over heading and goal angles, before any behavioral run.
@@ -521,10 +600,40 @@ class PlumeNavigation(NeuralInstrument):
         if self.hunger is not None:
             gain = gain * self.hunger.level
         self.turn.copy_((turn * gain).clamp(-1, 1))
+        # The published comparator's rate difference is the desired descending asymmetry.
+        # Its original one-way PFL3 injection often failed to bring DNa02 above threshold.
+        # Close that engineering bridge through the biological PFL3 -> DNa02 route.
+        self.target_difference.copy_(
+            self.parameters["steering_target_difference_hz"] * self.turn
+        )
+        actual = inputs["dna_L"].mean(1, keepdim=True) - inputs["dna_R"].mean(
+            1, keepdim=True
+        )
+        error = self.target_difference - actual
+        base = 80 * self.turn
+        previous = base + self.steer_integral
+        can_integrate = ((previous > -80) & (previous < 80)) | (previous * error < 0)
+        enabled = gain > 0
+        self.steer_integral.copy_(
+            torch.where(
+                enabled,
+                (
+                    self.steer_integral
+                    + can_integrate
+                    * self.parameters["steering_integral_gain_per_s"]
+                    * dt
+                    * error
+                ).clamp(-80, 80),
+                0.0,
+            )
+        )
+        self.steer_input.copy_(
+            torch.where(enabled, (base + self.steer_integral).clamp(-80, 80), 0.0)
+        )
         # Existing graph: PFL3-R -> DNa02-L -> positive/left yaw; opposite for PFL3-L.
         return {
-            "pfl_R": (80 * self.turn.relu()).expand(-1, len(self.writes["pfl_R"])),
-            "pfl_L": (80 * (-self.turn).relu()).expand(-1, len(self.writes["pfl_L"])),
+            "pfl_R": self.steer_input.relu().expand(-1, len(self.writes["pfl_R"])),
+            "pfl_L": (-self.steer_input).relu().expand(-1, len(self.writes["pfl_L"])),
             "forward": (60 * gain).expand(-1, len(self.writes["forward"])),
         }
 

@@ -31,6 +31,7 @@ def graph():
     for ty in [
         *dict.fromkeys(t for ts in LH_ODOUR_CHANNELS.values() for t in ts),
         "PFL3",
+        "DNa02",
         "DNp09",
         "DLMn1",
         "b1 MN",
@@ -86,6 +87,8 @@ def plume_inputs(m, heading=0.0, odor=1.0):
             (m.B, len(m.reads["odor_" + k])),
             base + odor * m.parameters["odor_range_hz"][k],
         )
+    for side in ("L", "R"):
+        values["dna_" + side] = torch.zeros((m.B, len(m.reads["dna_" + side])))
     return values
 
 
@@ -164,6 +167,7 @@ def test_composition_order_neural_boundary_and_checkpoint():
     before = a.c.W.copy()
     for fb in (a, b):
         fb.interoception([0.2, 0.8], airborne=[True, False])
+        fb.smell({"DM1": [0.11, 0.1]}, {"DM1": [0.1, 0.11]})
         fb.proprioception(0, 0, 0, False, yaw_rate=[0.4, -0.2])
         fb.step(70.0)
     torch.testing.assert_close(a.brain.rate, b.brain.rate, rtol=0, atol=0)
@@ -250,12 +254,13 @@ def test_plume_uses_heading_wind_odor_and_optional_hunger_without_oracles():
     for _ in range(200):
         out = m.step(10, inputs)
     assert bool((out["pfl_R"] > 0).all()) and torch.count_nonzero(out["pfl_L"]) == 0
-    assert (out["pfl_R"][0] / out["pfl_R"][1]).mean().item() == pytest.approx(
-        4.0, rel=1e-5
-    )
+    assert (
+        m.target_difference[0] / m.target_difference[1]
+    ).mean().item() == pytest.approx(4.0, rel=1e-5)
     entry = m.entry_x.clone()
     m.observe_wind([0.0, 0.0], [1.0, 1.0])
-    out = m.step(10, inputs)
+    for _ in range(200):
+        out = m.step(10, inputs)
     assert bool((out["pfl_L"] > 0).all())
     # After odor loss, walking returns toward the learned entry heading, despite changed wind.
     no_odor = plume_inputs(m, heading=math.pi / 2, odor=0.0)
@@ -291,6 +296,73 @@ def test_recurrent_memory_moves_both_ways_and_eb_brake_is_separate_counterfactua
         assert not hasattr(
             m, "phase"
         )  # memory is the recurrent activity, not an integrated scalar
+
+
+def test_walking_gradient_turns_to_stronger_antenna_despite_opposing_wind():
+    fb = make(["compass", "plume", "hunger"], batch=4)
+    m = fb.instruments["plume"]
+    fb.interoception(0.1)
+    # The last pair has the same ratios at 1000 times the concentration.
+    fb.smell({"DM1": [1.02, 1, 1020, 1000]}, {"DM1": [1, 1.02, 1000, 1020]})
+    fb.wind([0, 1, 0, 1], [1, 0, 1, 0])
+    inputs = plume_inputs(m)
+    for _ in range(200):
+        m.step(10, inputs)
+    assert m.turn[0] > 0 and m.turn[1] < 0
+    torch.testing.assert_close(m.turn[:2], m.turn[2:], rtol=1e-5, atol=1e-6)
+    # Airborne steering retains the wind-relative policy; it must not use this walking goal.
+    fb.interoception(0.1, airborne=True)
+    m.step(10, inputs)
+    assert m.turn[0] < 0 and m.turn[1] > 0
+    fb.interoception(0.1, feeding=True)
+    assert all(torch.count_nonzero(v) == 0 for v in m.step(10, inputs).values())
+    assert not m.steer_integral.any()
+
+
+def test_steering_feedback_can_cross_a_threshold_and_track_signed_demand():
+    fb = make(["compass", "plume", "hunger"])
+    m = fb.instruments["plume"]
+    fb.interoception(0.1)
+    fb.wind([1, 0], [0, 1])
+    inputs = plume_inputs(m)
+    actual = torch.zeros((2, 1))
+    for _ in range(1500):
+        inputs["dna_L"][:] = actual.relu()
+        inputs["dna_R"][:] = (-actual).relu()
+        out = m.step(10, inputs)
+        # Independent thresholded plant: a one-way small command cannot activate it.
+        # This is a controller unit test, not a fit or claimed model of DNa02 physiology.
+        drive = out["pfl_R"].mean(1, keepdim=True) - out["pfl_L"].mean(1, keepdim=True)
+        response = drive.sign() * (drive.abs() - 20).relu() * 0.35
+        actual.lerp_(response, 1 - math.exp(-0.01 / 0.1))
+    torch.testing.assert_close(actual, m.target_difference, rtol=0, atol=0.1)
+    assert actual[0] > 2 and actual[1] < -2
+    # No requested navigation means no accumulated hidden turn drive.
+    inputs["epg"].fill_(10)
+    assert all(torch.count_nonzero(v) == 0 for v in m.step(10, inputs).values())
+    assert not m.steer_integral.any()
+
+
+def test_smell_receiver_validates_both_sides_and_requires_explicit_instrument():
+    fb = make(["compass", "plume"])
+    assert fb.olfaction is None and "smell" in fb.available_senses
+    fb.smell({"DM1": [1, 2]}, {"DM1": [3, 4]})
+    m = fb.instruments["plume"]
+    saved = m.state_dict()
+    for left, right in (
+        ({"DM1": 2}, {"DM1": float("nan")}),
+        ({"DM1": -1}, {}),
+        ({}, {"DM1": [1]}),
+        ({}, {"DM1": 1e40}),
+    ):
+        with pytest.raises(ValueError):
+            fb.smell(left, right)
+        for key, value in saved.items():
+            torch.testing.assert_close(value, m.state_dict()[key], rtol=0, atol=0)
+    bare = make(["compass"])
+    assert "smell" not in bare.available_senses
+    with pytest.raises(ValueError, match="smell"):
+        bare.smell({}, {})
 
 
 def test_flight_needs_explicit_body_input_and_has_sided_bounded_neural_output():
