@@ -50,7 +50,7 @@ class FlyBrain:
         default changes: preset='raw' with instruments raises, and the constructor never builds an instrument on its own."""
         if optic not in (None, "auto"):
             raise ValueError("optic must be 'auto' or None")
-        from .instruments import PRESETS, _check_instrument
+        from .instruments import PRESETS
         if preset not in PRESETS:
             raise ValueError(f"preset must be one of {PRESETS}, got {preset!r}")
         instruments = [instruments] if isinstance(instruments, str) else list(instruments or [])

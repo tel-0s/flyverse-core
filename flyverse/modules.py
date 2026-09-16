@@ -451,7 +451,8 @@ class ExtensionRuntime:
             return False
         return (any(getattr(m, 'poisson_always_on', False) for m in self.modules.values())
                 and all(getattr(m, 'cuda_graph_safe', False) and getattr(m, 'cuda_async_validation', False)
-                        and m.channel_out == 'poisson_hz' and m.quantity_in in ('rate_hz','drive_mv','spike_count')
+                        # previous_spikes is replaced after a frame; capturing that input would bind stale storage.
+                        and m.channel_out == 'poisson_hz' and m.quantity_in in ('rate_hz','drive_mv')
                         and getattr(m, 'boundary', None) is None for m in self.modules.values()))
 
     def run_modules(self, dt_ms):

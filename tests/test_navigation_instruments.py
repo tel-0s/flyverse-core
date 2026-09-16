@@ -150,6 +150,14 @@ def test_dynamic_attach_detach_keeps_dependencies_and_hunger_binding():
     assert fb.instruments == {} and fb.attached_modules == {}
 
 
+def test_capture_excludes_replaced_spike_count_input_storage():
+    fb = make(["compass", "plume", "hunger", "flight"])
+    assert fb._extensions.can_capture_frame()
+    # Even an explicitly safe module cannot make the scheduler's replaced count buffer persistent.
+    fb.instruments["plume"].quantity_in = "spike_count"
+    assert not fb._extensions.can_capture_frame()
+
+
 def test_composition_order_neural_boundary_and_checkpoint():
     names = ["compass", "plume", "hunger", "flight"]
     a, b = make(names), make(names[::-1])
