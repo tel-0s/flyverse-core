@@ -3230,7 +3230,7 @@ insulin/sNPF circuit. Flight is a neural wing-MN servo targeting the current bod
 No parent weights, receptors, body constants or raw default change. Incompatible/dependent combinations
 fail early. Both room implementations supply held sensory/internal inputs and use normal neural readout.
 
-Full CPU: 496 passed / 19 skipped / 220 subtests, original golden and both cache copies unchanged.
+Final CPU: 497 passed / 19 skipped / 220 subtests, original golden and both cache copies unchanged.
 House: 26 exact multi-module CUDA lifecycle checks; the corrected harness records its actual instrumented
 controllers. Full-brain neural forcing gives signed steering and about 100 Hz power, with sated/feeding
 controls off. Six 60 s rooms with flight remain airborne 59.67 s each; plume+hunger yields one feeding

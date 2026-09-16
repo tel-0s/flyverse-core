@@ -129,8 +129,9 @@ names remain experimental even if their functional assays pass. Raw remains the 
 
 Implementation snapshot `3cac3cc`; lifecycle metadata correction `c7ead86`. All gains stayed
 frozen. The original eight-assay house job completed successfully, followed by a lifecycle-only
-metadata correction. GPU work used the house B200; no local GPU or Metal runs. Full CPU suite:
-**496 passed, 19 skipped, 220 subtests**. New files pass Ruff. The MaleCNS golden is unchanged,
+metadata correction. GPU work used the house B200; no local GPU or Metal runs. Initial full CPU suite:
+**496 passed, 19 skipped, 220 subtests**. The final capture-guard regression brings the final
+suite to **497 passed, 19 skipped, 220 subtests**. New files pass Ruff. The MaleCNS golden is unchanged,
 as are both checkouts' cache MD5s:
 
 ```
@@ -305,4 +306,5 @@ scheduler replaces its previous-count tensor each frame and a captured read coul
 storage. A regression check covers that exclusion and confirms all four named rate-reading
 instruments remain capturable. The frozen house snapshots precede this predicate restriction;
 no assayed instrument, law, parameter or selected execution path changes. One unused constructor
-import was also removed. Final merged-tree CPU verification is recorded in the handoff.
+import was also removed. Final-code CPU verification passes: 497 tests, 19 skips, 220 subtests. The earlier merged-tree
+run also passed (496 tests before the new regression case); cache and golden remain unchanged.
