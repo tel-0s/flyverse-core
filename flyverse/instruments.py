@@ -31,6 +31,56 @@ import numpy as np
 
 PRESETS = ("raw", "instrumented")
 INSTRUMENT_KINDS = {"stop-gap", "mechanism", "edges", "relabel"}
+NAMED_INSTRUMENTS = ('compass', 'compass_ring', 'plume', 'hunger', 'flight')
+
+
+def add_cli_arguments(parser):
+    """Plural list syntax plus the existing repeatable singular alias, in command-line order."""
+    import argparse
+    parser.add_argument('--instruments', dest='instrument', nargs='+', action='extend', default=[],
+                        metavar='NAME', help='explicit instruments: '+', '.join(NAMED_INSTRUMENTS))
+    parser.add_argument('--instrument', dest='instrument', action='append', default=argparse.SUPPRESS,
+                        metavar='NAME', help='compatibility alias; repeatable')
+
+
+def validate_cli(parser, specs):
+    """Fail on named conflicts before loading a connectome or allocating a brain."""
+    names=[s.split(':',1)[0] for s in specs]
+    if len(names)!=len(set(names)):
+        parser.error('instrument names must be unique')
+    unknown=set(names)-set(NAMED_INSTRUMENTS)-set(REGISTRY)
+    if unknown:
+        parser.error(f'unknown instruments: {sorted(unknown)}')
+    if {'compass','compass_ring'}<=set(names):
+        parser.error('compass and compass_ring are incompatible heading providers')
+    if 'plume' in names and not {'compass','compass_ring'}.intersection(names):
+        parser.error('plume requires compass or compass_ring')
+    if 'hunger' in names and not {'plume','flight'}.intersection(names):
+        parser.error('hunger requires plume or flight')
+
+
+def validate_composition(instruments):
+    """Validate dependencies and neural write conflicts before installing any instrument."""
+    names=[_check_instrument(m) for m in instruments]
+    if len(names)!=len(set(names)):
+        raise ValueError(f'instrument names must be unique: {names}')
+    present=set(names)
+    claimed={}
+    for m in instruments:
+        conflict=present.intersection(getattr(m,'incompatible',()))
+        if conflict:
+            raise ValueError(f'instrument {m.name!r} is incompatible with {sorted(conflict)}')
+        required=set(getattr(m,'requires_any',()))
+        if required and not required.intersection(present):
+            raise ValueError(f'instrument {m.name!r} requires one of {sorted(required)}')
+        for idx in getattr(m,'writes',{}).values():
+            if not isinstance(idx,np.ndarray):continue  # general selector conflicts are resolved by attach()
+            for i in idx:
+                key=(getattr(m,'channel_out',None),int(i))
+                if key in claimed:
+                    raise ValueError(f'instrument {m.name!r} overlaps {claimed[key]!r} on {key[0]}')
+                claimed[key]=m.name
+    return names
 
 
 def make_instrument(c, name):
@@ -38,7 +88,12 @@ def make_instrument(c, name):
     if name == 'compass':
         from .compass import CompassDriver
         return CompassDriver(c)
-    raise ValueError(f'unknown instrument {name!r}; named instruments: compass')
+    if name in NAMED_INSTRUMENTS:
+        from .navigation import RecurrentCompass, PlumeNavigation, HungerGain, FlightDrive
+        return {'compass_ring':RecurrentCompass,'plume':PlumeNavigation,'hunger':HungerGain,'flight':FlightDrive}[name](c)
+    if isinstance(name,str) and name.split(':',1)[0] in REGISTRY:
+        return parse_instrument(name,c)
+    raise ValueError(f'unknown instrument {name!r}; named instruments: {", ".join(NAMED_INSTRUMENTS)}')
 
 
 def identifier(obj):
@@ -372,6 +427,8 @@ def parse_instrument(spec, c):
     """'NAME[:key=value]...' -> an instrument instance on connectome `c` (the cx_wedge --instrument grammar)."""
     if not isinstance(spec, str) or not spec.strip():
         raise ValueError(f"instrument spec must be a nonempty string: {SPEC_HELP}")
+    if spec in NAMED_INSTRUMENTS:
+        return make_instrument(c,spec)
     parts = [p.strip() for p in spec.split(":")]
     name, kv = parts[0], parts[1:]
     if name not in REGISTRY:

@@ -86,3 +86,19 @@ extends the earlier round-7 clarification; `SidedTurnAfferent` still lives in it
 Admission checks and the distinction between an experimental option and default adoption are recorded in
 [audits/compass_standin.md](audits/compass_standin.md). A functional phase-tracking pass does not establish
 food finding, circuit recovery, or permission to change the raw model's constants.
+
+## 6. Owner extension: navigation experiments (2026-09-15)
+
+The owner subsequently requested a more direct Wang/paper implementation, plume/flight controls,
+and metabolic modulation under explicit instruments. `compass_ring` implements a reduced recurrent
+rate model as an alternative to `compass`. `plume` supplies an ideal goal memory and a published
+PFL3 comparator with an engineering neural-output bridge. `hunger` optionally scales navigation
+from normalized energy; `flight` is an explicit wing-MN control experiment. All remain labelled
+`stop-gap`, `law=unverified`: measured parts do not validate the complete composite law.
+
+Named receivers may consume held antennal deflections through `wind()` and normalized energy,
+sated/airborne/feeding flags through `interoception()`, as the existing compass consumes held yaw.
+This is explicit body-derived sensory input; no module receives the body object or world geometry.
+These receivers are constructed only when named. General module read/write boundaries and the raw
+default are unchanged. See [the navigation audit](audits/navigation_instruments.md) for exact laws,
+source limits, incompatible combinations, and functional versus admission gates.

@@ -299,6 +299,10 @@ class Sim:
         self.fb.taste(self.tasting)
         if 'proprioception' in self.fb.available_senses:
             self.fb.proprioception(0., 0., 0., self.fly.airborne, yaw_rate=self.fly.yaw_rate)
+        if 'interoception' in self.fb.available_senses:
+            self.fb.interoception(self.metabolism.energy, sated=self.metabolism.sated,
+                                  airborne=self.fly.airborne,
+                                  feeding=bool(self.tasting) and not self.metabolism.sated)
         self.fb.step(FRAME_MS)
         motor = self.fb.motor()
         self.cmd = self.loco.readout(motor, dt_s=FRAME_MS / 1000)
@@ -380,7 +384,8 @@ def main():
     ap.add_argument("--program", default="none",
                     help="hand-designed behaviour program between the brain and the body (flyverse/programs.py): none | anemotaxis | klinotaxis | cx, or a+b to compose; default none, the plain model")
     ap.add_argument('--preset', choices=['raw', 'instrumented'], default='raw', help='raw brain or explicitly named experimental instruments')
-    ap.add_argument('--instrument', action='append', choices=['compass'], default=[], help='opt-in stand-in; requires --preset instrumented; repeatable')
+    from flyverse.instruments import add_cli_arguments
+    add_cli_arguments(ap)
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
     ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames and sensory ray tracing on CUDA")
     ap.add_argument("--cuda-kernels", action=argparse.BooleanOptionalAction, default=None,
@@ -409,7 +414,9 @@ def main():
     ap.add_argument("--wind-dir", type=float, default=180.0, help="direction the wind blows towards, deg (180 = from the door at +x)")
     args = ap.parse_args()
     if args.instrument and args.preset != 'instrumented':
-        ap.error('--instrument requires --preset instrumented')
+        ap.error('--instruments requires --preset instrumented')
+    from flyverse.instruments import validate_cli
+    validate_cli(ap, args.instrument)
     if args.headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
     import pygame

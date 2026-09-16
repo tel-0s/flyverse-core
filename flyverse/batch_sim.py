@@ -222,6 +222,11 @@ class BatchSim:
                 self.fb.proprioception(**sense.take_body(self.body.proprio_state(self.motor,haltere_sides=sense.haltere_sides(self.brain))))
             else:  # an instrument-only angular-motion input, no other proprioceptive channels
                 self.fb.proprioception(0., 0., 0., False, yaw_rate=np.array([f.yaw_rate for f in self.flies]))
+        if "interoception" in available:
+            self.fb.interoception(np.array([m.energy for m in self.metabolisms]),
+                                  sated=np.array([m.sated for m in self.metabolisms]),
+                                  airborne=np.array([f.airborne for f in self.flies]),
+                                  feeding=(self.tasting>0)&~np.array([m.sated for m in self.metabolisms]))
         self.fb.step(self.FRAME_MS)
         self.motor = self.fb.motor()
         self.commands,self.wcommands = self.body.readout(self.motor,dt)

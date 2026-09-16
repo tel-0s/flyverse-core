@@ -445,14 +445,14 @@ class ExtensionRuntime:
                 for name, m in self.modules.items()]
 
     def can_capture_frame(self):
-        # Start with one explicit, read-free Poisson generator. Hooks, changing RNG activation,
-        # boundary adapters and arbitrary user modules retain the eager scheduler around the core graph.
-        if self.hooks or len(self.modules) != 1:
+        # Explicit built-ins may gather neural inputs in the graph. At least one generator must
+        # prove that Poisson RNG remains active on every frame. Hooks/boundaries keep the eager path.
+        if self.hooks or not self.modules:
             return False
-        m = next(iter(self.modules.values()))
-        return (getattr(m, 'cuda_graph_safe', False) and getattr(m, 'cuda_async_validation', False)
-                and getattr(m, 'poisson_always_on', False) and not m.reads
-                and m.channel_out == 'poisson_hz' and getattr(m, 'boundary', None) is None)
+        return (any(getattr(m, 'poisson_always_on', False) for m in self.modules.values())
+                and all(getattr(m, 'cuda_graph_safe', False) and getattr(m, 'cuda_async_validation', False)
+                        and m.channel_out == 'poisson_hz' and m.quantity_in in ('rate_hz','drive_mv','spike_count')
+                        and getattr(m, 'boundary', None) is None for m in self.modules.values()))
 
     def run_modules(self, dt_ms):
         b = self.fb.brain

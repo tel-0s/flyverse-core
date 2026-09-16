@@ -873,7 +873,8 @@ def main():
     ap.add_argument("--fast", action="store_true", help="shorter recordings and one seed (~half the runtime)")
     ap.add_argument("--eager", action="store_true", help="demo sections on the torch path (default: cuda_kernels + cuda_graphs + event_driven + warp CSR)")
     ap.add_argument('--preset', choices=['raw','instrumented'], default='raw')
-    ap.add_argument('--instrument', action='append', choices=['compass'], default=[])
+    from flyverse.instruments import add_cli_arguments
+    add_cli_arguments(ap)
     ap.add_argument('--draw-seed', type=int, default=None, help='override every neural seed in this suite draw; omitted preserves original section seeds')
     ap.add_argument("--deterministic", action="store_true",
                     help="torch.use_deterministic_algorithms(True) + cudnn.benchmark off: every op must have a deterministic "
@@ -917,7 +918,9 @@ def main():
                     help="gain-class factors of 'sign+gain' / 'full' as low,mid,high (default 0.5,1,1.5); '1,1,1' = the 'sign' fast weights under 'full'")
     args = ap.parse_args()
     if args.instrument and args.preset != 'instrumented':
-        ap.error('--instrument requires --preset instrumented')
+        ap.error('--instruments requires --preset instrumented')
+    from flyverse.instruments import validate_cli
+    validate_cli(ap, args.instrument)
     t_all = time.time()
     det_cfg = {"flag": bool(args.deterministic), "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG")}
     if args.deterministic:
