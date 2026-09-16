@@ -127,6 +127,174 @@ names remain experimental even if their functional assays pass. Raw remains the 
 
 ## 4. Results
 
-Pending the frozen house batch. CPU development established recurrent motion at roughly
-+132/-133 deg/s for +/-90 deg/s input with EB=0, and near-zero rotation with EB=2.7.
-Those are diagnostic observations at the declared gains, not a velocity calibration.
+Implementation snapshot `3cac3cc`; lifecycle metadata correction `c7ead86`. All gains stayed
+frozen. The original eight-assay house job completed successfully, followed by a lifecycle-only
+metadata correction. GPU work used the house B200; no local GPU or Metal runs. Full CPU suite:
+**496 passed, 19 skipped, 220 subtests**. New files pass Ruff. The MaleCNS golden is unchanged,
+as are both checkouts' cache MD5s:
+
+```
+neurons.parquet  c50c598a708b5b373cbaffca7d6a9d82
+W_post_pre.npz   ac131529cebf98decde58d0c227b7954
+sign0_counts.npz bf01d724acf2a1fec8fdb60ef8a9e066
+compiled CSR    ef23cc27bea13be7f6a96f3c04fd3737
+```
+
+### Recurrent control
+
+With +/-90 deg/s input for 4 s, EB=0 gives +125.264 / -124.959 deg/s measured between 1.01
+and 4 s. The final 3 s after stopping drift 0 / +0.563 deg; final strengths are 0.922 / 0.894.
+EB=2.7 gives essentially zero rotation and strength 0.789. CPU and GPU agree to the displayed
+precision. Earlier CPU development used an 8 s moving protocol and measured about +132/-133;
+that different window is retained here rather than silently replaced by the shorter frozen assay.
+This reproduces the qualitative EB-brake diagnostic but **fails a calibrated heading-integrator
+interpretation**. No angular gain was fitted. Use `compass` for the existing kinematic stand-in;
+`compass_ring` is the explicitly uncalibrated recurrence experiment.
+
+### CUDA lifecycle and full-brain neural control
+
+Both heading providers with plume+hunger+flight pass 13 exact checks each against checked/eager
+module execution: frame 0, pulse frame 20 and 21, drive frame 30, turn reversal frame 40,
+5 ms frames 45 and 46, feeding frame 50, frame 79, partial reset, checkpoint replay, queued
+full reset, and queued detach. These are CUDA **torch sparse subgraph** checks, not native-event
+whole-room determinism. Brain tensors, module state and held outputs are exact at checked points.
+
+The first lifecycle file used bare-graph provenance, whose default `preset=raw` was misleading
+for this instrumented test. `c7ead86` records all four actual controllers (captured/eager,
+each heading provider) before detach. A fresh frozen run reproduces all 26 checks with correct
+`preset=instrumented` and four instrument records per controller. The original file remains
+archived; its checks are valid but its root preset label is not evidence of a raw run.
+
+Full MaleCNS, native events, B=6, LH 40 Hz forcing, last 10 s of 30 s:
+
+| row | power MN Hz | signed plume demand | heading strength | power input Hz |
+|---|---:|---:|---:|---:|
+| left | 100.1012 | 0.1571 | 0.8372 | 98.8961 |
+| right | 100.4934 | -0.1572 | 0.8353 | 99.7866 |
+| sated | 1.0494 | 0.0000 | 0.8311 | 0.0000 |
+| feeding | 0.0000 | 0.0000 | 0.8285 | 0.0000 |
+| airborne left | 99.9646 | 0.1571 | 0.8335 | 98.7488 |
+| airborne right | 100.1156 | -0.1571 | 0.8301 | 100.6357 |
+
+Left/right wind reverses the synthetic neural steering demand. Active wing power settles near
+100 Hz; sated/feeding rows have zero added power and steering demand. Sated power activity
+(1.05 Hz) is biological residual activity, not a nonzero controller output. This is functional
+control through neural input, not evidence that DNg02 or a native hunger circuit was recovered.
+
+### Room observations
+
+Each arm is six environment seeds in one B=6 batch, brain RNG seed 0, no body program. These
+are one connectome/parameter configuration, not three neural draws. Closest-fruit is the current
+3D center-distance-minus-radius metric; negative means inside that geometric radius. Path length
+includes vertical motion. Flight gets no landing policy, and airborne near-contact cannot feed.
+The tables retain every environment seed rather than selecting the one that fed.
+
+**compass** (`compass`).
+
+| seed | path m | closest fruit cm | feeding s | airborne s | peak z m | mean power Hz |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0.5256 | 4.091 | 0.00 | 0.00 | 0.7500 | 20.461 |
+| 1 | 0.5408 | 6.524 | 0.00 | 0.00 | 0.7500 | 20.100 |
+| 2 | 0.5312 | 10.429 | 0.00 | 0.00 | 0.7500 | 20.318 |
+| 3 | 0.5326 | 2.210 | 0.00 | 0.00 | 0.7500 | 19.336 |
+| 4 | 0.5354 | 4.601 | 0.00 | 0.00 | 0.7500 | 18.781 |
+| 5 | 0.5330 | 5.752 | 0.00 | 0.00 | 0.7500 | 19.698 |
+
+**plume** (`compass plume hunger`).
+
+| seed | path m | closest fruit cm | feeding s | airborne s | peak z m | mean power Hz |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0.7013 | 5.784 | 0.00 | 0.00 | 0.7500 | 21.085 |
+| 1 | 0.7002 | 5.406 | 0.00 | 0.00 | 0.7500 | 20.877 |
+| 2 | 0.7003 | 2.248 | 0.00 | 0.00 | 0.7500 | 21.993 |
+| 3 | 0.7048 | 2.420 | 0.00 | 0.00 | 0.7500 | 21.205 |
+| 4 | 0.6514 | -0.387 | 8.08 | 0.25 | 0.7714 | 18.626 |
+| 5 | 0.6930 | 6.615 | 0.00 | 0.00 | 0.7500 | 20.240 |
+
+**flight** (`compass plume hunger flight`).
+
+| seed | path m | closest fruit cm | feeding s | airborne s | peak z m | mean power Hz |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 13.4202 | 3.121 | 0.00 | 59.67 | 1.0920 | 100.232 |
+| 1 | 14.3359 | 1.527 | 0.00 | 59.67 | 1.1389 | 100.523 |
+| 2 | 13.4849 | 1.426 | 0.00 | 59.67 | 1.1315 | 99.837 |
+| 3 | 14.2470 | 2.840 | 0.00 | 59.67 | 1.0780 | 100.437 |
+| 4 | 14.4246 | 3.101 | 0.00 | 59.67 | 1.1160 | 100.284 |
+| 5 | 13.0164 | 5.688 | 0.00 | 59.67 | 1.1558 | 100.149 |
+
+Flight remains airborne for 59.67/60 s in every row, after takeoff around 0.33 s. It sustains
+flight under the existing body, with a roughly 0.33-0.41 m maximum rise above the table, not
+altitude regulation. No flight row feeds. Plume+hunger produces 8.08 s feeding in one of six
+rows, versus none with compass alone. **One success does not establish reliable food finding
+or a statistically supported improvement.** No navigation gain is selected from these runs.
+
+![Room trajectories](data/navigation/navigation_room.svg)
+
+### Timing observations and failed exact-workload gate
+
+CUDA-event medians in ms per 10 ms brain frame; optic/body/UI excluded. All variants use captured
+module frames. Four alternating repeats, B=1/8/32, same external 250 Hz forcing on the union of
+instrument targets. These are shared-machine observations, not idle throughput guarantees.
+
+| B | compass | + plume + hunger | + plume + hunger + flight | compass_ring + plume + hunger |
+|---|---:|---:|---:|---:|
+| 1 | 0.679086 | 0.923501 | 1.014993 | 1.021668 |
+| 8 | 3.736605 | 3.984749 | 4.152044 | 4.109519 |
+| 32 | 13.433625 | 13.657673 | 13.968570 | 13.835881 |
+
+The exact-workload gate **fails**. B=1 spike/rate/count tensors match but v/g differ up to
+3.05e-5 / 6.10e-5. B=8 and B=32 also diverge in rates/spikes, with maximum per-cell accumulated
+count differences up to 21 and 13. This is consistent with earlier native CUDA nondeterminism
+observations, but this batch does not localize its cause. The full tensor maxima and repeat
+timings are retained in the derived JSON. Do not promote timing differences to clean causal
+module-overhead measurements, GPU bit-identity, or UI FPS. At B=1 the all-four observation is
+1.015 ms versus 0.679 ms for compass alone, a material increase despite remaining below the
+10 ms simulated frame. No performance gain is claimed from adding more computations.
+
+A headless one-second room launch with all four names and `--brain-map` succeeded. Visual
+inspection confirms the complete instrument list fits the header and the brain map remains
+available. This is a UI smoke check, not an interactive timing benchmark.
+
+## 5. Reproduction and self-review
+
+Public derived records: [summary and every timing repeat](data/navigation/navigation_summary.json),
+[initial declaration](data/navigation/navigation_predeclared.json),
+[lifecycle correction declaration](data/navigation/navigation_lifecycle_predeclared.json).
+Raw results, source archives and host/path-bearing provenance remain ignored under
+`out/navigation_v1/` and `out/navigation_v2/`; preserve them when retiring the worktree.
+
+```
+python -m pytest tests -q -p no:cacheprovider --ignore=tests/test_cuda.py --ignore=tests/test_metal.py
+python scripts/navigation_probe.py --mode recurrent --device cpu --out out/recurrent_new.json
+python scripts/navigation_analyse.py
+```
+
+The analysis helper checks each frozen 77-file source set against its committed snapshot and
+the exact archived remote source (`source.tar.gz`, extracted under each output's `source/`).
+It then checks all 52 shared source files in each runtime provenance. The archive step matters:
+some shipped Windows files have mixed CRLF/LF endings, while predeclarations normalize to LF.
+Both normalized content and exact runtime byte hashes are verified; line-ending guesses are
+not accepted as evidence. The declarations were frozen before the implementation/correction
+commits, so their recorded parent hashes differ from the verified snapshots named above.
+
+**Author self-review, not an independent skeptic verdict:**
+
+- Raw/golden/cache identity passes. Constructor preflight, direct attach and detach enforce
+  dependencies/conflicts; module execution order does not change the CPU result.
+- The published comparator is direct, but ideal FC2 memory, PFL3 soma-side injection, wind/odor
+  transduction, metabolic gain, and wing-MN drive are synthetic approximations. Native FC2,
+  hDelta, DNg02 or hunger-neuron mechanisms have not been validated by these controls.
+- Recurrent motion works as a qualitative diagnostic; calibration fails. Biological EB gain
+  cannot be inferred from the count ratio. No native weights are removed or tuned.
+- Flight sustains in this body. Altitude, landing, visual wind estimation, wall/ceiling
+  avoidance, tilt-compensated compass input, and flight metabolic cost remain open.
+- Walking reentry uses a reduced directional memory; it is not the complete Siliciano state
+  model. These assays do not establish source localization or robust plume tracking.
+- Multi-module graph correctness passes on the subgraph fixture. Whole native-CUDA workload
+  identity fails, so performance remains observational and whole-room determinism is unclaimed.
+- No admission-suite or 300 s rate-half result is claimed. All new names remain experimental;
+  the raw default and original model constants are unchanged. Independent review remains pending.
+
+Useful next work is a sourced landing/flight-state policy, boundary-triggered plume-return
+assays with odor/wind ablations, a declared velocity-calibration experiment for the recurrent
+ring, and reproducible runtime profiling before kernel fusion. None is adopted by this change.

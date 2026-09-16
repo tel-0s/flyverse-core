@@ -1,0 +1,1638 @@
+{
+  "source_commit": "3cac3cc",
+  "frozen_sources": 77,
+  "runtime_verification": [
+    {
+      "artifact": "lifecycle",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "recurrent",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "neural",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "room_compass",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "room_plume",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "room_flight",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[0]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[1]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[2]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[3]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[4]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[5]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[6]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[7]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[8]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[9]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[10]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "profile[11]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "lifecycle-correction[0]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "lifecycle-correction[1]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "lifecycle-correction[2]",
+      "shared_source_files": 52
+    },
+    {
+      "artifact": "lifecycle-correction[3]",
+      "shared_source_files": 52
+    }
+  ],
+  "runtime_source_sha256": {
+    "flyverse/air.py": "e65a94d9789b5695cbdfcf5ff763fc375692c461978a7d0758f6954eb41fe52a",
+    "flyverse/async_brain.py": "67dab3f3817cdbef07a1aa11382dd38fe986ada5e8fdd6b574deb6e87197bd78",
+    "flyverse/banc_vision.py": "bd9cca547a99623392d53905289af2d830e119631e802c70e40f3dcb3ee93faa",
+    "flyverse/batch_air.py": "91cb85afd1d552520ce06aa544238cefd63d6e78b663c98de808355c93b9c0ae",
+    "flyverse/batch_body.py": "20dafd0d81863121615380309a7c93a3c82190c6e9cbb1a4a60451a6933db935",
+    "flyverse/batch_sim.py": "8f055abbf0968468ff3ca0ef3f1a239f4cc42a8fcd2ebabc32e0edfcebbe581c",
+    "flyverse/batch_surfaces.py": "a4199be42dea5ceecb55a42b56004c754f72d4f28e019d896f3c1ea54eec1f79",
+    "flyverse/batch_world.py": "cb3330d2d201f17f7f87ea83d7584cb39421f1aeebdd2fb7c0e5dd7fc5f328a3",
+    "flyverse/body.py": "f0db425305cccb1978881a210995ae5d1cefcf972aa62d9f7b421aaf20039daf",
+    "flyverse/brain.py": "4575ef23ab994e90fa698d0614d8b5b87aeaf719f207111e46d1729006b720d5",
+    "flyverse/brainmap.py": "d33c3b085d73de94a7eb75fe4abfcf8578e8aacd7043556951a320b743c60926",
+    "flyverse/compass.py": "8de51b4f5e48cdb577463c58b085800c56cc48ea9cdee640f35a48b76fdef6fe",
+    "flyverse/connectome.py": "67560f2e825931940554092b47fa0d82f378f49fbad065121b354df67544fb7f",
+    "flyverse/cuda.py": "3fc25333536890631b8ede2d79d273e5eee6c8aa30a65de89ba5c4a4138794d2",
+    "flyverse/cx.py": "e69d076fa6abdab7530bc0cc4e4a3031d359cd2117de3096de78b9adf56191ef",
+    "flyverse/device.py": "41d4d44f222250be56ffe3f322479efc03458ba429d79c3fcb880f2455491fbf",
+    "flyverse/env.py": "e45e711d81da1daa184052dbf355e8477040370dad8498b9e01dff60cab8a058",
+    "flyverse/fly.py": "3cf9b4c3dfaf43e30350a380f8b66aa4830f1ca28242b768ba82d6b03c887a4d",
+    "flyverse/instruments.py": "92037d03fa9f50991cf7dd2fc41782420f201a1ef7b29484545de19145c4da95",
+    "flyverse/metal.py": "65b0ab934b78497187f2358e483e364fb21ed31c7ef3f146ded52ac51db1fe33",
+    "flyverse/modules.py": "0d0ade89545e83c045350f7bfef23377a2c3c71b6530ec8168caae422ac53b00",
+    "flyverse/motor.py": "6bc759806cf38564dd6f3b3aff648ca654bf5ded1d705f579851115987c897fc",
+    "flyverse/navigation.py": "bffb68df8fa3d15057e17760892d7205a2542a8e4d70feb14916d3b05c00ae47",
+    "flyverse/nt_readout.py": "273566ad99ea53ae2970990952648470fbe8374cf5cb82540fcf7253ebc1ea17",
+    "flyverse/olfaction.py": "05929cfd0af8ef592dec57b190b53018954cbc51248f8454a42407fd6ddb1dcc",
+    "flyverse/optic.py": "f5e0fc0747910e59006f64c716a52eef206ef58625924d02169b89f5496b1208",
+    "flyverse/programs.py": "3b5045223d75843f9a0761656e4023ac6e3b9b5441b3e432b0bb6520f32ef1f5",
+    "flyverse/regions.py": "af68964eba75cbdcd0e6e593830255d44ed0cd99c717e69994a4f4b411f11f12",
+    "flyverse/retina.py": "3a5927f8d4327d5741cf364f40ab6a8a4202a643f63302dd4418c22d83adf19b",
+    "flyverse/room_ui.py": "e5f90ac8c7269a8d0fdf4793bc924218b0f6a1fe68c10de539d6dc8dafdb1aea",
+    "flyverse/screen.py": "d72d7bfa8e35da348da06718bea7ea11d3d06f8ae78a31fd722f4e86fc0085bc",
+    "flyverse/senses.py": "bc6a47fad929eb13a15647971d10e50cea86aa15fee16e767c367cfe9b89e59e",
+    "flyverse/surfaces.py": "3523da0637f988ab62d40127d03e0217c4820a06640a98c38cf8de9f73aa8920",
+    "flyverse/world.py": "f7720104aa85024dc42efd31b19d476a53d69593c08b724c642f9c70ebc9e6c6",
+    "flyverse/__init__.py": "db45a1ea8b389fae15f287586f8fed65dfdb7e711a0bb5dc297d837d0b85b8e9",
+    "flyverse/backends/banc.py": "a97f9941908c29cfe4d6a9899d73f3ca8d0ac0c16bb72f3d23eb3c696e489ba2",
+    "flyverse/backends/common.py": "9d5efd20532efbbed727588a85575a2094aa8deb2687721522b9249da85e9faf",
+    "flyverse/backends/fafb.py": "7985caf782eeeb211187aacb8c69486e8401e915bc4daf97173920842a0954dd",
+    "flyverse/backends/malecns.py": "f19304784e4feeb48fd949a52b723a1a1fd405d87cfb384211be64453e5e1853",
+    "flyverse/backends/__init__.py": "8df26b4775463e8d22583f81a79c807ea08122708c32167e227556d5377c51ec",
+    "flyverse/data/banc_candidate_columns.csv": "60181451e52435ff31ca950d63d71833eb43740c470ab32d78721c2c74716e3d",
+    "flyverse/data/expected_responses.csv": "2f4ae50a2d1f5edb403705f89be2b11983d07e139f0d006d6c003476cc109b94",
+    "flyverse/data/expression_central.csv": "4d1ce2d81967dfcde3af9e49aa5cd426f64a8f9516b6dfab930cd3d4a1dc711a",
+    "flyverse/data/expression_davis2020.csv": "32509eca752dbc00b395c68494a32539e93c6f33acf3f670c494dddb3048193e",
+    "flyverse/data/expression_kurmangaliyev2020.csv": "707f28d2b3e3f694d91a86ca7fdde4a70325150cb9def40f1fcc3b7d472b7f42",
+    "flyverse/data/expression_ozel2021.csv": "4106527975f28163f1df024fea75cd2c1f75ade358ec426b31ac148cdf5edd31",
+    "flyverse/data/expression_ozel2021_mm.csv": "756b692d006dcee0aadf75049df1742bd7801eb90012ca14a2e5ad4cdea17981",
+    "flyverse/data/nt_by_type_transcriptome.csv": "02e7d50381f1aa813b331418f61fed52c77e78bfb91ff3704d3e7423d80ee7ae",
+    "flyverse/data/receptors_by_type.csv": "0ec5355def2067733061e41abe674dc66961a8b4cc92a58cd92e7dbdd0064326",
+    "flyverse/data/taste_grns.csv": "ff1aa30a6c825ad9260e451d324867e8674fddfca531a8acbfc5bbcb242b5c01",
+    "flyverse/data/type_aliases.csv": "fce527842d4b5d26c013f5e82d89adfcc715d05d6066c86d9c5cc37e8e882ee5",
+    "flyverse/data/type_aliases_nern2025.csv": "7168de1475f83b8aea32b6f1b507fa5ed3b40e00daa90e749bd9bf1f28ce5050",
+    "flyverse/data/type_aliases_typing.csv": "4aec4df3acc2843270c07f7524b8360a2cf525ccd942ec6d4e62291eeeb1546e",
+    "flyverse/data/type_map_central.csv": "0587336134b763da7bb87f29784db755b7ad76e611a285003dd4a1ea2907843d",
+    "flyverse/data/type_map_davis2020.csv": "918f105085d9de97cc681bd65f5d9cc1c6716f15f33d690e8257780280c425d8",
+    "flyverse/data/type_map_kurmangaliyev2020.csv": "d7749759a2518ec83a394407c83f9ab541035c97c62e29f476564850e6041759",
+    "flyverse/data/type_map_nern2025.csv": "54e96610f858225d592e5f27f2ea309cda0da943094141dee54811489bab8714",
+    "flyverse/data/type_map_ozel2021.csv": "912b6378fdc6cc2b085b489e92f135124a6e0e8cc2fb202e2d7484a5f2174833",
+    "flyverse/data/type_map_typing.csv": "2304f2d3b30be654ba15652c9a1d946cad676d0ca1923f25822ebb28843114bf",
+    "flyverse/interp/atlas.py": "3571c8ee3f2309977aa4d11ef32fa6a0be026993241f6c9c56f8e02a94791449",
+    "flyverse/interp/common.py": "0461b3edc6f4f4eb20d084e2d5a887a98b630b8e55ac1b530c7cb72c71af3826",
+    "flyverse/interp/decompose.py": "6da4b0efa71cfcb2dd02298e19fecded009182e1305119c6971323f47ba7ed78",
+    "flyverse/interp/export.py": "91a732e7ec63edcbd7bf68a7a6a1c04de60ad171f3d624704e11cd099743d6db",
+    "flyverse/interp/health.py": "03621d7b8c1d5c340602f293f75910b605ad496a7705b7fad028004b72514786",
+    "flyverse/interp/ledger.py": "4133aa9c19a8ebddbb318e92fd51f95cb9944ece588f48b6058cc54f9e2ca8d6",
+    "flyverse/interp/lesion.py": "b5dfed17a17703e9e77801c54361c6a67bd61f8f27f6871305ad38d451e7e3ac",
+    "flyverse/interp/paths.py": "215c0021d1f3d042b05b4a990c4e0e0ed15fca8d3d2334930684b0535e7a610e",
+    "flyverse/interp/trace.py": "1fe16ec4a654461691772f30c15765986351c64e586849d09c0a024ae0938f5c",
+    "flyverse/interp/__init__.py": "ba9708a0e4e91f20a6b465f4bd794a867a5cfb18820056d654e3fee155eeb1d2",
+    "flyverse/kernels/neural.cu": "b8beffc1c8fe7d042b14ee056de731f3e06ec1bd968ebabc7b180a1cd5cd9f1c",
+    "scripts/navigation_probe.py": "1de65653727e5ad988a470ddde7f6bdb3a78f6c1e58e704f54fe65fc3c42e4c2",
+    "scripts/navigation_batch.py": "1672aa8160e69a52fcaeb4af3a23a99b6192eabd37a959234a87c07ebed1c5fc",
+    "scripts/room_demo.py": "6a6cb75649646525854529faf325c69f57f226723ea27da863630c572268f103",
+    "scripts/benchmark.py": "7f518ab791daccda3de8d850fa5d40acc352d9a3803e26ab44d035d6f23899b2",
+    "scripts/cx_wedge.py": "18f7fb47bbcb2be5a3b6fc47ad982de820855d39906fd3bcbdb49b896e13fb7c",
+    "tests/test_navigation_instruments.py": "38810449b534a5e21add314d167bb1952cfc48906a420c6bafaaed4e99e71aef",
+    "docs/audits/navigation_instruments.md": "8eff259c12ab2eb111e5f9e33e4ef930e112b8f8123890020b2e36a946ce0b5e"
+  },
+  "device": "NVIDIA B200",
+  "compiled_connectome_md5": "ef23cc27bea13be7f6a96f3c04fd3737",
+  "artifact_sha256": {
+    "lifecycle.json": "fd03df38738498654c5239ef5eddb0b10597022111a1cb2a3d8aa826f4981be6",
+    "neural.json": "381599af95c0c7b8ec47f22614800d1e66a2be70cbebc9a16218d0967f096b6d",
+    "predeclared.json": "80648502afd5200a13b1f87a2d80a0ae031e25ca6b7f3bc87c413eba0651bcb7",
+    "profile.json": "d68f2d7faafa576866258ac66aef854f05970634d242bb33b0065f290e8b911f",
+    "recurrent.json": "668c6435d3946ee04df880ff5f8270111377f3c2e70633ab331606a5dcd4b11f",
+    "room_compass.json": "3ce7e594064b35768b393a30e9053dbcc17b8ba93c18eb2be3da6fb1797604de",
+    "room_flight.json": "15e1d994abdfdff67816166bd4fc49b80dab2513b63d2a52e72ad68e3c504177",
+    "room_plume.json": "7dc73a3f223fdf467766ad8fd2cfaf252d324d4e0ac3cb21e42ae46cd54a4ed6"
+  },
+  "lifecycle": [
+    {
+      "heading": "compass",
+      "checks": [
+        "frame 0",
+        "frame 20",
+        "frame 21",
+        "frame 30",
+        "frame 40",
+        "frame 45",
+        "frame 46",
+        "frame 50",
+        "frame 79",
+        "partial reset",
+        "checkpoint replay",
+        "queued reset",
+        "queued detach"
+      ]
+    },
+    {
+      "heading": "compass_ring",
+      "checks": [
+        "frame 0",
+        "frame 20",
+        "frame 21",
+        "frame 30",
+        "frame 40",
+        "frame 45",
+        "frame 46",
+        "frame 50",
+        "frame 79",
+        "partial reset",
+        "checkpoint replay",
+        "queued reset",
+        "queued detach"
+      ]
+    }
+  ],
+  "lifecycle_correction": {
+    "source_commit": "c7ead86",
+    "frozen_sources": 77,
+    "artifact_sha256": "179bcb6abb579cf1264b051f0e99faeb496fc717361f10ba5aeb6b0d587b1472",
+    "controllers": 4,
+    "runtime_source_sha256": {
+      "flyverse/air.py": "e65a94d9789b5695cbdfcf5ff763fc375692c461978a7d0758f6954eb41fe52a",
+      "flyverse/async_brain.py": "67dab3f3817cdbef07a1aa11382dd38fe986ada5e8fdd6b574deb6e87197bd78",
+      "flyverse/banc_vision.py": "bd9cca547a99623392d53905289af2d830e119631e802c70e40f3dcb3ee93faa",
+      "flyverse/batch_air.py": "91cb85afd1d552520ce06aa544238cefd63d6e78b663c98de808355c93b9c0ae",
+      "flyverse/batch_body.py": "20dafd0d81863121615380309a7c93a3c82190c6e9cbb1a4a60451a6933db935",
+      "flyverse/batch_sim.py": "8f055abbf0968468ff3ca0ef3f1a239f4cc42a8fcd2ebabc32e0edfcebbe581c",
+      "flyverse/batch_surfaces.py": "a4199be42dea5ceecb55a42b56004c754f72d4f28e019d896f3c1ea54eec1f79",
+      "flyverse/batch_world.py": "cb3330d2d201f17f7f87ea83d7584cb39421f1aeebdd2fb7c0e5dd7fc5f328a3",
+      "flyverse/body.py": "f0db425305cccb1978881a210995ae5d1cefcf972aa62d9f7b421aaf20039daf",
+      "flyverse/brain.py": "4575ef23ab994e90fa698d0614d8b5b87aeaf719f207111e46d1729006b720d5",
+      "flyverse/brainmap.py": "d33c3b085d73de94a7eb75fe4abfcf8578e8aacd7043556951a320b743c60926",
+      "flyverse/compass.py": "8de51b4f5e48cdb577463c58b085800c56cc48ea9cdee640f35a48b76fdef6fe",
+      "flyverse/connectome.py": "67560f2e825931940554092b47fa0d82f378f49fbad065121b354df67544fb7f",
+      "flyverse/cuda.py": "3fc25333536890631b8ede2d79d273e5eee6c8aa30a65de89ba5c4a4138794d2",
+      "flyverse/cx.py": "e69d076fa6abdab7530bc0cc4e4a3031d359cd2117de3096de78b9adf56191ef",
+      "flyverse/device.py": "41d4d44f222250be56ffe3f322479efc03458ba429d79c3fcb880f2455491fbf",
+      "flyverse/env.py": "e45e711d81da1daa184052dbf355e8477040370dad8498b9e01dff60cab8a058",
+      "flyverse/fly.py": "3cf9b4c3dfaf43e30350a380f8b66aa4830f1ca28242b768ba82d6b03c887a4d",
+      "flyverse/instruments.py": "92037d03fa9f50991cf7dd2fc41782420f201a1ef7b29484545de19145c4da95",
+      "flyverse/metal.py": "65b0ab934b78497187f2358e483e364fb21ed31c7ef3f146ded52ac51db1fe33",
+      "flyverse/modules.py": "0d0ade89545e83c045350f7bfef23377a2c3c71b6530ec8168caae422ac53b00",
+      "flyverse/motor.py": "6bc759806cf38564dd6f3b3aff648ca654bf5ded1d705f579851115987c897fc",
+      "flyverse/navigation.py": "bffb68df8fa3d15057e17760892d7205a2542a8e4d70feb14916d3b05c00ae47",
+      "flyverse/nt_readout.py": "273566ad99ea53ae2970990952648470fbe8374cf5cb82540fcf7253ebc1ea17",
+      "flyverse/olfaction.py": "05929cfd0af8ef592dec57b190b53018954cbc51248f8454a42407fd6ddb1dcc",
+      "flyverse/optic.py": "f5e0fc0747910e59006f64c716a52eef206ef58625924d02169b89f5496b1208",
+      "flyverse/programs.py": "3b5045223d75843f9a0761656e4023ac6e3b9b5441b3e432b0bb6520f32ef1f5",
+      "flyverse/regions.py": "af68964eba75cbdcd0e6e593830255d44ed0cd99c717e69994a4f4b411f11f12",
+      "flyverse/retina.py": "3a5927f8d4327d5741cf364f40ab6a8a4202a643f63302dd4418c22d83adf19b",
+      "flyverse/room_ui.py": "e5f90ac8c7269a8d0fdf4793bc924218b0f6a1fe68c10de539d6dc8dafdb1aea",
+      "flyverse/screen.py": "d72d7bfa8e35da348da06718bea7ea11d3d06f8ae78a31fd722f4e86fc0085bc",
+      "flyverse/senses.py": "bc6a47fad929eb13a15647971d10e50cea86aa15fee16e767c367cfe9b89e59e",
+      "flyverse/surfaces.py": "3523da0637f988ab62d40127d03e0217c4820a06640a98c38cf8de9f73aa8920",
+      "flyverse/world.py": "f7720104aa85024dc42efd31b19d476a53d69593c08b724c642f9c70ebc9e6c6",
+      "flyverse/__init__.py": "db45a1ea8b389fae15f287586f8fed65dfdb7e711a0bb5dc297d837d0b85b8e9",
+      "flyverse/backends/banc.py": "a97f9941908c29cfe4d6a9899d73f3ca8d0ac0c16bb72f3d23eb3c696e489ba2",
+      "flyverse/backends/common.py": "9d5efd20532efbbed727588a85575a2094aa8deb2687721522b9249da85e9faf",
+      "flyverse/backends/fafb.py": "7985caf782eeeb211187aacb8c69486e8401e915bc4daf97173920842a0954dd",
+      "flyverse/backends/malecns.py": "f19304784e4feeb48fd949a52b723a1a1fd405d87cfb384211be64453e5e1853",
+      "flyverse/backends/__init__.py": "8df26b4775463e8d22583f81a79c807ea08122708c32167e227556d5377c51ec",
+      "flyverse/data/banc_candidate_columns.csv": "60181451e52435ff31ca950d63d71833eb43740c470ab32d78721c2c74716e3d",
+      "flyverse/data/expected_responses.csv": "2f4ae50a2d1f5edb403705f89be2b11983d07e139f0d006d6c003476cc109b94",
+      "flyverse/data/expression_central.csv": "4d1ce2d81967dfcde3af9e49aa5cd426f64a8f9516b6dfab930cd3d4a1dc711a",
+      "flyverse/data/expression_davis2020.csv": "32509eca752dbc00b395c68494a32539e93c6f33acf3f670c494dddb3048193e",
+      "flyverse/data/expression_kurmangaliyev2020.csv": "707f28d2b3e3f694d91a86ca7fdde4a70325150cb9def40f1fcc3b7d472b7f42",
+      "flyverse/data/expression_ozel2021.csv": "4106527975f28163f1df024fea75cd2c1f75ade358ec426b31ac148cdf5edd31",
+      "flyverse/data/expression_ozel2021_mm.csv": "756b692d006dcee0aadf75049df1742bd7801eb90012ca14a2e5ad4cdea17981",
+      "flyverse/data/nt_by_type_transcriptome.csv": "02e7d50381f1aa813b331418f61fed52c77e78bfb91ff3704d3e7423d80ee7ae",
+      "flyverse/data/receptors_by_type.csv": "0ec5355def2067733061e41abe674dc66961a8b4cc92a58cd92e7dbdd0064326",
+      "flyverse/data/taste_grns.csv": "ff1aa30a6c825ad9260e451d324867e8674fddfca531a8acbfc5bbcb242b5c01",
+      "flyverse/data/type_aliases.csv": "fce527842d4b5d26c013f5e82d89adfcc715d05d6066c86d9c5cc37e8e882ee5",
+      "flyverse/data/type_aliases_nern2025.csv": "7168de1475f83b8aea32b6f1b507fa5ed3b40e00daa90e749bd9bf1f28ce5050",
+      "flyverse/data/type_aliases_typing.csv": "4aec4df3acc2843270c07f7524b8360a2cf525ccd942ec6d4e62291eeeb1546e",
+      "flyverse/data/type_map_central.csv": "0587336134b763da7bb87f29784db755b7ad76e611a285003dd4a1ea2907843d",
+      "flyverse/data/type_map_davis2020.csv": "918f105085d9de97cc681bd65f5d9cc1c6716f15f33d690e8257780280c425d8",
+      "flyverse/data/type_map_kurmangaliyev2020.csv": "d7749759a2518ec83a394407c83f9ab541035c97c62e29f476564850e6041759",
+      "flyverse/data/type_map_nern2025.csv": "54e96610f858225d592e5f27f2ea309cda0da943094141dee54811489bab8714",
+      "flyverse/data/type_map_ozel2021.csv": "912b6378fdc6cc2b085b489e92f135124a6e0e8cc2fb202e2d7484a5f2174833",
+      "flyverse/data/type_map_typing.csv": "2304f2d3b30be654ba15652c9a1d946cad676d0ca1923f25822ebb28843114bf",
+      "flyverse/interp/atlas.py": "3571c8ee3f2309977aa4d11ef32fa6a0be026993241f6c9c56f8e02a94791449",
+      "flyverse/interp/common.py": "0461b3edc6f4f4eb20d084e2d5a887a98b630b8e55ac1b530c7cb72c71af3826",
+      "flyverse/interp/decompose.py": "6da4b0efa71cfcb2dd02298e19fecded009182e1305119c6971323f47ba7ed78",
+      "flyverse/interp/export.py": "91a732e7ec63edcbd7bf68a7a6a1c04de60ad171f3d624704e11cd099743d6db",
+      "flyverse/interp/health.py": "03621d7b8c1d5c340602f293f75910b605ad496a7705b7fad028004b72514786",
+      "flyverse/interp/ledger.py": "4133aa9c19a8ebddbb318e92fd51f95cb9944ece588f48b6058cc54f9e2ca8d6",
+      "flyverse/interp/lesion.py": "b5dfed17a17703e9e77801c54361c6a67bd61f8f27f6871305ad38d451e7e3ac",
+      "flyverse/interp/paths.py": "215c0021d1f3d042b05b4a990c4e0e0ed15fca8d3d2334930684b0535e7a610e",
+      "flyverse/interp/trace.py": "1fe16ec4a654461691772f30c15765986351c64e586849d09c0a024ae0938f5c",
+      "flyverse/interp/__init__.py": "ba9708a0e4e91f20a6b465f4bd794a867a5cfb18820056d654e3fee155eeb1d2",
+      "flyverse/kernels/neural.cu": "b8beffc1c8fe7d042b14ee056de731f3e06ec1bd968ebabc7b180a1cd5cd9f1c",
+      "scripts/navigation_probe.py": "09a251422f3511198f862208268fffad5031f4dd744db0cbed6f72e704f3f5db",
+      "scripts/navigation_batch.py": "346662ffdb815b81bb9d1c793e81c0e30c42f4a92b5dd2a53a55c553fdea427b",
+      "scripts/room_demo.py": "6a6cb75649646525854529faf325c69f57f226723ea27da863630c572268f103",
+      "scripts/benchmark.py": "7f518ab791daccda3de8d850fa5d40acc352d9a3803e26ab44d035d6f23899b2",
+      "scripts/cx_wedge.py": "18f7fb47bbcb2be5a3b6fc47ad982de820855d39906fd3bcbdb49b896e13fb7c",
+      "tests/test_navigation_instruments.py": "38810449b534a5e21add314d167bb1952cfc48906a420c6bafaaed4e99e71aef",
+      "docs/audits/navigation_instruments.md": "8eff259c12ab2eb111e5f9e33e4ef930e112b8f8123890020b2e36a946ce0b5e"
+    },
+    "exact_checks_unchanged": true
+  },
+  "recurrent": [
+    {
+      "eb_ratio": 0.0,
+      "velocity_deg_s": [
+        125.26403601447554,
+        -124.95873794680546,
+        -1.9220963751396832e-05
+      ],
+      "stopped_drift_deg": [
+        0.0,
+        0.5629252164043341,
+        0.0
+      ],
+      "final_strength": [
+        0.92199426761772,
+        0.8940067139613628,
+        0.9219942552123584
+      ]
+    },
+    {
+      "eb_ratio": 2.7,
+      "velocity_deg_s": [
+        3.384450574889245e-10,
+        -1.8195921420732895e-09,
+        3.384450574889245e-10
+      ],
+      "stopped_drift_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "final_strength": [
+        0.7892750419084592,
+        0.7892750419084593,
+        0.7892750419084592
+      ]
+    }
+  ],
+  "neural": {
+    "columns": [
+      "wing_power_hz",
+      "plume_turn",
+      "heading_strength",
+      "power_input_hz"
+    ],
+    "rows": [
+      [
+        100.10123443603516,
+        0.15713286399841309,
+        0.8372484445571899,
+        98.8960952758789
+      ],
+      [
+        100.49335479736328,
+        -0.15717792510986328,
+        0.8353060483932495,
+        99.78656005859375
+      ],
+      [
+        1.0493961572647095,
+        0.0,
+        0.8310639262199402,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.8285204768180847,
+        0.0
+      ],
+      [
+        99.96463012695312,
+        0.1571241319179535,
+        0.8335263729095459,
+        98.74879455566406
+      ],
+      [
+        100.11558532714844,
+        -0.15705914795398712,
+        0.8300654888153076,
+        100.63568115234375
+      ]
+    ]
+  },
+  "rooms": {
+    "compass": [
+      {
+        "seed": 0,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.5255507671861103,
+        "nearest_fruit_m": 0.04091236262041504,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 20.46117140741527
+      },
+      {
+        "seed": 1,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.5407959176176854,
+        "nearest_fruit_m": 0.06524289630393587,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 20.100171649190596
+      },
+      {
+        "seed": 2,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.5311944597560764,
+        "nearest_fruit_m": 0.1042910342342187,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 20.31773913257083
+      },
+      {
+        "seed": 3,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.5325920867556323,
+        "nearest_fruit_m": 0.022101874913646152,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 19.335645595526117
+      },
+      {
+        "seed": 4,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.5353687245028496,
+        "nearest_fruit_m": 0.04600638195858118,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 18.78065587868644
+      },
+      {
+        "seed": 5,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.532972485904754,
+        "nearest_fruit_m": 0.057518562386743625,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 19.697727457454505
+      }
+    ],
+    "plume": [
+      {
+        "seed": 0,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.7013394025025095,
+        "nearest_fruit_m": 0.05783719395301607,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 21.085342758408903
+      },
+      {
+        "seed": 1,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.700233165852755,
+        "nearest_fruit_m": 0.054056086270300695,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 20.876651478830414
+      },
+      {
+        "seed": 2,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.7003012115656208,
+        "nearest_fruit_m": 0.02247763061841969,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 21.992851977717784
+      },
+      {
+        "seed": 3,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.7048383601966712,
+        "nearest_fruit_m": 0.024195489813363204,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 21.205064362979677
+      },
+      {
+        "seed": 4,
+        "airborne_s": 0.25000000000000006,
+        "feeding_s": 8.079999999999872,
+        "distance_m": 0.65139507531416,
+        "nearest_fruit_m": -0.0038708133196801928,
+        "z_min_m": 0.75,
+        "z_max_m": 0.7713870671971582,
+        "mean_wing_power_hz": 18.626252834714187
+      },
+      {
+        "seed": 5,
+        "airborne_s": 0.0,
+        "feeding_s": 0.0,
+        "distance_m": 0.6930102740428576,
+        "nearest_fruit_m": 0.06615275595693612,
+        "z_min_m": 0.75,
+        "z_max_m": 0.75,
+        "mean_wing_power_hz": 20.239570806042046
+      }
+    ],
+    "flight": [
+      {
+        "seed": 0,
+        "airborne_s": 59.6699999999967,
+        "feeding_s": 0.0,
+        "distance_m": 13.420208612076195,
+        "nearest_fruit_m": 0.031206213631217637,
+        "z_min_m": 0.75,
+        "z_max_m": 1.0920406602050317,
+        "mean_wing_power_hz": 100.23175866511133
+      },
+      {
+        "seed": 1,
+        "airborne_s": 59.6699999999967,
+        "feeding_s": 0.0,
+        "distance_m": 14.335851664161451,
+        "nearest_fruit_m": 0.01526657447820709,
+        "z_min_m": 0.75,
+        "z_max_m": 1.1389045757872218,
+        "mean_wing_power_hz": 100.52332915849156
+      },
+      {
+        "seed": 2,
+        "airborne_s": 59.6699999999967,
+        "feeding_s": 0.0,
+        "distance_m": 13.484907110321775,
+        "nearest_fruit_m": 0.014264436718939587,
+        "z_min_m": 0.75,
+        "z_max_m": 1.131501400644923,
+        "mean_wing_power_hz": 99.83710190945202
+      },
+      {
+        "seed": 3,
+        "airborne_s": 59.6699999999967,
+        "feeding_s": 0.0,
+        "distance_m": 14.24698833406029,
+        "nearest_fruit_m": 0.028395738775783434,
+        "z_min_m": 0.75,
+        "z_max_m": 1.0780260528987307,
+        "mean_wing_power_hz": 100.43692891756693
+      },
+      {
+        "seed": 4,
+        "airborne_s": 59.6699999999967,
+        "feeding_s": 0.0,
+        "distance_m": 14.42462977835592,
+        "nearest_fruit_m": 0.031007796179484216,
+        "z_min_m": 0.75,
+        "z_max_m": 1.1160319675280257,
+        "mean_wing_power_hz": 100.28351952433586
+      },
+      {
+        "seed": 5,
+        "airborne_s": 59.6699999999967,
+        "feeding_s": 0.0,
+        "distance_m": 13.016449889240825,
+        "nearest_fruit_m": 0.05687961453853802,
+        "z_min_m": 0.75,
+        "z_max_m": 1.1558364801238505,
+        "mean_wing_power_hz": 100.14912577231725
+      }
+    ]
+  },
+  "profile_records": [
+    {
+      "batch": 1,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 0,
+      "cuda_ms": 0.682040023803711,
+      "wall_ms": 0.6825890997424722,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 0,
+      "cuda_ms": 0.9275820922851562,
+      "wall_ms": 0.9278504410758615,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 0,
+      "cuda_ms": 1.0286374664306641,
+      "wall_ms": 1.0288981115445495,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 0,
+      "cuda_ms": 1.0423798370361328,
+      "wall_ms": 1.0426368098706007,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 1,
+      "cuda_ms": 1.0046995544433595,
+      "wall_ms": 1.0049502598121762,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 1,
+      "cuda_ms": 1.0061148834228515,
+      "wall_ms": 1.0063571599312127,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 1,
+      "cuda_ms": 0.9276729583740234,
+      "wall_ms": 0.927918239030987,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 1,
+      "cuda_ms": 0.6840697479248047,
+      "wall_ms": 0.6843226519413292,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 2,
+      "cuda_ms": 0.647371826171875,
+      "wall_ms": 0.6476210220716894,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 2,
+      "cuda_ms": 0.9022499084472656,
+      "wall_ms": 0.9024853399023414,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 2,
+      "cuda_ms": 1.0238719940185548,
+      "wall_ms": 1.0241173603571951,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 2,
+      "cuda_ms": 1.0374732971191407,
+      "wall_ms": 1.037730691023171,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 3,
+      "cuda_ms": 1.005863037109375,
+      "wall_ms": 1.0061103501357138,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 3,
+      "cuda_ms": 1.0010975646972655,
+      "wall_ms": 1.001346530392766,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 3,
+      "cuda_ms": 0.9194195556640625,
+      "wall_ms": 0.9196650795638561,
+      "module_graphs": 1
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 3,
+      "cuda_ms": 0.6761318206787109,
+      "wall_ms": 0.6763881095685065,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 0,
+      "cuda_ms": 3.734736328125,
+      "wall_ms": 3.7351947906427085,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 0,
+      "cuda_ms": 3.978749084472656,
+      "wall_ms": 3.97904294077307,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 0,
+      "cuda_ms": 4.152512512207031,
+      "wall_ms": 4.152765939943492,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 0,
+      "cuda_ms": 4.10249755859375,
+      "wall_ms": 4.102739088702947,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 1,
+      "cuda_ms": 4.116540222167969,
+      "wall_ms": 4.116770669352263,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 1,
+      "cuda_ms": 4.160935363769531,
+      "wall_ms": 4.1611753683537245,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 1,
+      "cuda_ms": 3.9907498168945312,
+      "wall_ms": 3.990953278262168,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 1,
+      "cuda_ms": 3.738473205566406,
+      "wall_ms": 3.738705040886998,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 2,
+      "cuda_ms": 3.74204345703125,
+      "wall_ms": 3.7423111381940544,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 2,
+      "cuda_ms": 4.01628173828125,
+      "wall_ms": 4.016490180511028,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 2,
+      "cuda_ms": 4.151576232910156,
+      "wall_ms": 4.151780339889228,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 2,
+      "cuda_ms": 4.119219665527344,
+      "wall_ms": 4.12138232961297,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 3,
+      "cuda_ms": 4.091100463867187,
+      "wall_ms": 4.091322568710893,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 3,
+      "cuda_ms": 4.124928283691406,
+      "wall_ms": 4.1251334198750556,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 3,
+      "cuda_ms": 3.9760812377929686,
+      "wall_ms": 3.9763007988221943,
+      "module_graphs": 1
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 3,
+      "cuda_ms": 3.702615966796875,
+      "wall_ms": 3.702837568707764,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 0,
+      "cuda_ms": 13.42822021484375,
+      "wall_ms": 13.428819191176444,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 0,
+      "cuda_ms": 13.657158203125,
+      "wall_ms": 13.65759446984157,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 0,
+      "cuda_ms": 13.960289306640625,
+      "wall_ms": 13.960607040207833,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 0,
+      "cuda_ms": 13.833370361328125,
+      "wall_ms": 13.833574841264635,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 1,
+      "cuda_ms": 13.86884765625,
+      "wall_ms": 13.868959308601916,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 1,
+      "cuda_ms": 14.00252197265625,
+      "wall_ms": 14.00261211907491,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 1,
+      "cuda_ms": 13.69212646484375,
+      "wall_ms": 13.692197690252215,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 1,
+      "cuda_ms": 13.46902099609375,
+      "wall_ms": 13.469137570355088,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 2,
+      "cuda_ms": 13.43903076171875,
+      "wall_ms": 13.43918205006048,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 2,
+      "cuda_ms": 13.658187255859374,
+      "wall_ms": 13.6583082517609,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 2,
+      "cuda_ms": 13.971021728515625,
+      "wall_ms": 13.971177791245282,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 2,
+      "cuda_ms": 13.836649169921875,
+      "wall_ms": 13.836749750189483,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 3,
+      "cuda_ms": 13.835113525390625,
+      "wall_ms": 13.83526757825166,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "repeat": 3,
+      "cuda_ms": 13.9661181640625,
+      "wall_ms": 13.966326978988945,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "repeat": 3,
+      "cuda_ms": 13.6564453125,
+      "wall_ms": 13.656565668061376,
+      "module_graphs": 1
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass"
+      ],
+      "repeat": 3,
+      "cuda_ms": 13.427352294921874,
+      "wall_ms": 13.42745232861489,
+      "module_graphs": 1
+    }
+  ],
+  "profile": [
+    {
+      "batch": 1,
+      "instruments": [
+        "compass"
+      ],
+      "cuda_ms_median": 0.6790859222412109,
+      "wall_ms_median": 0.6794886046554893,
+      "extra_us": 0.0,
+      "extra_percent": 0.0
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "cuda_ms_median": 0.9235008239746094,
+      "wall_ms_median": 0.9237577603198588,
+      "extra_us": 244.41490173339852,
+      "extra_percent": 35.99174916286698
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "cuda_ms_median": 1.0149934387207031,
+      "wall_ms_median": 1.015237260144204,
+      "extra_us": 335.90751647949224,
+      "extra_percent": 49.46465616175417
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "cuda_ms_median": 1.021668167114258,
+      "wall_ms_median": 1.0219205205794424,
+      "extra_us": 342.5822448730471,
+      "extra_percent": 50.447555110907174
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass"
+      ],
+      "cuda_ms_median": 3.736604766845703,
+      "wall_ms_median": 3.7369499157648534,
+      "extra_us": 0.0,
+      "extra_percent": 0.0
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "cuda_ms_median": 3.9847494506835934,
+      "wall_ms_median": 3.984998109517619,
+      "extra_us": 248.14468383789023,
+      "extra_percent": 6.640913324300124
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "cuda_ms_median": 4.152044372558594,
+      "wall_ms_median": 4.15227313991636,
+      "extra_us": 415.4396057128906,
+      "extra_percent": 11.118104044586685
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "cuda_ms_median": 4.10951889038086,
+      "wall_ms_median": 4.109754879027605,
+      "extra_us": 372.91412353515693,
+      "extra_percent": 9.980025900624124
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass"
+      ],
+      "cuda_ms_median": 13.43362548828125,
+      "wall_ms_median": 13.434000620618463,
+      "extra_us": 0.0,
+      "extra_percent": 0.0
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "cuda_ms_median": 13.657672729492187,
+      "wall_ms_median": 13.657951360801235,
+      "extra_us": 224.047241210938,
+      "extra_percent": 1.6678091957110563
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "cuda_ms_median": 13.968569946289062,
+      "wall_ms_median": 13.968752385117114,
+      "extra_us": 534.9444580078124,
+      "extra_percent": 3.9821302036034067
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "cuda_ms_median": 13.835881347656251,
+      "wall_ms_median": 13.836008664220572,
+      "extra_us": 402.25585937500165,
+      "extra_percent": 2.994395367995839
+    }
+  ],
+  "workload_identity": false,
+  "identity": [
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": true,
+        "drive": true,
+        "poisson_p": true,
+        "rate": true,
+        "spikes": true,
+        "adapt": true,
+        "res": true,
+        "spike_buf": true,
+        "spike_counts": true
+      },
+      "max_abs": {
+        "v": 3.0517578125e-05,
+        "g": 6.103515625e-05,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 0.0,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 0.0,
+        "spikes": 0.0,
+        "adapt": 0.0,
+        "res": 0.0,
+        "spike_buf": 0.0,
+        "spike_counts": 0.0
+      }
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": true,
+        "drive": true,
+        "poisson_p": true,
+        "rate": true,
+        "spikes": true,
+        "adapt": true,
+        "res": true,
+        "spike_buf": true,
+        "spike_counts": true
+      },
+      "max_abs": {
+        "v": 3.0517578125e-05,
+        "g": 6.103515625e-05,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 0.0,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 0.0,
+        "spikes": 0.0,
+        "adapt": 0.0,
+        "res": 0.0,
+        "spike_buf": 0.0,
+        "spike_counts": 0.0
+      }
+    },
+    {
+      "batch": 1,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": true,
+        "drive": true,
+        "poisson_p": true,
+        "rate": true,
+        "spikes": true,
+        "adapt": true,
+        "res": true,
+        "spike_buf": true,
+        "spike_counts": true
+      },
+      "max_abs": {
+        "v": 3.0517578125e-05,
+        "g": 6.103515625e-05,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 0.0,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 0.0,
+        "spikes": 0.0,
+        "adapt": 0.0,
+        "res": 0.0,
+        "spike_buf": 0.0,
+        "spike_counts": 0.0
+      }
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": false,
+        "drive": true,
+        "poisson_p": true,
+        "rate": false,
+        "spikes": false,
+        "adapt": false,
+        "res": true,
+        "spike_buf": false,
+        "spike_counts": false
+      },
+      "max_abs": {
+        "v": 48.2984619140625,
+        "g": 133.89700317382812,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 2.200000047683716,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 38.998809814453125,
+        "spikes": 1.0,
+        "adapt": 6.650390625,
+        "res": 0.0,
+        "spike_buf": 1.0,
+        "spike_counts": 21.0
+      }
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": false,
+        "drive": true,
+        "poisson_p": true,
+        "rate": false,
+        "spikes": false,
+        "adapt": false,
+        "res": true,
+        "spike_buf": false,
+        "spike_counts": false
+      },
+      "max_abs": {
+        "v": 26.769500732421875,
+        "g": 70.9350357055664,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 2.200000047683716,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 31.360010147094727,
+        "spikes": 1.0,
+        "adapt": 5.122912883758545,
+        "res": 0.0,
+        "spike_buf": 1.0,
+        "spike_counts": 10.0
+      }
+    },
+    {
+      "batch": 8,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": false,
+        "drive": true,
+        "poisson_p": true,
+        "rate": false,
+        "spikes": false,
+        "adapt": false,
+        "res": true,
+        "spike_buf": false,
+        "spike_counts": false
+      },
+      "max_abs": {
+        "v": 77.64949035644531,
+        "g": 193.36917114257812,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 2.200000047683716,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 38.998809814453125,
+        "spikes": 1.0,
+        "adapt": 6.650390625,
+        "res": 0.0,
+        "spike_buf": 1.0,
+        "spike_counts": 21.0
+      }
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": false,
+        "drive": true,
+        "poisson_p": true,
+        "rate": false,
+        "spikes": false,
+        "adapt": false,
+        "res": true,
+        "spike_buf": false,
+        "spike_counts": false
+      },
+      "max_abs": {
+        "v": 34.67789077758789,
+        "g": 129.07839965820312,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 2.200000047683716,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 41.37549591064453,
+        "spikes": 1.0,
+        "adapt": 9.312177658081055,
+        "res": 0.0,
+        "spike_buf": 1.0,
+        "spike_counts": 11.0
+      }
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass",
+        "plume",
+        "hunger",
+        "flight"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": false,
+        "drive": true,
+        "poisson_p": true,
+        "rate": false,
+        "spikes": false,
+        "adapt": false,
+        "res": true,
+        "spike_buf": false,
+        "spike_counts": false
+      },
+      "max_abs": {
+        "v": 42.193946838378906,
+        "g": 247.22972106933594,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 2.200000047683716,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 44.92351531982422,
+        "spikes": 1.0,
+        "adapt": 6.181942939758301,
+        "res": 0.0,
+        "spike_buf": 1.0,
+        "spike_counts": 13.0
+      }
+    },
+    {
+      "batch": 32,
+      "instruments": [
+        "compass_ring",
+        "plume",
+        "hunger"
+      ],
+      "tensors": {
+        "v": false,
+        "g": false,
+        "g_slow": true,
+        "g_slow_cls": true,
+        "refrac": false,
+        "drive": true,
+        "poisson_p": true,
+        "rate": false,
+        "spikes": false,
+        "adapt": false,
+        "res": true,
+        "spike_buf": false,
+        "spike_counts": false
+      },
+      "max_abs": {
+        "v": 42.193946838378906,
+        "g": 247.2298126220703,
+        "g_slow": 0.0,
+        "g_slow_cls": 0.0,
+        "refrac": 2.200000047683716,
+        "drive": 0.0,
+        "poisson_p": 0.0,
+        "rate": 44.92351531982422,
+        "spikes": 1.0,
+        "adapt": 6.17260217666626,
+        "res": 0.0,
+        "spike_buf": 1.0,
+        "spike_counts": 13.0
+      }
+    }
+  ]
+}
