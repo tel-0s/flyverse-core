@@ -33,12 +33,17 @@ python scripts/room_demo.py                 # live window: fly on the table
 python scripts/room_demo.py --fruit apple --fence                # one apple, a fence around the table top
 python scripts/room_demo.py --start floor                        # begin on the floor (it has to fly to get back up)
 python scripts/room_demo.py --program cx --escape-gating         # simulated central-complex steering, plugged into the brain
+python scripts/room_demo.py --gf-threshold 50                    # raise the giant-fibre escape threshold (default 33 Hz)
 python scripts/room_demo.py --headless --seconds 20 --loom-at 4 --gif out/room.gif
 ```
 
 The CPU path runs all of this, slowly; a GPU is what makes the demo interactive and what the
 benchmark suite and the batched sweeps need. `SPACE` pauses, `L` looms a ball at the fly, `T`
 teleports it to the apple, `?` lists the rest.
+
+`--gf-threshold HZ` sets the body's base escape threshold; `--escape-gating` adds habituation on top.
+It does not change voluntary wing-powered takeoff. Saved states retain the threshold; `--load`
+restores that saved value.
 
 Install details (CUDA wheels, extras, the female releases, the cluster runner): **`docs/INSTALL.md`**.
 Controls, flags, speed numbers, the batched simulator and the file-by-file map: **`docs/OVERVIEW.md`**.

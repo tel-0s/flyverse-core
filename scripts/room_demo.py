@@ -90,7 +90,9 @@ class Sim:
                  sensory_cuda_graphs=None, program="none", escape_gating=False, dt_by_module=None, prune_frozen=True,
                  fruit_set="all", fence=False,
                  cuda_kernels=None, event_driven=None, cuda_sparse="torch", cuda_compact=True, receptor_model="default",
-                 preset="raw", instruments=None):
+                 preset="raw", instruments=None, gf_threshold=None):
+        if gf_threshold is not None and (not np.isfinite(gf_threshold) or gf_threshold < 0):
+            raise ValueError("gf_threshold must be finite and nonnegative (Hz)")
         t0 = time.time()
         self.start = start                       # (x, y, z) or None = default spot on the table
         self.trail_seconds = trail_seconds
@@ -109,6 +111,8 @@ class Sim:
         self.groups, self.wings = self.fb.groups, self.fb.wings
         self.loco = body.Locomotion()
         self.flight = body.Flight()
+        if gf_threshold is not None:
+            self.flight.gf_hz = float(gf_threshold)
         self.metabolism = body.Metabolism()
         # behaviour programs (hand-designed stand-ins, off by default): flyverse/programs.py
         self.program = programs.make_program(program)
@@ -387,6 +391,8 @@ def main():
     from flyverse.instruments import add_cli_arguments
     add_cli_arguments(ap)
     ap.add_argument("--escape-gating", action="store_true", help="habituation + efference-copy gating of the giant-fibre escape (programs.EscapeGating)")
+    ap.add_argument("--gf-threshold", type=float, default=None, metavar="HZ",
+                    help=f"base giant-fibre escape threshold before --escape-gating (Hz, default {body.Flight.gf_hz:g}); --load restores the saved value")
     ap.add_argument("--cuda-graphs", action="store_true", help="capture and replay controller frames and sensory ray tracing on CUDA")
     ap.add_argument("--cuda-kernels", action=argparse.BooleanOptionalAction, default=None,
                     help="fused CUDA neuron updates (requires nvcc and a host C++ compiler)")
@@ -413,6 +419,8 @@ def main():
     ap.add_argument("--wind-speed", type=float, default=0.3, help="m/s (0 = still air: no plume, no wind cue)")
     ap.add_argument("--wind-dir", type=float, default=180.0, help="direction the wind blows towards, deg (180 = from the door at +x)")
     args = ap.parse_args()
+    if args.gf_threshold is not None and (not np.isfinite(args.gf_threshold) or args.gf_threshold < 0):
+        ap.error("--gf-threshold must be finite and nonnegative (Hz)")
     if args.instrument and args.preset != 'instrumented':
         ap.error('--instruments requires --preset instrumented')
     from flyverse.instruments import validate_cli
@@ -453,7 +461,8 @@ def main():
               dt_by_module=parse_dt_by_module(args.dt_by_module), prune_frozen=not args.no_prune, fruit_set=args.fruit, fence=args.fence,
               cuda_kernels=args.cuda_kernels, event_driven=args.event_driven, cuda_sparse=args.cuda_sparse,
               cuda_compact=args.cuda_compact, receptor_model=args.receptor_model,
-              sensory_cuda_graphs=args.sensory_cuda_graphs, preset=args.preset, instruments=args.instrument, **fast)
+              sensory_cuda_graphs=args.sensory_cuda_graphs, preset=args.preset, instruments=args.instrument,
+              gf_threshold=args.gf_threshold, **fast)
     if args.decoder:
         sim.load_decoder(args.decoder)
     if args.teleport:
