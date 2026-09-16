@@ -4,6 +4,10 @@
 parent synapses, receptors, neurotransmitter labels, or body constants. Independent review
 is pending Fable. This is implementation and engineering validation, not preset admission.
 
+Historical flight results below describe the original sustained-power servo. The owner's
+starvation observation led to a separate [flight-priority correction](flight_foraging_priority.md)
+with bounded bouts and reserve/odor interruptions; the original results are preserved here.
+
 ## 1. Scope and sources
 
 The owner requested a more direct implementation of Wang's ideas and their primary sources,

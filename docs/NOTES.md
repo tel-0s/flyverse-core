@@ -3242,3 +3242,23 @@ gate fails, including rate/spike differences at B=8/32, so no clean causal overh
 claim. UI smoke with brain map passes. No gains fitted, no preset admission/default adoption; independent
 skeptic pending. Sources, declarations, every per-room row, failures and reproducible derived tables:
 `audits/navigation_instruments.md`. Implementation 3cac3cc; lifecycle provenance correction c7ead86.
+
+## Flight gives foraging priority (Astra, 2026-09-15)
+
+The owner observed starvation during sustained instrumented flight. The old `flight` request
+stayed on down to energy 0.05; hunger strengthened steering without interrupting lift. The
+optional instrument now searches on foot for 20 s, caps powered bouts at 8 s, withdraws its
+wing drive at energy <= 0.35 (re-arm >= 0.50) or sustained strong neural LH odor, and holds an
+airborne interruption until touchdown. These are declared engineering rules, not physiology.
+Raw, body constants and metabolism are unchanged; native escape hops remain possible.
+
+One frozen house submission passes 26 lifecycle checks, 17 exact captured/eager transition
+checkpoints and both six-row room gates. Initially starving airborne flies land in 0.47-0.52 s.
+The normal-energy room requests no artificial wing drive: odor keeps the flies investigating
+on foot; one feeds 8.06 s. Two depleted rows feed 15 s each, four run out of energy. Food finding
+is still unreliable. This fixes perpetual flight, not the remaining navigation problem.
+
+CPU 500 passed / 19 skipped / 220 subtests; original golden and both cache copies unchanged.
+All constants frozen before submission, no tuning or default adoption. Audit, exact per-row
+table, provenance checks and reproduction: `audits/flight_foraging_priority.md`.
+Implementation 266d274. Author self-review complete; independent skeptic pending Fable.

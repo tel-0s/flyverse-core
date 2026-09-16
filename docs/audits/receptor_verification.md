@@ -3584,3 +3584,13 @@ weight or default was changed. The author self-review is labelled as such; Fable
 skeptic pass is pending. Functional flight is demonstrated in the shipped body, not a recovered
 DNg02 mechanism; recurrent velocity calibration and reliable food finding remain open. CPU/golden
 passes; full native CUDA exact-workload performance gate fails and is retained, not waived.
+
+## Flight foraging priority (Astra, 2026-09-15): independent review pending
+
+`audits/flight_foraging_priority.md` records the author's self-review and frozen correction to
+the optional wing-power servo. Reserve/odor interruptions and finite bouts are engineering
+policy, with no receptor, transmitter, synapse or raw/default changes. CPU 500 passed / 19
+skipped / 220 subtests; golden/cache unchanged. One house submission passes 26 lifecycle checks,
+17 exact captured/eager transition checkpoints and the room interruption gates. Starving
+airborne rows land within 0.52 s; robust food finding remains open. Independent skeptic pending
+(Fable, when accounts reset); no physiological adoption or performance-speedup claim.

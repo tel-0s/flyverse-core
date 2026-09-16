@@ -115,8 +115,13 @@ For example, in the room demo:
 python scripts/room_demo.py --preset instrumented --instruments compass plume hunger --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp --brain-map
 ```
 
-Add `flight` to request the experimental wing-power/steering controller. It can launch the fly;
-it supplies no altitude or landing policy and does not add a flight-energy model. These options
+Add `flight` to request the experimental wing-power/steering controller. It gives the fly 20 s
+to search on foot before each voluntary flight and caps each powered bout at 8 s. Low reserves
+(energy <= 0.35), sustained strong neural odor, feeding or satiety withdraw its artificial wing
+drive; an interrupted airborne bout stays off until touchdown. Reserves must recover to 0.50
+before re-arming. These are unverified engineering rules, not measured physiology. The instrument
+does not select a landing site, control altitude or add a flight-energy model. Native escape
+hops can still occur. These options
 are also accepted by `benchmark.py` and `cx_wedge.py`. In Python, pass the same names as the
 `instruments` list to `FlyBrain` or `BatchSim`. Empty instrumented remains identical to raw.
 
@@ -125,7 +130,7 @@ are also accepted by `benchmark.py` and `cx_wedge.py`. In Python, pass the same 
 | `compass_ring` | Wang's reduced recurrent EPG/PEN rate loop, projected onto biological EPGs | Alternative to `compass`; the two together are an error. EB feedback defaults to a declared textbook counterfactual; angular gain is uncalibrated. |
 | `plume` | Odor-gated upwind goal, entry-bearing return memory, published PFL3 comparator, neural PFL3/DNp09 drive | Requires `compass` or `compass_ring`. Reads neural EPG/LH rates and held antennal deflections. Goal memory and output bridge are synthetic; no food-location oracle. |
 | `hunger` | `(1-energy)*(not sated)` navigation gain | Requires `plume` or `flight`. Explicit engineering modulation, not a hormone/receptor model or fabricated hunger-neuron mapping. |
-| `flight` | Feedback onto existing wing power MNs, PFL3-to-wing steering bridge | Requires nonempty wing power/steering and PFL3 populations. The 100 Hz target comes from the current body equations, not measured physiology. |
+| `flight` | Bounded wing-power bouts with reserve/odor interruptions, PFL3-to-wing steering bridge | Requires nonempty wing power/steering and PFL3 populations. Available LH odor groups add the landing cue. The 100 Hz target comes from the current body equations, not measured physiology. |
 
 Duplicate names, incompatible heading providers, unmet dependencies and overlapping neural writes
 raise errors. Detaching a required provider also raises; remove dependent instruments first.
@@ -143,6 +148,11 @@ and each accepts a scalar or one value per batch row. Inputs persist until updat
 and full/partial resets include every instrument. Plume can receive wind on a selected graph
 without JO cells, just as the compass can receive yaw without a proprioceptive afferent module.
 This explicit receiver does not enable other sensory pathways.
+
+The flight-priority policy applies whenever `flight` is attached, including without `hunger`.
+Its timers, reserve/odor hysteresis and landing latch are included in checkpoints and row resets.
+Older checkpoints containing the original `flight` state are rejected; start a fresh episode.
+See [the flight-priority audit](audits/flight_foraging_priority.md) for the frozen rules and checks.
 
 See [the navigation audit](audits/navigation_instruments.md) for papers, exact versus approximate
 computations, CUDA checks and outcomes. These are experimental controls, not admitted/default

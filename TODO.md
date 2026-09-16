@@ -490,8 +490,10 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
       Evidence and limits: `docs/audits/navigation_instruments.md`; independent review pending.
 - [ ] Validate plume return with controlled odor/wind ablations and multiple neural draws before
       claiming robust food finding. One of six 60 s walking observations fed; no admission claim.
-- [ ] Add a sourced flight-state/landing policy, altitude/visual/tilt controls and flight energy costs
-      as explicit instruments/model proposals. Current servo sustains flight but has no landing policy.
+- [x] Interrupt the optional flight servo for low reserves and strong neural odor; bound its bouts
+      and allow ground search. Engineering policy only: `docs/audits/flight_foraging_priority.md`.
+- [ ] Source/validate neural flight-state and landing control, altitude/visual/tilt controls and
+      flight energy costs as explicit instruments/model proposals. No precision landing is supplied.
 - [ ] Declare a recurrent velocity-calibration study; EB=0 is a textbook counterfactual, 2.7 is a
       count-ratio brake diagnostic, neither identifies biological effective coupling.
 - [ ] Obtain reproducible runtime profiles before kernel fusion; native full-brain exact-workload

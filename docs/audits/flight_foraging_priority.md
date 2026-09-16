@@ -76,9 +76,58 @@ No end-to-end UI performance claim follows from headless rooms.
 
 ## 3. Results
 
-Pending the frozen submission. No results have been used to choose these parameters.
+All frozen functional gates pass on B200. Implementation and frozen protocol:
+`266d2741671fc79013cea30ee861f04f5c345791`. One house job, four sequential assays, no
+retry or parameter change. The exact remote source archive matches all 79 frozen LF-normalized
+hashes and that commit; each of the seven provenance records agrees on 52 shared runtime
+source files. Whole MaleCNS compiled CSR MD5: `ef23cc27bea13be7f6a96f3c04fd3737`.
+
+- All 26 existing exact multi-module lifecycle checks pass (13 per heading provider).
+- All 17 additional captured/eager transition checkpoints agree exactly, with six policy
+  gates passing. The prescribed healthy row waits, powers a bout and times out; the odor
+  row interrupts and stays off until touchdown; the depleted row never powers flight.
+- All six initially depleted airborne room rows land in 0.47-0.52 s. No artificial power is
+  delivered at low reserves. Two later native escape hops occur, one in each of seeds 1
+  and 5; there are no voluntary launches. Two rows feed for 15 s each; four exhaust their
+  energy. This is not a successful starvation-recovery policy for every fly.
+- In the normal-energy room arm, all six rows request zero artificial wing power; the neural
+  odor interruption prevents the ground interval completing. One native escape hop lasts
+  0.38 s. Seed 0 feeds for 8.06 s; the other five do not feed. This differs from the original
+  sustained-flight observation, but it is not a statistical food-finding improvement claim.
+  The bounded-bout room gate is vacuous here because there are no powered bouts; the
+  non-vacuous timeout test is the controlled transition assay and CPU regression.
+
+All per-environment rows, script-emitted without selection, are in
+[`data/flight_priority/room_table.md`](data/flight_priority/room_table.md). Exact values, gates,
+raw artifact hashes and source hashes are in [`summary.json`](data/flight_priority/summary.json);
+the original declaration is [`predeclared.json`](data/flight_priority/predeclared.json).
+The original navigation results remain unchanged in their audit.
+
+Reproduce the derived files with:
+
+```sh
+python scripts/flight_priority_analyse.py --source out/flight_priority_v1 --out docs/audits/data/flight_priority
+```
+
+The ignored raw directory retains all four JSONs, the original declaration, console/launcher
+logs and exact remote `source.tar.gz` (extracted under `source/`). Public derived files exclude
+host/path-bearing provenance. No gain, timing, threshold or protocol was changed after results.
 
 ## 4. Review status
 
-Self-review and full CPU/golden validation pending. Independent skeptic pending (Fable,
-when accounts reset). Nothing adopted into raw or made a preset default.
+Author self-review: all state transitions use held internal observations and frame-boundary
+neural rates; there are no world-position/fruit-distance inputs, body commands or synapse writes.
+The odor population read avoids module-order dependence; the CPU regression crosses the odor
+threshold with reversed attachment order. Capture keeps persistent state buffers, and the house
+fixture exercises both decision boundaries and the existing checkpoint/row-reset/detach paths.
+Failed takeoffs time out and touchdown resets the ground interval. The old flight checkpoint
+schema is deliberately rejected rather than silently omitting the new state.
+
+CPU: **500 passed / 19 skipped / 220 subtests**. Targeted navigation plus original golden:
+24 passed / 10 subtests. Ruff and diff whitespace checks pass. Both working copies retain
+cache MD5s `c50c598a708b5b373cbaffca7d6a9d82`, `ac131529cebf98decde58d0c227b7954`, and
+`bf01d724acf2a1fec8fdb60ef8a9e066`. No full-brain eager/captured equality, runtime improvement,
+precision landing or reliable food-finding claim follows from these checks.
+
+Independent skeptic pending (Fable, when accounts reset). Nothing adopted into raw or made a
+preset default. The energy/bout/odor policy remains an explicit unverified stand-in.
