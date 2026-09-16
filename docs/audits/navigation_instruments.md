@@ -298,3 +298,11 @@ commits, so their recorded parent hashes differ from the verified snapshots name
 Useful next work is a sourced landing/flight-state policy, boundary-triggered plume-return
 assays with odor/wind ablations, a declared velocity-calibration experiment for the recurrent
 ring, and reproducible runtime profiling before kernel fusion. None is adopted by this change.
+
+
+Final capture eligibility review: modules reading `spike_count` now remain eager, because the
+scheduler replaces its previous-count tensor each frame and a captured read could retain stale
+storage. A regression check covers that exclusion and confirms all four named rate-reading
+instruments remain capturable. The frozen house snapshots precede this predicate restriction;
+no assayed instrument, law, parameter or selected execution path changes. One unused constructor
+import was also removed. Final merged-tree CPU verification is recorded in the handoff.
