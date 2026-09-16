@@ -64,9 +64,8 @@ class FlyBrain:
         if any(isinstance(inst, str) for inst in instruments):
             from .instruments import make_instrument
             instruments = [make_instrument(self.c, inst) if isinstance(inst, str) else inst for inst in instruments]
-        names = [_check_instrument(inst) for inst in instruments]
-        if len(set(names)) != len(names):
-            raise ValueError(f"instrument names must be unique: {names}")
+        from .instruments import validate_composition
+        validate_composition(instruments)
         if self.c.n == 0:
             raise ValueError("FlyBrain needs at least one neuron")
         lp = lif_params or brain.LIFParams()
@@ -128,11 +127,19 @@ class FlyBrain:
         self._vision_has_advanced = False
         # preset 'instrumented': install each instrument through the surface its kind already has (a stand-in grows
         # the proprioception sense's channel; a hold / relabel record verifies the gain list / the cache carries it)
+        self._installing_instruments = True
         for inst in instruments:
             install = getattr(inst, "install", None)
             if callable(install):
                 install(self)
             self.instruments[inst.name] = inst
+        self._installing_instruments = False
+        self._bind_instruments()
+
+    def _bind_instruments(self):
+        for inst in self.instruments.values():
+            bind=getattr(inst,'bind_instruments',None)
+            if callable(bind):bind(self.instruments)
 
     def instrument_records(self):
         """[describe() of each instrument], JSON-ready -- provenance()['instruments']; [] under preset 'raw'."""
@@ -205,6 +212,9 @@ class FlyBrain:
             _check_instrument(module)
             if self.preset != module.required_preset or module.name in self.instruments:
                 raise ValueError("module instrument requires its named preset and a unique instrument name")
+            if not self._installing_instruments:
+                from .instruments import validate_composition
+                validate_composition([*self.instruments.values(), module])
         try:
             self._extension_runtime().attach(module)
         except Exception:
@@ -213,15 +223,21 @@ class FlyBrain:
         self._graphs.clear()
         if is_instrument:
             self.instruments[module.name] = module
+            if not self._installing_instruments:
+                self._bind_instruments()
         return module
 
     def detach(self, name):
         if self._extensions is None:
             raise KeyError(name)
         module = self._extensions.modules[name]
+        if name in self.instruments:
+            from .instruments import validate_composition
+            validate_composition([v for k,v in self.instruments.items() if k!=name])
         self._extensions.remove(name)
         if self.instruments.get(name) is module:
             del self.instruments[name]
+            self._bind_instruments()
         self._release_extensions()
         return module
 
@@ -246,8 +262,11 @@ class FlyBrain:
         # The explicit compass instrument can receive angular motion without enabling other afferents.
         # Neither a proprioceptive sense nor an instrument is built by default.
         motion = any(callable(getattr(inst, "observe_turn", None)) for inst in self.instruments.values())
+        internal = any(callable(getattr(inst, "observe_internal", None)) for inst in self.instruments.values())
+        wind = any(callable(getattr(inst, "observe_wind", None)) for inst in self.instruments.values())
         return tuple(name for name, value in (("vision", self.optic), ("smell", self.olfaction),
-                     ("wind", self.wind_sense), ("taste", self.taste_sense),
+                     ("wind", self.wind_sense or (True if wind else None)), ("taste", self.taste_sense),
+                     ("interoception", True if internal else None),
                      ("proprioception", getattr(self, "proprioception_sense", None) or (True if motion else None))) if value is not None)
 
     def neurotransmitters(self, batch_index=0) -> NTSnapshot | None:
@@ -306,10 +325,26 @@ class FlyBrain:
         self._input("smell", self.olfaction.orn_idx, self.olfaction.rates(cL, cR, self.B))
 
     def wind(self, dL, dR):
-        self._require("wind", self.wind_sense)
-        rE, rC = self.wind_sense.rates(dL, dR, self.B)
-        self._input("wind_E", self.wind_sense.joE, rE)
-        self._input("wind_C", self.wind_sense.joC, rC)
+        receivers=[i for i in self.instruments.values() if callable(getattr(i,'observe_wind',None))]
+        self._require("wind", self.wind_sense or (True if receivers else None))
+        if self.wind_sense is not None:
+            rE, rC = self.wind_sense.rates(dL, dR, self.B)
+            self._input("wind_E", self.wind_sense.joE, rE)
+            self._input("wind_C", self.wind_sense.joC, rC)
+        for inst in receivers:inst.observe_wind(dL,dR)
+
+    def interoception(self, energy, *, sated=False, airborne=False, feeding=False):
+        """Explicit internal-state input for named instruments; normalized energy and body-state flags."""
+        from .senses import batch_values
+        receivers=[i for i in self.instruments.values() if callable(getattr(i,'observe_internal',None))]
+        self._require('interoception',receivers or None)
+        values={k:batch_values(v,self.B,k) for k,v in
+                dict(energy=energy,sated=sated,airborne=airborne,feeding=feeding).items()}
+        if any(np.any((v<0)|(v>1)) for v in values.values()):
+            raise ValueError('interoception energy and flags must be in [0,1]')
+        if any(np.any((values[k]!=0)&(values[k]!=1)) for k in ('sated','airborne','feeding')):
+            raise ValueError('interoception flags must be boolean')
+        for inst in receivers:inst.observe_internal(**values)
 
     def taste(self, sugar):
         self._require("taste", self.taste_sense)

@@ -49,6 +49,7 @@ class CompassDriver:
     quantity_in = 'rate_hz'
     channel_out = 'poisson_hz'
     required_preset = 'instrumented'
+    incompatible = ('compass_ring',)
     # User inputs are checked on CPU. A nonfinite output is an internal invariant failure;
     # on CUDA it may abort the CUDA context at a later kernel launch, without a per-frame host wait.
     cuda_async_validation = True

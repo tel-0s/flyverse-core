@@ -120,6 +120,7 @@ behavior will survive the loss of the rest of its recurrent network.
 | `smell(cL, cR)` | Dictionaries keyed by glomerulus; values are nonnegative concentrations, scalar or `(B,)`. Omitted keys mean zero concentration. |
 | `wind(dL, dR)` | Backward antennal deflection, scalar or `(B,)`; `+1` is full backward deflection, `-1` full forward deflection. |
 | `taste(sugar)` | Sugar contact in `[0, 1]`, scalar or `(B,)`; full contact drives the sweet GRNs at 120 Hz. |
+| `interoception(energy, sated=False, airborne=False, feeding=False)` | Explicit named instrument receivers only; energy in `[0,1]`, Boolean flags, scalar or `(B,)`. Does not construct a receptor/hormone model. Listed in `available_senses` only when a receiver exists. |
 | `stimulate(selection, hz, ms)` | Local neuron indices, a boolean mask, or `Connectome.select` criteria. Rates broadcast to `(B, selected_neurons)`. Pulses combine with sensory forcing by maximum and expire on a LIF step boundary. |
 
 Inputs stay in effect until replaced. `step(ms)` returns actual simulated milliseconds and carries

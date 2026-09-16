@@ -1093,9 +1093,8 @@ def main():
     ap.add_argument("--preset", default=None, choices=list(PRESETS),
                     help="docs/PRESETS_SPEC.md: 'raw' (default, byte-identical to no flag) or 'instrumented' (the --instrument stand-ins, "
                          "and the --hold-edges / --nt-override / --edge-gain records, listed in provenance.instruments); --instrument implies it")
-    ap.add_argument("--instrument", action="append", default=None, metavar="NAME[:k=..][:sign=..][:cells=..]",
-                    help="repeatable; a flyverse.instruments stand-in, e.g. sided_turn_afferent:k=0.5:sign=-1:cells=AN07B037 "
-                         "(k in {0.25, 0.5, 1.0} Hz per deg/s, unverified; sign -1 = the HGV- control; cells AN07B037 | CB0675 | GNG580 | PS047_b | all)")
+    from flyverse.instruments import add_cli_arguments
+    add_cli_arguments(ap)
     ap.add_argument("--turn", type=float, default=None, metavar="DEG_S",
                     help="--ledger only: a prescribed signed yaw rate (deg/s, positive = a left turn) over --turn-window, fed to the afferent "
                          "instrument when attached and recorded either way (cx_wedge has no body: docs/audits/compass_velocity_route.md)")
@@ -1117,6 +1116,8 @@ def main():
     hold_edges = parse_hold_edges(a.hold_edges)
     edge_gains = parse_edge_gains(a.edge_gain)
     preset = resolve_preset(a.preset, a.instrument)             # round 7: 'raw' unless asked (or an instrument is named)
+    from flyverse.instruments import validate_cli
+    validate_cli(ap, a.instrument)
     turn_window = parse_turn_window(a.turn_window)
     if a.turn is not None and not a.ledger:
         raise SystemExit("--turn needs --ledger")

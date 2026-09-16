@@ -48,6 +48,10 @@ It integrates realized yaw and continuously drives the biological EPG cells; it 
 not a recovered neural attractor or a food-seeking policy. The UI and saved provenance label it. `raw`
 remains the default. See [instruments](docs/INSTRUMENTS.md) and the [validation audit](docs/audits/compass_standin.md).
 
+Use `--instruments compass plume hunger` to add the experimental goal/steering bridge and metabolic gain;
+add `flight` for the wing-control experiment. `compass_ring` is an alternative recurrent-model compass.
+See [the instrument guide](docs/INSTRUMENTS.md) for dependencies, scientific limits and validation status.
+
 ## What is simulated
 
 | stage | count | model |

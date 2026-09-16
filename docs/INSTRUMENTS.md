@@ -106,7 +106,49 @@ the analogue of the 90 deg/s imposed visual rotation of `audits/deficit_rotation
 (read beside `bump_follow_confined_frac`: on a dead bump the centre is noise) in `metrics`, and the JSON carries
 `preset`, `instruments` and every `describe()` in `provenance`.
 
-## What an instrument is not
+## Navigation experiments
+
+`--instruments` accepts several names; the repeatable `--instrument` alias still works.
+For example, in the room demo:
+
+```sh
+python scripts/room_demo.py --preset instrumented --instruments compass plume hunger --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp --brain-map
+```
+
+Add `flight` to request the experimental wing-power/steering controller. It can launch the fly;
+it supplies no altitude or landing policy and does not add a flight-energy model. These options
+are also accepted by `benchmark.py` and `cx_wedge.py`. In Python, pass the same names as the
+`instruments` list to `FlyBrain` or `BatchSim`. Empty instrumented remains identical to raw.
+
+| name | supplies | dependencies and limitations |
+|---|---|---|
+| `compass_ring` | Wang's reduced recurrent EPG/PEN rate loop, projected onto biological EPGs | Alternative to `compass`; the two together are an error. EB feedback defaults to a declared textbook counterfactual; angular gain is uncalibrated. |
+| `plume` | Odor-gated upwind goal, entry-bearing return memory, published PFL3 comparator, neural PFL3/DNp09 drive | Requires `compass` or `compass_ring`. Reads neural EPG/LH rates and held antennal deflections. Goal memory and output bridge are synthetic; no food-location oracle. |
+| `hunger` | `(1-energy)*(not sated)` navigation gain | Requires `plume` or `flight`. Explicit engineering modulation, not a hormone/receptor model or fabricated hunger-neuron mapping. |
+| `flight` | Feedback onto existing wing power MNs, PFL3-to-wing steering bridge | Requires nonempty wing power/steering and PFL3 populations. The 100 Hz target comes from the current body equations, not measured physiology. |
+
+Duplicate names, incompatible heading providers, unmet dependencies and overlapping neural writes
+raise errors. Detaching a required provider also raises; remove dependent instruments first.
+Direct `FlyBrain` callers must supply sensory/internal inputs themselves:
+
+```python
+fb.wind(dL, dR)  # signed antennal deflections, not a world wind angle
+fb.interoception(energy, sated=sated, airborne=airborne, feeding=feeding)
+fb.proprioception(0, 0, 0, airborne, yaw_rate=yaw_rad_per_s)
+fb.step(10)
+```
+
+The room demo and BatchSim supply these automatically. Energy is in [0,1], flags are Boolean,
+and each accepts a scalar or one value per batch row. Inputs persist until updated. Checkpoints
+and full/partial resets include every instrument. Plume can receive wind on a selected graph
+without JO cells, just as the compass can receive yaw without a proprioceptive afferent module.
+This explicit receiver does not enable other sensory pathways.
+
+See [the navigation audit](audits/navigation_instruments.md) for papers, exact versus approximate
+computations, CUDA checks and outcomes. These are experimental controls, not admitted/default
+physiology. No new native-circuit or food-finding result follows from their availability.
+
+## Experimental availability versus adoption
 
 Not a default, not a tuned constant, not a way to move a suite row (PRESETS_SPEC 4). The `raw` column stays the
 model's own behaviour; an `instrumented` column is reported beside it with the instrument list in the caption, and an
