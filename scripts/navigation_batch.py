@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(out):
+def build(out, lifecycle_only=False):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     if (out / "predeclared.json").exists():
@@ -36,6 +36,8 @@ def build(out):
     commands.append(
         f"python scripts/room_demo.py --headless --seconds 1 --preset instrumented --instruments compass plume hunger flight --brain-map --cuda-graphs --cuda-kernels --event-driven --cuda-sparse warp --screenshot {rel}/ui.png"
     )
+    if lifecycle_only:
+        commands = commands[:1]
     chain = " && ".join(commands)
     log = f"{rel}/fam_navigation.txt"
     job = f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( {chain} ) > {log} 2>&1; st=$?; tail -8 {log}; exit $st"
@@ -90,4 +92,10 @@ def build(out):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="out/navigation_v1")
-    build(ap.parse_args().out)
+    ap.add_argument(
+        "--lifecycle-only",
+        action="store_true",
+        help="metadata/lifecycle correction; no repeated behavioral assays",
+    )
+    args = ap.parse_args()
+    build(args.out, args.lifecycle_only)
