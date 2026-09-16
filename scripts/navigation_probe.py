@@ -42,6 +42,7 @@ def lifecycle(c):
             selected.update(idx)
     sub = c.subset(np.array(sorted(selected)))
     records = []
+    controllers = []
     for heading in ("compass", "compass_ring"):
         names = [heading, *NAV[1:]]
         a, b = [
@@ -136,6 +137,21 @@ def lifecycle(c):
             fb.reset()
             fb.step(10.0)
         equal("queued reset")
+        for role, fb in (("captured", a), ("checked eager", b)):
+            controllers.append(
+                provenance(
+                    sub,
+                    fb=fb,
+                    seeds=[31],
+                    batch=3,
+                    stimulus={
+                        "name": "multi-module lifecycle",
+                        "role": role,
+                        "heading": heading,
+                        "exact_state_comparison": True,
+                    },
+                )
+            )
         for fb in (a, b):
             for _ in range(20):
                 fb.step(10.0)
@@ -151,16 +167,7 @@ def lifecycle(c):
         print("lifecycle exact", heading, len(checks), flush=True)
     return {
         "records": records,
-        "provenance": provenance(
-            sub,
-            device="cuda",
-            seeds=[31],
-            batch=3,
-            stimulus={
-                "name": "captured vs checked multi-module scheduler",
-                "instruments": [NAV, ["compass_ring", *NAV[1:]]],
-            },
-        ),
+        "controllers": controllers,
     }
 
 
