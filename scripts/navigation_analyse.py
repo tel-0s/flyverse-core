@@ -182,6 +182,14 @@ def analyse(source, destination, commit, correction, correction_commit):
         fontsize=10,
     )
     fig.savefig(destination / "navigation_room.svg", metadata={"Date": None})
+    svg = destination / "navigation_room.svg"
+    svg.write_text(
+        "\n".join(
+            line.rstrip() for line in svg.read_text(encoding="utf-8").splitlines()
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     plt.close(fig)
     print(
         json.dumps(

@@ -3574,3 +3574,13 @@ status outside the gap; no default adoption and no food-finding claim. Final nat
 GPU full-brain equality and room-repeat equality fail where recorded, including a same-code eager
 control. CPU 482 passed / 19 skipped / 220 subtests, 15 exact house lifecycle checks, 8 CUDA tests /
 2 skipped / 3 subtests; golden/cache unchanged. Failed capture attempts are retained in the audit.
+
+
+## Navigation instruments (Astra, 2026-09-15): independent review pending
+
+`audits/navigation_instruments.md` records recurrent EPG/PEN, PFL3 goal comparison, metabolic gain,
+and wing-MN control as explicit stop-gap instruments. No receptor row, transmitter relabel, parent
+weight or default was changed. The author self-review is labelled as such; Fable's independent
+skeptic pass is pending. Functional flight is demonstrated in the shipped body, not a recovered
+DNg02 mechanism; recurrent velocity calibration and reliable food finding remain open. CPU/golden
+passes; full native CUDA exact-workload performance gate fails and is retained, not waived.
