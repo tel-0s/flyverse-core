@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(out, lifecycle_only=False, flight_priority=False):
+def build(out, lifecycle_only=False, flight_priority=False, plume_diagnostic=False):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     if (out / "predeclared.json").exists():
@@ -42,6 +42,11 @@ def build(out, lifecycle_only=False, flight_priority=False):
         commands = [
             f"python scripts/flight_priority_probe.py --mode {mode} --out {rel}/{mode}.json"
             for mode in ("lifecycle", "transitions", "room", "depleted")
+        ]
+    if plume_diagnostic:
+        commands = [
+            f"python scripts/plume_steering_probe.py --heading {heading} --out {rel}/{heading}.json"
+            for heading in ("compass", "compass_ring")
         ]
     chain = " && ".join(commands)
     log = f"{rel}/fam_navigation.txt"
@@ -76,6 +81,14 @@ def build(out, lifecycle_only=False, flight_priority=False):
                 "docs/audits/flight_foraging_priority.md",
             )
         ]
+    if plume_diagnostic:
+        paths += [
+            ROOT / p
+            for p in (
+                "scripts/plume_steering_probe.py",
+                "docs/audits/plume_steering.md",
+            )
+        ]
     hashes = {
         p.relative_to(ROOT).as_posix(): hashlib.sha256(
             p.read_bytes().replace(b"\r\n", b"\n")
@@ -100,6 +113,10 @@ def build(out, lifecycle_only=False, flight_priority=False):
         "room_seeds": list(range(6)),
         "neural_seed": 31,
     }
+    if plume_diagnostic:
+        declaration["rules"] = (
+            "docs/audits/plume_steering.md section 1; diagnostic only, no tuning/adoption"
+        )
     (out / "predeclared.json").write_text(
         json.dumps(declaration, indent=2) + "\n", encoding="utf-8"
     )
@@ -119,7 +136,8 @@ if __name__ == "__main__":
         action="store_true",
         help="flight interruption, capture transitions and two room observations",
     )
+    ap.add_argument("--plume-diagnostic", action="store_true")
     args = ap.parse_args()
-    if args.lifecycle_only and args.flight_priority:
-        ap.error("choose either --lifecycle-only or --flight-priority")
-    build(args.out, args.lifecycle_only, args.flight_priority)
+    if sum((args.lifecycle_only, args.flight_priority, args.plume_diagnostic)) > 1:
+        ap.error("choose one assay family")
+    build(args.out, args.lifecycle_only, args.flight_priority, args.plume_diagnostic)
