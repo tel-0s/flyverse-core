@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(out, lifecycle_only=False):
+def build(out, lifecycle_only=False, flight_priority=False):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     if (out / "predeclared.json").exists():
@@ -38,6 +38,11 @@ def build(out, lifecycle_only=False):
     )
     if lifecycle_only:
         commands = commands[:1]
+    if flight_priority:
+        commands = [
+            f"python scripts/flight_priority_probe.py --mode {mode} --out {rel}/{mode}.json"
+            for mode in ("lifecycle", "transitions", "room", "depleted")
+        ]
     chain = " && ".join(commands)
     log = f"{rel}/fam_navigation.txt"
     job = f"mkdir -p {rel} && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( {chain} ) > {log} 2>&1; st=$?; tail -8 {log}; exit $st"
@@ -63,6 +68,14 @@ def build(out, lifecycle_only=False):
             "docs/audits/navigation_instruments.md",
         )
     ]
+    if flight_priority:
+        paths += [
+            ROOT / p
+            for p in (
+                "scripts/flight_priority_probe.py",
+                "docs/audits/flight_foraging_priority.md",
+            )
+        ]
     hashes = {
         p.relative_to(ROOT).as_posix(): hashlib.sha256(
             p.read_bytes().replace(b"\r\n", b"\n")
@@ -78,7 +91,11 @@ def build(out, lifecycle_only=False):
         "commands": commands,
         "source_sha256_lf": hashes,
         "batch_sha256": hashlib.sha256((out / "batch.sh").read_bytes()).hexdigest(),
-        "rules": "docs/audits/navigation_instruments.md section 3; no fit or adoption",
+        "rules": (
+            "docs/audits/flight_foraging_priority.md section 2; no fit or adoption"
+            if flight_priority
+            else "docs/audits/navigation_instruments.md section 3; no fit or adoption"
+        ),
         "room_seconds": 60,
         "room_seeds": list(range(6)),
         "neural_seed": 31,
@@ -97,5 +114,12 @@ if __name__ == "__main__":
         action="store_true",
         help="metadata/lifecycle correction; no repeated behavioral assays",
     )
+    ap.add_argument(
+        "--flight-priority",
+        action="store_true",
+        help="flight interruption, capture transitions and two room observations",
+    )
     args = ap.parse_args()
-    build(args.out, args.lifecycle_only)
+    if args.lifecycle_only and args.flight_priority:
+        ap.error("choose either --lifecycle-only or --flight-priority")
+    build(args.out, args.lifecycle_only, args.flight_priority)

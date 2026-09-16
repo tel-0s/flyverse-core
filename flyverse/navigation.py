@@ -546,12 +546,25 @@ class FlightDrive(NeuralInstrument):
         "energy": (0, 1),
         "integral": (-100, 150),
         "power_input": (0, 250),
+        "ground_s": (0, 20),
+        "bout_s": (0, 8),
+        "odor": (0, 1),
     }
-    state_flags = ("sated", "airborne", "feeding", "observed")
+    state_flags = (
+        "sated",
+        "airborne",
+        "feeding",
+        "observed",
+        "reserve_low",
+        "odor_near",
+        "landing",
+        "active",
+        "was_airborne",
+    )
 
     def __init__(self, c):
         super().__init__(c)
-        from .motor import wing_groups
+        from .motor import LH_ODOUR_CHANNELS, wing_groups
 
         wings = wing_groups(c)
         for k in ("power", "steer_L", "steer_R"):
@@ -567,6 +580,14 @@ class FlightDrive(NeuralInstrument):
             if not len(idx):
                 raise ValueError(f"flight requires PFL3 {side}")
             self.reads["pfl_" + side] = idx
+        # Read the frame's neural inputs, not PlumeNavigation's mutable state:
+        # the latter would make flight depend on instrument attachment order.
+        odor_channels = {}
+        for key, (base, span) in {"berry": (10.0, 12.0), "apple": (5.0, 8.0)}.items():
+            idx = np.flatnonzero(c.neurons.type.isin(LH_ODOUR_CHANNELS[key]).to_numpy())
+            if len(idx):
+                self.reads["odor_" + key] = idx
+                odor_channels[key] = {"baseline_hz": base, "range_hz": span}
         self.parameters = {
             "target_power_hz": 100.0,
             "power_kp": 0.25,
@@ -574,7 +595,16 @@ class FlightDrive(NeuralInstrument):
             "max_input_hz": 250.0,
             "steering_baseline_hz": 10.0,
             "steering_gain": 0.1,
-            "min_energy": 0.05,
+            "reserve_stop": 0.35,
+            "reserve_resume": 0.5,
+            "ground_search_s": 20.0,
+            "max_power_bout_s": 8.0,
+            "odor_channels": odor_channels,
+            "odor_tau_s": 1.0,
+            "odor_land": 0.6,
+            "odor_clear": 0.25,
+            "landing_policy": "withdraw artificial wing drive until touchdown",
+            "policy_source": "unverified engineering foraging priority; no physiological fit",
             "source": "body lift equilibrium: 20 + 3/(1.5/40) = 100 Hz",
             "altitude_control": False,
             "flight_energy_cost": False,
@@ -583,6 +613,11 @@ class FlightDrive(NeuralInstrument):
 
     def bind_instruments(self, instruments):
         self.hunger = instruments.get("hunger")
+
+    def describe(self):
+        record = super().describe()
+        record["audits"].append("docs/audits/flight_foraging_priority.md")
+        return record
 
     def initialize(self):
         for k, v in {
@@ -593,6 +628,14 @@ class FlightDrive(NeuralInstrument):
             "observed": 0.0,
             "integral": 0.0,
             "power_input": 0.0,
+            "ground_s": 0.0,
+            "bout_s": 0.0,
+            "odor": 0.0,
+            "reserve_low": 0.0,
+            "odor_near": 0.0,
+            "landing": 0.0,
+            "active": 0.0,
+            "was_airborne": 0.0,
         }.items():
             self.state(k, v)
 
@@ -608,14 +651,70 @@ class FlightDrive(NeuralInstrument):
 
     def step(self, dt_ms, inputs):
         dt = _frame_seconds(dt_ms)
-        request = (
-            (self.energy > 0.05)
-            & (self.sated == 0)
-            & (self.feeding == 0)
-            & (self.observed > 0)
+        p = self.parameters
+        self.reserve_low.copy_(
+            torch.where(
+                self.energy <= p["reserve_stop"],
+                1.0,
+                torch.where(self.energy >= p["reserve_resume"], 0.0, self.reserve_low),
+            )
+        )
+        gates = [
+            (inputs["odor_" + key].mean(1, keepdim=True) - channel["baseline_hz"])
+            / channel["range_hz"]
+            for key, channel in p["odor_channels"].items()
+        ]
+        odor = (
+            torch.stack(gates).amax(0).clamp(0, 1)
+            if gates
+            else torch.zeros_like(self.odor)
+        )
+        self.odor.lerp_(odor, 1 - math.exp(-dt / p["odor_tau_s"]))
+        self.odor_near.copy_(
+            torch.where(
+                self.odor >= p["odor_land"],
+                1.0,
+                torch.where(self.odor <= p["odor_clear"], 0.0, self.odor_near),
+            )
+        )
+        inhibited = (
+            (self.reserve_low > 0)
+            | (self.odor_near > 0)
+            | (self.sated > 0)
+            | (self.feeding > 0)
+            | (self.observed == 0)
         )
         if self.hunger is not None:
-            request = request & ((self.hunger.level > 0) | (self.airborne > 0))
+            inhibited = inhibited | ((self.hunger.level == 0) & (self.airborne == 0))
+        airborne = self.airborne > 0
+        landed = (self.was_airborne > 0) & ~airborne
+        expired = self.bout_s >= p["max_power_bout_s"]
+        # Once descent is requested, intermittent odor/energy cannot restart lift midair.
+        self.landing.copy_(airborne & ((self.landing > 0) | inhibited | expired))
+        self.ground_s.copy_(
+            torch.where(
+                ~airborne & ~inhibited & ~landed & (self.active == 0),
+                (self.ground_s + dt).clamp_max(p["ground_search_s"]),
+                0.0,
+            )
+        )
+        request = (
+            ~inhibited
+            & (self.landing == 0)
+            & ~landed
+            & ~expired
+            & ((self.active > 0) | airborne | (self.ground_s >= p["ground_search_s"]))
+        )
+        # Count commanded flight, including a failed takeoff, so no episode can run forever.
+        self.bout_s.copy_(
+            torch.where(
+                request,
+                (self.bout_s + dt).clamp_max(p["max_power_bout_s"]),
+                0.0,
+            )
+        )
+        self.active.copy_(request)
+        self.was_airborne.copy_(self.airborne)
         error = 100 - inputs["power"].mean(1, keepdim=True)
         self.integral.copy_(
             torch.where(

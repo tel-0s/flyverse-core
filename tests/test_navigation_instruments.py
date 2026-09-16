@@ -298,9 +298,13 @@ def test_flight_needs_explicit_body_input_and_has_sided_bounded_neural_output():
     m = fb.instruments["flight"]
     inputs = {k: torch.zeros((2, len(ix))) for k, ix in m.reads.items()}
     assert all(torch.count_nonzero(v) == 0 for v in m.step(10, inputs).values())
-    fb.interoception([0.5, 0.01])
+    fb.interoception([0.6, 0.01])
     inputs["pfl_R"].fill_(40.0)
-    out = m.step(10, inputs)
+    # Healthy flies first get time to search on foot; a starving row never requests flight.
+    for _ in range(1900):
+        assert all(torch.count_nonzero(v) == 0 for v in m.step(10, inputs).values())
+    for _ in range(110):
+        out = m.step(10, inputs)
     assert (
         out["power"][0].mean() > 100
         and out["steer_L"][0].mean() > out["steer_R"][0].mean()
@@ -308,6 +312,100 @@ def test_flight_needs_explicit_body_input_and_has_sided_bounded_neural_output():
     assert all(torch.count_nonzero(v[1]) == 0 for v in out.values())
     fb.interoception(0.5, feeding=True)
     assert all(torch.count_nonzero(v) == 0 for v in m.step(10, inputs).values())
+
+
+def test_flight_bouts_end_and_do_not_relaunch_until_ground_search():
+    fb = make(["flight"])
+    m = fb.instruments["flight"]
+    inputs = {k: torch.zeros((2, len(ix))) for k, ix in m.reads.items()}
+    # A spontaneous/native takeoff may be assisted, but only for one bounded bout.
+    fb.interoception(0.8, airborne=True)
+    powered = 0
+    for _ in range(1200):
+        powered += bool(m.step(10, inputs)["power"].any())
+    assert 800 <= powered <= 801
+    assert bool((m.landing == 1).all())
+    # Losing the cue or restoring energy cannot restart lift before touchdown.
+    fb.interoception(1.0, airborne=True)
+    assert not m.step(10, inputs)["power"].any()
+    fb.interoception(0.8)
+    for _ in range(2000):
+        assert not m.step(10, inputs)["power"].any()
+    for _ in range(3):
+        out = m.step(10, inputs)
+    assert bool((out["power"] > 0).all())
+    # Even a failed takeoff times out; it cannot accumulate a permanent launch request.
+    for _ in range(900):
+        out = m.step(10, inputs)
+    assert not out["power"].any() and not m.active.any()
+
+
+def test_flight_reserve_and_neural_odor_land_independently_with_hysteresis():
+    fb = make(["flight", "hunger"])
+    m = fb.instruments["flight"]
+    inputs = {k: torch.zeros((2, len(ix))) for k, ix in m.reads.items()}
+    fb.interoception([0.6, 0.6], airborne=True)
+    assert bool((m.step(10, inputs)["power"] > 0).all())
+    fb.interoception([0.3, 0.6], airborne=True)
+    for k in m.parameters["odor_channels"]:
+        inputs["odor_" + k][1].fill_(40.0)
+    for _ in range(100):
+        out = m.step(10, inputs)
+    assert not out["power"].any()
+    assert m.reserve_low[:, 0].tolist() == [1, 0]
+    assert m.odor_near[:, 0].tolist() == [0, 1]
+    saved = m.state_dict()
+    # Odor lost during descent; low energy raised but still below the re-arm threshold.
+    for value in inputs.values():
+        value.zero_()
+    fb.interoception([0.45, 0.6], airborne=True)
+    for _ in range(250):
+        assert not m.step(10, inputs)["power"].any()
+    assert not m.odor_near.any() and bool((m.landing == 1).all())
+    fb.interoception([0.45, 0.6])
+    for _ in range(2010):
+        out = m.step(10, inputs)
+    assert not out["power"][0].any() and out["power"][1].any()
+    # Restoring sufficient reserves still requires the full grounded interval.
+    fb.interoception([0.6, 0.6], feeding=[False, True])
+    assert not m.step(10, inputs)["power"].any()
+    for _ in range(2010):
+        out = m.step(10, inputs)
+    assert out["power"][0].any() and not out["power"][1].any()
+    m.load_state_dict(saved)
+    for key, value in saved.items():
+        torch.testing.assert_close(value, m.state_dict()[key], rtol=0, atol=0)
+    m.reset_rows([0])
+    for key, value in saved.items():
+        torch.testing.assert_close(value[1], m.state_dict()[key][1], rtol=0, atol=0)
+    assert not m.observed[0].any() and not m.landing[0].any()
+
+
+def test_flight_odor_is_optional_and_independent_of_plume_attachment_order():
+    # A reduced graph without LH cells keeps reserve and time limits; no fabricated odor.
+    from flyverse.navigation import FlightDrive
+
+    c = graph()
+    keep = ~c.neurons.type.str.startswith("LH")
+    m = FlightDrive(c.subset(np.flatnonzero(keep.to_numpy())))
+    m.reset(1, "cpu")
+    assert m.parameters["odor_channels"] == {}
+    m.observe_internal(0.1, False, True, False)
+    inputs = {k: torch.zeros((1, len(ix))) for k, ix in m.reads.items()}
+    assert not m.step(10, inputs)["power"].any()
+
+    names = ["compass", "plume", "hunger", "flight"]
+    a, b = make(names), make(names[::-1])
+    for fb in (a, b):
+        fb.interoception(0.8, airborne=True)
+        flight = fb.instruments["flight"]
+        for k in flight.parameters["odor_channels"]:
+            fb.brain.rate[:, flight.reads["odor_" + k]] = 40
+        # Place the filter just below its switch, then cross it through normal scheduling.
+        flight.odor.fill_(0.599)
+        fb.step(10)
+        assert bool((flight.landing == 1).all())
+    torch.testing.assert_close(a.brain.rate, b.brain.rate, rtol=0, atol=0)
 
 
 def test_batch_environment_feeds_internal_state_and_resets_rows():
