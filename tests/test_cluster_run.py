@@ -718,6 +718,60 @@ class FetchTests(unittest.TestCase):
         self.assertIn("fetched out/run/ @b", buf.getvalue())
 
 
+class GpuPoolTests(unittest.TestCase):
+    """--gpu-ids 4,5,6,7 is a POOL: every job is submitted with `gpus: 1` and `gpu_ids: [one id]`, the ids dealt round-robin
+    over the pool in command order (the scheduler treats gpu_ids as a strict pin, so no job can land on another GPU);
+    `vram_gb` stays as configured, and without the flag the spec is exactly what it was (no gpu_ids key at all)."""
+
+    def one_box(self, slots=8):
+        h = FakeHeimdall()
+        self.addCleanup(h.stop)
+        return h, {"user": "tel0s", "targets": {"house": dict(TARGET, api=h.api, slots=slots)}}
+
+    def test_every_job_is_pinned_to_one_gpu_of_the_pool_round_robin(self):
+        h, cfg = self.one_box()
+        cmds = [f"c{i}" for i in range(6)]
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--target", "house", "--node", "<cluster-node-2>",
+                                 "--gpu-ids", "4,5,6,7", *cmds], cfg)
+        self.assertEqual(code, 0)
+        self.assertEqual(len(h.submitted), 6)
+        specs = sorted((b["spec"] for b in h.submitted), key=lambda s: int(s["name"].rsplit("-", 1)[-1]))
+        self.assertEqual([s["gpu_ids"] for s in specs], [[4], [5], [6], [7], [4], [5]])
+        self.assertEqual([s["gpus"] for s in specs], [1] * 6)
+        self.assertEqual([s["vram_gb"] for s in specs], [24] * 6)          # the configured per-GPU budget, untouched
+        self.assertEqual([s["node"] for s in specs], ["<cluster-node-2>"] * 6)
+        self.assertEqual([s["command"] for s in specs], [f"source .venv/bin/activate && {c}" for c in cmds])
+        self.assertIn("gpu pool [4, 5, 6, 7]", log)
+        self.assertRegex(log, r"job job01 queued  @house  x-\w+-0 \[gpu 4\]: c0")
+        self.assertRegex(log, r"job job05 queued  @house  x-\w+-4 \[gpu 4\]: c4")
+
+    def test_without_the_flag_the_spec_carries_no_pin(self):
+        h, cfg = self.one_box()
+        code, log, _ = run_main(["--name", "x", "--poll", "0.01", "--target", "house", "c0", "c1"], cfg)
+        self.assertEqual(code, 0)
+        for b in h.submitted:
+            self.assertNotIn("gpu_ids", b["spec"])
+            self.assertEqual((b["spec"]["gpus"], b["spec"]["vram_gb"]), (1, 24))
+        self.assertNotIn("gpu pool", log)
+        self.assertNotIn("[gpu ", log)
+
+    def test_a_bad_pool_exits_before_anything_is_shipped(self):
+        for bad in ("", "4,x", "-1", "4,4"):
+            h, cfg = self.one_box()
+            code, log, calls = run_main(["--name", "x", "--target", "house", "--gpu-ids", bad, "c0"], cfg)
+            self.assertNotEqual(code, 0, bad)
+            self.assertEqual(h.submitted, [], bad)
+            self.assertEqual(calls["ssh"], [], bad)                         # nothing was shipped
+
+    def test_parse_gpu_ids(self):
+        self.assertIsNone(cr.parse_gpu_ids(None))
+        self.assertEqual(cr.parse_gpu_ids("4,5,6,7"), [4, 5, 6, 7])
+        self.assertEqual(cr.parse_gpu_ids(" 7 , 4 "), [7, 4])
+        for bad in ("", "a", "1,1", "-2"):
+            with self.assertRaises(SystemExit):
+                cr.parse_gpu_ids(bad)
+
+
 class ExitStatusTests(unittest.TestCase):
     """A job line that ends with `; tail ...` / `; cat ...` after a redirect exits with TAIL's status, not python's:
     a run that died mid-write still reports `completed exit 0`, and `'<n> job(s), 0 failed'` then proves nothing.

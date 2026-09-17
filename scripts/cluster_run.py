@@ -55,8 +55,10 @@ block name) when the job names do not carry a usable key. A batch with more jobs
 warned about at submit time.
 
 Options: --targets a,b,c / --target x, --minutes (estimate, default 30), --no-wait, --priority, --node, --tags,
---poll seconds, --sync-only, --allow-bare-fetch, --arm-block, --arm-block-map, --balance-blocks /
---no-balance-blocks. Run directories are kept on each target (results and logs stay there under the printed paths).
+--gpu-ids 4,5,6,7 (a POOL of GPU indices on the --node: every job is submitted with `gpus: 1` and `gpu_ids: [one id]`,
+the ids dealt round-robin over the pool in command order, so no job can land on another GPU -- the scheduler treats
+`gpu_ids` as a strict pin; `vram_gb` stays as configured, so several pinned jobs still share one GPU), --poll seconds,
+--sync-only, --allow-bare-fetch, --arm-block, --arm-block-map, --balance-blocks / --no-balance-blocks. Run directories are kept on each target (results and logs stay there under the printed paths).
 See docs/CLUSTER.md section 14.
 """
 from __future__ import annotations
@@ -525,7 +527,22 @@ def ship_all(targets: list, run: str, tarball: bytes | None, files: list[str]) -
             print(f"[{t.name}] run dir {t.rdir}: {len(files)} local file(s) shipped" + (f" ({shown})" if files else ""))
 
 
-def build_spec(t: Target, jname: str, command: str, args) -> dict:
+def parse_gpu_ids(s: str | None) -> list[int] | None:
+    """--gpu-ids '4,5,6,7' -> [4, 5, 6, 7] (unique non-negative ints, order kept); None when the flag is absent."""
+    if s is None:
+        return None
+    try:
+        ids = [int(x) for x in s.split(",") if x.strip()]
+    except ValueError:
+        sys.exit(f"--gpu-ids expects a comma-separated list of GPU indices, got {s!r}")
+    if not ids or any(i < 0 for i in ids) or len(set(ids)) != len(ids):
+        sys.exit(f"--gpu-ids expects one or more distinct non-negative GPU indices, got {s!r}")
+    return ids
+
+
+def build_spec(t: Target, jname: str, command: str, args, gpu_id: int | None = None) -> dict:
+    """The scheduler JobSpec of one job. With a --gpu-ids pool the job is a strict pin: `gpus: 1`, `gpu_ids: [gpu_id]`
+    (the id submit_all dealt it from the pool); `vram_gb` is the configured per-GPU budget either way."""
     env = {"SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy", "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8",
            "TORCH_EXTENSIONS_DIR": f"{t.root}/.torch_ext", **t.env}
     spec = {"job_type": "benchmark", "name": jname, "gpus": t.gpus, "vram_gb": t.vram_gb,
@@ -534,6 +551,9 @@ def build_spec(t: Target, jname: str, command: str, args) -> dict:
             "command": f"source .venv/bin/activate && {command}"}
     if args.node:
         spec["node"] = args.node
+    if gpu_id is not None:
+        spec["gpus"] = 1
+        spec["gpu_ids"] = [int(gpu_id)]
     return spec
 
 
@@ -579,9 +599,13 @@ def submit_all(targets: list, commands: list[str], run: str, args) -> tuple[list
     placement, and the fallback is printed so the console log records where the block broke."""
     jobs, lost = [], 0
     names = plan_blocks(targets, commands, args)
+    pool = parse_gpu_ids(getattr(args, "gpu_ids", None))
+    if pool:
+        print(f"gpu pool {pool}: every job gpus 1, gpu_ids [pool[i mod {len(pool)}]] (a strict pin), vram_gb as configured")
     for i, command in enumerate(commands):
         jname = run if len(commands) == 1 else f"{run}-{i}"
         block = names[i]
+        gpu_id = pool[i % len(pool)] if pool else None
         tried: list = []
         while True:
             live = [t for t in targets if t.ok and t not in tried]
@@ -598,7 +622,7 @@ def submit_all(targets: list, commands: list[str], run: str, args) -> tuple[list
             if t is None:
                 t = pick_target(live)
             try:
-                r = api(t, "/jobs", {"spec": build_spec(t, jname, command, args), "submitted_by": t.user})
+                r = api(t, "/jobs", {"spec": build_spec(t, jname, command, args, gpu_id), "submitted_by": t.user})
                 job = r["job"]
             except Exception as e:                                     # noqa: BLE001 - try the next box
                 print(f"[{t.name}] submit failed ({e}); marking unavailable for this run")
@@ -611,7 +635,8 @@ def submit_all(targets: list, commands: list[str], run: str, args) -> tuple[list
             jobs.append({"t": t, "id": job["id"], "name": jname, "command": command, "job": job, "last": None,
                          "block": block})
             print(f"job {job['id']} {job['status']}  @{t.name}  {jname}"
-                  + (f" [block {block}]" if block is not None else "") + f": {command}"
+                  + (f" [block {block}]" if block is not None else "")
+                  + (f" [gpu {gpu_id}]" if gpu_id is not None else "") + f": {command}"
                   + (f"  warnings: {r['warnings']}" if r.get("warnings") else ""))
             break
     return jobs, lost
@@ -642,6 +667,10 @@ def main() -> int:
     ap.add_argument("--minutes", type=int, default=30)
     ap.add_argument("--priority", type=int, default=40)
     ap.add_argument("--node", default=None)
+    ap.add_argument("--gpu-ids", default=None, metavar="ID[,ID...]",
+                    help="a pool of GPU indices on the --node: every job is submitted with gpus 1 and gpu_ids [one id], dealt "
+                         "round-robin over the pool in command order (a strict pin in the scheduler: no job can land on another "
+                         "GPU); vram_gb stays as configured")
     ap.add_argument("--tags", default="flyverse")
     ap.add_argument("--fetch", nargs="*", action="extend", default=[], help="paths (relative to the repo root) to copy back when the jobs end; may be repeated; a NAMED directory (out/<name>/) is the robust form")
     ap.add_argument("--allow-bare-fetch", action="store_true", help="permit --fetch out/ (see the refusal message)")
@@ -669,6 +698,7 @@ def main() -> int:
     if bare and not args.allow_bare_fetch:
         sys.exit(BARE_FETCH_WHY.format(paths=" ".join(bare)))
     warn_exit_masking(args.commands)
+    parse_gpu_ids(args.gpu_ids)                                        # a bad pool exits before anything is shipped
     if args.arm_block_map:
         load_block_map(args.arm_block_map)                              # a bad map exits before anything is shipped
 
