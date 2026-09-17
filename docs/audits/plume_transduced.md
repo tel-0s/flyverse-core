@@ -150,7 +150,8 @@ exploration or other loop dynamics; it would not retroactively validate the sens
 ## 4. Prepared comparison, not submitted
 
 Generator: `scripts/plume_transduced_batch.py plan --out out/plume_transduced_rooms_v2`.
-The frozen JSON and guarded `batch.sh` are copied beside the CPU artifacts. The user
+The frozen [JSON](data/plume_transduced/predeclared.json) and guarded
+[batch.sh](data/plume_transduced/batch.sh) are copied beside the CPU artifacts. The user
 confirmed the goal-only definition on 2026-09-17:
 
 | Arm | Bilateral goal | DNa02 feedback | Instruments |
