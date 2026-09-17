@@ -367,7 +367,11 @@ def analyse(runs_dir: Path, out_dir: Path):
         want = (frozen or {}).get("source_sha256_lf", {})
         for i, r in enumerate((ra, rb)):
             fp = r.get("provenance", {}).get("source_fingerprint", {})
-            loaded = dict(fp.get("files", {})); loaded.update(fp.get("files_loaded", {}))
+            # the frozen hashes are LF-normalised (a Windows checkout ships CRLF bytes): compare files_lf where the
+            # fingerprint carries it, the raw hash otherwise
+            loaded = dict(fp.get("files", {})); loaded.update(fp.get("files_lf", {}))
+            for f, h in fp.get("files_loaded", {}).items():
+                loaded.setdefault(f, h)
             stale = sorted(f for f, h in loaded.items() if f in want and want[f] != h)
             if stale:
                 bad.append(f"r{i + 1} loaded {len(stale)} file(s) that differ from the predeclared tree: {stale[:6]}")
@@ -387,6 +391,26 @@ def analyse(runs_dir: Path, out_dir: Path):
                               npz=[npz_a.name, npz_b.name], problems="; ".join(bad)))
     pairs = pd.DataFrame(pair_rows); pairs.to_csv(out_dir / "pairs.csv", index=False)
     arrays = pd.DataFrame(array_rows); arrays.to_csv(out_dir / "arrays.csv", index=False)
+    # per-run metrics (docs/INTERP.md 10.4 rule 28: any per-run value quoted in prose is pasted from this file)
+    run_rows = []
+    for label, protocol, path, stem in PAIRS:
+        for i in (1, 2):
+            p = runs_dir / f"{stem}_r{i}.json"
+            if not p.is_file():
+                continue
+            rec, _, npz = load_run(runs_dir / f"{stem}_r{i}")
+            m = rec.get("metrics", {})
+            ex = rec.get("provenance", {}).get("execution", {})
+            row = dict(pair=label, run=f"{stem}_r{i}", npz=npz.name, device_name=ex.get("device_name"), backend=json.dumps(ex.get("backend", {}), sort_keys=True),
+                       cuda_visible_devices=rec.get("cuda_visible_devices"), wall_s=rec.get("wall_s"))
+            if label == "cxS":
+                row.update({k: m.get(k) for k in ("survival_s", "frac_confined_post", "GLNO_LR_hz", "PEN_LR_hz", "PS196b_LR_hz", "epg_in_mean_post")})
+            else:
+                row.update(feeding_s=json.dumps([round(v, 4) for v in m.get("feeding_s", [])]), path_m=json.dumps([round(v, 4) for v in m.get("path_m", [])]),
+                           first_contact_s=json.dumps(m.get("first_contact_s")), end_energy=json.dumps([round(v, 4) for v in m.get("end_energy", [])]),
+                           final_spike_counts=json.dumps(m.get("final_spike_counts")), final_rate_mean_hz=json.dumps([round(v, 4) for v in m.get("final_rate_mean_hz", [])]))
+            run_rows.append(row)
+    pd.DataFrame(run_rows).to_csv(out_dir / "runs.csv", index=False)
     by_path = {}
     for r in pair_rows:
         if r["pair"] == "cxS":

@@ -1,0 +1,167 @@
+{
+ "runs_dir": "out/det1",
+ "pairs": [
+  {
+   "pair": "cxS",
+   "protocol": "cx_wedge S arm seed 0",
+   "path": "torch (cx_wedge default)",
+   "verdict": "repeats exactly",
+   "n_arrays": 31,
+   "n_arrays_equal": 31,
+   "max_abs_diff_arrays": 0.0,
+   "n_metrics": 546,
+   "n_metrics_equal": 546,
+   "max_abs_diff_metrics": 0.0,
+   "first_diff_frame_spikes": null,
+   "worst_metrics": "[]",
+   "device_name": "NVIDIA B200",
+   "backend": "{\"cuda_graphs\": true, \"cuda_kernels\": false, \"cuda_sparse\": \"torch\", \"event_driven\": false, \"metal\": false}",
+   "cuda_visible": [
+    null,
+    null
+   ],
+   "npz": [
+    "cxS_r1_gE1_gD1_s0.npz",
+    "cxS_r2_gE1_gD1_s0.npz"
+   ],
+   "problems": ""
+  },
+  {
+   "pair": "plume_native",
+   "protocol": "plume room 10 s B=6 seed 0",
+   "path": "native",
+   "verdict": "one draw",
+   "n_arrays": 15,
+   "n_arrays_equal": 1,
+   "max_abs_diff_arrays": 37083.0,
+   "n_metrics": 1026,
+   "n_metrics_equal": 992,
+   "max_abs_diff_metrics": 32271.0,
+   "first_diff_frame_spikes": 30,
+   "worst_metrics": "[[\"metrics.final_spike_counts[4]\", 32271.0], [\"metrics.final_spike_counts[5]\", 18507.0], [\"metrics.final_spike_counts[0]\", 7317.0], [\"metrics.final_spike_counts[3]\", 5138.0], [\"metrics.final_spike_counts[2]\", 1370.0]]",
+   "device_name": "NVIDIA B200",
+   "backend": "{\"cuda_graphs\": true, \"cuda_kernels\": true, \"cuda_sparse\": \"torch\", \"event_driven\": true, \"metal\": false}",
+   "cuda_visible": [
+    "5",
+    "5"
+   ],
+   "npz": [
+    "plume_native_r1.npz",
+    "plume_native_r2.npz"
+   ],
+   "problems": ""
+  },
+  {
+   "pair": "plume_torch",
+   "protocol": "plume room 10 s B=6 seed 0",
+   "path": "torch",
+   "verdict": "one draw",
+   "n_arrays": 15,
+   "n_arrays_equal": 1,
+   "max_abs_diff_arrays": 41225.0,
+   "n_metrics": 1026,
+   "n_metrics_equal": 992,
+   "max_abs_diff_metrics": 26408.0,
+   "first_diff_frame_spikes": 60,
+   "worst_metrics": "[[\"metrics.final_spike_counts[5]\", 26408.0], [\"metrics.final_spike_counts[0]\", 22118.0], [\"metrics.final_spike_counts[2]\", 17278.0], [\"metrics.final_spike_counts[1]\", 14946.0], [\"metrics.final_spike_counts[4]\", 14544.0]]",
+   "device_name": "NVIDIA B200",
+   "backend": "{\"cuda_graphs\": true, \"cuda_kernels\": false, \"cuda_sparse\": \"torch\", \"event_driven\": false, \"metal\": false}",
+   "cuda_visible": [
+    "6",
+    "6"
+   ],
+   "npz": [
+    "plume_torch_r1.npz",
+    "plume_torch_r2.npz"
+   ],
+   "problems": ""
+  },
+  {
+   "pair": "raw_native",
+   "protocol": "raw room 10 s B=6 seed 0",
+   "path": "native",
+   "verdict": "one draw",
+   "n_arrays": 14,
+   "n_arrays_equal": 1,
+   "max_abs_diff_arrays": 49326.0,
+   "n_metrics": 178,
+   "n_metrics_equal": 142,
+   "max_abs_diff_metrics": 26811.0,
+   "first_diff_frame_spikes": 4,
+   "worst_metrics": "[[\"metrics.final_spike_counts[0]\", 26811.0], [\"metrics.final_spike_counts[2]\", 26688.0], [\"metrics.final_spike_counts[1]\", 21183.0], [\"metrics.final_spike_counts[4]\", 16790.0], [\"metrics.final_spike_counts[3]\", 8757.0]]",
+   "device_name": "NVIDIA B200",
+   "backend": "{\"cuda_graphs\": true, \"cuda_kernels\": true, \"cuda_sparse\": \"torch\", \"event_driven\": true, \"metal\": false}",
+   "cuda_visible": [
+    "7",
+    "7"
+   ],
+   "npz": [
+    "raw_native_r1.npz",
+    "raw_native_r2.npz"
+   ],
+   "problems": ""
+  },
+  {
+   "pair": "raw_torch",
+   "protocol": "raw room 10 s B=6 seed 0",
+   "path": "torch",
+   "verdict": "one draw",
+   "n_arrays": 14,
+   "n_arrays_equal": 1,
+   "max_abs_diff_arrays": 37865.0,
+   "n_metrics": 178,
+   "n_metrics_equal": 142,
+   "max_abs_diff_metrics": 29177.0,
+   "first_diff_frame_spikes": 86,
+   "worst_metrics": "[[\"metrics.final_spike_counts[3]\", 29177.0], [\"metrics.final_spike_counts[5]\", 25385.0], [\"metrics.final_spike_counts[1]\", 24392.0], [\"metrics.final_spike_counts[2]\", 14788.0], [\"metrics.final_spike_counts[4]\", 13640.0]]",
+   "device_name": "NVIDIA B200",
+   "backend": "{\"cuda_graphs\": true, \"cuda_kernels\": false, \"cuda_sparse\": \"torch\", \"event_driven\": false, \"metal\": false}",
+   "cuda_visible": [
+    "4",
+    "4"
+   ],
+   "npz": [
+    "raw_torch_r1.npz",
+    "raw_torch_r2.npz"
+   ],
+   "problems": ""
+  }
+ ],
+ "problems": [],
+ "decision": "neither path repeats: items 3-4 are >= 6 draws, run = replicate unit, nothing quoted beyond its across-draw SD",
+ "torch_repeats": false,
+ "native_repeats": false,
+ "frozen_rule": {
+  "unit": "the pair: two runs of one command, sequential, in one scheduler job pinned to one GPU (gpus 1, gpu_ids [id])",
+  "arrays": "every array of the run's NPZ compared with numpy.array_equal(a, b, equal_nan=True) after a shape check; max |a - b| reported per array (NaN-aware; inf where shapes differ)",
+  "metrics": "every numeric leaf of the run's JSON (ints, floats, bools; lists and dicts recursed) compared with ==; NaN == NaN; max |diff| over the numeric leaves reported",
+  "excluded_keys": [
+   "created_utc",
+   "cuda_visible_devices",
+   "elapsed_s",
+   "finished_utc",
+   "host",
+   "json",
+   "ledger_npz",
+   "npz",
+   "out",
+   "path",
+   "platform",
+   "seconds_wall",
+   "sim_out",
+   "stamped_utc",
+   "started_utc",
+   "time_s",
+   "torch",
+   "wall_s"
+  ],
+  "excluded_reason": "wall-clock, host / platform, timestamps and file paths differ between two runs by construction",
+  "verdict_per_pair": "`repeats exactly` iff every compared array and every compared metric is equal; otherwise `one draw` -- there is no tolerance and no partial credit",
+  "outcome_table": "per (path, protocol): repeats exactly -> numbers from that path / protocol may be quoted to the digit as 'reproduced exactly in 2 draws on <backend>' (INTERP 10.4 rule 16: never 'bit-identical' of a GPU number); one draw -> no number from it is quoted to more than its across-draw spread",
+  "decision_for_items_3_and_4": "if the torch path repeats exactly on both rooms and the native path does not, items 3 and 4 run on the torch path; if neither repeats, items 3-4 are >= 6 draws with the run as the replicate unit and no number quoted to more than its across-draw SD; if both repeat, the shipped native path stays",
+  "backend_check": "every run's provenance.execution.backend must carry the flags the plan names for its path (cuda_kernels / event_driven / cuda_sparse) and provenance.execution.device must start with cuda; a mismatch invalidates the pair"
+ },
+ "stamped_utc": "2026-09-17T23:31:08Z",
+ "analysis_sha256": "857a2ea6470d357f7d996251051471d65ebbee052da3891d02cde5a57882d3ff",
+ "created_utc": "2026-09-17T23:39:38Z"
+}

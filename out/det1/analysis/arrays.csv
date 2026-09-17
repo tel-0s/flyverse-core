@@ -1,0 +1,90 @@
+pair,array,shape_a,shape_b,equal,max_abs_diff,first_diff_index
+cxS,cells__Delta7,"(800, 42)","(800, 42)",True,0.0,
+cxS,cells__EPGt,"(800, 4)","(800, 4)",True,0.0,
+cxS,cells__ER4m,"(800, 11)","(800, 11)",True,0.0,
+cxS,cells__ER6,"(800, 4)","(800, 4)",True,0.0,
+cxS,cells__ExR6,"(800, 2)","(800, 2)",True,0.0,
+cxS,cells__GLNO,"(800, 4)","(800, 4)",True,0.0,
+cxS,cells__PEG,"(800, 18)","(800, 18)",True,0.0,
+cxS,cells__PEN,"(800, 42)","(800, 42)",True,0.0,
+cxS,epg,"(800, 46)","(800, 46)",True,0.0,
+cxS,g__DNa02_L,"(800,)","(800,)",True,0.0,
+cxS,g__DNa02_R,"(800,)","(800,)",True,0.0,
+cxS,g__Delta7,"(800,)","(800,)",True,0.0,
+cxS,g__EPGt,"(800,)","(800,)",True,0.0,
+cxS,g__ER4m,"(800,)","(800,)",True,0.0,
+cxS,g__ER6,"(800,)","(800,)",True,0.0,
+cxS,g__ExR6,"(800,)","(800,)",True,0.0,
+cxS,g__GLNO,"(800,)","(800,)",True,0.0,
+cxS,g__GLNO_L,"(800,)","(800,)",True,0.0,
+cxS,g__GLNO_R,"(800,)","(800,)",True,0.0,
+cxS,g__PEG,"(800,)","(800,)",True,0.0,
+cxS,g__PEN,"(800,)","(800,)",True,0.0,
+cxS,g__PEN_L,"(800,)","(800,)",True,0.0,
+cxS,g__PEN_R,"(800,)","(800,)",True,0.0,
+cxS,g__PS196b_L,"(800,)","(800,)",True,0.0,
+cxS,g__PS196b_R,"(800,)","(800,)",True,0.0,
+cxS,g__Ring,"(800,)","(800,)",True,0.0,
+cxS,g__rest,"(800,)","(800,)",True,0.0,
+cxS,inside,"(46,)","(46,)",True,0.0,
+cxS,t,"(800,)","(800,)",True,0.0,
+cxS,wedge_of,"(46,)","(46,)",True,0.0,
+cxS,yaw_deg_s,"(800,)","(800,)",True,0.0,
+plume_native,body,"(1000, 6, 14)","(1000, 6, 14)",False,91.59841936826706,"[31, 0, 13]"
+plume_native,final__adapt,"(6, 167106)","(6, 167106)",False,24.413782119750977,"[0, 0]"
+plume_native,final__drive,"(6, 167106)","(6, 167106)",False,70.0,"[0, 2]"
+plume_native,final__g,"(6, 167106)","(6, 167106)",False,676.0141839981079,"[0, 0]"
+plume_native,final__g_slow,"(6, 167106)","(6, 167106)",True,0.0,
+plume_native,final__poisson_p,"(6, 167106)","(6, 167106)",False,0.0035682842135429382,"[0, 501]"
+plume_native,final__rate,"(6, 167106)","(6, 167106)",False,146.19412994384766,"[0, 0]"
+plume_native,final__refrac,"(6, 167106)","(6, 167106)",False,2.200000047683716,"[0, 3]"
+plume_native,final__res,"(6, 167106)","(6, 167106)",False,0.42014050483703613,"[0, 82]"
+plume_native,final__spike_buf,"(4, 6, 167106)","(4, 6, 167106)",False,1.0,"[0, 0, 3]"
+plume_native,final__spike_counts,"(6, 167106)","(6, 167106)",False,78.0,"[0, 0]"
+plume_native,final__spikes,"(6, 167106)","(6, 167106)",False,1.0,"[0, 82]"
+plume_native,final__v,"(6, 167106)","(6, 167106)",False,66.10061264038086,"[0, 0]"
+plume_native,plume,"(1000, 6, 7)","(1000, 6, 7)",False,17.876181840896606,"[41, 0, 0]"
+plume_native,spikes_cum,"(1000, 6)","(1000, 6)",False,37083.0,"[30, 0]"
+plume_torch,body,"(1000, 6, 14)","(1000, 6, 14)",False,93.98039531707764,"[92, 4, 0]"
+plume_torch,final__adapt,"(6, 167106)","(6, 167106)",False,25.243245244026184,"[0, 0]"
+plume_torch,final__drive,"(6, 167106)","(6, 167106)",False,70.0,"[0, 1]"
+plume_torch,final__g,"(6, 167106)","(6, 167106)",False,579.3850917816162,"[0, 0]"
+plume_torch,final__g_slow,"(6, 167106)","(6, 167106)",True,0.0,
+plume_torch,final__poisson_p,"(6, 167106)","(6, 167106)",False,0.0031972015276551247,"[0, 501]"
+plume_torch,final__rate,"(6, 167106)","(6, 167106)",False,130.96348190307617,"[0, 0]"
+plume_torch,final__refrac,"(6, 167106)","(6, 167106)",False,2.200000047683716,"[0, 106]"
+plume_torch,final__res,"(6, 167106)","(6, 167106)",False,0.38076692819595337,"[0, 82]"
+plume_torch,final__spike_buf,"(4, 6, 167106)","(4, 6, 167106)",False,1.0,"[0, 0, 710]"
+plume_torch,final__spike_counts,"(6, 167106)","(6, 167106)",False,84.0,"[0, 0]"
+plume_torch,final__spikes,"(6, 167106)","(6, 167106)",False,1.0,"[0, 218]"
+plume_torch,final__v,"(6, 167106)","(6, 167106)",False,110.67239761352539,"[0, 0]"
+plume_torch,plume,"(1000, 6, 7)","(1000, 6, 7)",False,19.79511547088623,"[97, 4, 0]"
+plume_torch,spikes_cum,"(1000, 6)","(1000, 6)",False,41225.0,"[60, 4]"
+raw_native,body,"(1000, 6, 14)","(1000, 6, 14)",False,86.9035247862339,"[5, 5, 0]"
+raw_native,final__adapt,"(6, 167106)","(6, 167106)",False,24.855687141418457,"[0, 0]"
+raw_native,final__drive,"(6, 167106)","(6, 167106)",False,70.0,"[0, 1]"
+raw_native,final__g,"(6, 167106)","(6, 167106)",False,746.8697242736816,"[0, 0]"
+raw_native,final__g_slow,"(6, 167106)","(6, 167106)",True,0.0,
+raw_native,final__poisson_p,"(6, 167106)","(6, 167106)",False,0.0026962701231241226,"[0, 7438]"
+raw_native,final__rate,"(6, 167106)","(6, 167106)",False,141.54285430908203,"[0, 0]"
+raw_native,final__refrac,"(6, 167106)","(6, 167106)",False,2.200000047683716,"[0, 0]"
+raw_native,final__res,"(6, 167106)","(6, 167106)",False,0.5013043284416199,"[0, 82]"
+raw_native,final__spike_buf,"(4, 6, 167106)","(4, 6, 167106)",False,1.0,"[0, 0, 0]"
+raw_native,final__spike_counts,"(6, 167106)","(6, 167106)",False,59.0,"[0, 0]"
+raw_native,final__spikes,"(6, 167106)","(6, 167106)",False,1.0,"[0, 48]"
+raw_native,final__v,"(6, 167106)","(6, 167106)",False,56.14608383178711,"[0, 0]"
+raw_native,spikes_cum,"(1000, 6)","(1000, 6)",False,49326.0,"[4, 5]"
+raw_torch,body,"(1000, 6, 14)","(1000, 6, 14)",False,78.60181617736816,"[137, 0, 0]"
+raw_torch,final__adapt,"(6, 167106)","(6, 167106)",False,23.61965799331665,"[0, 0]"
+raw_torch,final__drive,"(6, 167106)","(6, 167106)",False,70.0,"[0, 1]"
+raw_torch,final__g,"(6, 167106)","(6, 167106)",False,450.2055473327637,"[0, 0]"
+raw_torch,final__g_slow,"(6, 167106)","(6, 167106)",True,0.0,
+raw_torch,final__poisson_p,"(6, 167106)","(6, 167106)",False,0.0007878318428993225,"[0, 7438]"
+raw_torch,final__rate,"(6, 167106)","(6, 167106)",False,127.27046966552734,"[0, 0]"
+raw_torch,final__refrac,"(6, 167106)","(6, 167106)",False,2.200000047683716,"[0, 257]"
+raw_torch,final__res,"(6, 167106)","(6, 167106)",False,0.3969188332557678,"[0, 82]"
+raw_torch,final__spike_buf,"(4, 6, 167106)","(4, 6, 167106)",False,1.0,"[0, 0, 639]"
+raw_torch,final__spike_counts,"(6, 167106)","(6, 167106)",False,86.0,"[0, 0]"
+raw_torch,final__spikes,"(6, 167106)","(6, 167106)",False,1.0,"[0, 473]"
+raw_torch,final__v,"(6, 167106)","(6, 167106)",False,100.10490417480469,"[0, 0]"
+raw_torch,spikes_cum,"(1000, 6)","(1000, 6)",False,37865.0,"[86, 0]"

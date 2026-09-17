@@ -1,0 +1,79 @@
+{
+ "batch": "cx9",
+ "seeds": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "turn_deg_s": 90.0,
+ "turn_window_s": "0.5:3.5",
+ "arms": {
+  "S": {
+   "instrument": null,
+   "role": "raw reference (cx8r's S, re-run)",
+   "preset": "raw",
+   "instruments": []
+  },
+  "V": {
+   "instrument": "sided_turn_afferent:k=0.5",
+   "role": "the afferent alone (cx8r's V, re-run)",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent"
+   ]
+  },
+  "V-": {
+   "instrument": "sided_turn_afferent:k=0.5:sign=-1",
+   "role": "the sign-flipped afferent alone",
+   "preset": "instrumented",
+   "instruments": [
+    "sided_turn_afferent"
+   ]
+  }
+ },
+ "family": [
+  [
+   "1_GLNO_LR_V-_vs_S",
+   "GLNO_LR_hz",
+   "V-",
+   "S",
+   "negative"
+  ],
+  [
+   "2_GLNO_LR_V_vs_V-",
+   "GLNO_LR_hz",
+   "V",
+   "V-",
+   "positive"
+  ],
+  [
+   "3_PS196b_LR_V_vs_V-",
+   "PS196b_LR_hz",
+   "V",
+   "V-",
+   "negative"
+  ]
+ ],
+ "generated_utc": "2026-09-17T23:43:38Z",
+ "gpu_pool": "4,5,6,7",
+ "node": "<cluster-node-2>",
+ "status": "DRAFT, not submitted",
+ "protocol": {
+  "gE": 1.0,
+  "gD": 1.0,
+  "gR": 1.0,
+  "delta7_pen": true,
+  "background_hz": 10.0,
+  "pulse_hz": 40.0,
+  "pulse_s": 2.0,
+  "seconds_after": 5.0,
+  "width": 4,
+  "start_wedge": 0,
+  "settle_s": 1.0,
+  "receptor_model": "sign",
+  "receptor_net_rule": "abs"
+ }
+}
