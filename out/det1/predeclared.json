@@ -89,12 +89,12 @@
       "line": "mkdir -p out/det1 && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( PYTHONIOENCODING=utf-8 python scripts/determinism_gate.py room --config raw --path torch --seconds 10 --seed 0 --out out/det1/raw_torch_r1 > out/det1/raw_torch_r1.txt 2>&1 && PYTHONIOENCODING=utf-8 python scripts/determinism_gate.py room --config raw --path torch --seconds 10 --seed 0 --out out/det1/raw_torch_r2 > out/det1/raw_torch_r2.txt 2>&1 ); st=\\$?; tail -3 out/det1/raw_torch_r1.txt; tail -3 out/det1/raw_torch_r2.txt; exit \\$st"
     }
   ],
-  "generated_utc": "2026-09-17T23:14:05Z",
+  "generated_utc": "2026-09-17T23:17:01Z",
   "status": "PREDECLARED, not submitted",
   "written_before_submission": true,
-  "stamped_utc": "2026-09-17T23:14:57Z",
-  "batch_sha256": "932f0a6d9a982209a13fbefbc09b55039f07cac1c3b33477084bc62df1ddd842",
-  "jobs_sha256": "d1157101f3aeb05c106042500cd58c89c9c3683366ceeea17a3757a0cd80186a",
+  "stamped_utc": "2026-09-17T23:17:01Z",
+  "batch_sha256": "553ec9cca8ddf9bd52b409808e72e01df66e68c285ca1fd3a64b8f1fa9947f65",
+  "jobs_sha256": "0525882f4f6f4cbb817ea9f05d661d2951da3574963a1a575f8d19e93a071de6",
   "source_sha256_lf": {
     "flyverse/__init__.py": "db45a1ea8b389fae15f287586f8fed65dfdb7e711a0bb5dc297d837d0b85b8e9",
     "flyverse/air.py": "e65a94d9789b5695cbdfcf5ff763fc375692c461978a7d0758f6954eb41fe52a",
@@ -167,7 +167,7 @@
     "flyverse/world.py": "f7720104aa85024dc42efd31b19d476a53d69593c08b724c642f9c70ebc9e6c6",
     "scripts/cluster_run.py": "b66edac095883459cd2f01b5e0764d1c8311b850c6ac6445d5b13fba3119bfcf",
     "scripts/cx_wedge.py": "18f7fb47bbcb2be5a3b6fc47ad982de820855d39906fd3bcbdb49b896e13fb7c",
-    "scripts/determinism_gate.py": "cf923831835b81b39a0693e5439e47a397e6125c7700c893021ce76f93eb89fa",
+    "scripts/determinism_gate.py": "22a06b3c93ac8924c2e314177700b757e8c5bcf4ab38187b79204209731ed2eb",
     "scripts/probe_compass_room.py": "b8f9e10767f6f4b60c895c83f574e2965da3b1f0d702326eec476395438b3cbb"
   },
   "comparison_rule": {

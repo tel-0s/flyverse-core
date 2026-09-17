@@ -89,6 +89,6 @@
    "line": "mkdir -p out/det1 && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && ( PYTHONIOENCODING=utf-8 python scripts/determinism_gate.py room --config raw --path torch --seconds 10 --seed 0 --out out/det1/raw_torch_r1 > out/det1/raw_torch_r1.txt 2>&1 && PYTHONIOENCODING=utf-8 python scripts/determinism_gate.py room --config raw --path torch --seconds 10 --seed 0 --out out/det1/raw_torch_r2 > out/det1/raw_torch_r2.txt 2>&1 ); st=\\$?; tail -3 out/det1/raw_torch_r1.txt; tail -3 out/det1/raw_torch_r2.txt; exit \\$st"
   }
  ],
- "generated_utc": "2026-09-17T23:14:05Z",
+ "generated_utc": "2026-09-17T23:17:01Z",
  "status": "DRAFT, not submitted"
 }
