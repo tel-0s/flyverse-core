@@ -294,12 +294,16 @@ class HungerGain(NeuralInstrument):
 
     name = "hunger"
     requires_any = ("plume", "flight")
-    body_input = ("normalized energy and the sated flag through FlyBrain.interoception -> observe_internal; "
-                  "no neural read and no neural write of its own")
-    effect_route = ("gain = (1-energy)*(not sated) is read by the sibling instruments that bind it: it scales plume's "
-                   "signed turn demand into the PFL3 Poisson input and flight's lift request. Without this instrument "
-                   "those consumers use gain 1. The value is written only by observe_internal, never during a step, so "
-                   "attachment order cannot change a frame's result")
+    body_input = (
+        "normalized energy and the sated flag through FlyBrain.interoception -> observe_internal; "
+        "no neural read and no neural write of its own"
+    )
+    effect_route = (
+        "gain = (1-energy)*(not sated) is read by the sibling instruments that bind it: it scales plume's "
+        "signed turn demand into the PFL3 Poisson input and flight's lift request. Without this instrument "
+        "those consumers use gain 1. The value is written only by observe_internal, never during a step, so "
+        "attachment order cannot change a frame's result"
+    )
     gap = "the environment metabolism is not reported to navigation circuits"
     removal = "a sourced metabolic transducer with verified target cells and dynamics"
     sources: ClassVar[list] = ["https://doi.org/10.1016/j.cell.2011.02.008"]
@@ -324,6 +328,48 @@ class HungerGain(NeuralInstrument):
         return {}
 
 
+def bilateral_orn_groups(c):
+    """Matched-glomerulus antenna rates, using the smell transducer's side assignments.
+
+    Weight glomerulus g by nL*nR/(nL+nR), then divide its weight among each side's
+    cells. Equal stimulation has zero expected difference even with unequal cell
+    counts. These fixed weights minimize variance for equal independent cell rates;
+    they are an engineering pooling rule, not a fitted biological decoder.
+    """
+    from .senses import Smell
+
+    smell = Smell(c)
+    groups, weights = {}, {}
+    table = []
+    for glom in sorted(set(smell.glom)):
+        counts = [
+            int(((smell.glom == glom) & (smell.side == sign)).sum()) for sign in (1, -1)
+        ]
+        if min(counts) > 0:
+            table.append(
+                {
+                    "glomerulus": str(glom),
+                    "left": counts[0],
+                    "right": counts[1],
+                    "mass": counts[0] * counts[1] / sum(counts),
+                }
+            )
+    if not table:
+        raise ValueError(
+            "plume bilateral=orn requires matched left/right antennal ORN groups"
+        )
+    total = sum(row["mass"] for row in table)
+    for side, sign, key in (("L", 1, "left"), ("R", -1, "right")):
+        indices, values = [], []
+        for row in table:
+            ix = smell.orn_idx[(smell.glom == row["glomerulus"]) & (smell.side == sign)]
+            indices.extend(ix.tolist())
+            values.extend([row["mass"] / total / row[key]] * len(ix))
+        groups[side] = np.asarray(indices, dtype=np.int64)
+        weights[side] = np.asarray(values, dtype=np.float32)[:, None]
+    return groups, weights, table
+
+
 class PlumeNavigation(NeuralInstrument):
     """Wind/odor goals, local walking gradients, and the published PFL3 comparator.
 
@@ -334,14 +380,18 @@ class PlumeNavigation(NeuralInstrument):
 
     name = "plume"
     requires_any = ("compass", "compass_ring")
-    body_input = ("held antennal deflections (dL, dR) through FlyBrain.wind -> observe_wind; held bilateral glomerular "
-                  "concentrations through FlyBrain.smell -> observe_smell; airborne / feeding flags through "
-                  "FlyBrain.interoception -> observe_internal; plus hunger.level when the hunger instrument is named. "
-                  "No world heading, wind angle, source position or distance")
-    effect_route = ("wind and smell set the goal (upwind, entry memory, or heading + atan(0.1 m * bilateral log-gradient)); "
-                   "the goal and the biological EPG heading drive the PFL3 comparator, gated by the LH odor channels, the "
-                   "interoception flags and hunger.level, and closed on measured DNa02 L-R; the output is Poisson Hz on "
-                   "biological PFL3 soma-L/R and DNp09")
+    body_input = (
+        "held antennal deflections (dL, dR) through FlyBrain.wind -> observe_wind; held bilateral glomerular "
+        "concentrations through FlyBrain.smell -> observe_smell; airborne / feeding flags through "
+        "FlyBrain.interoception -> observe_internal; plus hunger.level when the hunger instrument is named. "
+        "No world heading, wind angle, source position or distance"
+    )
+    effect_route = (
+        "wind and smell set the goal (upwind, entry memory, or heading + atan(0.1 m * bilateral log-gradient)); "
+        "the goal and the biological EPG heading drive the PFL3 comparator, gated by the LH odor channels, the "
+        "interoception flags and hunger.level, and closed on measured DNa02 L-R; the output is Poisson Hz on "
+        "biological PFL3 soma-L/R and DNp09"
+    )
     gap = "heading, odor and wind signals lack a functional goal-memory/steering bridge"
     removal = (
         "native odor/wind goal memory and PFL3 steering pass the same sensory controls"
@@ -372,8 +422,13 @@ class PlumeNavigation(NeuralInstrument):
     }
     state_flags = ("inside", "seen", "airborne", "feeding", "smell_observed")
 
-    def __init__(self, c):
+    def __init__(self, c, *, bilateral="concentration", feedback=True):
+        if bilateral not in ("concentration", "orn"):
+            raise ValueError("plume bilateral must be concentration or orn")
+        if not isinstance(feedback, bool):
+            raise TypeError("plume feedback must be a boolean")
         super().__init__(c)
+        self.bilateral_source, self.feedback = bilateral, feedback
         from .motor import LH_ODOUR_CHANNELS
 
         idx, w = epg_columns(c)
@@ -434,6 +489,41 @@ class PlumeNavigation(NeuralInstrument):
             "policy_source": "unverified engineering; bilateral turn sign motivated by Gaudry 2013 Fig 1",
         }
         self.hunger = None
+        if bilateral == "orn":
+            groups, self._orn_weights, table = bilateral_orn_groups(c)
+            self.reads.update({"antenna_" + side: ix for side, ix in groups.items()})
+            # Do not expose a physical concentration receiver in this mode.
+            self.observe_smell = None
+            self.body_input = (
+                "bilateral cue: brain.rate on antennal ORNs at the frame boundary, with matched-glomerulus "
+                "population weights; no physical concentration read. Held deflections through observe_wind; "
+                "airborne/feeding through observe_internal; optional hunger.level; EPG/LH/DNa02 neural rates"
+            )
+            self.effect_route = (
+                "walking goal = heading + atan(200 * atanh(filtered ORN population rate contrast)); "
+                "airborne or zero-rate fallback uses wind/entry memory; existing PFL3 comparator and DNa02 feedback"
+            )
+            self.parameters.update(
+                {
+                    "bilateral_source": "brain.rate: matched antennal ORN population means L-R",
+                    "orn_pooling": "glomerulus mass nL*nR/(nL+nR), normalized; equal mass per side",
+                    "orn_glomeruli": table,
+                    "rate_contrast_gain": 200.0,
+                    "rate_contrast_gain_status": "unverified; inherited small-contrast response slope, not concentration inversion",
+                    "walking_goal": "heading + atan(200 * atanh(EMA_0.25s((rL-rR)/(rL+rR))))",
+                    "smell_input": "brain.rate only; no observe_smell receiver or inverse ORN transduction",
+                }
+            )
+            del (
+                self.parameters["antenna_separation_m"],
+                self.parameters["gradient_length_m"],
+            )
+        if not feedback:
+            self.parameters["steering_integral_gain_per_s"] = 0.0
+            self.parameters["steering_feedback"] = (
+                "disabled: goal-only control, 80*turn PFL3 input"
+            )
+            self.effect_route += "; DNa02 feedback disabled: goal-only control"
 
     def bind_instruments(self, instruments):
         self.hunger = instruments.get("hunger")
@@ -441,9 +531,16 @@ class PlumeNavigation(NeuralInstrument):
     def describe(self):
         record = super().describe()
         record["audits"].append("docs/audits/plume_steering.md")
+        if self.bilateral_source == "orn" or not self.feedback:
+            record["audits"].append("docs/audits/plume_transduced.md")
         return record
 
     def initialize(self):
+        if self.bilateral_source == "orn":
+            self.orn_weights = {
+                side: torch.as_tensor(w, device=self.device)
+                for side, w in self._orn_weights.items()
+            }
         self.epg_weights = torch.as_tensor(
             self._epg_weights, dtype=torch.float32, device=self.device
         )
@@ -594,6 +691,9 @@ class PlumeNavigation(NeuralInstrument):
         # A bilateral gradient provides a local walking goal when physical smell samples
         # are available. The wind/memory policy remains the fallback and airborne policy.
         # Scale first to avoid overflow in L+R; contrast is invariant to common amplitude.
+        if self.bilateral_source == "orn":
+            self.odor_L.copy_(inputs["antenna_L"] @ self.orn_weights["L"])
+            self.odor_R.copy_(inputs["antenna_R"] @ self.orn_weights["R"])
         scale = torch.maximum(self.odor_L, self.odor_R).clamp_min(1e-12)
         l, r = self.odor_L / scale, self.odor_R / scale
         contrast = (l - r) / (l + r).clamp_min(1e-12)
@@ -601,19 +701,28 @@ class PlumeNavigation(NeuralInstrument):
             contrast, 1 - math.exp(-dt / self.parameters["bilateral_tau_s"])
         )
         # log(L/R) = 2*atanh((L-R)/(L+R)); one-sided input has a bounded limiting goal.
-        gradient = (
-            2
-            * torch.atanh(self.bilateral.clamp(-0.999, 0.999))
-            / self.parameters["antenna_separation_m"]
-        )
-        local_goal = self.heading + torch.atan(
-            self.parameters["gradient_length_m"] * gradient
-        )
-        local = (
-            (self.smell_observed > 0)
-            & (self.airborne == 0)
-            & (torch.maximum(self.odor_L, self.odor_R) > 1e-12)
-        )
+        if self.bilateral_source == "orn":
+            local_goal = self.heading + torch.atan(
+                self.parameters["rate_contrast_gain"]
+                * torch.atanh(self.bilateral.clamp(-0.999, 0.999))
+            )
+        else:
+            gradient = (
+                2
+                * torch.atanh(self.bilateral.clamp(-0.999, 0.999))
+                / self.parameters["antenna_separation_m"]
+            )
+            local_goal = self.heading + torch.atan(
+                self.parameters["gradient_length_m"] * gradient
+            )
+        if self.bilateral_source == "orn":
+            local = (self.airborne == 0) & (torch.maximum(self.odor_L, self.odor_R) > 1e-12)
+        else:
+            local = (
+                (self.smell_observed > 0)
+                & (self.airborne == 0)
+                & (torch.maximum(self.odor_L, self.odor_R) > 1e-12)
+            )
         self.goal.copy_(torch.where(local, local_goal, self.goal))
         rates = _pfl3(self.heading, self.goal, self.hpref, self.gpref)
         # With the paper's negated preferred-angle arrays, R-L follows positive goal error.
@@ -653,6 +762,8 @@ class PlumeNavigation(NeuralInstrument):
                 0.0,
             )
         )
+        if not self.feedback:
+            self.steer_integral.zero_()
         self.steer_input.copy_(
             torch.where(enabled, (base + self.steer_integral).clamp(-80, 80), 0.0)
         )
@@ -673,12 +784,16 @@ class FlightDrive(NeuralInstrument):
     """
 
     name = "flight"
-    body_input = ("normalized energy and the sated / airborne / feeding flags through FlyBrain.interoception -> "
-                  "observe_internal, plus hunger.level when the hunger instrument is named; no altitude, world position "
-                  "or fruit distance")
-    effect_route = ("energy and the flags drive the reserve / bout / ground-search / landing policy and hunger.level "
-                   "scales the lift request; the LH berry/apple rates supply the odor interruption; the output is Poisson "
-                   "Hz on the biological wing power and steering MNs")
+    body_input = (
+        "normalized energy and the sated / airborne / feeding flags through FlyBrain.interoception -> "
+        "observe_internal, plus hunger.level when the hunger instrument is named; no altitude, world position "
+        "or fruit distance"
+    )
+    effect_route = (
+        "energy and the flags drive the reserve / bout / ground-search / landing policy and hunger.level "
+        "scales the lift request; the LH berry/apple rates supply the odor interruption; the output is Poisson "
+        "Hz on the biological wing power and steering MNs"
+    )
     gap = "wing power cannot sustain level flight and the walking steering readout does not control wings"
     removal = "validated descending/VNC flight-state and steering mechanisms supply the same control"
     sources: ClassVar[list] = ["https://pmc.ncbi.nlm.nih.gov/articles/PMC9206711/"]

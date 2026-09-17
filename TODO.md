@@ -393,7 +393,7 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
 **Instrumented-preset follow-ups (2026-09-17, from the four independent skeptic passes).** All five are
 questions, not plans; none of them is authorized as a batch yet, and none licenses an adoption.
 
-- [ ] **A goal-only plume arm, with no DNa02 feedback.** No such arm exists. Mean |demand| did not rise between
+- [ ] **A goal-only plume arm, with no DNa02 feedback.** Available as `plume:feedback=off`; rooms pending. Mean |demand| did not rise between
       the diagnostic and the validation (0.057-0.074 -> 0.036-0.083) while mean |yaw| tripled (0.038-0.067 ->
       0.106-0.245 rad/s), so the feedback bridge looks like the load-bearing change -- but that is an inference,
       and a goal-only arm is what would measure it. Same rooms, same seeds, feedback off.
@@ -402,6 +402,8 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       0.26-0.57 %. Through the model's own ORN law (1 + 150c/(c+0.5)) that is ~0.1 Hz per ORN, under the Poisson
       noise of the 0.25 s window. The question: does a law that reads the ORN RATES still find food? If not, the
       200x gradient is doing the navigating and the instrument should say so in one sentence.
+      CPU implementation/characterization: `plume:bilateral=orn`, [audit](docs/audits/plume_transduced.md).
+      The 18-run full/transduced/goal-only comparison is prepared, not submitted; await pool release.
 - [ ] **A V- arm for the GLNO sign.** Round 7 declared no sign-flipped counterpart of V, and in the held arms
       GLNO L-R does not reverse (+0.6862 +- 1.9132 Hz, positive in four of six seeds), so primary 3's sign
       specificity is untested where it was measured. One arm: the afferent at k 0.5, sign -1, no hold, no relabel.
