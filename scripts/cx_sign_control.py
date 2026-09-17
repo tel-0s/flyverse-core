@@ -62,6 +62,28 @@ GPU_POOL = "4,5,6,7"
 MAX_JOBS_PER_CALL = 24
 
 
+def stale_sources(fp: dict, frozen_lf: dict) -> tuple[list, dict]:
+    """(files the run loaded whose content is NOT the predeclared tree's, every hash the run recorded).
+
+    The frozen hashes are LF-normalised. The fingerprint's `files_lf` is too, but `files_loaded` (the probe scripts the
+    process really imported) is a raw hash, and a Windows checkout ships those files as CRLF bytes -- so a loaded file
+    also passes when the local copy still has the frozen LF hash and the loaded hash is that copy's raw bytes."""
+    loaded = dict(fp.get("files", {})); loaded.update(fp.get("files_lf", {}))
+    for f, h in fp.get("files_loaded", {}).items():
+        loaded.setdefault(f, h)
+    stale = []
+    for f, h in loaded.items():
+        if f not in frozen_lf or frozen_lf[f] == h:
+            continue
+        local = ROOT / f
+        if local.is_file():
+            raw = local.read_bytes()
+            if hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest() == frozen_lf[f] and hashlib.sha256(raw).hexdigest() == h:
+                continue                                       # the frozen content, shipped with CRLF line endings
+        stale.append(f)
+    return sorted(stale), loaded
+
+
 def expected(label):
     for a in ARMS:
         if a[0] == label:
@@ -180,15 +202,10 @@ def load_runs(runs_dir: Path, frozen: dict | None, arms=ARMS, seeds=range(6), st
                         bad.append("resolved LIF differs from frozen protocol")
                     if not str(row["device_name"] or "").startswith("NVIDIA"):
                         bad.append("no CUDA device name in provenance")
-                    fp = prov.get("source_fingerprint", {})
-                    loaded = dict(fp.get("files", {})); loaded.update(fp.get("files_lf", {}))
-                    for f, h in fp.get("files_loaded", {}).items():
-                        loaded.setdefault(f, h)
-                    want = (frozen or {}).get("source_sha256_lf", {})
-                    stale = sorted(f for f, h in loaded.items() if f in want and want[f] != h)
+                    stale, loaded = stale_sources(prov.get("source_fingerprint", {}), (frozen or {}).get("source_sha256_lf", {}))
                     if stale:
                         bad.append(f"loaded source differs from the predeclared tree: {stale[:4]}")
-                    if want and not loaded:
+                    if frozen and not loaded:
                         bad.append("missing source fingerprint")
                 if (arm, seed) in identities:
                     bad.append("duplicate arm/seed")

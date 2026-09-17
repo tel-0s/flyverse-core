@@ -365,14 +365,9 @@ def analyse(runs_dir: Path, out_dir: Path):
         # the code the run LOADED is the predeclared tree, file for file (a target checkout behind origin/main runs its
         # own stale copy of every file outside the shipped diff; cluster_run.py --ship names what must be copied)
         want = (frozen or {}).get("source_sha256_lf", {})
+        from cx_sign_control import stale_sources          # the LF / shipped-CRLF rule, shared by the round-8 analyses
         for i, r in enumerate((ra, rb)):
-            fp = r.get("provenance", {}).get("source_fingerprint", {})
-            # the frozen hashes are LF-normalised (a Windows checkout ships CRLF bytes): compare files_lf where the
-            # fingerprint carries it, the raw hash otherwise
-            loaded = dict(fp.get("files", {})); loaded.update(fp.get("files_lf", {}))
-            for f, h in fp.get("files_loaded", {}).items():
-                loaded.setdefault(f, h)
-            stale = sorted(f for f, h in loaded.items() if f in want and want[f] != h)
+            stale, loaded = stale_sources(r.get("provenance", {}).get("source_fingerprint", {}), want)
             if stale:
                 bad.append(f"r{i + 1} loaded {len(stale)} file(s) that differ from the predeclared tree: {stale[:6]}")
             if want and not loaded:

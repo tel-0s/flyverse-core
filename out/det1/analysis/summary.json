@@ -162,6 +162,6 @@
   "backend_check": "every run's provenance.execution.backend must carry the flags the plan names for its path (cuda_kernels / event_driven / cuda_sparse) and provenance.execution.device must start with cuda; a mismatch invalidates the pair"
  },
  "stamped_utc": "2026-09-17T23:31:08Z",
- "analysis_sha256": "857a2ea6470d357f7d996251051471d65ebbee052da3891d02cde5a57882d3ff",
- "created_utc": "2026-09-17T23:39:38Z"
+ "analysis_sha256": "fbcd498f7e28295815ea6c5a7849121de9e39d494d40f0fce1fed4807fdc367e",
+ "created_utc": "2026-09-17T23:49:54Z"
 }
