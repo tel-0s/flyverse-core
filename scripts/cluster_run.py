@@ -57,8 +57,11 @@ warned about at submit time.
 Options: --targets a,b,c / --target x, --minutes (estimate, default 30), --no-wait, --priority, --node, --tags,
 --gpu-ids 4,5,6,7 (a POOL of GPU indices on the --node: every job is submitted with `gpus: 1` and `gpu_ids: [one id]`,
 the ids dealt round-robin over the pool in command order, so no job can land on another GPU -- the scheduler treats
-`gpu_ids` as a strict pin; `vram_gb` stays as configured, so several pinned jobs still share one GPU), --poll seconds,
---sync-only, --allow-bare-fetch, --arm-block, --arm-block-map, --balance-blocks / --no-balance-blocks. Run directories are kept on each target (results and logs stay there under the printed paths).
+`gpu_ids` as a strict pin; `vram_gb` stays as configured, so several pinned jobs still share one GPU), --ship
+PATH[,PATH...] (also copy every tracked file under these paths over the run copy whether or not it differs from
+origin/main here: a target checkout that is behind origin/main otherwise runs its stale copy of every file outside
+the diff), --poll seconds, --sync-only, --allow-bare-fetch, --arm-block, --arm-block-map, --balance-blocks /
+--no-balance-blocks. Run directories are kept on each target (results and logs stay there under the printed paths).
 See docs/CLUSTER.md section 14.
 """
 from __future__ import annotations
@@ -193,13 +196,24 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout
 
 
-def ship_list() -> list[str]:
+def ship_list(extra: list[str] | None = None) -> list[str]:
+    """The files that differ from origin/main here, plus every TRACKED file under each `extra` path (--ship): a target
+    whose checkout is behind origin/main runs the stale copy of any file that is not in the diff, so a batch that must
+    run this tree's package names it (`--ship flyverse`), and the files are copied whether or not they differ."""
     files = set()
     try:
         files |= set(git("diff", "--name-only", "origin/main", "HEAD").split())
     except subprocess.CalledProcessError:
         pass                                                           # no origin/main: ship the working tree diff only
     files |= set(git("ls-files", "-m", "-o", "--exclude-standard").split())
+    for p in extra or []:
+        p = p.strip().strip("/").replace("\\", "/")
+        if not p:
+            continue
+        listed = git("ls-files", "--", p).split()
+        if not listed:
+            sys.exit(f"--ship {p}: no tracked file under that path")
+        files |= set(listed)
     return sorted(f for f in files if os.path.isfile(os.path.join(ROOT, f)))
 
 
@@ -667,6 +681,9 @@ def main() -> int:
     ap.add_argument("--minutes", type=int, default=30)
     ap.add_argument("--priority", type=int, default=40)
     ap.add_argument("--node", default=None)
+    ap.add_argument("--ship", default=None, metavar="PATH[,PATH...]",
+                    help="also copy every tracked file under these paths over the run copy, whether or not it differs from "
+                         "origin/main here (a target checkout behind origin/main otherwise runs its stale copy), e.g. --ship flyverse")
     ap.add_argument("--gpu-ids", default=None, metavar="ID[,ID...]",
                     help="a pool of GPU indices on the --node: every job is submitted with gpus 1 and gpu_ids [one id], dealt "
                          "round-robin over the pool in command order (a strict pin in the scheduler: no job can land on another "
@@ -742,7 +759,8 @@ def main() -> int:
                 t.load = 0
 
     # 2. ship the local diff to every selected target, in parallel
-    files = ship_list()
+    extra = [p for p in (args.ship or "").split(",") if p.strip()]
+    files = ship_list(extra) if extra else ship_list()
     tarball = make_tarball(files) if files else None
     ship_all([t for t in sel if t.ok], run, tarball, files)
     sel_ok = [t for t in sel if t.ok]

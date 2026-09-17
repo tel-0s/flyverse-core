@@ -92,7 +92,7 @@
   "generated_utc": "2026-09-17T23:17:01Z",
   "status": "PREDECLARED, not submitted",
   "written_before_submission": true,
-  "stamped_utc": "2026-09-17T23:17:01Z",
+  "stamped_utc": "2026-09-17T23:31:08Z",
   "batch_sha256": "553ec9cca8ddf9bd52b409808e72e01df66e68c285ca1fd3a64b8f1fa9947f65",
   "jobs_sha256": "0525882f4f6f4cbb817ea9f05d661d2951da3574963a1a575f8d19e93a071de6",
   "source_sha256_lf": {
@@ -165,9 +165,9 @@
     "flyverse/senses.py": "bc6a47fad929eb13a15647971d10e50cea86aa15fee16e767c367cfe9b89e59e",
     "flyverse/surfaces.py": "3523da0637f988ab62d40127d03e0217c4820a06640a98c38cf8de9f73aa8920",
     "flyverse/world.py": "f7720104aa85024dc42efd31b19d476a53d69593c08b724c642f9c70ebc9e6c6",
-    "scripts/cluster_run.py": "b66edac095883459cd2f01b5e0764d1c8311b850c6ac6445d5b13fba3119bfcf",
+    "scripts/cluster_run.py": "cc9767a8ec0385d302dd28d8c3e53c3569bf4c78760facf97a1371998e1a4342",
     "scripts/cx_wedge.py": "18f7fb47bbcb2be5a3b6fc47ad982de820855d39906fd3bcbdb49b896e13fb7c",
-    "scripts/determinism_gate.py": "22a06b3c93ac8924c2e314177700b757e8c5bcf4ab38187b79204209731ed2eb",
+    "scripts/determinism_gate.py": "374f6b196f9c0697dd662123df1a79c95e992a4d36cba23fe05843baebf17648",
     "scripts/probe_compass_room.py": "b8f9e10767f6f4b60c895c83f574e2965da3b1f0d702326eec476395438b3cbb"
   },
   "comparison_rule": {

@@ -763,6 +763,26 @@ class GpuPoolTests(unittest.TestCase):
             self.assertEqual(h.submitted, [], bad)
             self.assertEqual(calls["ssh"], [], bad)                         # nothing was shipped
 
+    def test_ship_adds_every_tracked_file_under_the_path_even_when_it_matches_origin(self):
+        # ship_list with no extra: whatever git reports (patched to nothing here); with --ship flyverse: every tracked
+        # file under flyverse/, whether or not it differs from origin/main -- the point of the flag is a target checkout
+        # that is behind origin/main and would otherwise run its stale copy of any file outside the diff.
+        tracked = {("ls-files", "--", "flyverse"): "flyverse/a.py\nflyverse/sub/b.py\n",
+                   ("ls-files", "--", "nothing"): ""}
+
+        def fake_git(*args):
+            if args[0] == "diff":
+                return ""
+            if args == ("ls-files", "-m", "-o", "--exclude-standard"):
+                return "scripts/x.py\n"
+            return tracked.get(args, "")
+        with patch.object(cr, "git", fake_git), patch.object(cr.os.path, "isfile", lambda p: True):
+            self.assertEqual(cr.ship_list(), ["scripts/x.py"])
+            self.assertEqual(cr.ship_list(["flyverse"]), ["flyverse/a.py", "flyverse/sub/b.py", "scripts/x.py"])
+            self.assertEqual(cr.ship_list(["flyverse/", " flyverse "]), ["flyverse/a.py", "flyverse/sub/b.py", "scripts/x.py"])
+            with self.assertRaises(SystemExit):
+                cr.ship_list(["nothing"])
+
     def test_parse_gpu_ids(self):
         self.assertIsNone(cr.parse_gpu_ids(None))
         self.assertEqual(cr.parse_gpu_ids("4,5,6,7"), [4, 5, 6, 7])

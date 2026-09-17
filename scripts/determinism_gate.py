@@ -362,6 +362,17 @@ def analyse(runs_dir: Path, out_dir: Path):
         devnames = [p.get("device_name") for p in prov]
         if len(set(devnames)) != 1:
             bad.append(f"device names differ {devnames}")
+        # the code the run LOADED is the predeclared tree, file for file (a target checkout behind origin/main runs its
+        # own stale copy of every file outside the shipped diff; cluster_run.py --ship names what must be copied)
+        want = (frozen or {}).get("source_sha256_lf", {})
+        for i, r in enumerate((ra, rb)):
+            fp = r.get("provenance", {}).get("source_fingerprint", {})
+            loaded = dict(fp.get("files", {})); loaded.update(fp.get("files_loaded", {}))
+            stale = sorted(f for f, h in loaded.items() if f in want and want[f] != h)
+            if stale:
+                bad.append(f"r{i + 1} loaded {len(stale)} file(s) that differ from the predeclared tree: {stale[:6]}")
+            if want and not loaded:
+                bad.append(f"r{i + 1} has no source fingerprint")
         problems.extend(f"{label}: {b}" for b in bad)
         arrays_equal = all(r["equal"] for r in arr) and bool(arr)
         verdict = "invalid" if bad else ("repeats exactly" if (arrays_equal and n_eq == n_m) else "one draw")
