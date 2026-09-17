@@ -7,8 +7,9 @@
     PYTHONIOENCODING=utf-8 python scripts/cx_velocity_route.py --analyse --runs out/cx8 --out out/cx8/analysis
         -> runs.csv (one row per run with its checks), per_seed.csv (arm, key, seeds, values: the per-seed lists every
            quoted number is pasted from, docs/INTERP.md 10.4 rule 28), compare.csv (the six predeclared measures,
-           `common.compare` 6 v 6 exact U with Holm over the family of m = 6), descriptive.csv (per arm mean / sd / n
-           of every key: bump survival / rate / width, the k sweep, the L-R of every group) and analysis.md.
+           `common.compare` 6 v 6 exact U with Holm over the family of m = 6), descriptive.csv (the per-arm MEAN pivot
+           of every key -- bump survival / rate / width, the k sweep, the L-R of every group -- which is the table
+           analysis.md renders; the per-seed values with their sd and n are in per_seed.csv) and analysis.md.
     PYTHONIOENCODING=utf-8 python scripts/cx_velocity_route.py --analyse --runs out/cx6 --out out/cx6/analysis_cx8_pathcheck \\
         --label "PATH CHECK on cx6 runs: NOT cx8" --alias HG=H3 --alias HGV=H3G
         -> the same files on another batch's runs, every file headed by the label; `--alias NEW=OLD` maps that batch's
@@ -405,7 +406,9 @@ def analyse(runs_dir: Path, out_dir: Path, label: str | None, alias: dict):
                             n=int(np.isfinite(vals).sum())))
     per_df = pd.DataFrame(per); per_df.to_csv(out_dir / "per_seed.csv", index=False)
     desc = per_df.pivot_table(index="arm", columns="key", values="mean", aggfunc="first").reindex([a[0] for a in ARMS if a[0] in set(df.arm)])
-    per_df.to_csv(out_dir / "descriptive.csv", index=False)
+    # descriptive.csv is the per-arm mean pivot the analysis.md table renders (one row per arm, one column per key).
+    # The per-seed values, their SD and n stay in per_seed.csv; this file used to be a byte copy of it.
+    desc.to_csv(out_dir / "descriptive.csv", index=True)
     # the predeclared family
     comp = []
     for name, key, a, b in FAMILY:

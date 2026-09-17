@@ -134,6 +134,9 @@ class CompassDriver:
 
     def describe(self):
         return dict(name=self.name, kind=self.kind, law='unverified',
+                    # A program-shaped stand-in: it replaces the compass COMPUTATION, not a missing input, and is
+                    # admitted as an instrument only under PRESETS_SPEC section 5 (owner extension).
+                    replaces='computation',
                     **{'class': 'flyverse.compass:CompassDriver'}, trainable=False, checkpoint_hash=None,
                     parameters=dict(peak_hz=self.peak_hz, width_deg=self.width_deg,
                                     initial_phase_deg=self.initial_phase_deg, velocity_gain=self.velocity_gain),

@@ -210,8 +210,10 @@ class FlyBrain:
         if is_instrument:
             from .instruments import _check_instrument
             _check_instrument(module)
-            if self.preset != module.required_preset or module.name in self.instruments:
-                raise ValueError("module instrument requires its named preset and a unique instrument name")
+            # No instrument attaches under 'raw', whatever preset the object declares: 'raw' is the plain brain and its
+            # provenance must record instruments = [] (docs/PRESETS_SPEC.md 1, instrument_records()'s own docstring).
+            if self.preset != "instrumented" or self.preset != module.required_preset or module.name in self.instruments:
+                raise ValueError("module instrument requires preset 'instrumented', its named preset and a unique instrument name")
             if not self._installing_instruments:
                 from .instruments import validate_composition
                 validate_composition([*self.instruments.values(), module])

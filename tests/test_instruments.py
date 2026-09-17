@@ -244,6 +244,53 @@ class PresetTests(unittest.TestCase):
         prov = common.provenance(c, fb=fb, device="cpu", seeds=[0])
         self.assertEqual(prov["preset"], "raw"); self.assertEqual(prov["instruments"], [])
 
+    def test_nothing_attaches_under_raw_even_if_it_declares_required_preset_raw(self):
+        """The hole the 2026-09-17 skeptic pass found: `attach` compared `self.preset` with the OBJECT's declared
+        preset, so an object declaring required_preset='raw' attached to a raw brain, drove Poisson and produced
+        provenance preset 'raw' with a non-empty instruments list -- falsifying PRESETS_SPEC section 1."""
+        c = graph()
+
+        class RawClaimer:
+            name, kind, required_preset = "raw_claimer", "stop-gap", "raw"
+            quantity_in, channel_out = "rate_hz", "poisson_hz"
+
+            def __init__(self, idx):
+                self.reads, self.writes = {}, {"afferents": np.asarray(idx)}
+
+            def install(self, fb):
+                fb.attach(self)
+
+            def describe(self):
+                return dict(name=self.name, kind=self.kind, law="unverified", replaces="computation",
+                            gap="none: this object exists only to test the guard", removal="the guard",
+                            audits=["docs/audits/compass_velocity_route.md"])
+
+            def reset(self, B, device):
+                pass
+
+            def step(self, dt_ms, inputs):
+                return {"afferents": None}
+
+        obj = RawClaimer([0, 1])
+        raw = FlyBrain(c, device="cpu", lif_params=LIFParams(receptor_model=None))
+        self.assertEqual(raw.preset, "raw")
+        with self.assertRaisesRegex(ValueError, "instrumented"):
+            raw.attach(obj)
+        with self.assertRaisesRegex(ValueError, "instrumented"):
+            obj.install(raw)
+        # and a raw brain records instruments = [] no matter what is passed
+        self.assertEqual(raw.instruments, {}); self.assertEqual(raw.attached_modules, {})
+        self.assertEqual(raw.instrument_records(), [])
+        self.assertEqual(common.provenance(c, fb=raw, device="cpu", seeds=[0])["instruments"], [])
+        for passed in ([obj], [fi.SidedTurnAfferent(c)], ["sided_turn_afferent"]):
+            with self.assertRaises(ValueError):
+                FlyBrain(c, device="cpu", lif_params=LIFParams(receptor_model=None), preset="raw", instruments=passed)
+        # under 'instrumented' the same object is still refused, because its own declared preset is not 'instrumented'
+        fb = FlyBrain(c, device="cpu", lif_params=LIFParams(receptor_model=None), preset="instrumented")
+        with self.assertRaises(ValueError):
+            fb.attach(RawClaimer([0, 1]))
+        self.assertEqual(fb.instrument_records(), [])
+
     def test_instrumented_drives_the_sided_cells_and_lands_in_provenance(self):
         c = graph()
         for sign in (1, -1):
@@ -283,6 +330,107 @@ class PresetTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in fb.instrument_records()], ["glno_sign", "ring_dc_hold"])
         with self.assertRaises(ValueError):                                              # names unique
             FlyBrain(graph(glno_nt="glutamate"), device="cpu", lif_params=p, preset="instrumented", instruments=[hold, hold])
+
+
+# ------------------------------------------------ the record every instrument owes (PRESETS_SPEC sections 2 and 5)
+class InstrumentRecordContractTests(unittest.TestCase):
+    """`replaces` (section 5, owner decision 2026-09-17: a program-shaped stand-in must SAY it replaces a computation)
+    and the law/source gate (section 2 item 2), on every instrument that ships."""
+
+    EXPECTED_REPLACES = {
+        "sided_turn_afferent": "input",            # supplies a missing body-derived input
+        "ring_dc_hold": "configuration",           # a record of a caller configuration, not a transfer
+        "glno_sign": "configuration",
+        "edge_gain": "configuration",
+        "compass": "computation",                  # program-shaped: admitted only under the section-5 extension
+        "compass_ring": "computation",
+        "plume": "computation",
+        "hunger": "computation",
+        "flight": "computation",
+    }
+
+    def shipped(self):
+        """One instance of every shipped instrument, each on a graph that carries its cells."""
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_compass_driver import graph as epg_graph
+        from test_navigation_instruments import graph as nav_graph
+
+        from flyverse.compass import CompassDriver
+        from flyverse.navigation import FlightDrive, HungerGain, PlumeNavigation, RecurrentCompass
+        c, nav = graph(glno_nt="glutamate"), nav_graph()
+        return {"sided_turn_afferent": fi.SidedTurnAfferent(c),
+                "ring_dc_hold": fi.EdgeHold(r"^(ExR6|ER6|ER4m)$", r"^(PEN_|EPG$)", 0.0),
+                "glno_sign": fi.TypeRelabel("GLNO", "glutamate"),
+                "edge_gain": fi.EdgeGain(r"^EPG$", r"^EPG$", 10.0),
+                "compass": CompassDriver(epg_graph()),
+                "compass_ring": RecurrentCompass(nav),
+                "plume": PlumeNavigation(nav),
+                "hunger": HungerGain(nav),
+                "flight": FlightDrive(nav)}
+
+    def test_every_shipped_instrument_declares_what_it_replaces(self):
+        insts = self.shipped()
+        # the set under test is the whole shipped surface: the named instruments, the parseable registry and the
+        # three configuration records of PRESETS_SPEC section 3
+        self.assertTrue(set(fi.NAMED_INSTRUMENTS) <= set(insts))
+        self.assertTrue(set(fi.REGISTRY) <= set(insts))
+        for name, inst in insts.items():
+            d = inst.describe()
+            self.assertIn("replaces", d, name)
+            self.assertIn(d["replaces"], fi.REPLACES, name)
+            self.assertEqual(d["replaces"], self.EXPECTED_REPLACES[name], name)
+            self.assertEqual(fi._check_instrument(inst), name)                 # the gate accepts every shipped record
+            json.dumps(common.to_jsonable(d))                                  # and it lands in every JSON
+
+    def test_the_navigation_records_name_their_body_derived_inputs(self):
+        """reads / writes carry neural rates only, so hunger's record used to read as `does nothing`."""
+        insts = self.shipped()
+        for name, expected in (("hunger", "interoception"), ("plume", "smell"), ("flight", "interoception")):
+            d = insts[name].describe()
+            self.assertIn(expected, d["input"], name)
+            self.assertTrue(d["effect_route"], name)
+        self.assertIn("observe_internal", insts["hunger"].describe()["input"])
+        self.assertIn("plume", insts["hunger"].describe()["effect_route"])      # the route the gain takes
+        for key in ("observe_wind", "observe_smell", "observe_internal"):
+            self.assertIn(key, insts["plume"].describe()["input"])
+
+    def test_an_unsourced_non_unverified_law_is_refused(self):
+        """PRESETS_SPEC section 2 item 2: either the law is `unverified`, or describe() names where it came from."""
+        class Stub:
+            name, kind, required_preset = "stub", "stop-gap", "instrumented"
+            law = "a measured transfer"
+            source = ""
+            def install(self, fb):
+                pass
+            def describe(self):
+                return dict(name=self.name, kind=self.kind, law=self.law, replaces="computation", gap="gap",
+                            removal="a recording", audits=["docs/audits/x.md"], source=self.source)
+        with self.assertRaisesRegex(ValueError, "source"):
+            fi._check_instrument(Stub())
+        sourced = Stub(); sourced.source = "docs/audits/compass_local_recurrence.md"
+        self.assertEqual(fi._check_instrument(sourced), "stub")
+        unverified = Stub(); unverified.law = "unverified"
+        self.assertEqual(fi._check_instrument(unverified), "stub")              # `unverified` needs no source
+        # the three section-3 records are exactly the case the check was added for: their law is not the word
+        # `unverified`, so each one must name its audit
+        for name in ("ring_dc_hold", "glno_sign", "edge_gain"):
+            inst = self.shipped()[name]
+            self.assertTrue(inst.describe()["source"], name)
+            self.assertIn("docs/audits/", inst.describe()["source"], name)
+
+    def test_a_record_without_replaces_cannot_attach(self):
+        class NoReplaces:
+            name, kind, required_preset = "no_replaces", "stop-gap", "instrumented"
+            def install(self, fb):
+                pass
+            def describe(self):
+                return dict(name=self.name, kind=self.kind, law="unverified", gap="gap", removal="a recording",
+                            audits=["docs/audits/x.md"])
+        with self.assertRaisesRegex(ValueError, "replaces"):
+            fi._check_instrument(NoReplaces())
+        with self.assertRaisesRegex(ValueError, "replaces"):
+            FlyBrain(graph(), device="cpu", lif_params=LIFParams(receptor_model=None),
+                     preset="instrumented", instruments=[NoReplaces()])
 
 
 # ---------------------------------------------------------------------------------------------- cx_wedge threading

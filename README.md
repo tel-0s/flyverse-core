@@ -55,6 +55,9 @@ remains the default. See [instruments](docs/INSTRUMENTS.md) and the [validation 
 
 Use `--instruments compass plume hunger` to add the experimental goal/steering bridge and metabolic gain;
 add `flight` for the wing-control experiment. `compass_ring` is an alternative recurrent-model compass.
+All five are **computation stand-ins**: they replace a computation the model cannot do rather than supply a missing
+input, each says so in its `describe()` record (`replaces: "computation"`), and they are admitted as instruments
+only under the owner's extension in [PRESETS_SPEC](docs/PRESETS_SPEC.md) section 5.
 See [the instrument guide](docs/INSTRUMENTS.md) for dependencies, scientific limits and validation status.
 
 ## What is simulated

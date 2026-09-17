@@ -57,7 +57,7 @@ only with all of:
 | `ring_dc_hold` | edges | The ExR6 / ER6 / ER4m DC term on PEN / EPG that removes the ring's resting state (`compass_dc_balance.md`) | the 6A `--hold-edges` hold; removal condition: receptor rows at the EB / GA contacts (Eddy 2026 preprint is the lead) | round 7 arm, as a component |
 | `glno_sign` | relabel | GLNO sign 0 (two disagreeing EM predictions, `glno_relabel.md`) | glutamate per the stronger prediction; safe on the suite, fixes nothing alone (5B) | round 7 arm, as a component |
 | `flight_state` | mechanism | The OA-dependent flight state (the octopaminergic drive that gates wing MNs and the haltere loop); nothing in the model supplies it | law from the flight-initiation literature; **not yet specified** | after turning |
-| `CompassSteering` (`--program cx`) | program | the whole compass -> PFL3 -> DNa02 stage | already ships, labelled, writes PFL3 / DNp09 | stays a program, not an instrument: it replaces a computation, not a missing input |
+| `CompassSteering` (`--program cx`) | program | the whole compass -> PFL3 -> DNa02 stage | already ships, labelled, writes PFL3 / DNp09 | stays a `--program`, not an instrument, because it is a body-side program object. **Amended 2026-09-17:** "it replaces a computation, not a missing input" is no longer a criterion that excludes a stand-in from the instrument list -- the owner's section-5 extension admits program-shaped stand-ins as instruments, and each one says so in `describe()` (`replaces: "computation"`). See the paragraph at the end of section 5. |
 
 The order is forced: no instrument downstream of a heading bump (hDelta integration, goal comparison) is worth
 building until `sided_turn_afferent` + `ring_dc_hold` + `glno_sign` either produce a bump that follows the fly's own
@@ -86,6 +86,18 @@ extends the earlier round-7 clarification; `SidedTurnAfferent` still lives in it
 Admission checks and the distinction between an experimental option and default adoption are recorded in
 [audits/compass_standin.md](audits/compass_standin.md). A functional phase-tracking pass does not establish
 food finding, circuit recovery, or permission to change the raw model's constants.
+
+**Program-shaped stand-ins (owner decision, 2026-09-17).** Section 3's CompassSteering row made "it replaces a
+computation, not a missing input" the reason a program is not an instrument, while `CompassDriver`, `plume` (PFL3 +
+DNp09) and `flight` (wing MNs) are exactly that shape and ship as instruments. The reconciliation is explicit, not
+implicit: program-shaped stand-ins -- `CompassDriver`, `plume`, `flight`: the ones that replace a *computation*
+rather than supply a missing *input* -- are admitted as instruments **ONLY under the owner's section-5 extension**;
+they are distinguished in every `describe()` by a `replaces` field (`"input"` | `"computation"`); and the README and
+any suite column that uses them name them as computation stand-ins. The section-3 configuration records
+(`edges`, `relabel`) supply neither and carry `replaces: "configuration"`. `flyverse.instruments._check_instrument`
+requires the field on every instrument, so an instrument that does not declare what it replaces cannot attach.
+Nothing here relaxes section 2: the law is still `unverified` or sourced, the neural boundary is unchanged, and the
+`raw` default is unchanged.
 
 ## 6. Owner extension: navigation experiments (2026-09-15)
 

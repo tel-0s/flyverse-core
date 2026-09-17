@@ -2965,6 +2965,138 @@ one TODO B item is added (PS196_b from the compass side). Pages read: `findings/
 `findings/04-compass-brake.html`, `findings/index.html`, the two thesis records (Rockefeller Digital Commons 808
 and 837). The tooling behind his project is his, and nothing here is a claim about it.
 
+## Session 13, the instrumented preset: rounds 4d and 7, the transfer follow-up, and Astra's navigation stack (2026-09-17)
+
+**What happened while the owner's sessions were down.** The owner's accounts were out for several days, so the
+round ran on a handoff to Astra (GPT-6). It closed round 6B and round 4d from the batches that had already
+landed, reviewed and merged the `feat/instruments` branch with fixes (`instruments_review.md`), and submitted
+cx8 -- which it then invalidated itself, because the frozen declaration named `receptor_net_rule="class"` where
+`cx_wedge.py --receptor-model shipped` resolves `abs`; the physical commands were right and the record was not.
+It re-ran the identical 48 commands as cx8r and ran the one authorized follow-up, cx8t. The owner then asked for
+a larger stand-in stack under `instrumented`: `CompassDriver` (imposed angular memory), `compass_ring` (Wang's
+reduced EPG/PEN rate loop), `plume` (the published PFL3 comparator with an ideal goal memory), `hunger` (an
+explicit metabolic gain) and `flight` (a wing-MN control experiment). Two of the owner's own observations then
+forced corrections: flight continued while the fly starved (the flight-priority policy: ground search, bounded
+bouts, reserve and odour interruptions) and the fly walked nearly straight past fruit (the plume-steering
+correction: a bilateral walking goal and DNa02 L-R feedback onto the existing PFL3 inputs). The room demo's
+giant-fibre escape threshold was exposed as `--gf-threshold` in the same stretch. Four independent Opus skeptic
+passes then covered the lot -- round 4d, round 7 plus cx8t, the three navigation audits, and the shipped
+instrument code -- and all four verdicts are **mostly sound**. Their verdict and claim lines are quoted verbatim
+in each audit and in `receptor_verification.md`; their corrections are applied. **This entry closes every
+"Independent skeptic pending (Fable, when accounts reset)" line in the round-4d, round-7, transfer-follow-up,
+compass-stand-in, navigation, flight-priority and plume-steering entries further down this file**: those entries
+are left as written, because they were true when written, and the pass that answers them is here.
+
+**The scientific state, as the skeptics established it.** Round 7 is a **null**, and a well-localized one. The
+signed afferent does reach GLNO with a side: V minus S raises GLNO L-R by **+2.2 Hz** (`result`, Holm p 0.0130),
+and all six V values exceed all six S values. What does not happen is rotation. A hump **does** form in HG, HGV
+and HGV- -- vector strength ~0.72, ~160 Hz, ~3.9 wedges -- and it does not turn: in the three runs that pass the
+confinement gate the confined-frame centre slope is **+0.137, -0.086 and -0.069 wedges/s** against an ideal
+**+4.0**, and HGV's nearest miss gives +0.171. The gate fails mostly on its `out_above <= 3` clause, not on an
+absent bump, so "no eligible follow measurement" is an unavailable comparison, not a zero velocity. The sign
+control fails where it matters: GLNO L-R does not reverse in HGV- (+0.69 +- 1.91 Hz, positive in four of six
+seeds), and no sign-flipped counterpart of the V arm was declared, so primary 3's sign specificity is untested
+where it was measured. HGVp -- the PEN-only hold -- has no bump at all.
+
+**cx8 and cx8r are bit-identical**, which nobody claimed: 6,966 of 6,966 saved metric values and 1,560 of 1,560
+NPZ array pairs are exactly equal, and only the run paths and `wall_s` differ. The invalidation really was a
+declaration defect alone, and the replacement is a free replication -- two separate submissions twelve minutes
+apart on the same house B200 reproduced the batch exactly. That is recorded as a **qualification of
+`docs/INTERP.md` 10.4 item 2 for the cx_wedge protocol only**, not as licence to assume GPU reproducibility
+anywhere else.
+
+**The transfer follow-up (cx8t).** A direct 90 Hz GLNO challenge does put a correctly signed **~3 Hz** difference
+into PEN (HL-HR +2.9939, z 3.1904), while suppressing PEN overall -- the side-balanced mean falls from 24.0 Hz to
+5.0 / 3.6 Hz. The fourth contrast came out positive against a predeclared negative prediction, and the reason is
+the operating state, not the biology: the cut alone moves PEN L-R by **+11.4 Hz** while the challenge moves it
+about **-1.7 Hz**, so the challenge-attributable part carries the predicted sign in both edge contrasts and
+contrast 4 as declared could not have been negative at any biology. No unitary transfer and no receptor sign
+follows; the audit's refusal to infer one is right, and it now shows the decomposition that justifies it.
+
+**Round 4d closed the level question.** The leg-cycle attribution replicates on a control matched on all three
+leg channels at once: C minus L3 is **+2.7 / +3.9 Hz** at AN04B003 (pooled +3.27), **DNa02-left is a `result`**,
+and nothing else is -- DNa02-right, the clean yaw SD, straightness and DNa02 L-R are all null -- while **M2
+versus C is null on all seven primaries**, so the amplitude/turn law adds nothing beyond the per-phase
+modulation. The old cross-batch level model leaves +1.20 / +1.23 Hz in a modulation-free arm at the cycle's own
+level point: its extrapolation overestimated the structure term, and the direct matched difference is the number
+to quote.
+
+**The milestone, stated the way the navigation skeptic established it.** Under `instrumented` the fly **turns and
+finds food** in a 60 s room -- six of six plume rows feed -- with no oracle anywhere in the loop and `raw`
+untouched. The instrument's only body-derived inputs are antennal deflections, bilateral concentrations and
+interoception flags; no world position, wind angle, fruit position or distance reaches it, and the probe's
+`nearest_fruit()` is logging that never gets there. That is the real result, and it is smaller than "the fly
+flies and feeds":
+
+- **It never flies and feeds in the same episode.** `powered_s` is 0.00 wherever it feeds, in all 12
+  flight-priority room rows and all 12 plume rows; under the corrected policy the odour gate latches for
+  essentially the whole episode, so artificial flight is **unreachable in any room containing fruit**, not merely
+  bounded. The only powered-flight rooms are the superseded navigation flight arm, which fed in none of six.
+- **The plume cue is not something the model's own nose could resolve.** The law reads a bilateral contrast off
+  the physical concentration field -- noise-free, pre-transduction -- and multiplies it by 0.1 m / 0.001 m = a
+  gain of **200**. The observed contrast is 0.26-0.57 %, so this is close to a sign-of-contrast turn; through the
+  model's own ORN law (1 + 150c/(c+0.5)) a 0.3 % difference is ~0.1 Hz per ORN, well under the Poisson noise of
+  the 0.25 s window.
+- **The feedback servo-inverts the biological stage it runs through.** The integral supplies more than half the
+  PFL3 input in every room row, and the balanced control needs -5.94 Hz to hold DNa02 L-R at +0.06 Hz -- the loop
+  is cancelling the parent circuit's own bias rather than consulting its gain. What the connectome clearly owns
+  here is **DNa02 -> motor readout -> yaw**; the goal, the 200x gradient and the integral are the instrument's.
+- **The rooms do not test hunger.** Every plume row hits energy exactly 0.0000 at **18.0-18.2 s**, before every
+  first contact (20.1-37.3 s), so the gain is pinned at 1.0 for most of each episode and never leaves [0.90, 1.0].
+- **The six environment seeds are near-repeats.** `world.make_room` places apple, orange, banana and lime at
+  seed-independent coordinates, only the grapes and blueberries jitter, the start is identical and three rows
+  share the same 5 deg initial heading; the lime is the nearest fruit at 22.6 cm and **four of the six rows fed
+  there**.
+- **None of these rooms pins a number.** The native event-driven CUDA path is not reproducible run to run: the
+  exact-workload gate fails with per-cell rate differences to **44.9 Hz** (voltages to 77.6 mV, conductances to
+  247) while `poisson_p` and `drive` are bit-identical, so the divergence is in the kernels and not the inputs.
+  Re-running the same command with the same seeds gives a different trajectory and could give a different feeding
+  outcome.
+
+**The code state.** `raw` is byte-identical: the bit-identity golden predates the instrument branch (96c9a24, an
+ancestor of it), the three cache MD5s are unchanged (`c50c598a...`, `ac131529...`, `bf01d724...`) with compiled
+CSR `ef23cc27bea13be7f6a96f3c04fd3737`, and the CPU suite is 503 passed / 19 skipped. **No default moved**
+anywhere in `flyverse/` or `scripts/`; every change is a new trailing keyword with a neutral default. Three
+things are fixed in this closeout. `FlyBrain.attach` compared the brain's preset with the *object's* declared
+preset, so an object declaring `required_preset="raw"` attached to a raw brain, drove Poisson and produced
+provenance `preset: "raw"` with a non-empty instrument list -- the guard now refuses any instrument attach unless
+the preset is `instrumented`, with a test. Every shipped `describe()` now carries a **`replaces`** field
+(`"input"` for the sided afferent, `"configuration"` for the hold / relabel / gain records, `"computation"` for
+`compass`, `compass_ring`, `plume`, `hunger`, `flight`), because the owner's section-5 extension admits
+program-shaped stand-ins as instruments and they have to say so; `_check_instrument` now also requires
+`law == "unverified"` or a non-empty `source` / `sources`. And `hunger`, `plume` and `flight` now declare their
+body-derived inputs and effect route in `describe()`: `hunger`'s record used to read `reads {} / writes {}`, which
+implied it did nothing while it gates plume's turn and flight's lift.
+
+**Process notes.** The first is Fable's own: the WIP commit 62cdefb's message said "the Report block is complete"
+while the file still carried five `PENDING_*` placeholders -- a breach of `docs/INTERP.md` 10.4 rule 7's
+placeholder gate, recorded here rather than quietly fixed. `instruments_review.md` reviewed `a41d0f2..6d1c501`
+and reported 468/469 passing; it never saw `compass.py`, `navigation.py`, `interoception()` or the four
+navigation instruments, and it now says so at the top -- its "no new body-to-neural-module interface was
+introduced" is scoped to that range, because `interoception()` plus the four `observe_*` receivers are exactly
+such an interface. The `undetermined` label on the two empty follow comparisons is the frozen declaration's own
+word, but `common.compare` is never called on those rows and returns `underpowered` on an empty sample, while
+INTERP 2.4 / 10.2 reserve `undetermined` for a deterministic reference -- they are now read as unavailable
+comparisons. Two verdicts are **orientation-dependent**, because `compare` divides by the reference arm's SD:
+primary 3 reverses to |z| 2.96 and a null, and cx8t's transfer reverses to z -2.70 and a null, while the
+symmetric Welch statistics are +7.26 and +5.05 and U is unchanged. Round 4d's `probe_vnc_drive.py` -- the script
+every one of its 24 jobs ran -- is not one of the 52 files in `provenance.source_fingerprint`, so the driver is
+identified by the scheduler's verbatim job lines instead. And the infrastructure-identifier scrub is still owed
+before release: eight files by the code skeptic's list (`receptor_verification.md`, `NOTES.md`,
+`docs/media/README.md`, and the five ignored `out/*/predeclared.json` families).
+
+**What is next, as questions.** (1) Does the plume result survive a **goal-only arm with no DNa02 feedback**? No
+such arm exists, mean |demand| did not rise between diagnostic and validation while mean |yaw| tripled, so the
+feedback bridge is the load-bearing change -- but that is an inference, not a measurement. (2) Does a
+**transduced-contrast law** work: read the ORNs' own rates instead of the physical field, and let the Poisson
+noise in? If it does not, the 200x gradient is doing the navigating. (3) Does a **V- arm** (the sign-flipped
+afferent without the hold) reverse GLNO L-R where primary 3 measured it? The held arms do not. (4) Can a
+**deterministic-kernel gate** be met before any room number is quoted again -- an exact-workload pass, or the
+torch-sparse path, or repeated draws with the spread reported? (5) What does the **29-check suite under
+`instrumented`** say with the three-instrument list, at three draws, beside the `raw` column? The compass
+stand-in's own run already rejected admission on `taste.MN9_hz` (seed 1, 1.690 -> 4.296 Hz, FAIL -> PASS outside
+the declared gap), so the honest expectation is another rejection, and it is worth having on the record.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

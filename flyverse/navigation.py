@@ -84,6 +84,13 @@ def _pfl3(heading, goal, hpref, gpref):
 class NeuralInstrument:
     kind = "stop-gap"
     required_preset = "instrumented"
+    # Every navigation instrument replaces a COMPUTATION the model cannot do, not a missing input: they are
+    # program-shaped stand-ins, admitted only under PRESETS_SPEC section 5 (owner extension, 2026-09-17).
+    replaces = "computation"
+    # The body-derived inputs each one consumes through a named receiver, and how they reach the neural output.
+    # `reads` / `writes` cover neural rates only, so a record without these implies the instrument does nothing.
+    body_input: ClassVar[str] = "none"
+    effect_route: ClassVar[str] = ""
     quantity_in = "rate_hz"
     channel_out = "poisson_hz"
     cuda_async_validation = True
@@ -171,6 +178,9 @@ class NeuralInstrument:
             name=self.name,
             kind=self.kind,
             law="unverified",
+            replaces=self.replaces,
+            input=self.body_input,
+            effect_route=self.effect_route,
             **{"class": f"flyverse.navigation:{type(self).__name__}"},
             gap=self.gap,
             removal=self.removal,
@@ -196,6 +206,8 @@ class RecurrentCompass(NeuralInstrument):
 
     name = "compass_ring"
     incompatible = ("compass",)
+    body_input = "held body yaw_rate (rad/s) through FlyBrain.proprioception -> observe_turn; no absolute heading, goal or world geometry"
+    effect_route = "yaw_rate -> sided PEN gains (1-v, 1+v) -> recurrent e[16] -> Poisson Hz on the biological EPG cells"
     gap = "a recurrent angular-memory experiment beside the kinematic compass stand-in"
     removal = "a validated native heading circuit or a quantitatively validated connectome-fitted model"
     sources: ClassVar[list] = [WANG_SOURCE, "https://elifesciences.org/articles/23496"]
@@ -282,6 +294,12 @@ class HungerGain(NeuralInstrument):
 
     name = "hunger"
     requires_any = ("plume", "flight")
+    body_input = ("normalized energy and the sated flag through FlyBrain.interoception -> observe_internal; "
+                  "no neural read and no neural write of its own")
+    effect_route = ("gain = (1-energy)*(not sated) is read by the sibling instruments that bind it: it scales plume's "
+                   "signed turn demand into the PFL3 Poisson input and flight's lift request. Without this instrument "
+                   "those consumers use gain 1. The value is written only by observe_internal, never during a step, so "
+                   "attachment order cannot change a frame's result")
     gap = "the environment metabolism is not reported to navigation circuits"
     removal = "a sourced metabolic transducer with verified target cells and dynamics"
     sources: ClassVar[list] = ["https://doi.org/10.1016/j.cell.2011.02.008"]
@@ -316,6 +334,14 @@ class PlumeNavigation(NeuralInstrument):
 
     name = "plume"
     requires_any = ("compass", "compass_ring")
+    body_input = ("held antennal deflections (dL, dR) through FlyBrain.wind -> observe_wind; held bilateral glomerular "
+                  "concentrations through FlyBrain.smell -> observe_smell; airborne / feeding flags through "
+                  "FlyBrain.interoception -> observe_internal; plus hunger.level when the hunger instrument is named. "
+                  "No world heading, wind angle, source position or distance")
+    effect_route = ("wind and smell set the goal (upwind, entry memory, or heading + atan(0.1 m * bilateral log-gradient)); "
+                   "the goal and the biological EPG heading drive the PFL3 comparator, gated by the LH odor channels, the "
+                   "interoception flags and hunger.level, and closed on measured DNa02 L-R; the output is Poisson Hz on "
+                   "biological PFL3 soma-L/R and DNp09")
     gap = "heading, odor and wind signals lack a functional goal-memory/steering bridge"
     removal = (
         "native odor/wind goal memory and PFL3 steering pass the same sensory controls"
@@ -647,6 +673,12 @@ class FlightDrive(NeuralInstrument):
     """
 
     name = "flight"
+    body_input = ("normalized energy and the sated / airborne / feeding flags through FlyBrain.interoception -> "
+                  "observe_internal, plus hunger.level when the hunger instrument is named; no altitude, world position "
+                  "or fruit distance")
+    effect_route = ("energy and the flags drive the reserve / bout / ground-search / landing policy and hunger.level "
+                   "scales the lift request; the LH berry/apple rates supply the odor interruption; the output is Poisson "
+                   "Hz on the biological wing power and steering MNs")
     gap = "wing power cannot sustain level flight and the walking steering readout does not control wings"
     removal = "validated descending/VNC flight-state and steering mechanisms supply the same control"
     sources: ClassVar[list] = ["https://pmc.ncbi.nlm.nih.gov/articles/PMC9206711/"]

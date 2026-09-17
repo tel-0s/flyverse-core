@@ -8,7 +8,7 @@ Generator: `scripts/probe_vnc_drive.py --family level4` (`plan` / `analyse` / `p
 `out/vncd7/analysis_console.txt`, `out/vncd7/analysis/pairs_console.txt`, `out/vncd7/verification_console.txt`,
 `out/vncd7/level_model_console.txt`. Predeclaration `out/vncd7/predeclared.json`, stamped **2026-09-15T19:22:14Z** (archived
 unchanged as `out/vncd7/predeclared_archive/predeclared_2026-09-15T192214Z.json`) against the earliest run's own
-`started_utc` **19:22:56Z**; submission receipt `out/vncd7/submitted_at.txt` (19:22:20Z). Working-tree record
+`started_utc` **19:22:56Z**; submission receipt `out/vncd7/submitted_at.txt` (19:22:25Z). Working-tree record
 `out/vncd7/tree_state.json` (sha256 of every shipped file; `tree_state_check_astra.json` at closeout; stamp limits in section 10).
 Every number below is a run mean +- SD over the SIX runs of an arm (16 flies x 55 s window each; runs are the replicate
 unit); verdicts are `flyverse.interp.common.compare` on runs (6 v 6, exact-U floor p 0.0021645). **Every per-seed list in
@@ -41,7 +41,8 @@ the primary conclusion uses the direct matched difference, not that correction.
 
 This closes round 4d's matching question on **24 CUDA runs, six per arm, one house submission**.
 All preconditions pass; runtime, defaults and MaleCNS cache are unchanged, and nothing is adopted.
-**Independent skeptic pending (Fable, when accounts reset).** The handoff overstated the saved prose:
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound** -- all seven claims reproduced, the corrections
+it required are applied here, and no conclusion moved ("Skeptic pass" below). The handoff overstated the saved prose:
 sections 4-11 and Report were also placeholders at 62cdefb. This closeout reconstructs them from the
 completed recordings and regenerated analysis. Source-stamp limitations and a misleading descriptive
 rate column are disclosed in sections 8 and 10; neither is used to infer a primary result.
@@ -139,11 +140,11 @@ afferent input the three parameters set.
 Round 4b's K realised 77.4 Hz on the GPU against 81.0 on its CPU calibration (-3.6 Hz), round 4's L 86.2 against a
 predicted 88.1. The reason is in the recordings: the leg-MN rate is not constant over the 60-s protocol. Every arm shows a
 dip at 24-34 s (some flies' side-mean leg-MN rate falls to 3.0-3.5 Hz for several seconds; e.g. vncd6 L 5.0 -> 4.5 Hz, vncd5
-U 5.0 -> 4.1 Hz per-second means) and the flies leave the table after ~45 s (on-table fraction 0.59-0.82 at 45-55 s), so the
+U 5.0 -> 4.1 Hz per-second means) and the flies leave the table after ~45 s (on-table fraction 0.59-0.84 at 45-55 s), so the
 5-60 s window mean sits BELOW the 2-12 s window a 12-s calibration run realises by a **window factor W = (chord_full -
 10) / (chord_early - 10)** of **0.9648 (vncd5 L), 0.9550 (U), 0.9469 (K), 0.9710 (vncd6 L): 0.9594 +- 0.0106**
 (`fixed_point_derivation.json` `steady_gpu_arms`). The CPU calibration window matches the GPU's EARLY window, not its
-full one: vncd5's cal_L 86.97 sits against L's 88.3 early / 86.0 full, cal_K2 80.99 against K's 81.1 early / 77.4 full.
+full one: vncd5's cal_L 86.97 sits against L's 88.8 early / 86.1 full, cal_K2 80.99 against K's 81.1 early / 77.4 full.
 
 ### 3.4 The fixed point: the GPU anchor's full-window distribution scaled by the CPU-measured loop gain
 
@@ -212,8 +213,8 @@ camp +0.100 / +0.091 (1.5). L3's pooled realised means are 87.444 / 47.091 / 24.
 +0.039 / +0.021 / +0.109 from the derivation. P2 passes: M2-C pooled gaps +0.563 / +0.304 / -0.013 Hz;
 M2 amplitude is exactly 0.948 while walking and its amplitude L-R is zero. P3 passes: L3 chord/hair L-R
 zero. P4 brackets, P5 configurations and P6 predeclaration ordering pass. Detailed checks are in
-`out/vncd7/precondition_checks.csv` and the re-run verifier log `out/compass7/4d_verify.log` in the
-closeout worktree. The preconditions use six-run arm means, not a requirement that every stochastic
+`out/vncd7/precondition_checks.csv` and the re-run verifier log `out/compass7/4d_verify.log`, which is
+not retained in the repository. The preconditions use six-run arm means, not a requirement that every stochastic
 run or instantaneous rate lies inside the matching tolerance.
 
 
@@ -258,7 +259,9 @@ AN04B003 uses the all-window per-fly recording. These windows are not interchang
 
 F1 calls 3/7, F2 4/7, F3 0/7 and F4 7/7. In particular, F1 DNa02 L-R has z **2.9530**, below 3
 despite its small p; rounding it to 3 would change the decision incorrectly. F2 clean yaw has z 3.0406;
-F1 yaw has z 2.2837. No precision or significance is borrowed from the 16 flies within a run.
+F1 yaw has z 2.2837. F1's clean-yaw p is at the exact-U floor because the six seed pairs separate completely
+(C min 7.7038 > L3 max 7.5874); the null is the |z| >= 3 criterion, not an absence of a consistent difference.
+No precision or significance is borrowed from the 16 flies within a run.
 
 
 ## 6. The predeclared decision rules, applied
@@ -316,6 +319,9 @@ the four primary families above decide the round.
 | M2vL3 | L | +2.8521 | -0.0003 +- 0.0004 | +2.8525 |
 | M2vL3 | R | +4.0290 | -0.0055 +- 0.0014 | +4.0346 |
 | M2vL3 | pooled | +3.4406 | -0.0029 +- 0.0009 | +3.4435 |
+
+The same file also carries the DNa02 residual differences, where pooled C-L3 is +0.0941 Hz (z +4.3, `result`);
+those are unadjusted secondary verdicts from `level_model_r2_pairs.csv`, not one of the four primary families.
 
 Labelled cross-batch context only: earlier corrected terms +4.49 Hz (vncd5), +4.60 M2 / +4.72 C
 (vncd6, uncertainty 0.31 / 0.32) exceed this batch's direct 3.27 / 3.44 Hz. No old run is compared
@@ -376,6 +382,9 @@ Verbatim generator output `out/vncd7/analysis/per_seed_lists.txt`. Primary and d
 `analysis/per_seed.csv`, columns `key,arm,seed,file,value`; residuals use
 `analysis/level_model_r2_residual_runs.csv`, `residual`; fraction lists use `analysis/fractions.csv`,
 `per_seed`. Seeds are r0-r5 in that order; they are not sorted by value.
+`commanded_<ch>_absLR_hz` is computed on the post-skip NON-AIRBORNE mask, while the pooled `commanded_<ch>_hz` and
+the signed `commanded_<ch>_LR_hz` keys use post-skip frames only; the three do not share one window
+(INTERP 10.4 rule 22).
 
 ```text
 # per-seed lists pasted into docs/audits/level_fixed_point.md; source out\vncd7\analysis\per_seed.csv (columns key, arm, seed, file, value), seeds r0..r5 in seed order
@@ -555,9 +564,15 @@ fraction_DNa02_active_frac M2 [1.0478 1.0555 0.9415 1.0642 0.9150 0.9715]  0.999
 24 run JSONs and their recorded companion artifacts, all CUDA / NVIDIA B200, family level4,
 six seeds per A/L3/M2/C, blocks fam_r0-r5. The source fingerprint's 52-file maps agree in every run;
 compiled MaleCNS MD5 is `ef23cc27bea13be7f6a96f3c04fd3737`. Run headers have unknown Git commit in the
-cluster copy, so the file map, not that field, identifies the simulation source. One submission,
-24 completed jobs / zero failed (`out/vncd7_cluster.log`); first run starts 19:22:56Z and last finishes
-19:34:40Z. Predeclaration 19:22:14Z and submission receipt 19:22:20Z precede them. The archived
+cluster copy, so the file map, not that field, identifies the simulation source. The 52-file map covers
+`flyverse/**` plus `scripts/interp_export.py` and `scripts/probe_object_sweep.py`; it does NOT include
+`scripts/probe_vnc_drive.py`, the script every job ran, so the driver is identified by the verbatim job lines in
+`out/vncd7_cluster.log` and by the arm / spec / sense block each run JSON records, not by the fingerprint.
+One submission, 24 completed jobs / zero failed (`out/vncd7_cluster.log`); the record is the client console, and
+all 24 jobs are logged completed exit None, so no exit code survives; the 24 run JSONs with their `finished_utc`,
+five artefacts each and `device cuda` lines are what establishes completion (INTERP 10.4 items 4 and 21).
+First run starts 19:22:56Z and last finishes
+19:34:40Z. Predeclaration 19:22:14Z and submission receipt 19:22:25Z precede them. The archived
 predeclaration is preserved; no arms, tolerances or decisions are changed at closeout.
 
 **Source-stamp limit.** The original header promised `tree_state_check.json`, but that file did not
@@ -570,10 +585,21 @@ The source/analysis differences against the 19:22:14Z tree stamp are:
 | scripts/derive_level_fixed_point.py | f2b615832aa6b5b6722f6f3974165001847b8d07cc08db07c179eef50ec12ccd | 8071f2db8e46da3a869ea3e3203cbe1b037ca1d383bb8980091ef5aadb70b10c |
 | out/vncd7/batch.sh | 58611cc0ba8073d4eb5b898a00fb132aef93d5908f2d2746f108ab944f0509f0 | 3990a045f777b2984a85fd4c0e68b8bbe023b12cb50ac656596da1998f056519 |
 
-The rest of the 14-entry stamp matches. This does not certify when the changed files were edited.
+Checked at 2e15d05. Two of the three digests differ only by line endings: the stamp hashes raw working-tree
+bytes (CRLF), and the sha256 of the CRLF rendering of `scripts/probe_vnc_drive.py` and
+`scripts/derive_level_fixed_point.py` as committed is exactly the stamped `a3530afd...` / `f2b61583...`, so their
+CONTENT is unchanged since the stamp (`git diff 62cdefb HEAD` on both is empty). Only `out/vncd7/batch.sh` is a
+content difference, and its 24 quoted job lines are identical to the 24 commands the scheduler recorded in
+`out/vncd7_cluster.log`, so nothing about what ran is in doubt. On main 3ee368a two further stamped files now
+differ -- `flyverse/senses.py` and `flyverse/interp/common.py`, both predeclared reducers -- because of later
+rounds; the simulated `senses.py` is the one committed at 62cdefb (`c140067f...`, the run fingerprint's own hash).
+**Withdrawn:** "This does not certify when the changed files were edited." Two of the three digests are
+line-ending artefacts rather than edits, and the third is checkable against the scheduler's own job lines, so the
+sentence understated what the stamp establishes. Its companion sentence stands: the rest of the 14-entry stamp
+matches.
 The complete fetched batch was reanalysed with main 2e15d05: `probe_vnc_drive.py analyse`, `pairs
 --family level4 --predeclared ...`, the recorded `verify_runs.py`, `level_model.py`, and `per_seed_lists.py`.
-Logs are `out/compass7/4d_{verify,analyse,pairs,level_model,per_seed}.log` in the closeout worktree.
+Logs are `out/compass7/4d_{verify,analyse,pairs,level_model,per_seed}.log`, not retained in the repository.
 The committed primary generator is `scripts/probe_vnc_drive.py`; the three auxiliary generators remain
 with the local batch artifacts as named in the original predeclaration. Analysis outputs were re-emitted
 in full. The current reducer hashes above describe this reconstruction; they are not substituted into
@@ -593,7 +619,9 @@ Checked the masks in the primary reducer, satisfiable per-family Holm correction
 versus cross-batch distinction. Disclosed the incomplete WIP text, source-stamp mismatch and misleading
 descriptive rate column. No parameter, mechanism, ledger expectation or default is changed or adopted.
 
-**Independent skeptic pending (Fable, when accounts reset).**
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** All seven claims reproduced; the corrections it
+required are applied above and no conclusion moved. Its verdict line and claim lines are quoted verbatim in
+"Skeptic pass (independent, Opus, 2026-09-17)" at the end of this audit.
 
 
 ## Report
@@ -621,7 +649,8 @@ summary: |-
 
   This closes round 4d's matching question on **24 CUDA runs, six per arm, one house submission**.
   All preconditions pass; runtime, defaults and MaleCNS cache are unchanged, and nothing is adopted.
-  **Independent skeptic pending (Fable, when accounts reset).** The handoff overstated the saved prose:
+  **Independent skeptic pass (Opus, 2026-09-17): mostly sound** -- all seven claims reproduced, the corrections
+  it required are applied here, and no conclusion moved ("Skeptic pass" below). The handoff overstated the saved prose:
   sections 4-11 and Report were also placeholders at 62cdefb. This closeout reconstructs them from the
   completed recordings and regenerated analysis. Source-stamp limitations and a misleading descriptive
   rate column are disclosed in sections 8 and 10; neither is used to infer a primary result.
@@ -637,7 +666,8 @@ key_claims:
 validation:
 - 24 CUDA runs, all declared preconditions pass; four primary families m=7 at six versus six runs.
 - Full CPU suite 441 passed, 19 skipped, 215 subtests; golden and cache hashes unchanged.
-- Independent skeptic pending (Fable, when accounts reset).
+- Independent skeptic pass (Opus, 2026-09-17): mostly sound; all seven claims reproduced, corrections applied,
+  no conclusion moved.
 recommendations:
 - Adopt nothing from these labelled controls.
 - Use the direct matched difference for the structure term; preserve the extrapolation failure as a limit on the
@@ -645,6 +675,34 @@ recommendations:
 - Keep DNa02-right and C-L3 yaw as null; larger reference-arm precision requires a new predeclared experiment.
 - Fix the descriptive dna02_decompose rate_hz label separately, regenerating its affected outputs.
 open_questions:
-- The independent skeptic pass.
+- The independent skeptic pass is complete (mostly sound, 2026-09-17); what stays unchecked is its NOT CHECKED list.
 - Biological calibration and suite/room adoption gates for the leg-cycle mechanism remain open.
+```
+
+
+## Skeptic pass (independent, Opus, 2026-09-17)
+
+An independent skeptic pass ran on 2026-09-17 (Opus, CPU only, no cluster job, nothing adopted). Its verdict line
+and its claim lines are quoted verbatim below. The CORRECTIONS REQUIRED list is applied in place in the sections
+above; where a correction replaced a sentence that stated a finding, the original sentence stays in the record
+marked **Withdrawn:** (INTERP 10.4 rule 29 iii). The pass's NOT CHECKED list is recorded verbatim with this
+round's entry in [receptor_verification.md](receptor_verification.md).
+
+### Verdict
+
+```text
+VERDICT: mostly sound
+```
+
+### Claims
+
+```text
+CLAIMS:
+1. Fixed-point derivation -- REPRODUCED. Targets recomputed from out/vncd6/room_C_r*_body.npz: chord 87.40418 (L 87.22939 / R 87.58664), hair 47.06689, camp 24.86421 -- identical to out/vncd7/fixed_point_derivation.json targets. Algebra: D* 0.5528870, hair_plate_max_hz = 5+(47.06689-5)/D* = 81.08587 -> 81.09, campaniform_load_hz = 24.86421/0.9907822 = 25.09553 -> 25.10. Re-solved the loop on out/vncd5 arm U's 440,000-sample full-window leg-MN distribution: LS slope dg/dmn_ref -0.0832071, g(8.23)=0.9635293, brentq gives mn_ref = 8.2300430 -> 8.23. Realised match from the 24 runs: L3 87.4442/47.0909/24.9779 vs C 86.7034-87.0229/46.6798-46.8659/24.8783-24.8870, per-side gaps +0.7408/+0.4213, +0.4111/+0.2250, +0.0996/+0.0909 against tolerances 3/3/1.5 -- P1 passes. Stamp order holds: all seven cal runs are device: cpu, finish by 19:21:47Z, derivation stamped 19:21:59Z, predeclaration 19:22:14Z, earliest room run 19:22:56Z.
+2. Primaries -- REPRODUCED, all 28 rows exactly (analysis/decision_table.csv). compare 6 v 6, floor 0.0021645022, Holm m=7 per declared family. C-L3 AN04B003 +2.6687 (z 29.7355) / +3.8782 (z 27.0592), pooled +3.2734; DNa02_L +0.1342 z 4.9959 result; DNa02_R +0.0504 z 1.7945 null; yaw +0.5918 z 2.2837 null; straightness +0.0097 null; DNa02_LR +0.0838 z 2.9530 null. M2-L3 +2.8521/+4.0290, pooled +3.4406, DNa02_L +0.1260, yaw +0.7880 -> 4/7 called. M2 v C null on all seven. F4 7/7. m as predeclared (7 keys, m=7 in all four families) and satisfiable (7x0.0021645 = 0.0151515 <= 0.05).
+3. Per-seed lists -- REPRODUCED. The audit's text block is a zero-line diff against out/vncd7/analysis/per_seed_lists.txt (169 lines). 126 lists recomputed from the run files themselves: zero mismatches. The 12 residual_* lists match level_model_console.txt line for line.
+4. Predeclaration / stamps -- REPRODUCED in substance, but the audit's provenance prose is wrong in both directions. Archive byte-identical (8a3d2f46628a3be2e423d27aa18235d2c527866321128f457cc7cd5c0e2eff20); stamp 19:22:14Z precedes the earliest started_utc 19:22:56Z; no measure, key, family, m, tolerance or decision rule differs from predeclared.json. But: (a) the header's submission receipt time 19:22:20Z is wrong -- the file says 19:22:25Z; (b) two of the three "source-stamp" differences are line-ending artifacts, not edits -- sha256 of the CRLF rendering of today's scripts/probe_vnc_drive.py is exactly the stamped a3530afd..., ditto derive_level_fixed_point.py/f2b61583..., and git diff 62cdefb HEAD on both is empty; only batch.sh is a real content difference, and its 24 quoted job lines are set-identical to the 24 commands in out/vncd7_cluster.log; (c) two MORE stamped files now differ and the audit does not say so -- flyverse/senses.py (6b134bfa->6718e72a) and flyverse/interp/common.py (9e75c838->18e8eff9), both predeclared reducers, senses.py on the simulated path; they matched at 2e15d05 and were changed by the later round-7/navigation work; (d) scripts/probe_vnc_drive.py -- the driver of all 24 jobs -- is not one of the 52 files in provenance.source_fingerprint; (e) the logs cited in sections 4 and 10 (out/compass7/4d_*.log) are not in the repository.
+5. dna02_decompose_summary.csv rate_hz -- REPRODUCED. Its values are exactly chain_AN04B003_L_hz / _R_hz, not DNa02's rates. No conclusion depends on it: the only two things section 8 takes from the file are the AN04B003 input totals (+41.222, +58.649) and SNpp45 (128.2 vs 129.3 left, 59.1 vs 59.4 right), both verified; every primary, fraction and level-model number comes from per_seed.csv / the npz.
+6. Section 0 / Report consistency -- REPRODUCED. Section 0 Answer == Report.summary verbatim; key_claims 1-4 == section 6's four "Reading:" paragraphs verbatim. Every prose number traces to a table. Vocabulary clean. No finding asserted that the tables do not support. No unfilled placeholder remains.
+7. Astra's reconstruction changed no number -- REPRODUCED. All 28 decision rows, all slopes (b +0.18485+-0.03548, c -0.06475+-0.02851, RMSE 0.1279), the L3 residuals +1.2028/+1.2344, every row of section 7's correction table, and all 23 precondition lines are already in Fable's consoles with the audit's exact values. git diff 62cdefb HEAD on the audit removes only the five PENDING_* placeholders and two header lines. The commit 62cdefb really did carry PENDING_SECTION_0, PENDING_SECTIONS_4_TO_9, PENDING_SECTION_10, PENDING_SECTION_11, PENDING_REPORT, so that commit's message ("the Report block is complete") was false and it breached rule 7's placeholder gate.
 ```

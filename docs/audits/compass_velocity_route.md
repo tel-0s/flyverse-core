@@ -53,7 +53,10 @@ runs with `bump_follow_confined_frac >= 0.5` over the prescribed turn window. Th
 code's gate explicit before any cx8 result exists. Every excluded run, filename and run id is retained
 in the ungated per-seed table; the comparison records the included ids and actual sample sizes.
 No eligible measurements is `undetermined`; fewer than four runs in either arm is `underpowered`
-under `common.compare`. Holm remains one family of six, including missing p values, applied to the
+under `common.compare`. That first label is this declaration's own word for an empty comparison: `common.compare`
+is not called on such a row, and on an empty sample it returns `underpowered`, while INTERP 2.4 / 10.2 reserve
+`undetermined` for a deterministic (SD 0) reference arm. Read such rows as unavailable comparisons.
+Holm remains one family of six, including missing p values, applied to the
 actual eligible samples. The printed `6 * p_floor` is the first-step bound, not an impossibility
 claim for a contrast that falls later in the Holm order. A rejected gate is not a zero-velocity observation.
 
@@ -67,7 +70,9 @@ The generator freezes `out/cx8/predeclared.json` with `--predeclare out/cx8` aft
 submission: six contrasts, gate, resolved LIF parameters per arm, eight arm specifications, six seeds,
 protocol, source SHA-256s (explicit LF normalization), and byte hashes of the generated wrapper and
 arm manifest. Existing declarations cannot be overwritten. Both wrapper calls explicitly select
-`--target house`, run sequentially with one fetch directory, and abort if either client fails.
+`--target house`, run sequentially with one fetch directory, and abort if either client fails. This is a named
+departure from INTERP 10.4 item 3 (one client per `--fetch` directory), mitigated by the strict sequencing and by
+the reducer's check that all 48 distinct arm/seed identities appear exactly once.
 
 Verdict vocabulary result / null / underpowered / undetermined per INTERP 10.4. Per-seed scatter emitted by the
 analysis script to `out/cx8/analysis/per_seed.csv` and pasted (rule 28). Nothing adopted into `raw` under any outcome;
@@ -102,6 +107,10 @@ The signed afferent reaches GLNO, but this round demonstrates no turn-following 
 V minus S raises GLNO L-R by +2.2183 Hz (result, Holm p 0.0130). No HGV run passes the predeclared
 50% turn-window confinement gate: primaries 1 and 2 are undetermined, with 0 versus 2 and 0 versus 1
 eligible runs. These are unavailable comparisons, not zero velocity or statistical nulls.
+A hump does form in HG / HGV / HGV- (vector strength ~0.72, ~160 Hz, ~3.9 wedges) and does not rotate: in the
+three gate-passing runs the confined-frame centre slope is +0.137, -0.086 and -0.069 wedges/s against the ideal
++4.0, and HGV's nearest miss (seed 3, 0.4667) gives +0.171. The gate fails mostly on its `out_above <= 3` clause,
+not on an absent bump.
 
 PEN L-R HGV minus HG is null (+0.7813 Hz, z 0.4221), and DNa02 L-R is null (all values zero).
 The PEN-only hold gives no confined post-pulse frames in any seed; its contrast with HGV is null
@@ -122,17 +131,21 @@ contrasts are positive results; HR-CR +9.7340 Hz is opposite the predeclared neg
 That prediction failed. The controls cannot isolate unitary transfer at matched presynaptic rates.
 All 36 follow-up runs pass the frozen checks, including 648 reconstructed trace measurements.
 Nothing is adopted; the single follow-up is complete and the suite/odour-room gate remains unmet.
-Independent skeptic pending (Fable, when accounts reset).
+Independent skeptic pass (Opus, 2026-09-17): mostly sound; every quantitative claim in both documents
+reproduced and the corrections it required are applied here (see the Skeptic pass section below).
 
 ### 5.2 The six primaries
 
 Source: `out/cx8r/analysis/compare.csv`; runs are the replicate unit, one Holm family of six.
 The first two rows retain the family slots despite having no eligible HGV observations.
+Their label is the frozen declaration's own word for an empty comparison; `common.compare` is not called on those
+rows, and on these samples (0 v 2, 0 v 1) it returns `underpowered`, while INTERP 2.4 / 10.2 reserve
+`undetermined` for a deterministic (SD 0) reference arm. Read them as unavailable comparisons.
 
 | measure / contrast | n | verdict | difference | z | p | Holm p |
 |---|---|---|---:|---:|---:|---:|
-| 1_bump_follow_HGV_vs_HG | 0 v 2 | undetermined | NA | NA | NA | NA |
-| 2_bump_follow_HGV_vs_HGV- | 0 v 1 | undetermined | NA | NA | NA | NA |
+| 1_bump_follow_HGV_vs_HG | 0 v 2 | unavailable (declared undetermined) | NA | NA | NA | NA |
+| 2_bump_follow_HGV_vs_HGV- | 0 v 1 | unavailable (declared undetermined) | NA | NA | NA | NA |
 | 3_GLNO_LR_V_vs_S | 6 v 6 | result | 2.2183 | 1671.8089 | 0.0022 | 0.0130 |
 | 4_PEN_LR_HGV_vs_HG | 6 v 6 | null | 0.7813 | 0.4221 | 0.5887 | 1.0000 |
 | 5_DNa02_LR_HGV_vs_HG | 6 v 6 | null | 0.0000 | NA | 1.0000 | 1.0000 |
@@ -141,7 +154,10 @@ The first two rows retain the family slots despite having no eligible HGV observ
 Primary 3's large z (1671.8) is a +2.2183 Hz effect divided by the nearly zero raw-reference SD
 (0.0013269 Hz); it is not a claim of a huge absolute signal. All six V values exceed all six S values.
 Primary 6 separates by rank but fails the additional |difference/reference SD| >=3 requirement in
-`common.compare`; its verdict remains null. DNa02 L and R turn-window rates are zero in every run,
+`common.compare`; its verdict remains null. Its verdict is orientation-dependent too: HGVp is exactly 0.0000 in
+all six runs, so HGV versus HGVp would return `undetermined` on a deterministic reference. Primary 3 is the same
+case in reverse -- reversing it gives |z| 2.963 and a null against the +2.2183 Hz difference, whose Welch statistic
+is +7.26. DNa02 L and R turn-window rates are zero in every run,
 so the equal-zero contrast is null with undefined z, not a detected steering signal.
 
 ### 5.3 Eligibility and the saved traces
@@ -153,8 +169,8 @@ eligible observations. The 50% gate does not certify physiological rate or conti
 
 ![All follow traces and their confinement masks](assets/compass7_follow.png)
 
-Generated by `scripts/cx8_plot.py` from every NPZ. Gray means the run fails eligibility. The raster is
-the per-frame confinement mask. Apparent large unwrapped centre movements during loss of confinement
+Generated by `scripts/cx8_plot.py` from the 18 HG / HGV / HGV- NPZs (all six seeds of each follow arm).
+Gray means the run fails eligibility. The raster is the per-frame confinement mask. Apparent large unwrapped centre movements during loss of confinement
 are not following. Even eligible HG/HGV- traces can jump and then park rather than track the ideal slope.
 
 ### 5.4 Descriptive magnitudes and k sweep
@@ -175,7 +191,9 @@ not an assertion of uninterrupted confinement. NA means no confined frame.
 | HGVk1 | 1 | 4.8400 +/- 0.1463 | 159.8255 +/- 4.9640 | 3.9030 +/- 0.0701 | 0.2610 +/- 0.0976 | 0.2456 +/- 0.1396 |
 
 The HGV k sweep (0.25 / 0.5 / 1.0) is descriptive on the held, GLNO-relabelled ring, not a V sweep.
-It raises the actual afferent L-R and PS196_b side signal while confinement remains poor. No k is selected.
+It raises the actual afferent L-R, the PS196_b side signal, GLNO L-R (2.1845 / 3.7955 / 6.9057 Hz) and PEN L-R
+(0.7414 / 1.1072 / 1.6210 Hz) monotonically in k, while turn-window confinement stays flat
+(0.2311 / 0.2389 / 0.2456). No k is selected.
 
 | arm | afferent L-R Hz | PS196_b L-R Hz | GLNO L-R Hz | PEN L-R Hz | DNa02 L-R Hz |
 |---|---:|---:|---:|---:|---:|
@@ -188,9 +206,17 @@ It raises the actual afferent L-R and PS196_b side signal while confinement rema
 | HGVk025 | 20.0241 +/- 2.0311 | -3.7866 +/- 1.7394 | 2.1845 +/- 0.8605 | 0.7414 +/- 0.9517 | 0.0000 +/- 0.0000 |
 | HGVk1 | 85.1863 +/- 2.9019 | -38.9186 +/- 2.2872 | 6.9057 +/- 1.4805 | 1.6210 +/- 0.5402 | 0.0000 +/- 0.0000 |
 
-The afferent sign control reverses the PS196_b side report, but does not establish opposite eligible
-compass motion. The k=0.5 law commands 45 Hz Poisson input at +90 deg/s; the measured afferent
-spike-rate estimate is about 42.6 Hz. These are different quantities. The law remains unverified.
+The afferent sign control reverses the AFF and PS196_b side reports (-44.2544 and +17.0148 Hz), but GLNO L-R
+does not reverse with it (+0.6862 +/- 1.9132 Hz, positive in four of six seeds) and PEN L-R reverses only in the
+mean (-0.7082 +/- 1.7688, positive in three of six). No sign-flipped counterpart of the V arm was declared, so the
+sign specificity of primary 3's GLNO response is untested where it was measured and is not reproduced in the held
+arms. It does not establish opposite eligible compass motion. The k=0.5 law commands 45 Hz Poisson input at
++90 deg/s; the measured afferent spike-rate estimate is about 42.6 Hz. These are different quantities. The law
+remains unverified.
+
+The same L-R sits on very different pedestals: V's +2.2183 Hz is GLNO_L 2.59 / GLNO_R 0.37 Hz, while HGVk025's
++2.1845 Hz is 69.76 / 67.57 Hz. Per-side rates are in `out/cx8r/analysis/per_seed.csv`
+(`GLNO_L_hz_turn` / `GLNO_R_hz_turn`, and the same for PEN / PS196_b / AFF / DNa02).
 
 | arm | ExR6 pre / pulse / post Hz | ER6 pre / pulse / post Hz | ER4m pre / pulse / post Hz |
 |---|---|---|---|
@@ -324,9 +350,16 @@ Both archived bytes match, all 48 unique identities and complete resolved LIF re
 report 24 completed / 0 failed and every console says `device cuda`. Metadata checks: zero problems.
 Independent trace verifier: 48 runs, 972 metrics checked, 52 source files including loaded probes, zero issues.
 Verifier SHA-256: `15c65c60d23fb8a895c834c648801b8167e14f99c416a23257751d647cdf1f76`; primary reducer SHA-256: `cb91cc196d223ea592cd3e780bd652ff7bd96f39f14fca717041a3599fe63786`.
-The original cx8 attempt ran the same physical commands but had a class/abs mismatch in Astra's new
-declaration. It remains invalid under `out/cx8/`, with its freeze unchanged, 144 metadata issues and
-48 model-to-declaration issues in the independent verifier. No inference uses its numbers. All 48
+The original cx8 attempt ran the same physical commands and had a class/abs mismatch only in Astra's new
+declaration. All 48 cx8 runs are numerically identical to their cx8r replacements: 6,966 of 6,966 saved metric
+values and 1,560 of 1,560 NPZ array pairs are exactly equal, with only run-directory paths and `wall_s`
+(different in 47 of 48 runs) distinguishing the records. The replacement is a genuine re-submission that reproduced
+the invalidated batch exactly on the same B200 node, so the cx_wedge compass assay is seed-reproducible on this GPU
+path across submissions -- recorded as a qualification of INTERP 10.4 item 2 for this protocol only, and not used
+to relax it elsewhere. No inference uses cx8's numbers. It remains invalid under `out/cx8/`, with its freeze unchanged, 144 metadata issues in the retained
+`out/cx8/invalid_analysis/analysis.json` (48 runs x three checks, written by the pre-correction reducer
+`analysis_sha256 307ede2c...`; the corrected reducer reports 48) and 48 model-to-declaration issues in the
+independent verifier. No inference uses its numbers. All 48
 replacement commands match after substituting only the output directory. See `instruments_review.md` 5.
 
 All arms use the common diagnostic protocol, including compass adaptation held at zero and EPG pulse /
@@ -336,10 +369,12 @@ setting is sign/abs. MaleCNS CSR MD5 is `ef23cc27bea13be7f6a96f3c04fd3737`; the 
 
 CPU suite at the submitted tree: 469 passed / 19 skipped, 220 subtests, including the original golden.
 Closeout full CPU suite also passes: 469 passed / 19 skipped, 220 subtests, 166.40 s
-(`out/compass7/cx8_closeout_cpu.log`); main and worktree cache hashes unchanged.
+(`out/compass7/cx8_closeout_cpu.log` in the run worktree `flyverse-connectome`; `out/` is git-ignored, so this
+log is not in the main checkout); main and worktree cache hashes unchanged.
 Astra self-review: compared the primary family to the freeze, checked all trace masks/means and loaded
 sources, inspected every follow trace, and retained the small raw SD and rank/effect-rule caveats.
-Independent skeptic pending (Fable, when accounts reset). Nothing adopted.
+Independent skeptic pass (Opus, 2026-09-17): mostly sound; its verdict line and eight claim lines are quoted
+verbatim in the Skeptic pass section at the end of this audit, and its corrections are applied. Nothing adopted.
 
 ### 5.7 Outcome
 
@@ -446,7 +481,10 @@ or that a confined bump follows a turn. There is no afferent or body in this fol
 Source: `out/cx8t/analysis/compare.csv` and `analysis.json`; six fresh-brain runs per arm, one Holm
 family of four. All four comparisons separate every run by rank (U=36, two-sided exact p=0.0021645).
 The transfer z=3.1904 only modestly clears the additional |z|>=3 threshold; the measured size is
-about 3 Hz. A statistical result is distinct from agreement with its directional prediction.
+about 3 Hz. Because `common.compare` divides by the reference arm's SD, this verdict is orientation-dependent:
+HL versus HR gives z +3.1904 (SD_HR 0.9384) and a `result`, HR versus HL gives z -2.7036 and a `null`. The
+symmetric Welch statistic is +5.05 and U = 36 either way. Engagement and both edge contrasts clear |z| >= 3 in
+both orientations. A statistical result is distinct from agreement with its directional prediction.
 
 | test / measure | contrast | verdict | difference Hz | z | p | Holm p | prediction |
 |---|---|---|---:|---:|---:|---:|---|
@@ -456,6 +494,11 @@ about 3 Hz. A statistical result is distinct from agreement with its directional
 | 4_right_edge_dependency / PEN_LR_hz | HR-CR | result | +9.7340 | 9.0518 | 0.0021645 | 0.0086580 | negative: FAILED |
 
 The fourth contrast is **positive**, +9.7340 Hz, contrary to the predeclared negative prediction.
+Decomposed against the two unforced baselines, the cut alone moves PEN L-R by +11.3997 Hz (H0 - C0) while the
+challenge moves it +1.4585 Hz in HL and -1.5353 Hz in HR, so the challenge-attributable part is +1.1864 Hz for
+contrast 3 and -1.6657 Hz for contrast 4 -- the predicted sign in both. The baseline shift is about seven times
+the challenge effect, so contrast 4 as declared could not have been negative at any biology. This is a descriptive
+decomposition, not a declared test, an interaction claim or a unitary transfer estimate.
 It is not recoded as a null, nor described as confirmation of both directional edge tests. The
 unforced cut control C0 already has a large negative PEN L-R (-11.0738 Hz); CL and CR stay near it
 (-10.8016 / -10.9434 Hz). Thus removing the path shifts the operating state, even without the
@@ -467,7 +510,8 @@ do not identify a receptor mechanism or a unitary transfer at matched presynapti
 All rates below are recorded firing-rate estimates on [3.5,6.5) s, averaged over the cells of each
 somaSide; means +/- sample SD across six runs. The 90 Hz command is Poisson input, not a clamp on
 these observed rates. Both PEN sides fall below H0 under either intact-path challenge. The stimulated
-GLNO side stays near 90 Hz while the opposite side falls to 13-19 Hz, illustrating the network response.
+GLNO side stays near 90 Hz while the opposite side falls to 12.7 Hz (HR's left) and 18.5 Hz (HL's right),
+illustrating the network response.
 
 | arm | GLNO L Hz | GLNO R Hz | PEN L Hz | PEN R Hz |
 |---|---:|---:|---:|---:|
@@ -709,8 +753,8 @@ All three MaleCNS cache file MD5s remain unchanged in main and the worktree.
 The single authorized follow-up is complete. Direct challenge establishes a PEN side response under
 HG, while the round-7 afferent experiment still has no qualifying following/sign-reversal result.
 The conditional benchmark suite and odour room are therefore **not run**. No default, gain or
-receptor row is adopted; `raw` remains unchanged. No second follow-up is submitted. Independent
-skeptic pending (Fable, when accounts reset); this self-review does not replace it.
+receptor row is adopted; `raw` remains unchanged. No second follow-up is submitted. The independent skeptic
+pass (Opus, 2026-09-17) is complete and quoted at the end of this audit; this self-review does not replace it.
 
 ## Report
 
@@ -720,6 +764,10 @@ summary: |-
   V minus S raises GLNO L-R by +2.2183 Hz (result, Holm p 0.0130). No HGV run passes the predeclared
   50% turn-window confinement gate: primaries 1 and 2 are undetermined, with 0 versus 2 and 0 versus 1
   eligible runs. These are unavailable comparisons, not zero velocity or statistical nulls.
+  A hump does form in HG / HGV / HGV- (vector strength ~0.72, ~160 Hz, ~3.9 wedges) and does not rotate: in the
+  three gate-passing runs the confined-frame centre slope is +0.137, -0.086 and -0.069 wedges/s against the ideal
+  +4.0, and HGV's nearest miss (seed 3, 0.4667) gives +0.171. The gate fails mostly on its `out_above <= 3` clause,
+  not on an absent bump.
 
   PEN L-R HGV minus HG is null (+0.7813 Hz, z 0.4221), and DNa02 L-R is null (all values zero).
   The PEN-only hold gives no confined post-pulse frames in any seed; its contrast with HGV is null
@@ -740,7 +788,8 @@ summary: |-
   That prediction failed. The controls cannot isolate unitary transfer at matched presynaptic rates.
   All 36 follow-up runs pass the frozen checks, including 648 reconstructed trace measurements.
   Nothing is adopted; the single follow-up is complete and the suite/odour-room gate remains unmet.
-  Independent skeptic pending (Fable, when accounts reset).
+  Independent skeptic pass (Opus, 2026-09-17): mostly sound; every quantitative claim in both documents
+  reproduced and the corrections it required are applied here (see the Skeptic pass section below).
 key_claims:
 - The signed afferent changes GLNO L-R in V; the absolute primary effect is +2.2183 Hz.
 - HGV has zero eligible follow runs. Both follow contrasts are undetermined; no eligible sign reversal is demonstrated.
@@ -756,11 +805,43 @@ validation:
 - Every H0 seed exactly reproduces the earlier HG metrics and arrays.
 - Submitted and closeout CPU suites each passed 473 tests, with 19 skipped and 220 subtests; golden and cache unchanged.
 - Initial cx8 invalidated for a declaration error, retained separately without inference.
-- Independent skeptic pending (Fable, when accounts reset).
+- Independent skeptic pass (Opus, 2026-09-17): mostly sound; every quantitative claim reproduced, corrections
+  applied, no verdict moved.
 recommendations:
 - Nothing adopted; raw remains the default.
 - The one authorized follow-up is complete. The following/sign-reversal gate remains unmet, so no suite or room is run.
 open_questions:
 - How to obtain a stable confined bump that tracks a signed afferent input without suppressing relay activity.
 - A physiological receptor and kinetic account remains unresolved; the direct challenge does not identify one.
+```
+
+
+## Skeptic pass (independent, Opus, 2026-09-17)
+
+An independent skeptic pass ran on 2026-09-17 (Opus, CPU only, no cluster job, nothing adopted). Its verdict line
+and its claim lines are quoted verbatim below. The CORRECTIONS REQUIRED list is applied in place in the sections
+above; where a correction replaced a sentence that stated a finding, the original sentence stays in the record
+marked **Withdrawn:** (INTERP 10.4 rule 29 iii). The pass's NOT CHECKED list is recorded verbatim with this
+round's entry in [receptor_verification.md](receptor_verification.md).
+
+The pass covers this audit (sections 5-6 and the Report block); it is the round-7 / cx8r / cx8t pass.
+
+### Verdict
+
+```text
+VERDICT: mostly sound
+```
+
+### Claims
+
+```text
+CLAIMS:
+1. cx8 invalidation -- REPRODUCED, and the runs were fine: declarations differ only in protocol.receptor_net_rule class/abs; all 96 run records say sign/abs; cx8 vs cx8r 6,966/6,966 metrics and 1,560/1,560 NPZ arrays exactly equal. "144 metadata issues" reproduces only from the retained out/cx8/invalid_analysis/analysis.json (48 x 3, reducer analysis_sha256 307ede2c...); the corrected reducer gives 48, and cx8_verify.py gives 48 model-to-declaration issues.
+2. cx8r's six primaries -- REPRODUCED exactly, twice: +2.2183/z 1671.8089/p 0.0021645/p_holm 0.012987; 0v2 and 0v1 with eligible ids HG_s0#0, HG_s4#0, HGV-_s4#0; +0.7813/z 0.4221; 0.0000/p 1.0; -0.2637/z -2.3613/p_holm 0.012987. Gate was frozen pre-submission -- follow_gate_confined_frac 0.5 is in out/cx8/predeclared.json (20:59:55Z, submitted 21:00:59Z) and audit sections 1-4 are byte-identical from a20d0ed to HEAD. Vocabulary -- NOT REPRODUCED: common.compare([], vb) returns underpowered (n_min 0), the script never calls it for those rows (cx_velocity_route.py 424-425 hardcodes the string), and INTERP 2.4/10.2 reserve undetermined for a deterministic (SD 0) reference.
+3. Physical picture -- REPRODUCED. Afferent reaches both cells with a side: AFF 42.61/0.00, PS196b 0.00/18.16, GLNO 2.59/0.37 in V and 69.17/65.37 in HGV. The bump is not absent in HG/HGV/HGV-: vector strength ~0.72, in-block fraction 0.95-1.00, 158-163 Hz, 3.92 wedges, survival ~4.8 s -- the confined predicate fails mostly on its out_above <= 3 clause (epg_out_mean_post 14-52 Hz). S, V and HGVp have no bump at all (all six frac_confined_post = 0.0000). Joint ledger 0/48. Confined-frame slopes: HG_s0 +0.137, HG_s4 -0.086, HGV-_s4 -0.069, HGV_s3 +0.171 w/s vs ideal +4.0; HGV_s4's +13.2114 collapses to +3.315 on its confined frames. So a hump forms and does not rotate. Sign control partly fails, unreported: GLNO L-R does not reverse in HGV- (+0.6862 +- 1.9132, positive in 4/6) and no V- arm exists.
+4. cx8t -- REPRODUCED exactly: 36 runs / 0 problems / 648 trace checks; +149.0748 z 16.8905, +2.9939 z 3.1904, +12.5861 z 12.6558, +9.7340 z 9.0518, all p 0.0021645 / p_holm 0.0086580. Suppression reproduced (24.0426 -> 5.0211/3.6345; stimulated side 90.2/90.1, opposite 18.52/12.74). The HR-CR sign failure IS an artefact of the operating-state shift: cut alone H0-C0 = +11.3997; challenge HL-H0 = +1.4585, HR-H0 = -1.5353; challenge-attributable part of contrast 3 = +1.1864 and of contrast 4 = -1.6657, i.e. the predicted sign in both. The baseline shift is ~7x the challenge, so contrast 4 as declared could not have been negative at any biology. The audit's refusal to infer unitary transfer or a receptor sign is justified, not over-cautious -- but it hides this decomposition.
+5. H0 == HG -- REPRODUCED: 138 metrics / 31 arrays for all six seeds, 72 frozen + 58 recorded hashes tied to dc98bfe.
+6. Provenance -- REPRODUCED. Presets/instruments/holds per arm exactly as tabled; md5 sharing ef23cc27... for S+V (12 runs) and 7a10d93b... for the 36 relabelled cx8r runs + all 36 cx8t runs; 48/48 and 36/36 consoles say device cuda, all NVIDIA B200 on one node, blocks fam_s0..s5 (8 and 6 jobs, no one-job block, no device crossing); declarations 1e220af9.../16a9230d... byte-equal to archives; 70/70, 70/70, 72/72 frozen source hashes match their commits, zero recorded-hash mismatches.
+7. Per-seed lists and plots -- REPRODUCED: 202/202 audit rows (88 + 114) match an emitted per_seed.csv row exactly; 20/20 spot-checks re-derived from run JSONs; both docs/audits/assets/ PNGs md5-identical to the analysis outputs. Caption REFUTED: cx8_plot.py loops ('HG','HGV','HGV-') x 6 seeds = 18 of 48 NPZs, not "every NPZ".
+8. Prose/tables/vocabulary/branch -- REPRODUCED: 5.1 Answer and Report.summary byte-identical; 5.4's three tables reproduce cell for cell; "all six V exceed all six S" true (V min 0.8462 vs S max 0.0015). "The round-7 afferent following gate remains unmet" is true as written. The branch chosen is exactly the one the freeze prescribes, one batch only. No claim beyond what the arms can show.
 ```

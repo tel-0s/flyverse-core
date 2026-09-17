@@ -15,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -160,6 +161,16 @@ def test_analyse_computes_the_family_with_holm_and_the_follow_gate():
             assert (out / f).exists(), f
         per = (out / "per_seed.csv").read_text(encoding="utf-8").splitlines()
         assert per[0] == "arm,key,seeds,files,run_ids,values,mean,sd,n"
+        # descriptive.csv is the per-arm MEAN pivot the analysis.md table renders, not a second copy of per_seed.csv
+        # (the docstring advertised a per-arm file and the script wrote per_df to both; skeptic correction 15).
+        desc = pd.read_csv(out / "descriptive.csv")
+        assert desc.columns[0] == "arm" and len(desc) == len(set(desc.arm)) == 8
+        assert "bump_follow_wedges_per_s" in desc.columns and "seeds" not in desc.columns
+        assert (out / "descriptive.csv").read_bytes() != (out / "per_seed.csv").read_bytes()
+        per_tbl = pd.read_csv(out / "per_seed.csv")
+        for _, row in desc.iterrows():
+            want = per_tbl[(per_tbl.arm == row["arm"]) & (per_tbl.key == "GLNO_LR_hz")]["mean"].iloc[0]
+            assert abs(float(row["GLNO_LR_hz"]) - float(want)) < 1e-9, row["arm"]
         hgv_follow = [ln for ln in per if ln.startswith("HGV,bump_follow_wedges_per_s,")][0]
         assert '"0,1,2,3,4,5"' in hgv_follow and "15.0000" in hgv_follow                     # ungated list carries the dead run
         # Four eligible runs still use the actual Holm ordering. m*p_floor alone is only the first-step bound;

@@ -13,6 +13,13 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       `<cluster-host>`, `$CLUSTER_RUNS`, … in 19 files); decide whether to rewrite history before the announcement
       (`git filter-repo` on the same patterns) — the identifiers are internal hostnames and paths, nothing secret,
       but they were committed. `docs/CLUSTER.md` and `.cluster.json` stay git-ignored.
+      **Still owed at the tip (the 2026-09-17 code skeptic's list; nothing on the instrument branch added any of
+      them):** `docs/audits/receptor_verification.md` and `docs/NOTES.md` (cluster node names, hosts and
+      `<workstation>` home-directory paths quoted inside older verbatim blocks -- scrub the identifier, keep the quotation
+      intact and say it was scrubbed), `docs/media/README.md` lines 41 / 63 / 109. The five ignored
+      `out/*/predeclared.json` families (`out/cx5`, `cx6`, `cx7`, `objr3sd*`, `vncd4-7`) carry `host` / `ssh`
+      fields; they are git-ignored today and the check is that they **stay** ignored, not that they are edited.
+      That is eight files in all; do them in one pass with a `grep -n` receipt before the announcement.
 - [~] **Packaging** (2026-09-13: pyproject metadata, extras, `flyverse.interp` now shipped in wheels, `CITATION.cff` validated, `docs/INSTALL.md`; still owed: a clean-clone CUDA run-through and a lock file): `pip install -e .` from a clean clone works (pyproject has the deps; add `python_requires`,
       optional extras `[cuda]`, `[ui]`, `[interp]`), `python scripts/fetch_data.py --malecns` then
       `python scripts/room_demo.py` runs on CPU-only and on CUDA; pin torch/numpy minimums; a `requirements-lock`.
@@ -95,9 +102,11 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
       Final native overhead 54.22 us/frame at B=1 (11.01%, misses <=10% target), 3.19% at B=8, 1.22% at B=32.
       This does not close the biological compass or steering items below. One taste status changes in
       the three-draw suite, rejecting strict admission; the full room rate-half is not run. Raw remains
-      default, no food-finding claim. See `docs/audits/compass_standin.md`; independent skeptic pending.
-- [ ] **Review the compass experiment before any adoption**: independent skeptic (Fable), account for
-      the taste-row change, then the full room gate if an admissible candidate exists. Do not retune
+      default, no food-finding claim. See `docs/audits/compass_standin.md`; independent skeptic pass
+      (Opus, 2026-09-17) mostly sound -- the claims match the code and no unearned physiology was found.
+- [~] **Review the compass experiment before any adoption**: the independent skeptic pass is **done**
+      (Opus, 2026-09-17, mostly sound; quoted in `compass_standin.md`). Still owed: account for the
+      taste-row change, then the full room gate if an admissible candidate exists. Do not retune
       gains to pass the suite or treat short room rollouts as evidence of food finding.
 
 - [ ] **Spontaneous turning / the straight walker.** DNa02 sits under tonic sign-correct inhibition
@@ -184,7 +193,10 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           8.23 / 81.09 / 25.10 matches C on both sides; direct C-L3 relay +2.6687 / +3.8782 Hz, pooled
           +3.2734. M2-L3 +2.8521 / +4.0290; M2-C null on all seven primaries. The older level model
           leaves +1.2028 / +1.2344 Hz in modulation-free L3: its extrapolation overestimated the size.
-          Nothing adopted; independent skeptic pending (Fable, when accounts reset).
+          Nothing adopted. **Independent skeptic pass done** (Opus, 2026-09-17, mostly sound): all seven claims
+          reproduced, no conclusion moved, eleven corrections applied in the audit. What it changed in the record
+          is bookkeeping only -- the receipt time, two line-ending "source-stamp differences" that are not edits,
+          the driver script missing from the 52-file fingerprint, and the rule-7 breach in commit 62cdefb.
     - [ ] **more runs of the REFERENCE arm for DNa02_R / the clean yaw SD** (`level_controls_r2.md` 9 item 6): both
           rows reproduce as DIFFERENCES in all three batches (DNa02_R +0.103 / +0.107 / +0.094 Hz; clean yaw SD
           +0.572 / +0.490 / +0.588 deg/s) and as verdicts only sometimes (DNa02_R `result` in rounds 4 and 4b at
@@ -261,8 +273,15 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           working-compass successes in every arm. H3E is wide, high-rate and systematically offset; H3F
           nearly flat. Withdrawn: missing inhibition everywhere else; the far half is already near background.
           No default changed or intervention adopted. Independent completed notes and their limits are in the audit.
+          **Round 7's skeptic pass sharpens the same answer** (2026-09-17): under the hold plus the GLNO relabel a
+          hump DOES form -- vector strength ~0.72, ~160 Hz, ~3.9 wedges -- and does not rotate. In the three
+          gate-passing runs the confined-frame centre slope is +0.137 / -0.086 / -0.069 wedges/s against an ideal
+          +4.0, and the gate fails mostly on its `out_above <= 3` clause, not on an absent bump. So the open
+          question is not "is there a bump" but "why does a bump that exists not follow the side signal".
     - [x] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate, -- ANSWERED by Astra (2026-09-16, `docs/audits/exr6_evidence.md`, merged 4fcfdf7): ExR6 glutamate and ER6 GABA have direct EASI-FISH support (Wolff et al. 2025 eLife 104764 Fig. 9 source data: SS53617 vGlut strong, SS58833 Gad1 weak -- worksheet rows verified locally); the model's labels stand; peptide / monoamine co-transmission untested; the open question is receptor placement and kinetics at the EB/GA contacts (a 2026 Turner-Evans-lab preprint reports glutamate inhibiting E-PG but exciting P-EN in the PB -- not isolated to ExR6). Nothing adopted.
-    - [ ] **PS196_b, from the compass side too** (2026-09-15, literature note in `docs/NOTES.md`): Wang's MaleCNS mining (`fly-circuit-exploration`, finding 3) names PS196_b as GLNO's largest input outside the ring (1,801 syn, 19-21 %; every count reproduced to the synapse in our cache) and FB3A as a PFNd input; rounds 1-4 reach the same cell from the body (AN04B003 -> PS196_b is where the self-turn report breaks; its L-R is unsigned under the Coriolis stop-gap). Owed before any compass room is called: PS196_b's afferent budget by side (AN07B037_a/_b 419 / 52, CB0675 / GNG580 / PS047_b) and a sided ascending-stimulus arm, so a signed PS196_b L-R exists to test whether GLNO carries it into PEN -- a labelled diagnostic, never a default. His "compass brake" (the EPG -> PEN write-position recurrence, 3 : 1 in hemibrain; not checkable in our cache, no per-ROI edges) is the other term of 6A's balance: both readings predict the saturated ring H3 gives. hDelta path integration (Janke 2025 hDeltaG / vDeltaE; Avritzer 2026 hDeltaA, ~7-10 s) goes on the expectation side once a bump exists.
+    - [x] **PS196_b, from the compass side too** -- ANSWERED by round 7 and its one follow-up; the remaining
+          bump question moved to the instrumented-preset follow-ups at the end of this section.
+          (2026-09-15, literature note in `docs/NOTES.md`): Wang's MaleCNS mining (`fly-circuit-exploration`, finding 3) names PS196_b as GLNO's largest input outside the ring (1,801 syn, 19-21 %; every count reproduced to the synapse in our cache) and FB3A as a PFNd input; rounds 1-4 reach the same cell from the body (AN04B003 -> PS196_b is where the self-turn report breaks; its L-R is unsigned under the Coriolis stop-gap). Owed before any compass room is called: PS196_b's afferent budget by side (AN07B037_a/_b 419 / 52, CB0675 / GNG580 / PS047_b) and a sided ascending-stimulus arm, so a signed PS196_b L-R exists to test whether GLNO carries it into PEN -- a labelled diagnostic, never a default. His "compass brake" (the EPG -> PEN write-position recurrence, 3 : 1 in hemibrain; not checkable in our cache, no per-ROI edges) is the other term of 6A's balance: both readings predict the saturated ring H3 gives. hDelta path integration (Janke 2025 hDeltaG / vDeltaE; Avritzer 2026 hDeltaA, ~7-10 s) goes on the expectation side once a bump exists.
           Withdrawn older continuation: ExR6 transmitter wholly UNKNOWN. The checked evidence is in the completed ExR6 item above.
           **Round 7 answered the afferent budget / sided-input item** (`compass_velocity_route.md`, cx8r):
           AN07B037 drives a signed PS196_b report and V-S GLNO L-R is +2.2183 Hz, result. HGV has 0/6
@@ -271,7 +290,13 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           transfer follow-up is complete (cx8t, audit section 6): direct 90 Hz forcing gives PEN L-R
           HL-HR +2.9939 Hz, result, while lowering PEN mean. The cut changes the baseline; the right-edge
           contrast has the opposite sign to prediction. Transfer at this strong challenge is established,
-          but a stable following bump remains open. No second batch; independent skeptic pending.
+          but a stable following bump remains open. No second batch. **Independent skeptic pass done**
+          (Opus, 2026-09-17, mostly sound): every quantitative claim in both documents reproduced, and it added
+          two things the round did not claim -- cx8 and cx8r are bit-identical (6,966/6,966 metrics,
+          1,560/1,560 arrays), a free replication recorded as a qualification of INTERP 10.4 item 2 for the
+          cx_wedge protocol only; and cx8t's failed HR-CR sign is the operating-state shift (the cut moves PEN
+          L-R +11.4 Hz, the challenge about -1.7), so the challenge-attributable part carries the predicted sign
+          in both edge contrasts. No unitary transfer or receptor sign is inferred either way.
     - [ ] **the room rate-half for GLNO, if adoption is ever wanted** (`glno_relabel.md` 4.3(b);
           `guard_suites_r3.md` 4): the room take-off protocol on `out/cache_glno_glu` at **>= 6 runs per arm** in ONE
           submission (`guard_suites.sh`'s room jobs with `FLYVERSE_CACHE` / `--cache-dir`). The suite half is already met
@@ -365,6 +390,32 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
       **dose in postsynaptic cells touched**, which this design structurally cannot close.
 - [ ] **Escape and wind orientation** pass today; keep them in every suite run as regression guards.
 
+**Instrumented-preset follow-ups (2026-09-17, from the four independent skeptic passes).** All five are
+questions, not plans; none of them is authorized as a batch yet, and none licenses an adoption.
+
+- [ ] **A goal-only plume arm, with no DNa02 feedback.** No such arm exists. Mean |demand| did not rise between
+      the diagnostic and the validation (0.057-0.074 -> 0.036-0.083) while mean |yaw| tripled (0.038-0.067 ->
+      0.106-0.245 rad/s), so the feedback bridge looks like the load-bearing change -- but that is an inference,
+      and a goal-only arm is what would measure it. Same rooms, same seeds, feedback off.
+- [ ] **A transduced-contrast plume law.** The shipped correction reads the bilateral contrast off the physical
+      concentration field (noise-free, pre-transduction) at a gain of 200, and the observed contrast is
+      0.26-0.57 %. Through the model's own ORN law (1 + 150c/(c+0.5)) that is ~0.1 Hz per ORN, under the Poisson
+      noise of the 0.25 s window. The question: does a law that reads the ORN RATES still find food? If not, the
+      200x gradient is doing the navigating and the instrument should say so in one sentence.
+- [ ] **A V- arm for the GLNO sign.** Round 7 declared no sign-flipped counterpart of V, and in the held arms
+      GLNO L-R does not reverse (+0.6862 +- 1.9132 Hz, positive in four of six seeds), so primary 3's sign
+      specificity is untested where it was measured. One arm: the afferent at k 0.5, sign -1, no hold, no relabel.
+- [ ] **A deterministic-kernel gate before any room number is quoted again.** The native event path is not
+      reproducible run to run: per-cell rate differences to 44.9 Hz (voltages to 77.6 mV, conductances to 247)
+      under bit-identical `poisson_p` and `drive`. Either an exact-workload pass, or the torch-sparse path for
+      the quoted rooms, or repeated draws with the spread reported -- until one of those, first-contact times and
+      end energies are one draw and not a number.
+- [ ] **The 29-check suite under `instrumented`, three draws, with the three-instrument list**, beside the `raw`
+      column, as PRESETS_SPEC section 2 item 5 requires. The compass stand-in's own run already rejected
+      admission on `taste.MN9_hz` (seed 1, 1.690456 -> 4.295961 Hz, FAIL -> PASS outside the declared heading
+      gap, rejected regardless of its favourable direction), so the expectation is another rejection; the point
+      is to have the instrumented column on the record.
+
 Most useful experimental data, ranked by leverage: (1) receptor / conductance profiles for the unprofiled
 types and for DA / OA / 5-HT receptors; (2) per-type baseline firing in behaving flies (DN / AN / CX imaging);
 (3) unitary synaptic strengths by transmitter (mV per synapse; the global scale is the one number every
@@ -421,6 +472,12 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
       verdict-agreement script that diffs two analysis CSVs and prints the count and the flipped keys verbatim.
 - [ ] Batch-sustain / probe JSON headers: done for `batch_sustain.py`; do the same for every probe still
       writing `options.device = None`.
+- [ ] **`benchmark.Context.new_brain` provenance records carry `execution.host`** (2026-09-17 code skeptic,
+      claim 2): it now builds a `provenance()` record per legacy section even under `raw`, and emits a new
+      `controllers` array. Brain construction is unchanged and no default moved, but the records carry the
+      execution host, so **those JSONs must not be committed raw** -- strip or placeholder `execution.host`
+      (and any path-bearing field) in whatever writes them to a tracked file, and add a test that a committed
+      benchmark JSON carries no host.
 - [ ] Observatory UI: NT readout of the `health` tool; a "why did it do that" panel that runs `decompose` on
       the current frame's DN inputs.
 
@@ -487,7 +544,8 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
 
 - [x] Plural `--instruments`, composition/dependency errors, recurrent ring experiment, published PFL3
       comparator, explicit metabolic gain, wing-MN power/steering control. Raw default unchanged.
-      Evidence and limits: `docs/audits/navigation_instruments.md`; independent review pending.
+      Evidence and limits: `docs/audits/navigation_instruments.md`; independent review done (Opus,
+      2026-09-17, mostly sound for all three navigation audits; quoted in each).
 - [ ] Validate plume return with controlled odor/wind ablations and multiple neural draws before
       claiming robust food finding. After the explicit bilateral-goal/feedback correction, six
       of six compass and five of six ring rows feed in one 60 s family; no admission claim.

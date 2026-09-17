@@ -31,6 +31,10 @@ import numpy as np
 
 PRESETS = ("raw", "instrumented")
 INSTRUMENT_KINDS = {"stop-gap", "mechanism", "edges", "relabel"}
+# What the stand-in stands in for (PRESETS_SPEC section 5, owner extension of 2026-09-17): 'input' supplies a missing
+# *input* the connectome names, 'computation' replaces a *computation* the model cannot do (a program-shaped stand-in,
+# admitted only under the section-5 extension), 'configuration' is a record of a caller configuration (edges/relabel).
+REPLACES = {"input", "computation", "configuration"}
 NAMED_INSTRUMENTS = ('compass', 'compass_ring', 'plume', 'hunger', 'flight')
 
 
@@ -113,13 +117,20 @@ def _check_instrument(inst):
     if not callable(getattr(inst, "install", None)):
         raise ValueError(f"instrument {name!r} must implement install()")
     d = inst.describe()
-    for key in ("name", "kind", "law", "gap", "removal", "audits"):
+    for key in ("name", "kind", "law", "gap", "removal", "audits", "replaces"):
         if key not in d:
             raise ValueError(f"instrument {name!r}: describe() lacks {key!r} (PRESETS_SPEC section 2)")
     if d["name"] != name or d["kind"] != inst.kind:
         raise ValueError(f"instrument {name!r}: describe() disagrees with its name or kind")
     if any(not d[key] for key in ("law", "gap", "removal", "audits")):
         raise ValueError(f"instrument {name!r}: law, gap, removal and audits must be nonempty")
+    if d["replaces"] not in REPLACES:
+        raise ValueError(f"instrument {name!r}: describe()['replaces'] must be one of {sorted(REPLACES)} "
+                         "(PRESETS_SPEC section 5: a program-shaped stand-in says so)")
+    # PRESETS_SPEC section 2 item 2: either the law is marked `unverified`, or the record names where it came from.
+    if d["law"] != "unverified" and not (d.get("source") or d.get("sources")):
+        raise ValueError(f"instrument {name!r}: law {d['law']!r} is not 'unverified', so describe() must carry a "
+                         "nonempty `source` or `sources` (PRESETS_SPEC section 2 item 2)")
     return name
 
 
@@ -300,6 +311,7 @@ class SidedTurnAfferent:
         ids = self.c.neurons.bodyId.to_numpy()
         return {
             "name": self.name, "class": identifier(self), "kind": self.kind, "law": self.law,
+            "replaces": "input",                        # a missing body-derived input, not a computation
             "law_text": "poisson_hz = k * max(0, sign * yaw_deg_s) on the left afferents, k * max(0, -sign * yaw_deg_s) on the right; "
                         "clamped to max_hz; positive yaw = a left turn (body.Locomotion)",
             "parameters": dict(self.parameters), "trainable": False, "checkpoint_hash": None,
@@ -351,12 +363,14 @@ class EdgeHold:
 
     def describe(self):
         return {"name": self.name, "class": identifier(self), "kind": self.kind, "law": self.law,
+                "replaces": "configuration",            # a record of a caller configuration: neither an input nor a computation
                 "law_text": f"W[post ~ {self.post_re}, pre ~ {self.pre_re}] x {self.factor:g} through LIFParams.type_path_gain",
                 "parameters": {"pre": self.pre_re, "post": self.post_re, "factor": self.factor},
                 "resolved": self.resolved, "trainable": False, "checkpoint_hash": None,
                 "gap": "the ExR6 / ER6 / ER4m DC term on PEN / EPG removes the ring's resting state (compass_dc_balance.md); "
                        "receptor placement and kinetics at those contacts are open",
-                "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point (compass_ring_mechanism.md)",
+                "source": "a factor-0 hold claims no transfer; the DC term it removes is the 5A fixed point, recorded in "
+                          "docs/audits/compass_dc_balance.md and docs/audits/compass_ring_mechanism.md",
                 "removal": "sourced receptor placement and kinetics at the EB / GA contacts of ExR6 / ER6 / ER4m that reproduce the physiological operating state",
                 "audits": ["docs/audits/compass_dc_balance.md", "docs/audits/compass_ring_mechanism.md", "docs/audits/exr6_evidence.md"],
                 **self.description}
@@ -383,10 +397,12 @@ class TypeRelabel:
 
     def describe(self):
         return {"name": self.name, "class": identifier(self), "kind": self.kind, "law": self.law,
+                "replaces": "configuration",            # a record of a caller configuration: neither an input nor a computation
                 "law_text": f"type {self.type_name} compiled as {self.nt} (NT_SIGN sign) in a scratch cache",
                 "parameters": {"type": self.type_name, "nt": self.nt}, "trainable": False, "checkpoint_hash": None,
                 "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
-                "source": "the stronger of two disagreeing EM predictions (glno_relabel.md); no sourced transmitter call exists",
+                "source": "the stronger of two disagreeing EM predictions, recorded in docs/audits/glno_relabel.md and "
+                          "docs/audits/cx_glno.md; no sourced transmitter call exists",
                 "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
                 "audits": ["docs/audits/glno_relabel.md", "docs/audits/cx_glno.md"]}
 
@@ -412,7 +428,9 @@ class EdgeGain(EdgeHold):
     def describe(self):
         d = super().describe()
         d.update(gap="a per-type undamping the 5A / 6A rounds asked for (compass_local_recurrence.md)",
-                 source="none: a gain factor is not a measurement", removal="a measured recurrence gain, or the round that retires the question",
+                 source="no measurement: a gain factor is not one. The round that asked for it and the arms it was run "
+                        "in are docs/audits/compass_local_recurrence.md",
+                 removal="a measured recurrence gain, or the round that retires the question",
                  audits=["docs/audits/compass_local_recurrence.md"])
         return d
 

@@ -1349,7 +1349,7 @@ threads' own documents (`compass_room.md`, `cx_shift.md`, `feeding_horizon.md`, 
 * 'TmY21 is fed by non-carriers (TmY5a, TmY13, Tm5a, Tm5Y)' omits its third input, Tm20 at 5.8 %, which is a carrier (z +5.3) and supplies its largest positive contribution (+0.000615); and 'no hand-crafted measure sits on these edges' has the two exceptions the doc itself lists elsewhere (T5b -> T2 2.1 % and T5d -> TmY5a 4.5 %, both at the x2 output gain). The loss mechanism is also not one mechanism: T3/T2 are cancellation (contributions ~0.001 summing to -0.0004), whereas Tm5Y is dilution plus higher background scatter (14 % of a +0.0107 carrier, estimate +0.00084, sd_bg 3.9e-3).
 * On the LPLC2 null rise, the exact tie-aware test the round asks for: rank-sum of the 3 shipped-gain null draws (0.154, 0.269, 0.291) against round 3's 5 damped-gain draws (0.081, 0.124, 0.137, 0.174, 0.178) gives U = 13 of 15, one-sided p = 4/56 = 0.071; the ball arm's apparent drop is p = 0.29. So 'the null rose while the ball arm did not move' is the right description but is not significant at n = 3 vs 5 -- stronger than the doc's 'not settled', and worth stating as p = 0.07.
 * Two further reading caveats on the benchmark half: loom_escape.GF_peak is a max over seeds taken over 3 draws for the baseline and 2 for every ablation (a max over more draws is biased upward, and my rerun showed a 5.9 Hz swing within one configuration), and loom.escape_cm passes on 'notnone', so the runaway configuration out_norm_l2 scores a PASS at 50.0 cm and no_t4t5_rectify at 9.0 cm. Neither is flagged.
-* My verification artefacts, for the record (no file of the reported thread was edited): out/optic_verify_cluster.log (cluster run optic-verify-acf696, 3 jobs, 0 failed, 14.5 min, all NVIDIA B200 / torch 2.11.0+cu128), out/optic_verify/{baseline/{stages_s0.json,obj_ball_s0.json,obj_null_s0.json}, pair_gain_lpi_x1/pair_gain_lpi_x1.json, no_spk_feedback/obj_{ball,null}_s{0,1}.json} plus the three job console logs; the comparison and re-derivation scripts are in <workstation-home>/AppData/Local/Temp/claude/D--Projects-flyverse/d280c0e1-e89c-49ce-943c-279a614bcc17/scratchpad (chk1-13.py, cmp.py, cmp2.py, cmp3.py, pool.py, stage2.py, mw.py). The reruns used the reported thread's own generator, scripts/audit_optic.py --one.
+* My verification artefacts, for the record (no file of the reported thread was edited): out/optic_verify_cluster.log (cluster run optic-verify-acf696, 3 jobs, 0 failed, 14.5 min, all NVIDIA B200 / torch 2.11.0+cu128), out/optic_verify/{baseline/{stages_s0.json,obj_ball_s0.json,obj_null_s0.json}, pair_gain_lpi_x1/pair_gain_lpi_x1.json, no_spk_feedback/obj_{ball,null}_s{0,1}.json} plus the three job console logs; the comparison and re-derivation scripts are in the session scratchpad under <workstation> (chk1-13.py, cmp.py, cmp2.py, cmp3.py, pool.py, stage2.py, mw.py). The reruns used the reported thread's own generator, scripts/audit_optic.py --one.
 
 ## verify:takeoff-hold  --  verdict: **mostly sound**
 
@@ -3518,7 +3518,9 @@ Closeout CPU suite: 441 passed / 19 skipped, 215 subtests; bit-identity gate and
 
 ## Round 4d, three-channel matched level control (2026-09-15)
 
-**Independent skeptic pending (Fable, when accounts reset).** Astra's self-review is labelled in
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** All seven claims reproduced, no conclusion moved; the
+eleven corrections it required (seven required, four recommended) are applied in `level_fixed_point.md`, which
+also carries its verdict and claim lines verbatim. Astra's self-review is labelled in
 `level_fixed_point.md` section 11 and does not replace the independent pass. All 24 CUDA runs and
 the predeclared channel matches checked; primary families re-emitted with Holm m=7, six runs per arm.
 C-L3 relay +2.6687 / +3.8782 Hz and DNa02-left are results; DNa02-right and the behavioural/sided
@@ -3526,10 +3528,46 @@ primaries are null. M2-C is null on all seven. The direct pooled matched structu
 the old level model's residual on L3 reveals its extrapolation limit. Source-stamp differences and
 an unused descriptive rate-column defect are recorded. Nothing adopted; CPU suite 441 passed /
 19 skipped, 215 subtests, including the golden gate; cache MD5s unchanged.
+What the pass changed in the record: the submission receipt is 19:22:25Z, not 19:22:20Z; two of the three
+source-stamp differences are line-ending artefacts rather than content edits, and two further stamped reducers
+(`senses.py`, `interp/common.py`) now differ because of later rounds; `scripts/probe_vnc_drive.py` is not one of
+the 52 fingerprinted files; the re-analysis logs are not in the repository; and the WIP commit 62cdefb's message
+("the Report block is complete") was false against five PENDING_* placeholders -- a rule-7 breach, recorded.
+
+### Verdict
+
+```text
+VERDICT: mostly sound
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED:
+1. Header. "submission receipt out/vncd7/submitted_at.txt (19:22:20Z)" -> "(19:22:25Z)".
+2. Section 3.3. "vncd5's cal_L 86.97 sits against L's 88.3 early / 86.0 full" -> "against L's 88.8 early / 86.1 full" (out/vncd5 L: early 88.825, full 86.052; 88.361 is arm U's early window, quoted correctly in 3.4).
+3. Section 10, "Source-stamp limit". Replace the paragraph "The rest of the 14-entry stamp matches. This does not certify when the changed files were edited." with: "Checked at 2e15d05. Two of the three digests differ only by line endings: the stamp hashes raw working-tree bytes (CRLF), and the sha256 of the CRLF rendering of scripts/probe_vnc_drive.py and scripts/derive_level_fixed_point.py as committed is exactly the stamped a3530afd... / f2b61583..., so their CONTENT is unchanged since the stamp (git diff 62cdefb HEAD on both is empty). Only out/vncd7/batch.sh is a content difference, and its 24 quoted job lines are identical to the 24 commands the scheduler recorded in out/vncd7_cluster.log, so nothing about what ran is in doubt. On main 3ee368a two further stamped files now differ -- flyverse/senses.py and flyverse/interp/common.py, both predeclared reducers -- because of later rounds; the simulated senses.py is the one committed at 62cdefb (c140067f..., the run fingerprint's own hash)."
+4. Section 10. Add after "the file map, not that field, identifies the simulation source": "The 52-file map covers flyverse/** plus scripts/interp_export.py and scripts/probe_object_sweep.py; it does NOT include scripts/probe_vnc_drive.py, the script every job ran, so the driver is identified by the verbatim job lines in out/vncd7_cluster.log and by the arm / spec / sense block each run JSON records, not by the fingerprint."
+5. Sections 4 and 10. out/compass7/4d_{verify,analyse,pairs,level_model,per_seed}.log are not in the repository. Say "not retained in the repository" instead of "in the closeout worktree".
+6. Section 10. "One submission, 24 completed jobs / zero failed (out/vncd7_cluster.log)" -> add "the record is the client console, and all 24 jobs are logged completed exit None, so no exit code survives; the 24 run JSONs with their finished_utc, five artefacts each and device cuda lines are what establishes completion (INTERP 10.4 items 4 and 21)."
+7. Section 0 / Report / section 11. "Independent skeptic pending (Fable, when accounts reset)" -> replace with the result of this pass (mostly sound; all seven claims reproduced; corrections above; no conclusion moved).
+Recommended: 8. Section 5, after "F1 yaw has z 2.2837": add "F1's clean-yaw p is at the exact-U floor because the six seed pairs separate completely (C min 7.7038 > L3 max 7.5874); the null is the |z| >= 3 criterion, not an absence of a consistent difference." 9. Section 3.3. "on-table fraction 0.59-0.82 at 45-55 s" -> "0.59-0.84". 10. Section 7: the same file also carries the DNa02 residual differences, where pooled C-L3 is +0.0941 (z +4.3, result) -- add one line. 11. Section 9: note that commanded_<ch>_absLR_hz is computed on the post-skip non-airborne mask while the pooled and L-R keys use post-skip only (INTERP 10.4 rule 22).
+```
+
+### Not checked
+
+```text
+NOT CHECKED: Section 11's "441 passed / 19 skipped, 215 subtests" (suite at the closeout commit; main runs 503; ran section 2's three files instead: 41 passed / 10 subtests / 0 failed incl. test_bit_identity.py). The GPU experiment itself. out/vncd7/smoke/room_L3_r0.json field-level content. The level model's fit internals (round 4c's skeptic covered the fit; declared secondary). decompose_*/trace_*/paths_* products other than the two figures section 8 quotes. Literature/bracket claims: the audit makes none.
+```
 
 ## Compass round 7, signed afferent route (2026-09-15)
 
-**Independent skeptic pending (Fable, when accounts reset).** `compass_velocity_route.md` section 5;
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** One pass covered cx8r and the cx8t follow-up below.
+Every quantitative claim in both documents reproduced exactly; the defects are omissions, one mis-used verdict
+word and one false figure caption, plus one substantial finding the audit never reported: cx8 and cx8r are
+bit-identical (6,966/6,966 metrics, 1,560/1,560 NPZ array pairs), so the invalidation was purely a declaration
+defect and the round got a free replication -- recorded as a qualification of INTERP 10.4 item 2 for the cx_wedge
+protocol only. `compass_velocity_route.md` section 5;
 Astra's self-review is labelled. Valid cx8r has 48 CUDA runs, six per arm, zero protocol or trace-check
 problems, 972 measurements and 52 source hashes verified independently on CPU. V-S GLNO L-R is result
 (+2.2183 Hz, Holm p 0.0130); HGV has 0/6 eligible follow runs, so primaries 1/2 are undetermined.
@@ -3541,10 +3579,47 @@ Initial cx8 remains invalid due to Astra's class/abs declaration error, never us
 The full replacement ran identical physical commands. Submitted-tree CPU 469 passed / 19 skipped,
 220 subtests, unchanged golden and cache. Review correction is in `instruments_review.md` section 5.
 
+### Verdict
+
+```text
+VERDICT: mostly sound
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED:
+1. 5.2 line ~131 -- after "The first two rows retain the family slots despite having no eligible HGV observations." add: "Their label is the frozen declaration's own word for an empty comparison; common.compare is not called on those rows, and on these samples (0 v 2, 0 v 1) it returns underpowered, while INTERP 2.4 / 10.2 reserve undetermined for a deterministic (SD 0) reference arm. Read them as unavailable comparisons." Change the two table cells from undetermined to "unavailable (declared undetermined)". Same qualifier in section 3's "No eligible measurements is undetermined" sentence.
+2. 5.6 line ~327 -- replace "The original cx8 attempt ran the same physical commands but had a class/abs mismatch in Astra's new declaration." with: "The original cx8 attempt ran the same physical commands and had a class/abs mismatch only in Astra's new declaration. All 48 cx8 runs are numerically identical to their cx8r replacements: 6,966 of 6,966 saved metric values and 1,560 of 1,560 NPZ array pairs are exactly equal, with only run-directory paths and wall_s (different in 47 of 48 runs) distinguishing the records. The replacement is a genuine re-submission that reproduced the invalidated batch exactly on the same B200 node, so the cx_wedge compass assay is seed-reproducible on this GPU path across submissions -- recorded as a qualification of INTERP 10.4 item 2 for this protocol only, and not used to relax it elsewhere. No inference uses cx8's numbers."
+3. 5.6 line ~328 -- "144 metadata issues and 48 model-to-declaration issues in the independent verifier" -> "144 metadata issues in the retained out/cx8/invalid_analysis/analysis.json (48 runs x three checks, written by the pre-correction reducer analysis_sha256 307ede2c...; the corrected reducer reports 48) and 48 model-to-declaration issues in the independent verifier".
+4. 5.3 caption line ~156 -- "Generated by scripts/cx8_plot.py from every NPZ." -> "Generated by scripts/cx8_plot.py from the 18 HG / HGV / HGV- NPZs (all six seeds of each follow arm)."
+5. 5.4 line ~191 -- replace "The afferent sign control reverses the PS196_b side report, but does not establish opposite eligible compass motion." with: "The afferent sign control reverses the AFF and PS196_b side reports (-44.2544 and +17.0148 Hz), but GLNO L-R does not reverse with it (+0.6862 +/- 1.9132 Hz, positive in four of six seeds) and PEN L-R reverses only in the mean (-0.7082 +/- 1.7688, positive in three of six). No sign-flipped counterpart of the V arm was declared, so the sign specificity of primary 3's GLNO response is untested where it was measured and is not reproduced in the held arms. It does not establish opposite eligible compass motion."
+6. 5.4 -- add after the L-R table: "The same L-R sits on very different pedestals: V's +2.2183 Hz is GLNO_L 2.59 / GLNO_R 0.37 Hz, while HGVk025's +2.1845 Hz is 69.76 / 67.57 Hz. Per-side rates are in out/cx8r/analysis/per_seed.csv (GLNO_L_hz_turn / GLNO_R_hz_turn, and the same for PEN / PS196_b / AFF / DNa02)."
+7. 5.1 AND Report.summary together (byte-identical by rule 26) -- after "These are unavailable comparisons, not zero velocity or statistical nulls." add: "A hump does form in HG / HGV / HGV- (vector strength ~0.72, ~160 Hz, ~3.9 wedges) and does not rotate: in the three gate-passing runs the confined-frame centre slope is +0.137, -0.086 and -0.069 wedges/s against the ideal +4.0, and HGV's nearest miss (seed 3, 0.4667) gives +0.171. The gate fails mostly on its out_above <= 3 clause, not on an absent bump."
+8. 6.4 line ~460 -- after "That prediction failed." add: "Decomposed against the two unforced baselines, the cut alone moves PEN L-R by +11.3997 Hz (H0 - C0) while the challenge moves it +1.4585 Hz in HL and -1.5353 Hz in HR, so the challenge-attributable part is +1.1864 Hz for contrast 3 and -1.6657 Hz for contrast 4 -- the predicted sign in both. The baseline shift is about seven times the challenge effect, so contrast 4 as declared could not have been negative at any biology. This is a descriptive decomposition, not a declared test, an interaction claim or a unitary transfer estimate."
+9. 6.4 line ~448 -- after "The transfer z=3.1904 only modestly clears the additional |z|>=3 threshold; the measured size is about 3 Hz." add: "Because common.compare divides by the reference arm's SD, this verdict is orientation-dependent: HL versus HR gives z +3.1904 (SD_HR 0.9384) and a result, HR versus HL gives z -2.7036 and a null. The symmetric Welch statistic is +5.05 and U = 36 either way. Engagement and both edge contrasts clear |z| >= 3 in both orientations."
+10. 5.2 line ~143 -- after "its verdict remains null" add: "Its verdict is orientation-dependent too: HGVp is exactly 0.0000 in all six runs, so HGV versus HGVp would return undetermined on a deterministic reference. Primary 3 is the same case in reverse -- reversing it gives |z| 2.963 and a null against the +2.2183 Hz difference, whose Welch statistic is +7.26."
+11. 5.6 line ~339 -- "(out/compass7/cx8_closeout_cpu.log)" -> "(out/compass7/cx8_closeout_cpu.log in the run worktree flyverse-connectome; out/ is git-ignored, so this log is not in the main checkout)".
+12. section 3 line ~69 / 5.6 -- after "run sequentially with one fetch directory, and abort if either client fails" add: "This is a named departure from INTERP 10.4 item 3 (one client per --fetch directory), mitigated by the strict sequencing and by the reducer's check that all 48 distinct arm/seed identities appear exactly once."
+13. 6.5 line ~470 -- "the opposite side falls to 13-19 Hz" -> "the opposite side falls to 12.7 Hz (HR's left) and 18.5 Hz (HL's right)".
+14. 5.4 line ~177 -- "It raises the actual afferent L-R and PS196_b side signal while confinement remains poor." -> "It raises the actual afferent L-R, the PS196_b side signal, GLNO L-R (2.1845 / 3.7955 / 6.9057 Hz) and PEN L-R (0.7414 / 1.1072 / 1.6210 Hz) monotonically in k, while turn-window confinement stays flat (0.2311 / 0.2389 / 0.2456)."
+15. Code: scripts/cx_velocity_route.py 406-408 writes per_df to both per_seed.csv and descriptive.csv (md5-identical) while the docstring advertises descriptive.csv as per-arm mean/sd/n; the desc pivot is computed and only rendered into analysis.md. Save desc to descriptive.csv (and keep per_seed.csv), or fix the docstring.
+```
+
+### Not checked
+
+```text
+NOT CHECKED: the full CPU suites at the submitted trees (read the retained logs instead: 469/176.98 s, 469/166.40 s, 473/216.42 s, 473/217.19 s -- as quoted; ran the four round-7 test files at HEAD: 41 passed). The GPU executions themselves. The three MaleCNS cache-file MD5s (only the compiled-graph md5s as recorded). The literature layer. A separate fetched scheduler receipt (none exists; only client_stdout*.txt). Pixel-level re-rendering of the two figures. out/cx8t/analysis/self_check.json beyond the regenerated artifacts.
+```
+
 ## Compass round 7, single direct GLNO transfer follow-up (2026-09-15)
 
-**Independent skeptic pending (Fable, when accounts reset).** `compass_velocity_route.md` sections
-6.4-6.7; Astra's self-review is labelled. One house submission, 36 runs, six per condition, four
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** This is the same pass as the round-7 entry above; its
+verdict line, the full fifteen-item corrections list and its NOT CHECKED list are quoted there, and the four
+items that name section 6 are repeated below. All four primaries reproduced exactly, and the failed HR-CR sign is
+the operating-state shift: the cut alone moves PEN L-R +11.3997 Hz while the challenge moves it +1.4585 (HL) and
+-1.5353 (HR), so the challenge-attributable part carries the predicted sign in both edge contrasts. No unitary
+transfer or receptor inference follows. `compass_velocity_route.md` sections 6.4-6.7; Astra's self-review is labelled. One house submission, 36 runs, six per condition, four
 predeclared contrasts. All pass the frozen protocol checks; 648 trace measurements agree, all 72
 frozen and 58 recorded source hashes match the submitted commit. Three recorded files were outside
 the freeze and are explicitly checked retrospectively. H0 reproduces HG's 138 metrics and 31 arrays
@@ -3562,10 +3637,36 @@ No joint ledger success; DNa02 side rates are zero in every challenge-window mea
 the one authorized follow-up is complete, and the conditional suite and odour room remain gated.
 Submitted-tree and final closeout CPU suites each have 473 passed / 19 skipped, 220 subtests; golden and cache unchanged.
 
+### Verdict
+
+```text
+VERDICT: mostly sound
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED (the items naming section 6)
+8. 6.4 line ~460 -- after "That prediction failed." add: "Decomposed against the two unforced baselines, the cut alone moves PEN L-R by +11.3997 Hz (H0 - C0) while the challenge moves it +1.4585 Hz in HL and -1.5353 Hz in HR, so the challenge-attributable part is +1.1864 Hz for contrast 3 and -1.6657 Hz for contrast 4 -- the predicted sign in both. The baseline shift is about seven times the challenge effect, so contrast 4 as declared could not have been negative at any biology. This is a descriptive decomposition, not a declared test, an interaction claim or a unitary transfer estimate."
+9. 6.4 line ~448 -- after "The transfer z=3.1904 only modestly clears the additional |z|>=3 threshold; the measured size is about 3 Hz." add: "Because common.compare divides by the reference arm's SD, this verdict is orientation-dependent: HL versus HR gives z +3.1904 (SD_HR 0.9384) and a result, HR versus HL gives z -2.7036 and a null. The symmetric Welch statistic is +5.05 and U = 36 either way. Engagement and both edge contrasts clear |z| >= 3 in both orientations."
+13. 6.5 line ~470 -- "the opposite side falls to 13-19 Hz" -> "the opposite side falls to 12.7 Hz (HR's left) and 18.5 Hz (HL's right)".
+```
+
+### Not checked
+
+```text
+NOT CHECKED: the full CPU suites at the submitted trees (read the retained logs instead: 469/176.98 s, 469/166.40 s, 473/216.42 s, 473/217.19 s -- as quoted; ran the four round-7 test files at HEAD: 41 passed). The GPU executions themselves. The three MaleCNS cache-file MD5s (only the compiled-graph md5s as recorded). The literature layer. A separate fetched scheduler receipt (none exists; only client_stdout*.txt). Pixel-level re-rendering of the two figures. out/cx8t/analysis/self_check.json beyond the regenerated artifacts.
+```
+
 
 ## Imposed compass memory experiment (2026-09-15)
 
-**Independent skeptic pending (Fable, when accounts reset).** `compass_standin.md`; Astra's labelled
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** The instrument-code pass of 2026-09-17 covered this audit
+(its claim 7): the claims match the code and no unearned physiology was found; the rejected admission and the
+B=1 overhead miss are stated in the audit itself. No correction was required in `compass_standin.md`; the pass's
+full corrections list, its `RAW-BREAKING: none` line and its NOT CHECKED list are in the instrument-code entry
+below. One stale detail the pass names without requiring a change: the audit's "Final CPU: 482 passed /
+19 skipped" predates the navigation work (main is 503). `compass_standin.md`; Astra's labelled
 self-review does not replace it. This is an owner-authorized program memory under instrumented,
 not a receptor-row proposal or recovered compass mechanism. All 48 controlled trajectories pass,
 with exact trace reproduction after capture. Strict preset admission fails because taste changes
@@ -3576,26 +3677,85 @@ control. CPU 482 passed / 19 skipped / 220 subtests, 15 exact house lifecycle ch
 2 skipped / 3 subtests; golden/cache unchanged. Failed capture attempts are retained in the audit.
 
 
-## Navigation instruments (Astra, 2026-09-15): independent review pending
+## Navigation instruments (Astra, 2026-09-15)
 
 `audits/navigation_instruments.md` records recurrent EPG/PEN, PFL3 goal comparison, metabolic gain,
 and wing-MN control as explicit stop-gap instruments. No receptor row, transmitter relabel, parent
-weight or default was changed. The author self-review is labelled as such; Fable's independent
-skeptic pass is pending. Functional flight is demonstrated in the shipped body, not a recovered
+weight or default was changed. The author self-review is labelled as such; the independent
+skeptic pass ran on 2026-09-17 (Opus), not Fable. Functional flight is demonstrated in the shipped body, not a recovered
 DNg02 mechanism; recurrent velocity calibration and reliable food finding remain open. CPU/golden
 passes; full native CUDA exact-workload performance gate fails and is retained, not waived.
 
-## Flight foraging priority (Astra, 2026-09-15): independent review pending
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** One pass covered the three navigation audits and could not
+refute a single published number: all 11 committed derived files regenerate byte-identically. What it refuted is
+the owner's composite claim (nothing flies and feeds in one episode), one factual sentence in
+`plume_steering.md`, and the reported magnitude of the failed workload gate here -- per-cell rate differences
+reach 39.0 / 44.9 Hz at B=8 / B=32 under bit-identical inputs, so no 60 s room in any of the three audits is
+reproducible run to run.
+
+### Verdict
+
+```text
+VERDICT (one per audit):
+- navigation_instruments: mostly sound -- every number reproduces; the failed exact-workload gate is under-quantified by roughly three orders of magnitude in the wrong direction, and recurrent.json's misleading preset=raw root label is undisclosed.
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED (the items naming this audit)
+7. navigation_instruments.md section 4 -- "B=8 and B=32 also diverge in rates/spikes, with maximum per-cell accumulated count differences up to 21 and 13." -> "B=8 and B=32 also diverge in rates/spikes: maximum per-cell rate differences reach 39.0 and 44.9 Hz, voltages 77.6 and 42.2 mV, conductances 193 and 247, and accumulated spike counts 21 and 13, while poisson_p and drive are bit-identical -- the divergence is in the kernels, not the inputs, so no whole-room result in this or the later audits is reproducible run to run."
+8. navigation_instruments.md section 4 -- after the c7ead86 paragraph add: "recurrent.json carries the same bare-graph preset=raw, instruments=[] root label; its per-record instrument block names compass_ring with law=unverified, calibrated=false."
+9. navigation_instruments.md section 2 -- head the plume paragraph "(pre-correction law; superseded for walking by plume_steering.md section 3)" and extend "It receives neither world heading nor wind angle, source coordinates, distance, or motor commands." with "...; after the correction it additionally receives held bilateral concentrations through smell()."
+13. All three audits (or the navigation index) -- add: "No run in these audits shows artificially powered flight and feeding in the same episode: the only powered-flight rooms are the superseded navigation flight arm (59.67 s airborne, zero feeding in all six rows), and powered_s is 0.00 in all 12 flight-priority room rows and all 12 plume room rows."
+```
+
+### Not checked
+
+```text
+NOT CHECKED: Mussells Pires Methods constants (29.23 Hz, 2.17, 0.63, -0.7) and the two 12-element preferred-angle arrays -- only the model form is verified. CPU suite counts, the golden test, Ruff (verified the cache MD5s directly instead). Exactness residuals of the 26 lifecycle and 17 transition checkpoints (artifacts store only labels). The B200 CUDA runs themselves, the warp-sparse backend, graph capture, and the two UI screenshots. Whether a goal-only or feedback-only arm finds food (no such arm exists; the attribution in claim 8(b) is an inference). Other citations (Siliciano 2026, Matheson 2022/2024, van Breugel 2014, Root 2011, Namiki 2022, Turner-Evans 2017, Wang 80b94e6) -- not fetched. Any claim about longer episodes, alternate starts, noisy plumes, mixed valence, wall/ceiling walking, or repeated brain draws.
+```
+
+## Flight foraging priority (Astra, 2026-09-15)
 
 `audits/flight_foraging_priority.md` records the author's self-review and frozen correction to
 the optional wing-power servo. Reserve/odor interruptions and finite bouts are engineering
 policy, with no receptor, transmitter, synapse or raw/default changes. CPU 500 passed / 19
 skipped / 220 subtests; golden/cache unchanged. One house submission passes 26 lifecycle checks,
 17 exact captured/eager transition checkpoints and the room interruption gates. Starving
-airborne rows land within 0.52 s; robust food finding remains open. Independent skeptic pending
-(Fable, when accounts reset); no physiological adoption or performance-speedup claim.
+airborne rows land within 0.52 s; robust food finding remains open. Independent skeptic pass
+(Opus, 2026-09-17): mostly sound; no physiological adoption or performance-speedup claim.
 
-## Plume steering correction (Astra, 2026-09-16): independent review pending
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** Every number reproduces and the policy is provably frozen
+before the run (`predeclared.json` stamped at the commit time of 266d274), but two things were missing and are
+now stated: with the shipped LH normalisation the odour gate latches for essentially the whole episode, so under
+this policy artificial flight is unreachable in any room containing fruit; and a ballistic fall of the 0.25 m
+drop takes 0.41 s, so the declared 5 s landing gate tests only that no power was applied.
+
+### Verdict
+
+```text
+VERDICT (one per audit):
+- flight_foraging_priority: mostly sound -- every number reproduces, the policy is provably frozen before the run, but the results omit that the policy makes artificial flight unreachable in any fruited room and that the 5 s landing gate is near-vacuous.
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED (the items naming this audit)
+10. flight_foraging_priority.md section 3 -- after "the neural odor interruption prevents the ground interval completing." add: "With the shipped LH normalisation the odour gate reads 0.66-0.71 mean (max 0.95-0.99) even with a single apple 40 cm away and the fence on, so the 0.60/0.25 hysteresis latches for essentially the whole episode: under this policy artificial flight is unreachable in any room containing fruit, not merely bounded. Powered flight is demonstrated only in the transition assay, where LH is prescribed at 0 Hz."
+11. flight_foraging_priority.md section 3 -- after "All six initially depleted airborne room rows land in 0.47-0.52 s." add: "A ballistic fall of the 0.25 m drop at the body's 3.0 m/s^2 gravity takes 0.41 s, so the declared 5 s gate tests only that no power was applied."
+12. flight_foraging_priority.md section 2 -- add the explicit sentence the other two audits carry: "Neither the three-draw 29-check admission suite nor the 300 s room rate-half is replaced by these checks."
+13. All three audits (or the navigation index) -- add: "No run in these audits shows artificially powered flight and feeding in the same episode: the only powered-flight rooms are the superseded navigation flight arm (59.67 s airborne, zero feeding in all six rows), and powered_s is 0.00 in all 12 flight-priority room rows and all 12 plume room rows."
+```
+
+### Not checked
+
+```text
+NOT CHECKED: Mussells Pires Methods constants (29.23 Hz, 2.17, 0.63, -0.7) and the two 12-element preferred-angle arrays -- only the model form is verified. CPU suite counts, the golden test, Ruff (verified the cache MD5s directly instead). Exactness residuals of the 26 lifecycle and 17 transition checkpoints (artifacts store only labels). The B200 CUDA runs themselves, the warp-sparse backend, graph capture, and the two UI screenshots. Whether a goal-only or feedback-only arm finds food (no such arm exists; the attribution in claim 8(b) is an inference). Other citations (Siliciano 2026, Matheson 2022/2024, van Breugel 2014, Root 2011, Namiki 2022, Turner-Evans 2017, Wang 80b94e6) -- not fetched. Any claim about longer episodes, alternate starts, noisy plumes, mixed valence, wall/ceiling walking, or repeated brain draws.
+```
+
+## Plume steering correction (Astra, 2026-09-16)
 
 `audits/plume_steering.md` records diagnostic source 384898a, correction ef90c23 and scalar
 check 74f64de. Bilateral walking goals and DNa02 feedback onto existing PFL3 inputs are explicit
@@ -3603,4 +3763,85 @@ unverified engineering. No synapse, receptor, transmitter or raw/body default ch
 exact CUDA lifecycle checks and five full-brain neural gates pass; six of six compass and five
 of six ring room rows feed >=1 s. Scalar demo feeds 15 s. These functional checks do not establish
 native navigation or broad success rates. CPU 503 passed / 19 skipped / 220 subtests; original
-golden/cache unchanged. Author self-review complete; independent skeptic pending Fable.
+golden/cache unchanged. Author self-review complete.
+
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** Every number reproduces exactly, including the 0.841211
+end energy and the six first contacts, and there is no geometric shortcut: the walking goal is
+`atan(200*atanh(contrast))` on the antennal samples alone in 99.64 % of 3,600 logged samples. One sentence was
+factually wrong ("some trajectories reach zero" -- it is every row, at 18.0-18.2 s, before any first contact) and
+four characterisations a reader needs were missing: the 200x gain on a noise-free pre-transduction contrast the
+model's own ORNs could not resolve, the integral that servo-inverts the PFL3 -> DNa02 stage, the near-repeat
+environment seeds, and the non-reproducible native CUDA path.
+
+### Verdict
+
+```text
+VERDICT (one per audit):
+- plume_steering: mostly sound -- every number reproduces exactly; one sentence is factually wrong ("some trajectories reach zero" -> all of them), and four material characterisations a reader needs are missing.
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED (the items naming this audit)
+1. plume_steering.md section 6 -- "The starting energy is only 0.1 and some trajectories reach zero before finding food." -> "The starting energy is only 0.1 and every row reaches zero energy at 18.0-18.2 s, before any first contact (20.1-37.3 s); the hunger gain is therefore pinned at 1.0 for most of each episode and never leaves [0.90, 1.0], so these rooms do not test metabolic modulation."
+2. plume_steering.md section 6 -- after "All six compass rows feed for 15 s in the 60 s room run." add: "15 s is the shipped meal length (Metabolism.feed_per_s = 1/15 up to the 0.95 satiety threshold), so it is a ceiling reached by any row that makes contact, not a graded measure."
+3. plume_steering.md sections 1 and 6 -- after "environment seeds 0-5" add: "world.make_room places the apple, orange, banana and lime at seed-independent coordinates and the start is identical in every row, so the six seeds differ only in grape/blueberry jitter, plume puff phase, brain RNG stream and the imposed initial heading (three rows share 5 deg). The lime is the nearest fruit at 22.6 cm and four of the six compass rows fed there."
+4. plume_steering.md section 6 -- add: "The native event-driven CUDA path is not bit-reproducible (the exact-workload gate in navigation_instruments.md fails with per-cell rate differences up to 44.9 Hz under provably identical inputs), so these first-contact times and the 0.841211 end energy are one draw and do not pin a number on re-running (INTERP 10.4 item 2). The analyser re-derives the tables from the stored records; it does not re-run the rooms."
+5. plume_steering.md section 3 item 2 -- add: "0.1 m / 0.001 m gives a contrast gain of 200; at the 0.26-0.57 % bilateral contrast observed in the rooms this yields 25-41 deg mean goal offsets (p95 54-66 deg), so the law behaves as a near-sign-of-contrast turn. The contrast is read from the physical concentration field, so it is noise-free and would not survive the model's own ORN transduction (1 + 150c/(c+0.5) plus Poisson spiking)."
+6. plume_steering.md section 6 -- add: "In the 60 s rooms the integral supplies more than half the PFL3 input (mean |integral| 3.2-6.9 Hz vs mean |base| 2.9-6.6 Hz), and the balanced control row needs -5.94 Hz to hold DNa02 L-R at +0.061 Hz, so the loop inverts the parent PFL3 -> DNa02 gain rather than relying on it. The comparator's normalised demand is bounded by 0.281, so the [-1,1] clip and the 80 Hz one-way scale are unreachable (max 22.5 Hz)."
+13. All three audits (or the navigation index) -- add: "No run in these audits shows artificially powered flight and feeding in the same episode: the only powered-flight rooms are the superseded navigation flight arm (59.67 s airborne, zero feeding in all six rows), and powered_s is 0.00 in all 12 flight-priority room rows and all 12 plume room rows."
+```
+
+### Not checked
+
+```text
+NOT CHECKED: Mussells Pires Methods constants (29.23 Hz, 2.17, 0.63, -0.7) and the two 12-element preferred-angle arrays -- only the model form is verified. CPU suite counts, the golden test, Ruff (verified the cache MD5s directly instead). Exactness residuals of the 26 lifecycle and 17 transition checkpoints (artifacts store only labels). The B200 CUDA runs themselves, the warp-sparse backend, graph capture, and the two UI screenshots. Whether a goal-only or feedback-only arm finds food (no such arm exists; the attribution in claim 8(b) is an inference). Other citations (Siliciano 2026, Matheson 2022/2024, van Breugel 2014, Root 2011, Namiki 2022, Turner-Evans 2017, Wang 80b94e6) -- not fetched. Any claim about longer episodes, alternate starts, noisy plumes, mixed valence, wall/ceiling walking, or repeated brain draws.
+```
+
+## The shipped instrument code (2026-09-17)
+
+**Independent skeptic pass (Opus, 2026-09-17): mostly sound.** An independent pass over the code the instruments ship as --
+`flyverse/fly.py`, `flyverse/navigation.py`, `docs/PRESETS_SPEC.md`, `instruments_review.md`,
+`compass_standin.md` and `plume_steering.md` line ~172 -- rather than over a batch. Raw bit-identity holds (the
+golden predates the branch, at 96c9a24), no default moved anywhere in `flyverse/` or `scripts/`, all three cache
+MD5s and the compiled fingerprint `ef23cc27bea13be7f6a96f3c04fd3737` are unchanged, and the CPU suite is 503
+passed / 19 skipped / 220 subtests.
+
+```text
+RAW-BREAKING: none. No default moved anywhere in flyverse/ or scripts/; the golden predates the branch and passes; all three cache md5s and the compiled fingerprint are unchanged.
+```
+
+Three boundary deviations are recorded rather than waived: `FlyBrain.interoception()` is a new body-to-neural
+interface (authorized by PRESETS_SPEC sections 5-6, but contradicting `instruments_review.md` section 1 item 10,
+now scoped); `plume.step` and `flight.step` read `hunger.level`, a sibling instrument's mutable tensor; and by
+section 3's own criterion `plume` and `flight` are programs admitted as instruments, which the owner reconciled
+on 2026-09-17 by amending section 3 and extending section 5 with the `replaces` field. The one reproduced hole
+was in `fly.py` `attach()`: an object declaring `required_preset="raw"` attached to a raw brain, drove Poisson and
+produced provenance `preset: "raw"` with a non-empty instruments list. It is fixed with a test, together with the
+`replaces` field on every shipped `describe()`, the `_check_instrument` law/source gate, and the body-derived
+inputs now declared by `hunger` / `plume` / `flight`.
+
+### Verdict
+
+```text
+VERDICT: mostly sound
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED
+1. flyverse/fly.py:213 -- if self.preset != module.required_preset or module.name in self.instruments: -> refuse any instrument attach while self.preset == "raw" (e.g. if self.preset != "instrumented" or self.preset != module.required_preset or module.name in self.instruments:). Today a required_preset="raw" object attaches, drives Poisson, and produces preset: "raw" with a non-empty instruments list, falsifying PRESETS_SPEC section 1 and instrument_records()'s own docstring. Add a test.
+2. docs/audits/plume_steering.md:172 -- "All neural reads are frame-boundary samples, so no mutable sibling state is read during a module step" is false: PlumeNavigation.step and FlightDrive.step read self.hunger.level. Replace with "All neural reads are frame-boundary samples; the only sibling state read is hunger.level, which is written solely by observe_internal and never during a module step, so execution order cannot change the result."
+3. flyverse/navigation.py:280-306 (HungerGain) -- add the body-derived input to the record (an input/observes key, as CompassDriver.describe() has) and state the effect route; reads {} / writes {} currently implies the instrument does nothing while it gates plume's turn and flight's lift. Same addition for PlumeNavigation (wind/smell/interoception) and FlightDrive (interoception) at navigation.py:405-410 / 717-720.
+4. docs/PRESETS_SPEC.md:60 -- reconcile the section 3 CompassSteering row ("stays a program, not an instrument: it replaces a computation, not a missing input", "writes PFL3 / DNp09") with the admission of plume (PFL3 + DNp09) and flight (wing MNs) as instruments under section 5/6. Either amend section 3's criterion or say in section 5/6 why these program-shaped stand-ins are admitted as instruments.
+5. docs/audits/instruments_review.md -- add a scope line at the top: the review covers a41d0f2..6d1c501 (+ section 5 at a20d0ed) and its 468/469-passing numbers; it does not cover compass.py, navigation.py, FlyBrain.interoception() or the four navigation instruments now on main at 3ee368a (503 passing). Its section 1 item 10 sentence "No new body-to-neural-module interface was introduced" must be scoped to that range, since interoception() plus the four observe_* receivers are exactly such an interface.
+6. Optional hardening: flyverse/instruments.py:104-123 (_check_instrument) does not constrain law; consider requiring law == "unverified" or a non-empty source/sources field.
+```
+
+### Not checked
+
+```text
+NOT CHECKED: anything requiring CUDA (the modules=True graph-capture path, can_capture_frame, _positive_poisson/_poisson_on forcing, record_stream buffer rebinding, tests/test_cuda.py / test_metal.py; the device-staleness risk in the attach-time device_bindings cache). The numbers inside the committed evidence JSON/CSV/SVG (other skeptics). The 29-check suite and 300 s rate-half. Literature verification of the cited sources. Pre-existing infra leaks in files outside the 62cdefb..3ee368a name list (out/cx5|cx6|cx7|objr3sd*|vncd4-7/predeclared.json carry <cluster-node>/ssh; worth a separate pass before release). [infrastructure identifier replaced by a placeholder in this quotation]
+```
