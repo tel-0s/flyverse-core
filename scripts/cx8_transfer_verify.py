@@ -1,6 +1,6 @@
 """CPU source and unchanged-control checks for cx8t; no simulation or submission.
 
-    python scripts/cx8_transfer_verify.py --runs out/cx8t --reference out/cx8r --commit dc98bfe
+    python scripts/cx8_transfer_verify.py --runs out/cx8t --reference out/cx8r --commit 036e512
 
 The primary reducer separately checks all 36 protocols and reconstructs the trace metrics. This
 check ties every frozen and recorded source hash to the submitted commit, and compares the six H0
@@ -11,20 +11,27 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import sys
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from flyverse.interp.common import resolve_commit  # noqa: E402
 
 
 def verify(runs, reference, commit):
     runs, reference = Path(runs), Path(reference)
     frozen = json.loads((runs / 'predeclared.json').read_text(encoding='utf-8'))
     hashes = {}
+    # A submitted id predating the 2026-09-17 rewrite is read through the map (docs/INTERP.md 10.4 rule 30).
+    resolved = resolve_commit(commit)
+    submitted = resolved if resolved == str(commit).strip() else f'{resolved} (recorded {str(commit).strip()})'
 
     def at_commit(name):
         if name not in hashes:
-            blob = subprocess.check_output(['git', 'show', f'{commit}:{name}'], cwd=ROOT)
+            blob = subprocess.check_output(['git', 'show', f'{resolved}:{name}'], cwd=ROOT)
             hashes[name] = hashlib.sha256(blob.replace(b'\r\n', b'\n')).hexdigest()
         return hashes[name]
 
@@ -58,7 +65,7 @@ def verify(runs, reference, commit):
 
     assert seen == {(a, s) for a in ('H0', 'HL', 'HR', 'C0', 'CL', 'CR') for s in range(6)}
     assert len(baselines) == 6
-    report = dict(submitted_commit=commit, n_runs=len(seen), frozen_sources=len(frozen['source_sha256_lf']),
+    report = dict(submitted_commit=submitted, n_runs=len(seen), frozen_sources=len(frozen['source_sha256_lf']),
                   recorded_sources=len(sources), recorded_sources_not_in_freeze=sorted(sources-set(frozen['source_sha256_lf'])),
                   all_sources_match_commit=True, h0_matches_hg=baselines, joint_ledger=joint)
     dest = runs / 'verification'

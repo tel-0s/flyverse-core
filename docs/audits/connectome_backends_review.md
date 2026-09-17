@@ -1,6 +1,6 @@
-# Review of `feat/connectome-backends` (d9f8cf2) against `docs/CONNECTOME_BACKENDS_SPEC.md`
+# Review of `feat/connectome-backends` (7937f01) against `docs/CONNECTOME_BACKENDS_SPEC.md`
 
-Independent read-only review (Opus, 2026-09-14) of Astra's implementation branch (one commit on `eac71e0`, 32 files,
+Independent read-only review (Opus, 2026-09-14) of Astra's implementation branch (one commit on `f9e9fea`, 32 files,
 +4,252/-75), run in its worktree `flyverse-connectome`; nothing edited or committed there, and no cluster job
 submitted. Every number below was recomputed by the reviewer from the repository, the two FlyWire releases in
 `D:\Datasets\flywire\`, and the author's house-run JSONs; where a number could not be recomputed it is marked *not
@@ -75,7 +75,7 @@ reviewer's harness (`connectome.load(cache_dir=<scratch>, rebuild=True)` under t
 | recompiled `W_post_pre.npz` **file** md5 | `ac131529cebf98decde58d0c227b7954` -- byte-identical to main's cache file |
 | recompiled `neurons.parquet` **file** md5 | `c50c598a708b5b373cbaffca7d6a9d82` -- byte-identical |
 | neurons table | 167,106 × 24; identical column **order**; every column `Series.equals` True; no dtype change |
-| `connectome_fingerprint(load())` on the branch vs on main at eac71e0 | identical in every key and value except `cache_dir` (the worktree path); key set unchanged -- **no new keys on the MaleCNS path**, `md5 ef23cc27bea13be7f6a96f3c04fd3737` |
+| `connectome_fingerprint(load())` on the branch vs on main at f9e9fea | identical in every key and value except `cache_dir` (the worktree path); key set unchanged -- **no new keys on the MaleCNS path**, `md5 ef23cc27bea13be7f6a96f3c04fd3737` |
 | `load().dataset / .release` | `malecns` / `v1.0` |
 | `provenance()["model"]` on a MaleCNS graph | gains **two** keys, `dataset` and `release` (`interp/common.py:986`); everything else unchanged, `units` unchanged, `REQUIRED_PROVENANCE` unchanged |
 
@@ -98,7 +98,7 @@ caller hits it (`scripts/interp_export.py:171` derives `optic` from the same `fb
 |---|---|
 | branch full CPU suite (`pytest tests -q --ignore=tests/test_cuda.py --ignore=tests/test_metal.py`) | **357 passed, 19 skipped, 215 subtests passed** in 127 s -- exactly the author's claim |
 | `tests/test_bit_identity.py` + `test_connectome_backends.py` + `test_connectome_data.py` | 22 passed, 5 subtests; the two `data`-marked female cache tests **ran** (caches present), they did not skip |
-| baseline at eac71e0 (author's log, `out/connectome_backends/baseline_tests.txt`) | 338 passed / 19 skipped -- *not re-run by the reviewer*; the +19 is the two new files |
+| baseline at f9e9fea (author's log, `out/connectome_backends/baseline_tests.txt`) | 338 passed / 19 skipped -- *not re-run by the reviewer*; the +19 is the two new files |
 
 `tests/test_unitary.py` is the only existing test changed: `_nt_factor({"tyramine": 1.0})` no longer raises because
 tyramine is now a valid transmitter, so the invalid-NT case uses `"not-a-transmitter"`. Correct and minimal.
@@ -290,7 +290,7 @@ on-table under the correct bounds. Plain-walk metrics recomputed: straightness *
 **0.494932 ± 0.000018 m**, yaw SD **0.27710 ± 0.00385 °/s**, hops 0. Exactly as published.
 
 **Snapshot vs commit.** The cluster snapshots' `source_fingerprint` shows the runs did **not** use the committed
-tree: `connectome.py`, `fly.py` and `interp/common.py` differ from both `eac71e0` and `d9f8cf2` (and differ between
+tree: `connectome.py`, `fly.py` and `interp/common.py` differ from both `f9e9fea` and `7937f01` (and differ between
 the two submissions); `optic.py` in the snapshot is the *parent* version; `retina.py`, `senses.py`, `motor.py` are
 the committed ones. This is disclosed in the reply. It is closed from the other side by evidence the reviewer could
 check: every Result's `compiled_connectome` digest equals the **current** cache exactly (BANC
@@ -302,7 +302,7 @@ every `lif`/`optic` field recorded equals the shipped default. The walking runs 
 
 ## 8. Merge-conflict map
 
-`main` is at `eac71e0`, clean, and `eac71e0` is an ancestor of `d9f8cf2`: the merge is a fast-forward and **no
+`main` is at `f9e9fea`, clean, and `f9e9fea` is an ancestor of `7937f01`: the merge is a fast-forward and **no
 conflict is possible**. Nothing in `out/`, no cache, no infra file is committed. Grepping the whole diff for IPs,
 hostnames, `<cluster-domain>`, `<cluster-user>`, `<cluster-fs>`, `vast`, `ssh`, `slurm`, `sbatch`, `<cluster-node>`, `hostname`: **zero
 hits**. `pyproject.toml` changes exactly one line (`packages` gains `flyverse.backends`).
@@ -334,7 +334,7 @@ hits**. `pyproject.toml` changes exactly one line (`packages` gains `flyverse.ba
   somewhere else. Either keep MaleCNS pinned to `CACHE_DIR` and route only the female datasets through the env var,
   or call the change out explicitly in `CONTROL_SURFACE.md` and the changelog.
 * **B3 -- the shipped FAFB cache, and therefore the FAFB acceptance and GPU evidence, does not come from the
-  committed code.** A fresh compile with `d9f8cf2` writes `cache/fafb/neurons.parquet` with `hex_side` at column 11;
+  committed code.** A fresh compile with `7937f01` writes `cache/fafb/neurons.parquet` with `hex_side` at column 11;
   the worktree's cache has it at column 20, i.e. it was built before `backends/fafb.py:48`
   (`n["hex_side"] = n.bodyId.map(col_side)`) existed. The GPU Result's `files_loaded` confirms it: its
   `flyverse/backends/fafb.py` hash matches **neither** the committed file nor the parent. The contents are
@@ -417,7 +417,7 @@ Accepted as decided on the branch, all of them defensible and all of them stated
 6. **A single translation serves both hemispheres** (`fafb.py:15`), i.e. the published p/q lattice is taken to be in
    retina.py's handedness already. Justified by the mirror and T4 controls, not asserted.
 7. **MaleCNS defaults remain pinned to `CACHE_DIR`; `FLYVERSE_CACHE` selects only female cache roots.**
-   Corrected by B2 in `34c2eb0`; see `default_cache_directory()` in
+   Corrected by B2 in `cfaa694`; see `default_cache_directory()` in
    [connectome.py](../../flyverse/connectome.py) and the [author follow-up record](connectome_backends_followups.md).
    An explicit `cache_dir` can relocate any dataset.
 8. **BANC optic-intrinsic cells run as LIF cells**, with no optic module and no retina, rather than being pruned.

@@ -817,6 +817,84 @@ def git_state() -> dict:
     return {"commit": head, "dirty": bool(files), "modified_files": files[:200]}
 
 
+def _commit_exists(sha: str, root: Path) -> bool:
+    """True when `sha` names a commit object in `root` (a bare existence test, no output parsed)."""
+    try:
+        done = subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], cwd=root,
+                              capture_output=True, timeout=20)
+    except Exception:  # noqa: BLE001 -- no git, no repository: fall through to the map
+        return False
+    return done.returncode == 0
+
+
+def commit_map(repo: Path | None = None) -> dict[str, str]:
+    """Every `docs/audits/commit_map_<date>.json` merged into one old id -> new id table, oldest map first.
+
+    A history rewrite renames every commit, so the ids frozen into run records under ignored `out/` directories stop
+    resolving. The map the rewrite itself wrote is the only bridge back (docs/INTERP.md 10.4 rule 30). Maps are read
+    in filename (date) order and a later one wins, so a second rewrite's map composes over the first's.
+    """
+    root = ROOT if repo is None else Path(repo)
+    table: dict[str, str] = {}
+    for path in sorted((root / "docs" / "audits").glob("commit_map_*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        entries = data.get("map", data) if isinstance(data, dict) else {}
+        for old, new in (entries or {}).items():
+            old, new = str(old).strip().lower(), str(new).strip().lower()
+            if re.fullmatch(r"[0-9a-f]{7,40}", old) and re.fullmatch(r"[0-9a-f]{7,40}", new):
+                table[old] = new
+    return table
+
+
+def resolve_commit(sha: str, repo: Path | None = None) -> str:
+    """The id `sha` names in `repo` today: itself when it still resolves, else its post-rewrite id from the map.
+
+    Frozen run records are never edited (docs/INTERP.md 10.4 rule 30 (ii)), so an analyser that `git show`s a recorded
+    commit reads it through this. Full ids and unique abbreviations both match; an abbreviation that matches more than
+    one map entry, and an id no map knows, raise rather than silently reading the wrong tree.
+    """
+    text = str(sha or "").strip()
+    if not re.fullmatch(r"[0-9a-fA-F]{4,40}", text):
+        raise ValueError(f"not a commit id: {sha!r}")
+    root = ROOT if repo is None else Path(repo)
+    if _commit_exists(text, root):
+        return text
+    table, current, mapped, seen = commit_map(root), text.lower(), None, set()
+    for _ in range(8):                                   # chase old -> new -> newer across successive rewrites
+        hits = sorted({v for k, v in table.items() if k.startswith(current)})
+        if not hits:
+            break
+        if len(hits) > 1:
+            raise ValueError(f"commit {sha!r} abbreviates {len(hits)} commit-map entries; give more characters")
+        current = mapped = hits[0]
+        if _commit_exists(current, root) or current in seen:
+            return mapped
+        seen.add(current)
+    if mapped is not None:
+        return mapped
+    raise ValueError(f"commit {sha!r} is not in {root} and no docs/audits/commit_map_*.json maps it")
+
+
+def commit_equivalent(a: str | None, b: str | None, repo: Path | None = None) -> bool:
+    """True when two ids name the same commit -- at any abbreviation, and across a history rewrite either way.
+
+    A recorded (pre-rewrite) id and the expected (post-rewrite) id are the same commit, so a check that compares a
+    record against a declaration compares with this, not with `==`.
+    """
+    x, y = str(a or "").strip().lower(), str(b or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{4,40}", x) or not re.fullmatch(r"[0-9a-f]{4,40}", y):
+        return bool(x) and x == y
+    table = commit_map(ROOT if repo is None else Path(repo))
+
+    def forms(s: str) -> set[str]:                       # the id itself, what it maps to, and what maps to it
+        return {s} | {v for k, v in table.items() if k.startswith(s)} | {k for k, v in table.items() if v.startswith(s)}
+
+    return any(p.startswith(q) or q.startswith(p) for p in forms(x) for q in forms(y))
+
+
 def source_fingerprint(git: dict | None = None, force: bool = False) -> dict:
     """The content identity of the code behind a Result when git cannot name it.
 

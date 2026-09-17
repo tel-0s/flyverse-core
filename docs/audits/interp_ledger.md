@@ -398,7 +398,7 @@ rows reported as `unknown` rather than `same`.
 | `out/interp/ledger/all.json` / `all.csv` | the whole corpus: 98 sources, 301 rows, 20 arms, `Result.check()` empty |
 | `out/interp/ledger/validate.json` / `validate.csv` | the validation target, status `reproduced` |
 
-Provenance of `all.json`: commit `0d32fd6e7406` (dirty), MaleCNS v1.0 flat-connectome (4 files with SHA-256),
+Provenance of `all.json`: commit `2dede310b66e` (dirty), MaleCNS v1.0 flat-connectome (4 files with SHA-256),
 compiled `W` md5 `ef23cc27bea13be7f6a96f3c04fd3737`, nnz 25,578,600, 167,106 neurons, sum\|W\| 121,460,584,
 **the scorer's own** `LIFParams` and `OpticParams` fully resolved (a default pair, not the resolved parameters of any
 scored run; `provenance.model.type_path_gain` is `null` -- see 7.8), body thresholds

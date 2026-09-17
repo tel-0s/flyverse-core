@@ -353,7 +353,7 @@ CPU suites pass unchanged (section 8).
   note of section 5(6).
 * Git identity of the cluster runs: `flyverse_commit.commit` is `unknown` in every run JSON (the per-run directories on
   the rented boxes are file copies, not git checkouts), so the `source_fingerprint` (43 files, sha256, identical across
-  the 11 JSONs) is the code identity; the local checkout was at HEAD 926da3a with the task's uncommitted edits when the
+  the 11 JSONs) is the code identity; the local checkout was at HEAD ae7c86f with the task's uncommitted edits when the
   report was written (e168bd0 at the start of the session; other tasks commit into this tree concurrently, which is why
   the shipped-file list also names `flyverse/optic.py`, `flyverse/interp/common.py`, `docs/audits/optic_stream_hooks.md`).
 * The side-rule numbers of section 1 (173 / 4 on the 177 decisive instance-labelled cells, the per-cell SNpp53 lateralities)

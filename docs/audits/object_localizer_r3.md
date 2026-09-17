@@ -174,7 +174,7 @@ warning). `block_value(line, 'fam')` reads `locr3` on all 10 lines; the block wa
 lobes, all 10 jobs, one box), behind 10 jobs of the other round-3 workflows already on that box (the other box held
 12): the batch waited for capacity rather than splitting.
 
-The tree the batch shipped from (`out/objr3rf/tree_state.json`, commit `6ec2de1a`): 17 files differing from
+The tree the batch shipped from (`out/objr3rf/tree_state.json`, commit `d2abf3cd`): 17 files differing from
 `origin/main`, among them other tasks' uncommitted edits to `flyverse/brain.py` (+31 lines at plan time),
 `senses.py` (+169), `body.py` (+132), `motor.py`, `batch_body.py`, `batch_sim.py` -- `tree_state.json` records no
 per-file counts, so these are plan-time figures and they drift: `body.py` is +134 in the current tree.

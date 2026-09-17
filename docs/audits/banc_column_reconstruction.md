@@ -1,6 +1,6 @@
 # BANC right-eye column reconstruction: candidate, validation blocked
 
-Author: Astra. Base: `442c420` on `feat/banc-vision`. This is an author experiment
+Author: Astra. Base: `67c76a4` on `feat/banc-vision`. This is an author experiment
 record, not an independent review. The owner explicitly requested that R1-R6
 integration remain gated on anatomical validation.
 
@@ -78,8 +78,8 @@ reconstruction. MaleCNS supplies the direction convention only.
 | Maximum assignment displacement | 1.323 column spacings |
 | Neighbour-edge step agreement after assignment | 82.39% |
 
-The table above was regenerated from committed `b4ebf9a` (unchanged reconstruction
-code from `7ffe957`) with the following fingerprint block:
+The table above was regenerated from committed `0b3668f` (unchanged reconstruction
+code from `ebd6f26`) with the following fingerprint block:
 
 ```
 generator SHA256 a0630eca7b898c454f332c013322f84eccbcd3b5085a6295e75bf06e6374ce89

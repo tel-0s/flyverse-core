@@ -280,7 +280,7 @@ Central-brain / VNC coverage is 0 by construction: the atlas is optic lobe only 
 
 ## 7. Round-2 corrections (verify:tables:ozel2021, `docs/audits/receptor_verification.md`) and their effect on the counts
 
-Applied in `scripts/build_ozel2021_tables.py` and rebuilt; round-1 numbers are those of the committed round-1 document (commit c0332e3).
+Applied in `scripts/build_ozel2021_tables.py` and rebuilt; round-1 numbers are those of the committed round-1 document (commit 5d6198d).
 
 | item | round 1 | round 2 |
 |---|---|---|

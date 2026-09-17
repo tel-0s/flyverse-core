@@ -1,4 +1,4 @@
-"""MaleCNS v1.0 source reader; selection and row order preserved from eac71e0."""
+"""MaleCNS v1.0 source reader; selection and row order preserved from f9e9fea."""
 import pandas as pd
 import pyarrow.feather as pf
 from ..connectome import ANNOT_FILE, NT_FILE, WEIGHTS_FILE, KEEP_COLS, PHOTORECEPTOR_TYPES

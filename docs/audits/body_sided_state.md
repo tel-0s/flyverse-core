@@ -261,7 +261,7 @@ is device-crossed; the realised `device_name` per run is in every JSON (section 
 behind them; nothing was submitted to the house cluster (disabled) and no second client fetched into `out/vncd3/`.
 
 **What the batch shipped, and what the numbers depend on (docs/INTERP.md 10.1(7b)).** `cluster_run.py` ships every file
-that differs from `origin/main` (HEAD 6ec2de1 = origin/main at submission), 25 files: this task's (section header) and
+that differs from `origin/main` (HEAD d2abf3c = origin/main at submission), 25 files: this task's (section header) and
 the other round-3 threads' working-tree edits -- `flyverse/brain.py` (+31 / -1: `LIFParams.w_syn_by_nt`, default
 `None`, "executes nothing and the shaped weights are byte-identical"; thread unitary), `flyverse/data/expected_responses.csv`
 (+13 `op report` rows; threads unitary / monoamines), their untracked scripts / audits / tests, and

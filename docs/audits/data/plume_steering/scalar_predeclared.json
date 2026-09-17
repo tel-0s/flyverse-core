@@ -1,6 +1,6 @@
 {
   "stamped_utc": "2026-09-16T17:48:47Z",
-  "commit": "74f64defe663a1a7400bccfd46b27d9a31c85351",
+  "commit": "6863f39e89818fc23d5fcce4ceae78ba5afb5045 (recorded 74f64defe663a1a7400bccfd46b27d9a31c85351)",
   "status": "frozen before submission",
   "commands": [
     "python scripts/plume_steering_probe.py --mode scalar --out out/plume_scalar_v1/scalar.json",

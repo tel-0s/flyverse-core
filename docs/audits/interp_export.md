@@ -307,7 +307,7 @@ for those rows is not reproducible, and the atlas one is wrong.
 
 From `out/export/<run_id>/manifest.json` of the shipped object-sweep run, with no other file:
 
-* **commit** -- `0d32fd6e74067569317d1a4bd604ce2f82f69dd5`, `dirty: true`, with `commit_verified` saying how
+* **commit** -- `2dede310b66e2edfc47c0e833c7d7adfe5473a77`, `dirty: true`, with `commit_verified` saying how
   it is known (see below).
 * **dataset** -- `male-cns v1.0 flat-connectome`, the four MaleCNS files with SHA-256 (`body-annotations`
   `2177e246...`, `body-neurotransmitters` `95c92892...`, `connectome-weights` `e35da783...`, `tbar-neurotransmitters`
@@ -354,7 +354,7 @@ commit into the manifest with `commit_verified` saying **how** it is known. Two 
   while these jobs ran, and a module the job never imported cannot have changed its numbers. Batch 3 matched 26 of
   28 imported files, the two differing ones being `export.py` / `interp_export.py`, which this task edited after
   submitting; batch 4 ran with the code frozen and matched **28 of 28**, so the shipped manifest reads
-  `commit: 0d32fd6e...` with `commit_verified: "by source hash (loaded scope): every one of the 28 source files the
+  `commit: 2dede310...` with `commit_verified: "by source hash (loaded scope): every one of the 28 source files the
   run loaded holds the content of this checkout"`. The glob scope of that same run was 40 of 43 -- the three
   differing files being `flyverse/interp/{atlas,ledger,trace}.py`, none of them imported by the job, which is
   exactly the noise the imported-set scope removes.
@@ -689,11 +689,11 @@ because both move along the sweep.
   26.78; > 50 % 0.14 / 2.26 / 7.64 / 19.73; centre elevation 0.88 / 4.34 / 8.66 / 13.71 deg).
 
 **The one provenance regression, stated plainly.** Revision 1's manifests read
-`commit 0d32fd6e...` with `commit_verified: "by source hash (loaded scope): every one of the 28 source files the run
+`commit 2dede310...` with `commit_verified: "by source hash (loaded scope): every one of the 28 source files the run
 loaded holds the content of this checkout"`. The re-export's read **`commit: unknown`**: `match_sources` finds
 **24 of the recordings' 28 loaded source files identical to this checkout** and four different --
 `flyverse/interp/__init__.py`, `flyverse/interp/common.py` (changed by their owner between the recording and now:
-the toolkit was committed in `d4e34b3` / `ec91182`) and `flyverse/interp/export.py`, `scripts/interp_export.py`
+the toolkit was committed in `4d55f96` / `8543cac`) and `flyverse/interp/export.py`, `scripts/interp_export.py`
 (changed by this revision itself). The per-file evidence is in `flyverse_commit.source_match.differ` and the
 recorded hashes in `source_fingerprint`, so a skeptic can check any one of them; nothing is asserted that is not
 true. The *recording* is the same one revision 1 exported -- the 40 NPZ / JSON files are unchanged on disk and the

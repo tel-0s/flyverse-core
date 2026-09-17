@@ -288,16 +288,16 @@ so offline analyses retain the attribution.
 Run dataset-free contracts with `python -m unittest discover -s tests -p test_modules.py`,
 `test_extend.py`, `test_surrogate.py`, and `test_bit_identity.py` (the default-path golden).
 
-Merge validation (this surface merged into `main` at `c251e98`, which had since landed the
+Merge validation (this surface merged into `main` at `10ad8cc`, which had since landed the
 proprioceptive transducer and the opt-in optic stream hooks): the CPU suite
 `pytest tests -q -m "not gpu and not data and not cluster"` passed 293 with 15 skipped. The
-default path was byte-identical to `c251e98` across the five stages of `tests/test_bit_identity.py`,
+default path was byte-identical to `10ad8cc` across the five stages of `tests/test_bit_identity.py`,
 run in both trees. The independent review of the branch is
 [docs/audits/extensibility_review.md](audits/extensibility_review.md); its three blocking findings
 (the unconditional external-drive record, the surrogate optic substep bypassing the stream hooks,
 and a reads-only module perturbing `step(50)`) are fixed and each has a test.
 
-Earlier implementation validation (against `d89155b`): the full CPU discovery run passed
+Earlier implementation validation (against `b5463af`): the full CPU discovery run passed
 252 tests with 42 data/accelerator checks skipped; the final module suite adds
 one post-hook attribution check (15 module tests passed). Three additional CUDA
 checks passed on a cluster worker: eager/captured hooks and module inputs, changing

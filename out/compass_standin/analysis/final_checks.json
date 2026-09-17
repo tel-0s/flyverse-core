@@ -2,32 +2,32 @@
   "source_snapshots": [
     {
       "batch": "compass_standin",
-      "archive_commit": "61d9415",
+      "archive_commit": "497589d",
       "matched_files": 77
     },
     {
       "batch": "compass_standin_r2",
-      "archive_commit": "efdfbb7",
+      "archive_commit": "89bf14b",
       "matched_files": 77
     },
     {
       "batch": "compass_standin_r3",
-      "archive_commit": "f7bcd48",
+      "archive_commit": "07cf966",
       "matched_files": 80
     },
     {
       "batch": "compass_standin_r4",
-      "archive_commit": "ac7ebc3",
+      "archive_commit": "3aa676c",
       "matched_files": 80
     },
     {
       "batch": "compass_standin_r5",
-      "archive_commit": "8ba1818",
+      "archive_commit": "17205bb",
       "matched_files": 80
     },
     {
       "batch": "compass_standin_r6",
-      "archive_commit": "45eb6b6",
+      "archive_commit": "3742a57",
       "matched_files": 80
     }
   ],

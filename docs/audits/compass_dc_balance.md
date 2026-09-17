@@ -10,7 +10,7 @@ submit_stamp.txt, predeclare_stamp.txt, scheduler_receipt.json, scheduler_receip
 smokes and the job-line check), `out/cx6/<arm>_s<seed>.{json,txt,npz}` (40 runs), `out/cx6_cluster.log`,
 `out/cx6/analysis/{analysis.md, runs.csv, compare.csv, decision.csv, call.csv, scatter.csv, state.csv,
 cross_batch_cx5.csv, analysis.json, scatter.png}`.
-Tree: HEAD a9946cd (= origin/main); nothing committed by this thread. `tree_state.json` lists every file that shipped
+Tree: HEAD ad760cd (= origin/main); nothing committed by this thread. `tree_state.json` lists every file that shipped
 with the batch with its sha256 -- this thread's `scripts/cx_ring_structure.py`, `scripts/cx_wedge.py`,
 `tests/test_cx_ring_structure.py`, `tests/test_cx_wedge_hold.py`, and another thread's concurrent
 `flyverse/body.py`, `scripts/probe_vnc_drive.py`, `tests/test_body_cycle.py`, `uv.lock` (none on the simulated path:

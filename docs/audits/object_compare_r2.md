@@ -157,7 +157,7 @@ and `hook arm without the Torch-substep warning` on all 10 sphere copies, `optic
 
 Run id `objr2c-a9af1d`, **20 jobs = 520 processes, one submission** (8 sphere x 30, 4 spec x 64,
 8 bench x 3), submitted 2026-09-13 at 22:06:37Z from the tree of `out/objr2c/tree_state.json`
-(commit `653179b4...` plus other tasks' uncommitted edits; `provenance.source_fingerprint`, not
+(commit `c78cb93d...` plus other tasks' uncommitted edits; `provenance.source_fingerprint`, not
 the commit, identifies the code of every run). The `cluster_run.py` client was killed before the
 fetch, so **`out/objr2c_cluster.log` carries no `20 job(s), N failed` line and nothing here claims
 one**; the batch was fetched by hand per box and the replacement check is

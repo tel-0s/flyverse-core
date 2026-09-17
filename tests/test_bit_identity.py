@@ -195,7 +195,7 @@ def scenario(**preset):
 
 # The recorded golden. Regenerate ONLY on an explicit owner decision (see the module docstring).
 # Recorded 2026-09-13 on the merge of feat/extensibility into main, and verified identical on the pre-merge tree
-# (main c251e98, which has neither flyverse/modules.py nor the hooks / attach / surrogate_grad surface) by running
+# (main 10ad8cc, which has neither flyverse/modules.py nor the hooks / attach / surrogate_grad surface) by running
 # this same file there: five stages, five equal digests. That equality IS the cross-version claim of
 # docs/audits/extensibility_review.md 2, now in code rather than prose.
 GOLDEN = {

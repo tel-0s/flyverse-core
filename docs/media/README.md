@@ -1,6 +1,6 @@
 # Demo media: what each file is, how it was made, what actually happened in it
 
-Every file here is a recording of the shipped model at commit **`442c420`** (the tree the clips were rendered from
+Every file here is a recording of the shipped model at commit **`67c76a4`** (the tree the clips were rendered from
 was a clean, detached `git worktree` of that commit; the per-run cluster copy has no `.git`, so the clip logs say
 `commit unknown` -- the checkout is the one `scripts/cluster_run.py` shipped from the worktree). Nothing was staged,
 tuned, retried or cherry-picked: each clip is the first and only run of its command line, and the captions report
@@ -77,7 +77,7 @@ the body reads from it here (both 10-30 Hz, the difference small with the wind n
 
 ## The toolkit figure -- `toolkit_loom_gf.png`
 
-Left panel, `paths` (structural, CPU; `docs/INTERP.md` 4.3), run on this desktop at commit `442c420` with the
+Left panel, `paths` (structural, CPU; `docs/INTERP.md` 4.3), run on this desktop at commit `67c76a4` with the
 shipped cache (compiled W md5 `ef23cc27bea13be7f6a96f3c04fd3737`):
 
 ```
@@ -143,7 +143,7 @@ checked with ffprobe: 25.0 s each (312 frames in the MP4s, 250 in the GIFs).
 
 `compass_standin.png` shows actual EPG spike rates and decoded phase, raw versus the explicit
 instrumented compass, seed 10 row 6 (+180 deg/s, stop, reverse). Sources are
-`out/compass_standin/{raw,instrumented}_s10.npz`, submitted code `61d9415`, house CUDA; this is
+`out/compass_standin/{raw,instrumented}_s10.npz`, submitted code `497589d`, house CUDA; this is
 an imposed angular-memory experiment, not a recovered biological compass. Recreate with
 `python scripts/compass_driver_analyse.py`, then copy `out/compass_standin/analysis/turn_trace.png`
 here. The plot uses unwrapped headings and masks phase when vector strength is below 0.6.

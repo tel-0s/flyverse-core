@@ -1,6 +1,6 @@
 # ExR6 and ER6: transmitter evidence and the remaining DC-brake question
 
-2026-09-15. Read-only investigation from `fa584b2`, branch `docs/exr6-evidence`.
+2026-09-15. Read-only investigation from `8854691`, branch `docs/exr6-evidence`.
 Scope: the data question in `HANDOFF_EXR6_ASTRA.md` and
 [`compass_dc_balance.md`, section 5](compass_dc_balance.md#5-what-an-adoption-would-require-nothing-is-adopted).
 No model, label, receptor table, weight, gain, or benchmark status is changed.

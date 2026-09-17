@@ -3,7 +3,7 @@
 What the shipped model is, exactly; what identifies the data it runs on; what is reproducible and
 what is not; and which number in `README.md` was measured at which commit.
 
-Everything in sections 1-3 was recomputed on **2026-09-14 at commit `4db2e8c`** (the current tree)
+Everything in sections 1-3 was recomputed on **2026-09-14 at commit `28e862f`** (the current tree)
 with the commands each section quotes. Sections 4-7 record facts established earlier and name the
 file and run they come from.
 
@@ -120,7 +120,7 @@ simulation is bit-identical to the default path on CPU (`tests/test_bit_identity
 
 ## 2. The compiled connectome: cache fingerprint
 
-Recomputed at `4db2e8c` with
+Recomputed at `28e862f` with
 
 ```
 python -c "from flyverse import connectome; from flyverse.interp import common; import json; print(json.dumps({k: v for k, v in common.connectome_fingerprint(connectome.load()).items() if k != 'nt_counts'}, indent=2, default=str))"
@@ -154,7 +154,7 @@ Cell counts by transmitter: acetylcholine 104,044, glutamate 29,707, gaba 22,135
 unknown 2,361, serotonin 415, dopamine 395, octopamine 141.
 
 The rebuild is deterministic: `python -m flyverse.connectome` recompiled from the feather files at
-`4db2e8c` in 15.1 s and every one of the three cache md5s above was unchanged.
+`28e862f` in 15.1 s and every one of the three cache md5s above was unchanged.
 
 ### 2.1 The female graphs
 
@@ -283,11 +283,11 @@ gate on a B200 and not on an H200).
 
 | commit | date | what it is |
 |---|---|---|
-| `eac71e0` | 2026-09-14 | **The round-3 reproducibility anchor.** The whole round-3 working tree in one commit, so every batch's uncommitted cross-task dependencies have a history. `provenance.source_fingerprint` covers **44 files** at this tree (`flyverse/*.py`, `flyverse/interp/*.py`, `flyverse/data/receptors_by_type.csv`, `scripts/probe_object_sweep.py`, `scripts/interp_export.py`; verified by enumerating that commit against its own `export.SOURCE_PATTERNS`). Compiled-W md5 `ef23cc27bea13be7f6a96f3c04fd3737`, receptor-table md5 `0381a446107e6050e75cc87b16d7f830`. **Nothing was adopted in round 3 and no default moved**, so the shipped model this document describes is unchanged by it. |
-| `d9f8cf2`, `34c2eb0`, `4db2e8c` | 2026-09-14 | The FAFB / BANC connectome backends and their review. **The current tree.** MaleCNS identity preserved exactly: the three cache md5s and the CSR fingerprint are unchanged, the `test_bit_identity.py` golden is unchanged, and the legacy fingerprint dictionary keeps its key set (`docs/audits/connectome_backends.md`). `source_fingerprint` covers **51 files** here (the five `flyverse/backends/*.py`, `flyverse/data/type_aliases.csv` and `flyverse/data/manifest.json` were added to `SOURCE_PATTERNS`). |
-| `c251e98` | 2026-09-13 | Round 2 (object + dynamics): the matched object assay, the optic stream hooks, the proprioceptive transducer, `walk.power_max` de-scored. |
-| `ec281f2` | 2026-09-12 | Receptor round 5: the GF x0.3 input damping retired. **A default model change.** |
-| `b5e6ae2` | 2026-09-12 | Receptor round 3: `receptor_model='sign'` / `'abs'` adopted as the default. **A default model change.** |
+| `f9e9fea` | 2026-09-14 | **The round-3 reproducibility anchor.** The whole round-3 working tree in one commit, so every batch's uncommitted cross-task dependencies have a history. `provenance.source_fingerprint` covers **44 files** at this tree (`flyverse/*.py`, `flyverse/interp/*.py`, `flyverse/data/receptors_by_type.csv`, `scripts/probe_object_sweep.py`, `scripts/interp_export.py`; verified by enumerating that commit against its own `export.SOURCE_PATTERNS`). Compiled-W md5 `ef23cc27bea13be7f6a96f3c04fd3737`, receptor-table md5 `0381a446107e6050e75cc87b16d7f830`. **Nothing was adopted in round 3 and no default moved**, so the shipped model this document describes is unchanged by it. |
+| `7937f01`, `cfaa694`, `28e862f` | 2026-09-14 | The FAFB / BANC connectome backends and their review. **The current tree.** MaleCNS identity preserved exactly: the three cache md5s and the CSR fingerprint are unchanged, the `test_bit_identity.py` golden is unchanged, and the legacy fingerprint dictionary keeps its key set (`docs/audits/connectome_backends.md`). `source_fingerprint` covers **51 files** here (the five `flyverse/backends/*.py`, `flyverse/data/type_aliases.csv` and `flyverse/data/manifest.json` were added to `SOURCE_PATTERNS`). |
+| `10ad8cc` | 2026-09-13 | Round 2 (object + dynamics): the matched object assay, the optic stream hooks, the proprioceptive transducer, `walk.power_max` de-scored. |
+| `560aaf3` | 2026-09-12 | Receptor round 5: the GF x0.3 input damping retired. **A default model change.** |
+| `79769c3` | 2026-09-12 | Receptor round 3: `receptor_model='sign'` / `'abs'` adopted as the default. **A default model change.** |
 | `069deb0` | 2026-09-11 | Session-9 audit: the 14-section benchmark suite, the compass ring attractor, the NT-sign audit. |
 
 ## 6. The benchmark tables, and which commit each was produced at
@@ -301,10 +301,10 @@ session-9 audit commit **`069deb0`**. **That table predates the round-3 anchor a
 the shipped model.** The JSON's own `config` block proves it:
 
 * `type_path_gain` still carries the GF damping `(^(SAD073|GNG300|DNp70|CL367|PVLP010)$, ^DNp01$, 0.3)`,
-  which was **retired at `ec281f2`** (receptor round 5) and is now only available as
+  which was **retired at `560aaf3`** (receptor round 5) and is now only available as
   `brain.GF_DAMPED_TYPE_PATH_GAIN`;
 * `gf_hz = 38.0`, where `body.Flight.gf_hz` has been 33 since session 9;
-* the receptor model was not yet the default (adopted at `b5e6ae2`).
+* the receptor model was not yet the default (adopted at `79769c3`).
 
 So none of `walk.power_max_hz 79.06 FAIL`, `loom_escape.GF_peak_hz 37.12 FAIL`,
 `loom_escape.escapes 0 FAIL` in that table is a statement about the shipped model. The skeptic's
@@ -323,15 +323,15 @@ not scored (`scripts/benchmark.py:85`, the `notnone` form, de-scored from the da
 `docs/audits/anti_runaway.md` round 6), and `loom.escape_cm` is the other `notnone` row; both count
 as PASS whenever measured, so a 27/0/2 tally contains them.
 
-The source tree of that batch was HEAD **`6ec2de1`** plus an inert `body.LegCycle` (recorded in
+The source tree of that batch was HEAD **`d2abf3c`** plus an inert `body.LegCycle` (recorded in
 `out/guard_r3/submit_tree.txt`; every other file md5-equal to `git show HEAD:<file>`). Round 3 was
-then committed as `eac71e0` and changed no default, so the shipped model of `6ec2de1 + inert
-LegCycle` and of `eac71e0` is the same model.
+then committed as `f9e9fea` and changed no default, so the shipped model of `d2abf3c + inert
+LegCycle` and of `f9e9fea` is the same model.
 
 ### 6.3 The behaviour-status table (`docs/BENCHMARK_BATTERY.md`)
 
 Assay-level statuses (`pass` / `partial` / `program` / `gap` / `fail` / `untested`), not a per-check
-run. Its prose and numbers were last updated at **`eac71e0`** (round 3). Its machine-readable form is
+run. Its prose and numbers were last updated at **`f9e9fea`** (round 3). Its machine-readable form is
 `flyverse/data/expected_responses.csv`, scored by `scripts/interp_ledger.py`.
 
 ---
@@ -385,26 +385,26 @@ python -m pytest -m "not gpu and not data and not cluster" -q
 
 | number in `README.md` | measured at | source |
 |---|---|---|
-| 167,106 neurons / 25,578,600 stored pairs / `sum|W|` 121,460,584 / md5 `ef23cc27...` | `4db2e8c` (recomputed 2026-09-14) | section 2 above |
-| FAFB 139,255 cells, BANC 157,789 cells | `4db2e8c` | section 2.1; `docs/audits/connectome_backends.md` |
-| 29-check suite: 27 PASS / 0 FAIL / 2 KNOWN GAP, 3 of 3 draws | `6ec2de1` + inert `LegCycle` = `eac71e0`'s defaults | `docs/audits/guard_suites_r3.md` 1, batch `guard7-97ce35` |
-| Behaviour statuses (optomotor `partial`, escape `pass`, landing `fail`, ...) | `eac71e0` | `docs/BENCHMARK_BATTERY.md` |
-| `motion.min_dsi` 0.241, correct preferred direction 8/8 in 9 of 9 | `6ec2de1` + inert `LegCycle` = `eac71e0`'s defaults | `docs/audits/guard_suites_r3.md` 1 |
+| 167,106 neurons / 25,578,600 stored pairs / `sum|W|` 121,460,584 / md5 `ef23cc27...` | `28e862f` (recomputed 2026-09-14) | section 2 above |
+| FAFB 139,255 cells, BANC 157,789 cells | `28e862f` | section 2.1; `docs/audits/connectome_backends.md` |
+| 29-check suite: 27 PASS / 0 FAIL / 2 KNOWN GAP, 3 of 3 draws | `d2abf3c` + inert `LegCycle` = `f9e9fea`'s defaults | `docs/audits/guard_suites_r3.md` 1, batch `guard7-97ce35` |
+| Behaviour statuses (optomotor `partial`, escape `pass`, landing `fail`, ...) | `f9e9fea` | `docs/BENCHMARK_BATTERY.md` |
+| `motion.min_dsi` 0.241, correct preferred direction 8/8 in 9 of 9 | `d2abf3c` + inert `LegCycle` = `f9e9fea`'s defaults | `docs/audits/guard_suites_r3.md` 1 |
 | Loom GF peak 46.7-49.5 Hz, escape in 9 of 9, walking GF p99 17-25 Hz vs the 33 Hz threshold | same | `docs/audits/guard_suites_r3.md` 1 |
 | GF spikes at ~3.5 cm range (`loom.escape_cm`, a `notnone` reported row) | session 4 reference, still the reference in `scripts/benchmark.py` | `docs/audits/benchmark_suite.md`, `probe_loom.py` |
 | Sugar -> MN9: Shiu rules 139.9 -> 0.8 Hz, calibrated 5.5 -> 0 Hz; `taste.MN9_hz` 10.93 | same | `docs/audits/guard_suites_r3.md` 1 (identical in all nine runs) |
 | Wind: `DNp18_flip_hz` +44.7 to +45.8, `DNp33_flip_hz` -49.4 to -50.0 | same | `docs/audits/guard_suites_r3.md` 1 |
 | Rotation: `rotation.group_flip_hz` -8.7 to -10.3 | same | `docs/audits/guard_suites_r3.md` 1 |
 | Odour: apple channel 17.3-17.5 Hz at 8 cm vs 4.3-4.9 Hz plume-free | same | `docs/audits/guard_suites_r3.md` 1 |
-| Take-off: 3.0 voluntary + 2.0 escape per 1,000 fly-s at the default | receptor round 5 / `ec281f2`, replicated round 3 | `docs/BENCHMARK_BATTERY.md`, `docs/audits/receptor_integration.md` G.5-G.6 |
-| Straight walking: clean-frame yaw SD 2.6-2.8 deg/s, straightness 0.995; DNa02 tonic inhibition -1.6 / -2.0 mV against a 7 mV gap | `d4e34b3` (localization), `eac71e0` (round-3 replication) | `docs/audits/deficit_turning.md`, `body_sided_state.md` |
-| Leg cycle + sided haltere: yaw SD -> 7.7-7.9 deg/s, DNa02 0.54 / 0.38 Hz, no frame above 100 deg/s, fixed left drift | `eac71e0` | `docs/audits/body_sided_state.md`, `round3_integration.md` |
-| Compass: 0/48 bumps at shipped gains under every per-transmitter unitary bracket; bump drift <= 0.005 wedges/s vs 4.0 ideal | `eac71e0` | `docs/audits/unitary_strength.md` 4, `body_sided_state.md` 6 |
-| Small object: LC11 12/12 `null`, LC10a fails Holm (p_holm 0.104); no passing mechanism in 8 arms | `c251e98` (round 2) | `docs/audits/object_matched_assay.md`, `object_compare_r2.md` |
-| Object round 3: localizer negative, 40/40 rectangle verdicts `null`, same-device H200 `REPRODUCES` / B200 `PARTIAL` | `eac71e0` | `docs/audits/object_localizer_r3.md`, `object_rectangles_r3.md`, `object_samedevice_r3.md` |
-| Cross-connectome walking: MaleCNS 2.641 +/- 0.146 vs BANC 0.275 +/- 0.004 deg/s clean yaw SD, leg-cycle arm 7.837 vs 2.651 | `34c2eb0` (merged at `4db2e8c`) | `docs/audits/connectome_backends.md`, batch `cbwalk-384afd` |
-| Anatomy scale MaleCNS : FAFB : BANC = 1 : 0.59215 : 0.28127 | `34c2eb0` | `docs/audits/connectome_backends.md` |
+| Take-off: 3.0 voluntary + 2.0 escape per 1,000 fly-s at the default | receptor round 5 / `560aaf3`, replicated round 3 | `docs/BENCHMARK_BATTERY.md`, `docs/audits/receptor_integration.md` G.5-G.6 |
+| Straight walking: clean-frame yaw SD 2.6-2.8 deg/s, straightness 0.995; DNa02 tonic inhibition -1.6 / -2.0 mV against a 7 mV gap | `4d55f96` (localization), `f9e9fea` (round-3 replication) | `docs/audits/deficit_turning.md`, `body_sided_state.md` |
+| Leg cycle + sided haltere: yaw SD -> 7.7-7.9 deg/s, DNa02 0.54 / 0.38 Hz, no frame above 100 deg/s, fixed left drift | `f9e9fea` | `docs/audits/body_sided_state.md`, `round3_integration.md` |
+| Compass: 0/48 bumps at shipped gains under every per-transmitter unitary bracket; bump drift <= 0.005 wedges/s vs 4.0 ideal | `f9e9fea` | `docs/audits/unitary_strength.md` 4, `body_sided_state.md` 6 |
+| Small object: LC11 12/12 `null`, LC10a fails Holm (p_holm 0.104); no passing mechanism in 8 arms | `10ad8cc` (round 2) | `docs/audits/object_matched_assay.md`, `object_compare_r2.md` |
+| Object round 3: localizer negative, 40/40 rectangle verdicts `null`, same-device H200 `REPRODUCES` / B200 `PARTIAL` | `f9e9fea` | `docs/audits/object_localizer_r3.md`, `object_rectangles_r3.md`, `object_samedevice_r3.md` |
+| Cross-connectome walking: MaleCNS 2.641 +/- 0.146 vs BANC 0.275 +/- 0.004 deg/s clean yaw SD, leg-cycle arm 7.837 vs 2.651 | `cfaa694` (merged at `28e862f`) | `docs/audits/connectome_backends.md`, batch `cbwalk-384afd` |
+| Anatomy scale MaleCNS : FAFB : BANC = 1 : 0.59215 : 0.28127 | `cfaa694` | `docs/audits/connectome_backends.md` |
 | Demo speed 0.5x / 0.8x / 1.3x real time on a 4090 | session 10 | `docs/NOTES.md`, `docs/PERFORMANCE.md` |
-| CPU test subset green | `4db2e8c` (2026-09-14, this desktop, cache present) | `364 passed, 7 skipped, 29 deselected ... in 144.62s` |
+| CPU test subset green | `28e862f` (2026-09-14, this desktop, cache present) | `364 passed, 7 skipped, 29 deselected ... in 144.62s` |
 
 A number not in this table and not in a `docs/audits/*.md` file with a batch line is not a result.

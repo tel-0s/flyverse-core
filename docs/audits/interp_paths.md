@@ -17,7 +17,7 @@ Generators of every number below (2026-09-12, local desktop, `device cpu` -- the
 | `out/interp/paths/rot_pen.json` + `rot_pen_console.txt` | `python scripts/interp_paths.py --a "LNO1\|LNO2\|LNOa\|SpsP\|PS196_b\|~^LAL" --b "PEN_a\|PEN_b" --k 3 --json out/interp/paths/rot_pen.json` | ~30 s |
 | `out/interp/paths/epg_loop.json` + `epg_loop_console.txt` | `python scripts/interp_paths.py --a EPG --b EPG --k 2 --level cell --wedge --json out/interp/paths/epg_loop.json` | ~10 s |
 
-Provenance carried by every JSON (checked by `Result.check()`, empty): commit `0d32fd6` dirty (the interp tree is
+Provenance carried by every JSON (checked by `Result.check()`, empty): commit `2dede31` dirty (the interp tree is
 untracked), MaleCNS v1.0 flat connectome (four file SHA-256s from `flyverse/data/manifest.json`), compiled connectome
 md5 `ef23cc27bea13be7f6a96f3c04fd3737` (167,106 neurons, 25,578,600 stored entries, `TYPE_NT_OVERRIDE` TmY14 / Mi19 / aMe8),
 `LIFParams()` resolved (w_syn 0.275 mV, conn_cap 60, same_type_gain 0.1, input_norm 5000 / alpha 1, receptor_model

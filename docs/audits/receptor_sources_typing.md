@@ -678,7 +678,7 @@ wrote flyverse/data/type_aliases.csv (= type_aliases_typing.csv; 22,200 data row
 
 ## 5. Round-2 changes (verify:tables:typing corrections applied; old -> new)
 
-Every value below comes from `out/type_map_typing_report.md` (this run) versus the round-1 doc (git HEAD c0332e3).
+Every value below comes from `out/type_map_typing_report.md` (this run) versus the round-1 doc (git HEAD 5d6198d).
 
 | item | round 1 | round 2 |
 |---|---|---|

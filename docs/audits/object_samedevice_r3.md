@@ -122,11 +122,11 @@ Holm families are per arm so restricting to three arms changes no adjusted p. On
 suppress vs-base line, `rectify: REPRODUCES` (trivially, against itself), `suppress: REPRODUCE`, and the
 cross-batch rows z 0.00 / p 1.000 throughout (the two "batches" are the same files). `Result.check()` none.
 
-**The tree.** `out/objr3sd/tree_state.json`: HEAD `6ec2de1` plus other tasks' uncommitted edits (`flyverse/body.py`,
+**The tree.** `out/objr3sd/tree_state.json`: HEAD `d2abf3c` plus other tasks' uncommitted edits (`flyverse/body.py`,
 `brain.py`, `senses.py`, `motor.py`, `batch_body.py`, `batch_sim.py`; `git diff --stat` 9 files, +499 / -27), which
 `cluster_run.py` ships with everything else. Against round 2's shipped tree (`out/objr2c/tree_state.json`, commit
-`653179b4`), the sha256 of `flyverse/optic.py`, `brain.py`, `body.py`, `senses.py`, `fly.py`, `connectome.py` and
-`interp/common.py` DIFFER (the merges since `653179b` and the edits above; e.g. `LIFParams.w_syn_by_nt`, default
+`c78cb93d`), the sha256 of `flyverse/optic.py`, `brain.py`, `body.py`, `senses.py`, `fly.py`, `connectome.py` and
+`interp/common.py` DIFFER (the merges since `c78cb93` and the edits above; e.g. `LIFParams.w_syn_by_nt`, default
 `None`, byte-identical off); `scripts/probe_object_matched.py` and `flyverse/retina.py` are the SAME. Every arm of
 THIS batch runs on this one tree, so the within-batch questions are untouched; the cross-batch base rows of section 5
 carry a code difference as well as a box difference, which is why they were predeclared exploratory.
@@ -579,8 +579,8 @@ Fetch receipts: `out/round3_astra/fetch_sd_meta_house_hashes.txt` "180 remote fi
 **The CPU smoke (§2) and the tree state (§2).** `out/objr3sd/smoke/samedevice_smoke.json`: 264 side-by-side rows,
 264 `verdict_agrees`, max |z_r3 − z_r2| = 0.0, max |p_holm_r3 − p_holm_r2| = 0.0; `closed false`, `one_model false`,
 `same_device_rows 140/420`; all 88 cross-batch rows z = 0.0, p = 1.0. `out/objr3sd/tree_state.json`: commit
-`6ec2de1a8c52…`, `diff_stat` "9 files changed, 499 insertions(+), 27 deletions(-)"; round 2's
-`out/objr2c/tree_state.json` commit `653179b4b0e2…`; `probe_object_matched.py` (adb77d08…) and `retina.py`
+`d2abf3cd2f22…`, `diff_stat` "9 files changed, 499 insertions(+), 27 deletions(-)"; round 2's
+`out/objr2c/tree_state.json` commit `c78cb93d6d84…`; `probe_object_matched.py` (adb77d08…) and `retina.py`
 (a8e60aac…) identical between round 2 and round 3, as §2 says.
 
 **`## Report` field-by-field.** `summary`, all five `key_claims`, the `api` lines (verified against

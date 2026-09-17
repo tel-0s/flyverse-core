@@ -248,7 +248,7 @@ the pipeline reproduces the known size-scaling of LPLC2's draw (+0.37 -> +2.89) 
 **What the run JSON records** (`out/objm/smk2/d110_obj_s0.json`, checked): `provenance.compiled_connectome.md5
 ef23cc27bea13be7f6a96f3c04fd3737` (the shipped cache; `sum_abs_W` 121,460,584; 167,106 neurons), dataset `v1.0
 flat-connectome`, `flyverse_commit.commit unknown` on the rented box with `source_fingerprint.computed true`
-(docs/INTERP.md 10.4 rule 6; the local checkout was `926da3a`, dirty), `execution.device cuda` / `device_name`
+(docs/INTERP.md 10.4 rule 6; the local checkout was `ae7c86f`, dirty), `execution.device cuda` / `device_name`
 per box -- **and, named as `verify:sphere` asks: the tree this smoke shipped to the boxes was not HEAD.** It carried
 two OTHER tasks' uncommitted changes to `flyverse/optic.py` (the hooks refactor, +215/-13 lines, touching the shipped
 optic path) and to `flyverse/fly.py` (the proprioception task); the cluster log confirms both were shipped.

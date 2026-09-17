@@ -162,7 +162,7 @@ one target (<cluster-node>, 8 x B200), so every block is trivially on one box an
 concurrently on <cluster-node> (2 TB RAM; `slots 112`); room jobs took 1,061-2,221 s of wall (the B arms ~1.5x, the slow term is on the
 Torch path), a compass arm 20-480 s per phase depending on the load.
 
-**What the batch shipped** (`out/r3int/submit_tree.txt`, HEAD `6ec2de1` = `origin/main`): the whole round-3 working tree,
+**What the batch shipped** (`out/r3int/submit_tree.txt`, HEAD `d2abf3c` = `origin/main`): the whole round-3 working tree,
 35 files -- this task's `scripts/probe_round3_integrate.py`; thread body-state's `flyverse/body.py` (+134), `batch_body.py`
 (+26 / -4), `batch_sim.py` (+5 / -1), `motor.py` (+29), `senses.py` (+157 / -12), `scripts/probe_vnc_drive.py`; thread
 unitary's `flyverse/brain.py` (+30 / -1: `LIFParams.w_syn_by_nt`, default `None`); the 13 `op report` ledger rows of threads

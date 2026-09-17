@@ -179,7 +179,7 @@ def main():
     cache_after = {p: digest(p, "md5") for p in cache_before}
     assert cache_after == cache_before, "A cache file changed during extraction"
     outputs = {p.name: digest(p) for p in sorted(args.out.glob("*.csv"))}
-    report = dict(schema=1, base_commit="fa584b2", code_commit=subprocess.check_output(
+    report = dict(schema=1, base_commit="8854691", code_commit=subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         script_sha256=digest(__file__), inputs=inputs, output_sha256=outputs,
         cache_manifest=cache_manifest, cache_md5_before=cache_before, cache_md5_after=cache_after,

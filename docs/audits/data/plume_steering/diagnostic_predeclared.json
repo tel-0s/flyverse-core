@@ -1,6 +1,6 @@
 {
   "stamped_utc": "2026-09-16T17:29:39Z",
-  "commit": "384898ae7ac8783f8c444d871d4118600f39780b",
+  "commit": "f687f968744275362768e9e4b6c8cd8bd9a27ff8 (recorded 384898ae7ac8783f8c444d871d4118600f39780b)",
   "status": "frozen before submission",
   "commands": [
     "python scripts/plume_steering_probe.py --heading compass --out out/plume_diagnostic_v1/compass.json",

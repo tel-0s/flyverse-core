@@ -1,4 +1,4 @@
-# Review: `feat/banc-vision` @ 7ffe957 (parent 442c420 = main)
+# Review: `feat/banc-vision` @ ebd6f26 (parent 67c76a4 = main)
 
 Read-only review. Worktree `D:\Projects\flyverse-connectome`. All runs CPU-only
 (`PYTHONIOENCODING=utf-8 CUDA_VISIBLE_DEVICES=-1`). No cluster job. Nothing edited or committed.
@@ -17,7 +17,7 @@ below -- a number the branch does not provide and the one a reader actually need
 
 ## 1. Diff, isolation, merge
 
-`git diff 442c420..7ffe957 --stat`: 4 files, +997 / -0.
+`git diff 67c76a4..ebd6f26 --stat`: 4 files, +997 / -0.
 
 | file | lines |
 |---|---:|
@@ -41,7 +41,7 @@ Read every hunk. Confirmed:
   MaleCNS supplies the T4 direction convention and nothing else. FAFB is loaded only inside the
   `--fafb-control` block. The audit's claim here is accurate.
 - **Merge is clean.** `git merge-tree $(git merge-base main feat/banc-vision) main feat/banc-vision` ->
-  `merged`, no conflict markers. `TODO.md` in `D:\Projects\flyverse` is unmodified vs 442c420, so the
+  `merged`, no conflict markers. `TODO.md` in `D:\Projects\flyverse` is unmodified vs 67c76a4, so the
   other agents' uncommitted work cannot collide.
 
 ### TODO.md conflict map for the round-4b agent

@@ -559,7 +559,7 @@ def main() -> None:
     e, f_, k, u = (cov_ol.loc[t] for t in ("exact", "fuzzy", "class", "unmatched"))
     pre_named = both.loc[named].to_numpy().sum()
     out.append("## 7. Round-2 corrections (verify:tables:ozel2021, `docs/audits/receptor_verification.md`) and their effect on the counts\n")
-    out.append("Applied in `scripts/build_ozel2021_tables.py` and rebuilt; round-1 numbers are those of the committed round-1 document (commit c0332e3).\n")
+    out.append("Applied in `scripts/build_ozel2021_tables.py` and rebuilt; round-1 numbers are those of the committed round-1 document (commit 5d6198d).\n")
     out.append("| item | round 1 | round 2 |\n|---|---|---|")
     out.append(f"| cluster 163 Pm1 | tier exact -> MaleCNS Pm1 only | tier class over Pm1, Pm5, Pm6 (Nern 2025 Sup_Table_7: Schlegel Pm1 = Matsliah Pm01 + Pm02 + Pm06) |")
     out.append(f"| cluster 55 Tm29 | tier exact (name only) | tier fuzzy, `flag = name_collision` (FCA Tm29 cholinergic; MaleCNS Tm29 = FlyWire Tm5d / CB3851, glutamate; Sup_Table_7 FW_transmitter_pred acetylcholine); {tm29[0]:,} cells / {tm29[1]:,} out-syn move exact -> fuzzy |")

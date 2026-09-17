@@ -9,12 +9,12 @@ type, runs the same propagation, and compares; then it measures what the rule do
 annotation in either release. CPU only, 31 s; no simulation, no default changed.
 
 Generator: `scripts/probe_column_ground_truth.py --out out/colgt` (run `trace-20260915T022803Z-9dc64269`, commit
-`27d265c`). Every number below is in `out/colgt/column_ground_truth.json` (a `Result`; tables named in each heading)
+`4ebf680`). Every number below is in `out/colgt/column_ground_truth.json` (a `Result`; tables named in each heading)
 or the per-cell CSVs beside it. Test: `tests/test_column_ground_truth.py` (a 7-column synthetic graph, CPU).
 **Regenerated after the independent skeptic pass** (`## Skeptic pass` below): the `<= 4.6 deg` and `within r50`
 statistics now carry a 1e-6 tolerance and `frac_same_column` is tested on the column index, not on an `arccos`
 distance (skeptic corrections 2 and 5 / R7). The original run was `trace-20260915T020015Z-5f4edd51`, commit
-`4db2e8c`; nothing else in the generator changed.
+`28e862f`; nothing else in the generator changed.
 
 ## 1. Method
 
@@ -338,8 +338,8 @@ api:
   - "no library API changed; flyverse.interp.trace.column_of_cells is called as the rounds called it; no default changed"
 validation:
   - "tests/test_column_ground_truth.py: 7 passed (CPU, synthetic 7-column graph: exact recovery, chance control, wide-field fallback = 1 column = 4.6 deg, permutation invariants, LC partner, lattice / retina distances)"
-  - "Result.check() empty; provenance per dataset (commit 27d265c, cache fingerprints, retina records) in summary.provenance_by_dataset"
-  - "Regenerated after the independent skeptic pass (run trace-20260915T022803Z-9dc64269; the original was trace-20260915T020015Z-5f4edd51, commit 4db2e8c): frac_same_column and full_vs_malecns_set_deg now use the column-index identity shortcut, and the <= 4.6 deg / within-r50 statistics a 1e-6 tolerance. No other generator change; 7 tests still pass"
+  - "Result.check() empty; provenance per dataset (commit 4ebf680, cache fingerprints, retina records) in summary.provenance_by_dataset"
+  - "Regenerated after the independent skeptic pass (run trace-20260915T022803Z-9dc64269; the original was trace-20260915T020015Z-5f4edd51, commit 28e862f): frac_same_column and full_vs_malecns_set_deg now use the column-index identity shortcut, and the <= 4.6 deg / within-r50 statistics a 1e-6 tolerance. No other generator change; 7 tests still pass"
   - "reproduces object_localizer_r3.md 1.2 for MaleCNS LC11 (13 columns, 50 / 44 / 14 / 13 cells) and LC10a (88 columns)"
   - "FAFB cache compiled from D:/Datasets/flywire (139,255 cells, 3,732,460 pairs); MaleCNS cache untouched"
 recommendations:
@@ -355,7 +355,7 @@ open_questions:
 
 ## Skeptic pass (independent, 2026-09-15)
 
-Branch `main`, HEAD `4db2e8c`. Nothing committed, nothing under `docs/`, `scripts/`, `flyverse/`, `tests/` edited.
+Branch `main`, HEAD `28e862f`. Nothing committed, nothing under `docs/`, `scripts/`, `flyverse/`, `tests/` edited.
 CPU only. Every number below comes from my own code
 (`scratchpad/recheck.py`, `recheck2.py`, `recheck3.py`, `recheck4.py`), which shares only
 `flyverse.connectome` / `flyverse.retina` with the audit: my own withhold-and-propagate, my own great-circle

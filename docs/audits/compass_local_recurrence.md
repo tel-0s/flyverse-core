@@ -15,7 +15,7 @@ submit_stamp.txt, scheduler_receipt.json, scheduler_receipt.py}`, `out/cx7/smoke
 check and the analysis path check), `out/cx7/<arm>_s<seed>.{json,txt,npz}` (**40 runs**), `out/cx7_cluster.log`,
 `out/cx7/analysis/{analysis.md, runs.csv, compare.csv, decision.csv, call.csv, scatter.csv, state.csv,
 ring_rates.csv, predictions_vs_measured.csv, cross_batch_cx6.csv, analysis.json, scatter.png}`.
-Tree: HEAD a41d0f2 (this thread's offline half, committed by the owner before the batch ran); nothing committed by
+Tree: HEAD be549c8 (this thread's offline half, committed by the owner before the batch ran); nothing committed by
 this thread. `out/cx7/tree_state.json` (stamped 2026-09-15T18:30:29Z) lists every file that shipped with the batch
 with its sha256 -- this thread's `scripts/cx_wedge.py`, `scripts/cx_ring_structure.py`,
 `scripts/measure_lif_sigma.py`, the two test files, and another thread's concurrent `scripts/probe_vnc_drive.py`,
@@ -702,7 +702,7 @@ inserted into the reviewer's text.
 <details>
 <summary>Completed independent review, sections 0-16 and carry-over corrections</summary>
 
-> # Skeptic pass, compass 6B OFFLINE part (docs/audits/compass_local_recurrence.md, repo main a41d0f2)
+> # Skeptic pass, compass 6B OFFLINE part (docs/audits/compass_local_recurrence.md, repo main be549c8)
 >
 > Reviewer: independent skeptic. Everything below was recomputed on this desktop (CPU, PATH python
 > <PATH-python>, CUDA_VISIBLE_DEVICES=-1). No repo file edited.
@@ -723,7 +723,7 @@ inserted into the reviewer's text.
 > `out/cx7/submit_stamp.txt` now reads **2026-09-15T19:11:54Z**, not the 18:30:36Z the audit's stamp chain
 > states. Audit committed 19:08:50Z; submission 19:11:54Z; this review ran 19:13-19:20Z. So the batch was
 > resubmitted ~3 min after the audit was committed and is (at review time) queued at house with 0 of 40
-> artefacts fetched. origin/main == a41d0f2, so the box gets the 6B code from the repo (only 3 other-thread
+> artefacts fetched. origin/main == be549c8, so the box gets the 6B code from the repo (only 3 other-thread
 > files were shipped as a diff).
 >
 > ## 1. Sigma measurement

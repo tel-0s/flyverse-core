@@ -940,7 +940,7 @@ provenance block and the Neurome `readout_per_body` table.
 2. **`provenance.flyverse_commit.commit` is `unknown` for every cluster job.** `cluster_run.py` ships a file copy of
    the checkout without `.git`, so `common.git_state()` on the node has nothing to read. `analyse_runs` now records
    `provenance.flyverse_commit_analysis` -- the desktop checkout that produced the code and ran the analysis
-   (`0d32fd6e74067569317d1a4bd604ce2f82f69dd5`, dirty, with the interp files listed) -- *beside* the run's own
+   (`2dede310b66e2edfc47c0e833c7d7adfe5473a77`, dirty, with the interp files listed) -- *beside* the run's own
    `flyverse_commit`, rather than overwriting what the run actually reported. Worth fixing centrally (shipping
    `git rev-parse HEAD` into the run environment), since every tool's GPU half has the same hole.
 3. **`SD_FLOOR_HZ = 0.05` is a declared constant, not a fit.** It only affects rows whose null arm is bit-identical
@@ -992,7 +992,7 @@ execution        device cuda (NVIDIA B200), devices ['cuda','cuda','cuda'], host
                  dt lif 0.5 / optic 1 / frame 10 ms, batch 64, seeds brain [0,1,2], replicate_unit 'runs'
 stimulus         protocol 'atlas', hz 150, ms 400, settle_ms 200, n_null_rows 4, context None,
                  control '4 unstimulated rows of the same FlyBrain batch, same seed, same context'
-analysis         flyverse_commit_analysis 0d32fd6e74067569317d1a4bd604ce2f82f69dd5 (dirty)
+analysis         flyverse_commit_analysis 2dede310b66e2edfc47c0e833c7d7adfe5473a77 (dirty)
 ```
 
 `Result.check()` returns `[]` for `validation.json`, `validation_half.json` and `dn_sensory.json`; the

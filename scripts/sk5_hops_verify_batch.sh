@@ -5,7 +5,7 @@
 #
 # Every job runs from the PRESERVED run directory of the batch under audit
 # ($CLUSTER_RUNS/r5-hops-218d81), i.e. the exact code snapshot that produced
-# out/r5_sustain_*.json and out/r5_hops_*.json -- brain.py there is HEAD 611f554's (the GF x0.3
+# out/r5_sustain_*.json and out/r5_hops_*.json -- brain.py there is HEAD c01a137's (the GF x0.3
 # damping still in place), which the working tree no longer is.  Results are written into this
 # run's own out/ so --fetch out/ brings them back.
 #

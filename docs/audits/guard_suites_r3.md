@@ -14,7 +14,7 @@ carries). An earlier version of this sentence said 21; the substance holds, the 
 `guard_summary.json` (`bash scripts/guard_suites.sh --report`, CPU).
 
 **What the boxes ran.** `cluster_run.py` ships the working-tree diff at submission (`out/guard_r3/submit_tree.txt`,
-2026-09-14 05:19 UTC, HEAD `6ec2de1`): `flyverse/body.py` (+11 lines at that moment: the body-state thread's `LegCycle`
+2026-09-14 05:19 UTC, HEAD `d2abf3c`): `flyverse/body.py` (+11 lines at that moment: the body-state thread's `LegCycle`
 class and five `FlyState` fields with static defaults, opt-in, nothing reads them unless a `LegCycle` is attached) plus
 three scripts. Read back over ssh from the run directory on both boxes: `flyverse/senses.py`, `batch_body.py`,
 `motor.py`, `batch_sim.py`, `brain.py`, `optic.py`, `fly.py`, `scripts/benchmark.py`, `batch_sustain.py`,
@@ -312,7 +312,7 @@ docs/audits/anti_runaway.md round 7.
    is the same-box reference for it.
 4. The 29-check suite with the transducer on is not a measurement (section 1b); the suite's own `hops` section and
    the room protocol are where the sense acts.
-5. The batch ran HEAD `6ec2de1` + the inert `LegCycle` in `body.py` (section 0); the other threads' round-3 edits
+5. The batch ran HEAD `d2abf3c` + the inert `LegCycle` in `body.py` (section 0); the other threads' round-3 edits
    (`senses.py`, `motor.py`, `batch_body.py`, `brain.py`, `optic.py`, `fly.py`, `batch_sim.py`,
    `retire_measures.py` in the present tree) were **not** on the boxes. The CPU smoke of the wrapper
    (`bash scripts/guard_suites.sh --smoke`, `out/guard_r3/smoke/`) passes against the present tree (three JSONs,
