@@ -3097,6 +3097,18 @@ torch-sparse path, or repeated draws with the spread reported? (5) What does the
 stand-in's own run already rejected admission on `taste.MN9_hz` (seed 1, 1.690 -> 4.296 Hz, FAIL -> PASS outside
 the declared gap), so the honest expectation is another rejection, and it is worth having on the record.
 
+## Session 13, continued: the history rewrite (2026-09-17)
+
+The release blocker in TODO A -- infrastructure identifiers in committed files -- was closed by rewriting the
+whole history rather than the tip: `git filter-repo` over all 161 commits with a replacement map (hostnames,
+the cluster user, the shared-filesystem root, the scheduler's name, three rented-box IPs and the workstation
+home path -> `<cluster-host>`, `<cluster-node>`, `<cluster-node-2>`, `<cluster-user>`, `<cluster-fs>`,
+`<scheduler>`, `<rented-box-ip>`, `<workstation-home>`), applied to blobs and commit messages, verified by a
+full-history grep returning nothing. Every commit SHA changed; the ten remote branches were force-pushed; a
+pre-rewrite bundle is kept outside the repository. Audit prose that quoted a run directory or a host now reads the
+placeholder, which is the convention the audits already used. `tests/test_cluster_run.py`'s canned scheduler
+fixture was renamed by the same map and still passes (74 passed with the bit-identity and instrument files).
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

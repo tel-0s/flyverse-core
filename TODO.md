@@ -9,7 +9,7 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
 - [x] **LICENSE** (code: MIT, 2026-09-13) and a data-licence note: MaleCNS v1.0 (Janelia FlyEM; cite the release paper and its
       licence), the external expression tables (`scripts/fetch_data.py`; not redistributed — `data/external/` is
       git-ignored), FlyWire NT predictions where used. `CITATION.cff` for flyverse itself.
-- [ ] **Infrastructure scrub** — done at the tip (2026-09-13: cluster host / IP / filesystem paths replaced by
+- [x] **Infrastructure scrub** — done at the tip (2026-09-13: cluster host / IP / filesystem paths replaced by -- DONE 2026-09-17: the whole history was rewritten with git-filter-repo (161 commits; hostnames, the cluster user, the shared-filesystem root, the scheduler name, the rented-box IPs and the workstation home path replaced by `<cluster-host>` / `<cluster-node>` / `<cluster-user>` / `<cluster-fs>` / `<scheduler>` / `<rented-box-ip>` / `<workstation-home>` in every blob and commit message); a pre-rewrite bundle is kept outside the repo; the ten remote branches were force-pushed. GitHub may retain the old objects until its own GC -- ask support to purge before the public flip.
       `<cluster-host>`, `$CLUSTER_RUNS`, … in 19 files); decide whether to rewrite history before the announcement
       (`git filter-repo` on the same patterns) — the identifiers are internal hostnames and paths, nothing secret,
       but they were committed. `docs/CLUSTER.md` and `.cluster.json` stay git-ignored.
