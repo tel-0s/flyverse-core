@@ -46,13 +46,17 @@ def hashes():
     }
 
 
-def plan(out):
+def plan(
+    out, published_plan=Path("docs/audits/data/plume_transduced/predeclared.json")
+):
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     from flyverse import connectome, world
     from flyverse.instruments import make_instrument
 
-    if out.exists():
-        raise FileExistsError("use a fresh plan directory")
+    published_plan = (ROOT / published_plan).resolve()
+    public_rel = published_plan.relative_to(ROOT).as_posix()
+    if out.exists() or published_plan.exists():
+        raise FileExistsError("use a fresh plan directory and published declaration")
     c = connectome.load()
     out.mkdir(parents=True)
     rel = out.relative_to(ROOT).as_posix()
@@ -82,6 +86,8 @@ def plan(out):
     protocol = {
         "status": "PREPARED ONLY; no submission authorized until Fable releases the pool",
         "seconds": 60,
+        "results_dir": rel,
+        "published_plan": public_rel,
         "initial_energy": 0.1,
         "batch": 1,
         "fruit": "all",
@@ -141,15 +147,15 @@ def plan(out):
         names = list(ARMS)
         for arm in names[seed % 3 :] + names[: seed % 3]:
             commands.append(
-                f"python scripts/plume_transduced_batch.py room --plan {rel}/predeclared.json --arm {arm} --seed {seed} --out {rel}/{arm}_{seed}.json"
+                f"python scripts/plume_transduced_batch.py room --plan {public_rel} --arm {arm} --seed {seed} --out {rel}/{arm}_{seed}.json"
             )
     protocol["commands"] = commands
     job_lines = []
     for command in commands:
         stem = Path(command.split("--out ")[1]).stem
-        filename = f"{rel}/fam_plume_{stem}.log"
+        filename = f"{rel}/fam_plume/{stem}.log"
         job = (
-            f"mkdir -p {rel} && source .venv/bin/activate && FLYVERSE_PLUME_GPU_RELEASED=1 {command} > {filename} 2>&1; "
+            f"mkdir -p {rel}/fam_plume && source .venv/bin/activate && FLYVERSE_PLUME_GPU_RELEASED=1 {command} > {filename} 2>&1; "
             f"st=$?; tail -8 {filename}; exit $st"
         )
         job_lines.append(shlex.quote(job))
@@ -169,6 +175,8 @@ def plan(out):
         (out / "batch.sh").read_bytes()
     ).hexdigest()
     save(out / "predeclared.json", protocol)
+    # A tracked/public declaration is shipped; ignored out/ is not in the source overlay.
+    save(published_plan, protocol)
     print(f"Prepared {len(commands)} independent rooms in {rel}; NOT submitted")
 
 
@@ -332,10 +340,11 @@ def analyse(args):
     records = []
     digest = hashlib.sha256(args.plan.read_bytes()).hexdigest()
     p = json.loads(args.plan.read_text(encoding="utf-8"))
+    result_dir = ROOT / p["results_dir"]
     for arm in ARMS:
         for seed in range(6):
             r = json.loads(
-                (args.plan.parent / f"{arm}_{seed}.json").read_text(encoding="utf-8")
+                (result_dir / f"{arm}_{seed}.json").read_text(encoding="utf-8")
             )
             if (r["arm"], r["seed"], r["declaration_sha256"]) != (arm, seed, digest):
                 raise ValueError("run identity differs from declaration")
@@ -405,11 +414,16 @@ if __name__ == "__main__":
     ap.add_argument("mode", choices=("plan", "room", "analyse"))
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--plan", type=Path)
+    ap.add_argument(
+        "--published-plan",
+        type=Path,
+        default=Path("docs/audits/data/plume_transduced/predeclared.json"),
+    )
     ap.add_argument("--arm", choices=tuple(ARMS))
     ap.add_argument("--seed", type=int, choices=range(6))
     args = ap.parse_args()
     if args.mode == "plan":
-        plan(args.out.resolve())
+        plan(args.out.resolve(), args.published_plan)
     else:
         if args.plan is None or (
             args.mode == "room" and (args.arm is None or args.seed is None)

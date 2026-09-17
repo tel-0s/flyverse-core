@@ -228,6 +228,19 @@ def test_draft_has_eighteen_independent_guarded_rooms(tmp_path, monkeypatch):
     shell = (out / "batch.sh").read_text(encoding="utf-8")
     assert "set -euo pipefail" in shell and "FLYVERSE_PLUME_GPU_RELEASED:-0" in shell
     assert "--target house" in shell and "--arm-block fam" in shell
+    import shlex
+
+    from cluster_run import block_value
+
+    tokens = shlex.split(
+        shell[shell.index("python scripts/cluster_run.py") :].replace("\\\n", "")
+    )
+    jobs = [t for t in tokens if t.startswith("mkdir ")]
+    assert len(jobs) == 18 and {block_value(j, "fam") for j in jobs} == {"plume"}
+    assert (tmp_path / p["published_plan"]).read_bytes() == (
+        out / "predeclared.json"
+    ).read_bytes()
+    assert all("--plan docs/" in command for command in p["commands"])
     with pytest.raises(FileExistsError):
         batch.plan(out)
     monkeypatch.delenv("FLYVERSE_PLUME_GPU_RELEASED", raising=False)
@@ -243,6 +256,7 @@ def test_room_analysis_uses_runs_and_rejects_incomplete_records(tmp_path):
     import plume_transduced_batch as batch
 
     plan = {
+        "results_dir": str(tmp_path),
         "starts": [{"seed": s} for s in range(6)],
         "provenance": {
             "preset": "instrumented",

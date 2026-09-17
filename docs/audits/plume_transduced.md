@@ -149,7 +149,7 @@ exploration or other loop dynamics; it would not retroactively validate the sens
 
 ## 4. Prepared comparison, not submitted
 
-Generator: `scripts/plume_transduced_batch.py plan --out out/plume_transduced_rooms_v1`.
+Generator: `scripts/plume_transduced_batch.py plan --out out/plume_transduced_rooms_v2`.
 The frozen JSON and guarded `batch.sh` are copied beside the CPU artifacts. The user
 confirmed the goal-only definition on 2026-09-17:
 
@@ -175,6 +175,11 @@ family blocking, preserved per-job exit codes and a named fetch directory. The s
 and room entry point refuse execution without the explicit pool-release environment
 flag; it must not be set until Fable authorizes submission. Source hashes must match
 the declaration or the room runner refuses.
+The declaration is also published under `docs/audits/data/plume_transduced/` so the source
+overlay ships it; ignored `out/` files are not assumed to be present on a worker. The v1
+local draft was superseded during CPU preflight (declaration shipping and family grouping),
+before any submission; v2 is the prepared draft. A later source change requires a fresh
+plan directory and `--published-plan` path, preserving this declaration.
 
 Report six feeding durations and contact indicators per arm (>=1 s feeding), censored
 first-contact times, energy, distance, airborne duration, neural rates, goal offsets and
