@@ -3849,3 +3849,124 @@ NOT CHECKED: anything requiring CUDA (the modules=True graph-capture path, can_c
 ## Transduced-contrast plume law (Astra, `astra/plume-transduced`; independent skeptic, Opus, 2026-09-17)
 
 **VERDICT: refuted (the section-1 mechanism; the SNR arithmetic itself is sound and reproduces exactly).** The defect -- `bilateral_orn_groups` returned indices in glomerulus-table order while the scheduler's `resolve()` sorts read selections, so the per-glomerulus weights were applied to the wrong cells (+3.58 Hz L-R under exactly symmetric odour, a constant +88.8 deg goal offset) -- was fixed at 9c74945 with a non-ascending-fixture regression test, the characterisation regenerated (no number changed), the draft re-frozen as v3 with `stamped_utc`, and the audit corrections applied at 0bcb897; merged at ca23768 (532 passed / 19 skipped; cache md5s unchanged). The verdict and CLAIMS 1-9 are quoted verbatim in `docs/audits/plume_transduced.md`'s skeptic section. Standing finding: at the shipped ORN law and filters a 0.26-1.1 % bilateral contrast arrives at cascade SNR 0.16-0.34 (below 1 across the historical range; conservative, since shared synaptic drive lowers it further), correct sign in 0.667 of 250 ms windows (analytic 0.635); the inherited gain 200 is underived for a rate contrast. Rooms not run. NOT CHECKED: anything on GPU; the rooms; the ORN law's literature basis; ruff.
+
+## Round 8 items 1-2: the determinism gate (`det1`) and the V- sign control (`cx9`) (independent skeptic, Opus, 2026-09-18)
+
+**VERDICT: mostly sound for both audits.** Both audits' quantitative content reproduced exactly on the CPU from the frozen run files; no correction overturns a verdict, and two of them (the +-1-spike localisation of the room divergence and the two-process CPU control) strengthen the gate's reading rather than weaken it. Every CORRECTIONS REQUIRED item below is applied in place in
+`docs/audits/determinism_gate.md` and `docs/audits/compass_sign_control.md`, with each replaced finding kept as a **Withdrawn:** note
+(INTERP 10.4 rule 29 iii); the verdict line and all ten CLAIMS are quoted verbatim in both audits' `## Skeptic pass
+(independent, Opus, 2026-09-18)` sections. Nothing was adopted and no default moved on either account.
+
+### Verdict
+
+```text
+VERDICT
+- determinism_gate: mostly sound
+- compass_sign_control: mostly sound
+
+Both audits' quantitative content reproduced exactly; every correction below is documentation-level or an under-statement, none overturns a verdict.
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED
+determinism_gate.md
+- Section 5 (Reproduction): "Every run: device `cuda`, `NVIDIA B200`, the pinned id in `CUDA_VISIBLE_DEVICES` (`runs.csv`), ..." -> false for cxS. Replace with: "Every run: device `cuda`, `NVIDIA B200`, the path's backend flags in `provenance.execution.backend`, and every loaded source file at the predeclared hash (...); the pinned id is in `CUDA_VISIBLE_DEVICES` (`runs.csv`) for the eight room runs -- `cx_wedge` does not record the variable, so cxS's id is only in the client log's `[gpu 4]`."
+- Section 3 Results table, cxS row: "B200, id 4" -> "B200, id 4 (from the client log; not recorded in the run)".
+- Section 6, "Same GPU" bullet: after "the four room pairs ran on four different ids concurrently", add: "and cxS shared id 4 with raw_torch (5 jobs, round-robin over a pool of 4): the pair that repeats exactly ran concurrently with one that does not, which is evidence against co-tenancy as the cause."
+- Section 2, third-stamp sentence: "...(a loaded-source check was added -- the check that would have caught the second submission -- and a per-run metrics file)" -> drop "and a per-run metrics file" and add: "; `runs.csv` was added later, with the analysis, so the predeclared `scripts/determinism_gate.py` hash is the hash of the code the RUNS loaded, not of the analysis that produced the CSVs."
+- Section 5: add "`out/det1/batch.sh` is the generated plan, stamped 23:17:01Z and carrying no `--ship flyverse`; it therefore reproduces the *invalid* submission. The submitted command line is in the ignored `out/det1/client_stdout_0.txt`." (Better: teach `plan()` a `--ship` option and regenerate.)
+- Section 2 (receipt paragraph): add "the scheduler's receipt was not fetched as a file into `out/det1/` this round (INTERP 10.4 rule 21); only the client console records the submission."
+- Section 4.2: after "is **not established here**", add: "What the saved arrays do show: the first difference in every room pair is exactly +-1 spike in exactly one of the six rows (plume_native row 0 at frame 30, plume_torch row 4 at 60, raw_native row 5 at 4, raw_torch row 0 at 86); that row's body diverges 1-51 frames later and its antenna / plume columns later still, and the other five rows stay bit-identical for a further 215-329 frames. The body integrator and the air / odour field are therefore not the source. On the native path the event-scatter CUDA kernel accumulates with a float `atomicAdd` (`flyverse/kernels/neural.cu:122`), which is order-nondeterministic by construction and is a sufficient mechanism for that path."
+- Section 4 / recommendations / open_questions: add the CPU control -- "the same B=6 raw room on the torch path repeats bit-exactly across two separate CPU processes for 120 frames (body, cumulative spikes and the full `v` and `g` tensors), with Python hash randomisation on, so an RNG-seeding or iteration-order bug in the Python layer is excluded" -- and note that `scripts/benchmark.py --deterministic` already provides `torch.use_deterministic_algorithms(True)` + `CUBLAS_WORKSPACE_CONFIG=:4096:8`.
+- Section 3/5 (minor): "every loaded source file at the predeclared hash" -> "every loaded source file the predeclaration covers (three loaded paths -- `flyverse/data/manifest.json`, `scripts/interp_export.py`, `scripts/probe_object_sweep.py` -- fall outside `source_hashes()` and are not checked)".
+- Section 2 (minor): "four files ... (`flyverse/compass.py`, `fly.py`, `instruments.py`, `navigation.py`)" -> add "(and, for the room runs, the pre-re-stamp `scripts/determinism_gate.py`)".
+
+compass_sign_control.md
+- Section 3.4 + section 4 + Report summary / key_claims: "**76 of 76 (arm, key) rows are exactly equal in all six seeds**" -> "**76 of 76 (arm, key) *metric* rows** ... `replication.csv` compares the run JSON's 38 keys; the ledger arrays are not compared by it." (Optionally strengthen with the verified fact that the 384 ledger arrays of the 12 S/V runs are bit-equal too, and that the full numeric record differs only in `source_fingerprint.n_files`.)
+- Section 3.2 + section 4 + Report summary: "...the mirror of V (GLNO_L 2.59 / GLNO_R 0.37)" -> "...V is the same picture with the sides exchanged (GLNO_L 2.59 / GLNO_R 0.37), but not exactly: V's GLNO_R equals S's in only three of six seeds (2, 3, 5) -- 0.3316 / 1.3144 / 0.4936 against S's 0.0018 / 0.0020 / 0.0000 in the others -- so the untouched-side statement holds for V- and not for V."
+- Report open_questions: "Why the hold plus relabel removes the sign specificity that the unheld ring shows." -> "Whether the hold plus relabel removes the sign specificity the unheld ring shows: HGV vs HGV- on GLNO L-R is a null in cx8r (+3.1092 Hz, z +1.625, p 0.0260, not separated), so the held arms' non-reversal is an unresolved contrast, not a demonstrated absence."
+- Section 6, orientation bullet: after "(|t| 7.8-47.6)" add "; reversing the arms in `compare` itself gives |z| 3.20, 5.72 and 20.78 -- all still `result`, but primary 1 clears the |z| >= 3 gate by 0.20, where round 7's primary 3 reversed gave 2.963 and became null."
+- Section 3 (receipt sentence): add "the scheduler's receipt was not fetched as a file into `out/cx9/` (INTERP 10.4 rule 21); the job indices and arms are corroborated by `client_stdout_0.txt` (`cx9-2daa4d-5` = `V-_s1`, `-6` = `S_s2`), which is ignored."
+- Section 1 (minor): name the instrument's own status once -- `sided_turn_afferent` is `kind` stop-gap with an `unverified` gain (`docs/PRESETS_SPEC.md` section 3, `flyverse/instruments.py`) -- so "the GLNO side report follows the afferent's sign" cannot be read as a claim about the fly.
+```
+
+### Not checked
+
+```text
+NOT CHECKED
+- Anything on a GPU. No det1 or cx9 job was re-run; the GPU non-repeat and the exact cxS repeat are taken from the fetched run files as recorded.
+- Whether the scheduler actually placed the cxS job on GPU 4 (no id in the record) and whether cx9's 18 jobs landed on their requested ids (cx_wedge records no CUDA_VISIBLE_DEVICES at all) -- corroborated only by the client log.
+- The scheduler's own receipts for det1 and cx9 (no receipt file exists locally).
+- INTERP 10.4 rule 16's "CPU value quoted beside it" for cxS's reference numbers -- cx_wedge was not run on the CPU.
+- det1_attempt1's own predeclared.json as a file (not kept; all three stamps verified from git history), and the attempt-1 room-pair numbers (24 / 125) beyond confirming their stale-source status.
+- Round-8 items 3-4 and anything under out/suite-inst*, out/plume-go.
+- flyverse/instruments.py (+17) and flyverse/navigation.py (+29) on this branch: they belong to items 3-4 and were only checked to the extent of confirming they are absent from the items 1-2 commits.
+- Hardware identity (B200) and node identity were taken from the run records, not independently verified.
+```
+
+## Round 8 items 3-4: the three-instrument suite list (`suite-inst`) and the goal-only plume arm (`plume-go`) (independent skeptic, Opus, 2026-09-18)
+
+**VERDICT: mostly sound for both audits.** All three analysis scripts reproduce their committed CSVs byte-for-byte on the CPU and every headline number checks out; the corrections are scope and wording defects -- one claim of no movement that was true only of statuses, one 'undeclared' that was declared, one 'on a fruit' that was 1.6-3.2 cm outside the feeding shell, and one hunger sentence that no longer generalised. Every CORRECTIONS REQUIRED item below is applied in place in
+`docs/audits/instrumented_suite.md` and `docs/audits/plume_goal_only.md`, with each replaced finding kept as a **Withdrawn:** note
+(INTERP 10.4 rule 29 iii); the verdict line and all ten CLAIMS are quoted verbatim in both audits' `## Skeptic pass
+(independent, Opus, 2026-09-18)` sections. Nothing was adopted and no default moved on either account.
+
+### Verdict
+
+```text
+VERDICT
+- instrumented_suite: mostly sound
+- plume_goal_only: mostly sound
+
+All three analysis scripts reproduce their committed CSVs byte-for-byte on the CPU (suite_rows/runs/suite_table, room_runs/room_tests, plume compare/descriptive/rows/runs -- all diff-identical, 0 problems). Branch tests: 514 passed / 15 skipped / 220 subtests, 1 failure (test_connectome_data.py::test_loading_malecns_never_rewrites_cache) that is an artefact of the cache junction, not a branch defect; test_bit_identity.py and test_plume_variants_are_opt_in_and_recorded pass.
+```
+
+### Corrections required (all applied)
+
+```text
+CORRECTIONS REQUIRED
+docs/audits/instrumented_suite.md, section 2 (Result block, last paragraph). Replace
+> "The raw tallies and values reproduce compass_standin's raw column exactly on eight rows (rest, taste, smell, dn, walk.GF_max, bitter.calibrated -- the B=1 legacy probes; these repeat like cx_wedge does) and differ on the room-derived rows (walk.power, loom, rotate, walk_gf, loom_escape), as determinism_gate.md says they must."
+with
+> "The raw column reproduces exactly on 18 of the 29 rows and differs on 11, both against compass_standin's raw column and against this batch's own first submission (a same-code repeat of the raw arm: `out/suite-inst_attempt1`). The 11 that do not repeat are loom.GF_peak, rotate.DNp20, motion.min_dsi, loom_escape.GF_peak, walk_gf.p99, rotation.group_flip, object.LC10a, wind.DNp18, wind.DNp33 and the two odour rows. walk.power_max / power_sustained and the two bitter.shiu rows repeat exactly, so the raw-vs-instrumented differences there (walk.power at seed 2; shiu at all three seeds, 138.934 -> 149.314 at seed 1) are attributable to the instruments, not to the non-repeating path. Note that walk.power, loom and rotate come from the legacy B=1 `sec_walk` probe, not from a room section, and that flyverse/fly.py, modules.py, instruments.py, compass.py and batch_sim.py changed between compass_standin's commit and this branch, so the cross-batch differences are not attributable to determinism_gate.md alone."
+
+docs/audits/instrumented_suite.md, section 2 (add after the Result table):
+> "The compass section's own rates show the hold acting: during the 2 s wedge drive, PEN_hz is 2.01 / 1.78 / 1.08 under raw and 7.72 / 7.66 / 7.22 under the instruments, rest_EPG_hz 0.000 x 3 against 1.36 / 2.12 / 3.36, wedge_hz 61-67 against 69-80 -- three draws against three with no overlap -- while wedge_cells_persisting stays 0 in all six. The 'no status change' result is therefore not vacuous: the ring's operating state moves substantially and no check changes status."
+
+docs/audits/instrumented_suite.md, section 3 (first line of the undeclared-descriptives paragraph), section 4, and the Report summary / key_claims. "Undeclared descriptives from the same runs" -> "Descriptives from the same runs (meals, path and the walking-GF median are named in `predeclared.json`'s `rule.descriptive`; rows at the GF threshold is not)"; and in section 4 / the Report summary / key_claims, "a fewer-meals descriptive (1-4 against 0-7 per run, undeclared, null at 6 v 6)" -> "a fewer-meals descriptive (1-4 against 0-7 per run, a predeclared descriptive, null at 6 v 6)".
+
+docs/audits/instrumented_suite.md, section 3 (same paragraph). Add:
+> "The per-row maximum GF rate (gf_max_hz, including airborne frames) is the descriptive that moves most: 31.4, 31.6, 30.8, 33.6, 33.2, 35.8 Hz instrumented against 36.7, 36.7, 33.9, 38.2, 34.2, 34.9 raw (diff -3.01, z -1.79, Welch -2.94, exact U p 0.0152; null under the z >= 3 rule). It is undeclared, it is the only measure in the set with a rank-test p below 0.05, and it belongs on the record beside meals."
+
+docs/audits/instrumented_suite.md, section 4 and the Report summary (identical text). "this list, unlike the compass stand-in, moves no suite row" -> "this list, unlike the compass stand-in, moves no suite row's status (values move on 20 of the 29 rows; 8 rows are bit-identical to raw)".
+
+docs/audits/instrumented_suite.md, section 6 (Author self-review), add a bullet:
+> "The hold and the relabel are shown to act (the compass PEN / rest-EPG rates, and the bitter.shiu and walk.power rows that repeat under raw). The afferent is not: no run record carries its rate, so both halves establish that it was attached, not that it fired."
+
+docs/audits/plume_goal_only.md, section 2 (closing sentence). "no room repeats, so every number below is a mean +/- SD over runs and nothing is quoted beyond that" -> "no room repeats, so every summary number below is a mean +/- SD over runs; the per-room-row values in section 3.3 and the single-draw times quoted in section 4 are one draw each, pasted from `rows.csv` under INTERP 10.4 rule 28 and labelled as such."
+
+docs/audits/plume_goal_only.md, section 4 item 3, the Report summary, the Report key_claims (4th item) and section 6 (third bullet). Replace "Two of the six drawn rows (0 and 3) begin within a fruit's reach" / "two drawn rows begin on a fruit" / "Two drawn rows start on the fruit" with: "Two of the six drawn rows start just outside a fruit -- row 3 at 0.0163 m and row 0 at 0.0318 m from the nearest fruit surface, against the 0.015 m feeding radius -- and are fed in every arm and run (first contact 0.4-1.9 s, once 13.1 s). They are counted in every drawn fed_rows figure, so full 6, goal-only 4.33 and feedback-only 4.00 each include two rows no arm has to steer to."
+
+docs/audits/plume_goal_only.md, section 4 item 5. "nothing about hunger (energy reaches zero before every first contact as before)" -> "nothing about hunger. The shipped-start rooms still deplete before every first contact under `full`, but that is no longer general: over the 36 runs 143 of 216 rows reach energy 0 (17.8-19.6 s) and 74 of 151 first contacts precede it -- 28 of 36 under `full` with the drawn starts, all 24 under feedback-only drawn, and 7 of 28 under goal-only with the shipped starts. The drawn set therefore does exercise the hunger gain below 1.0, which the shipped set did not."
+
+docs/audits/plume_goal_only.md, section 4 item 2 and the Report key_claims (3rd item). After "the row goal-only never feeds (0 of 6 runs) is row 3, the 185 deg heading", add: "Row 1 (90 deg) also fails in 2 of the 6 goal-only runs, so row 3 is 1.00 of the +1.33 rows and row 1 the remaining 0.33. The shipped set has one room per heading, so heading and room are not separable here; with the drawn starts the row goal-only never feeds is row 4 (heading -87.9 deg), not a downwind start."
+
+docs/audits/plume_goal_only.md, section 6 (Author self-review), add a bullet:
+> "The three arms are three cells of a 2 x 2: (bilateral goal, gain 5), (bilateral goal, gain 0) and (pre-correction goal, gain 5). The fourth -- pre-correction goal with gain 0 -- is not in this batch; it exists only as plume_steering.md's diagnostic (2 of 6, one draw, a different batch). So +5.83 and +1.33 are simple effects, not main effects, and the +5.83 includes whatever the feedback costs when it chases a goal that does not point at food. 'Load-bearing' is a comparison of those two simple effects."
+
+docs/audits/plume_goal_only.md, section 1 or 2 (design). Carry forward: "The six shipped rooms are near-repeats (plume_steering.md skeptic item 5): world.make_room places apple, orange, banana and lime at seed-independent coordinates, only the grapes and blueberries jitter, the start is identical, and three rows share the 5 deg heading."
+```
+
+### Not checked
+
+```text
+NOT CHECKED
+- Any GPU/cluster re-run. CPU-only; the runs are native-CUDA B200 and the native path does not repeat, so the runs themselves cannot be reproduced anywhere. The analyses, the provenance and the derived statistics were verified from the frozen run files instead.
+- Room-arm yaw SD and DNa02 rates. Not recorded in the room JSONs.
+- Whether sided_turn_afferent actually fired. No run record carries its rate or its injected Poisson input; only attachment is verifiable.
+- The --ship flyverse,scripts / cluster_run submission mechanics and the per-job GPU pinning beyond what the run JSONs and jobs.json assert.
+- The 3 v 3 in-band value comparison the suite half explicitly declines to make.
+- plume_steering.md's diagnostic (2 of 6) and the six near-repeat seeds were read from that audit and its skeptic section, not re-derived from its run files.
+```

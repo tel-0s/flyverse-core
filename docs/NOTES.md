@@ -3128,6 +3128,99 @@ pool; it will be quoted as mean +- across-run SD, and it answers a different que
 moving, casting loop can use a 64 %-correct sign at 4 Hz, and whether it is the DNa02 feedback bridge rather than
 the cue that finds food. Nothing adopted; raw untouched (532 passed / 19 skipped).
 
+## Session 14, round 8: the determinism gate, the sign control, the admissible instrument list, the goal-only arm (2026-09-18)
+
+Four predeclared batches, all on the second node's GPUs 4-7 through two new `cluster_run.py` options: `--gpu-ids`
+(a pool; each job gets `gpus 1` + one id, round-robin in command order) and `--ship PATH[,PATH]` (copy the named
+tracked paths whether or not they differ from `origin/main`). `--ship` was needed because the box checkout is
+behind `origin/main` after the history rewrite: the first det1 submission ran the box's stale `flyverse/compass.py`,
+`fly.py`, `instruments.py` and `navigation.py`, whose `PlumeNavigation` has no DNa02 reads, and both plume pairs
+crashed. Nothing is adopted in this round; `raw` is untouched; no default moved.
+
+**The determinism gate (item 1, batch det1).** Each protocol ran twice, sequentially, in one job on one pinned GPU,
+and every saved array and numeric metric was compared exactly under a rule frozen before submission. The
+`cx_wedge` protocol (B=1 FlyBrain, torch path, no world, no optic lobe) **repeats exactly**: 31/31 arrays,
+546/546 metrics, on the same B200 -- the third exact repeat of that protocol. **No B=6 room repeats on either
+path**: first differing frame 4 (raw native) / 30 (plume native) / 86 (raw torch) / 60 (plume torch), after which
+the two runs differ as two seeds do. The skeptic localised more than the audit had: the first difference in every
+pair is exactly +-1 spike in exactly one of the six rows, that row's body follows 1-51 frames later and the other
+five rows stay bit-identical for a further 215-329 frames, so neither the body integrator nor the air / odour field
+is the source; and the same B=6 raw room on the torch path repeats bit-exactly across two separate CPU processes
+for 120 frames with hash randomisation on, which excludes the Python layer. The native path's event-scatter kernel
+accumulates with a float `atomicAdd` (`flyverse/kernels/neural.cu:122`) -- order-nondeterministic by construction
+and a sufficient mechanism for that path -- and `scripts/benchmark.py --deterministic` already provides
+`torch.use_deterministic_algorithms(True)` with `CUBLAS_WORKSPACE_CONFIG=:4096:8`, an existing, unused knob. The
+frozen decision governs the rest of the round: rooms are >= 6 draws with the run as the replicate unit and no room
+number is quoted beyond its across-draw SD; every room number quoted before the gate stays one draw.
+
+**The V- arm (item 2, batch cx9).** The sign-flipped afferent alone, no hold, no relabel, beside re-runs of S and V,
+six seeds each. V- minus S on GLNO L-R is **-2.0665 +/- 0.6461 Hz** (result, Holm p 0.0065, Welch t -7.83, all six
+seeds separated), V minus V- +4.2848 Hz and PS196_b L-R -36.1679 Hz, all with the predicted sign; V- drives GLNO_R
+(2.09 Hz) and leaves GLNO_L at S's values to the last bit in all six seeds. So round 7's primary 3 is
+**sign-specific where it was measured**, in the unheld ring. V is the same picture with the sides exchanged but not
+exactly -- V's GLNO_R equals S's in only three of six seeds. The held arms are a separate question and the audit's
+first wording over-claimed it: recomputed from cx8r, HGV vs HGV- on GLNO L-R is a **null** (+3.1092 Hz, z +1.625,
+not separated), so the held arms' non-reversal is an unresolved contrast, not a demonstrated absence. cx9's S and V
+reproduce cx8r's values in 76 of 76 (arm, key) metric rows across two nodes -- a metric check; the skeptic extended
+it and the 384 ledger arrays are bit-equal too.
+
+**The three-instrument list under `instrumented` (item 3, batches suite-inst, suite-inst-room).** The 29-check
+suite at three instrumented draws beside three raw draws changes **no row's status** (27/0/2, 26/1/2, 27/0/2 under
+both presets; the one non-uniform row, `taste.MN9_hz`, is raw's own instability and identical under the
+instruments), and the room rate-half at six seed-matched runs per arm passes: 110 take-offs against 101 over
+28,800 fly-s each, one-sided exact Poisson p 0.291, run-level null. The list is therefore **admissible** under
+PRESETS_SPEC section 2 item 5 -- and nothing more: nothing is adopted, `raw` stays the default, the afferent's law
+is still `unverified` and the relabel still has no transmitter source. The result is not vacuous: under the
+instruments the ring's operating state moves hard (during the wedge drive PEN 2.01/1.78/1.08 -> 7.72/7.66/7.22 Hz,
+rest EPG 0.000 x3 -> 1.36/2.12/3.36 Hz, three draws against three with no overlap) while every check keeps its
+status. Values move on 20 of the 29 rows; 8 rows are bit-identical to raw. The one descriptive with a rank-test
+p below 0.05 is `gf_max_hz` (31-36 Hz instrumented against 34-38 raw, exact U p 0.0152, undeclared, null under the
+z >= 3 rule) -- not meals, which is a declared descriptive and null at 6 v 6.
+
+**The goal-only plume arm (item 4, batch plume-go).** Three arms -- `full` as shipped, `goal-only` (the bilateral
+walking goal with the DNa02 integral gain at 0) and `feedback-only` (the feedback with the pre-correction upwind /
+entry-memory goal) -- on the shipped six rooms and on six drawn starts, six runs each. **The walking goal is the
+load-bearing part, not the feedback**: goal-only feeds 4.67 +/- 0.52 rows of six at a DNa02 |L-R| of 0.62 Hz, while
+feedback-only feeds 0.17 +/- 0.41 with the *largest* DNa02 |L-R| (1.97 Hz) and |yaw| of the three arms -- the loop
+turns the fly hard toward a goal that does not point at food. The earlier skeptic's inference (the feedback is the
+load-bearing change, and a goal-only arm would show 0.28-0.69 Hz DNa02 differences) is refuted on its own
+prediction. What the feedback adds is the last rows: full 6/6, and the row goal-only never feeds is the 185 deg
+start (1.00 of the +1.33 rows; the 90 deg row is the other 0.33). The claim is a **simple effect**: the three arms
+are three cells of a 2 x 2 whose fourth cell -- the pre-correction goal at gain 0 -- is not in this batch, so
++5.83 rows is "swap the goal at gain 5" and includes whatever the servo costs when it chases a bad goal. The drawn
+set is weaker than designed: two of its six rows start 1.6 and 3.2 cm from the nearest fruit surface against a
+1.5 cm feeding shell and are fed in every arm and run, so every drawn figure includes two rows no arm has to steer
+to.
+
+**Process, for the next round.** The scheduler reports `exit_code None` for every job and classed a crashed job as
+`completed`, so "n completed, 0 failed" is a status and not a receipt (INTERP 10.4 rule 4); two cx9 jobs were
+`failed / infrastructure` while their outputs were complete. No scheduler receipt file was fetched into any batch
+directory this round -- only the git-ignored client console records the submission, which rule 21 asks for as a
+file. Submissions used `--no-wait` with foreground polling because the tool call caps at 10 minutes. det1 took
+three predeclaration stamps (a shell-quoting error in the planner, then the stale box) and suite-inst two (a
+`benchmark.py` adapter gap that cost every instrumented draw eight checks, now fixed with a test); every stamp is
+on the record rather than folded away. What `--ship` actually copied is in no run's provenance: the run tree is a
+hybrid and `source_fingerprint.git.commit` is `unknown`, identity falling back to content. `cx_wedge` records no
+`CUDA_VISIBLE_DEVICES` and no timestamp at all, so cxS's GPU id is only in the client log.
+
+Two independent skeptic passes (Opus, 2026-09-18, CPU only) covered the four audits in pairs and returned
+**mostly sound** for all four; every quantitative claim reproduced, and all four audits carry the verdict line and
+the ten claims verbatim with the corrections applied in place and the replaced findings kept as withdrawn.
+`main` was merged into the branch afterwards: the two plume APIs are now one constructor,
+`PlumeNavigation(c, *, bilateral="concentration", feedback_gain_per_s=None, walking_goal=True)`, and one grammar in
+which `plume:feedback=off` and `plume:feedback=0` are the same arm, beside `plume:bilateral=orn` and
+`plume:walking_goal=0`; bare `plume` is unchanged, parameter for parameter. All four round-8 analysers and Astra's
+CPU characterisation reproduce their committed artefacts byte-for-byte on the merged tree.
+
+**What is next, as questions.** (1) A **deterministic-kernels arm**: replace the native event-scatter `atomicAdd`
+with a deterministic reduction, run the torch path under `use_deterministic_algorithms(True)`, then repeat det1 --
+the gate's own open question now has a named mechanism and an existing knob. (2) The **held-ring sign question** as
+its own declared contrast, HGV vs HGV- at >= 6 seeds, since the cx8r recomputation is a null rather than an
+absence. (3) The missing **(pre-correction goal, gain 0) cell**, which is what would turn round 8's two simple
+effects into a main effect and an interaction. (4) Astra's **plume v4 rooms**: the v3 freeze now refuses the tree
+because this merge moved `navigation.py` and `instruments.py`, so the 18-room full / transduced / goal-only
+comparison needs a v4 re-freeze before submission.
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

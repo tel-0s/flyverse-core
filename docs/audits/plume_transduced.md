@@ -193,6 +193,23 @@ its frozen hashes correctly refuse the fixed tree. The fresh v3 declaration carr
 `stamped_utc`; v1 and v2 were never submitted. A later source change requires a fresh
 plan directory and `--published-plan` path, preserving this declaration.
 
+**A v4 re-freeze is required before submission.** The round-8 merge (`feat/round8`) reconciled the two plume
+constructors into one -- `PlumeNavigation(c, *, bilateral="concentration", feedback_gain_per_s=None,
+walking_goal=True)`, where `feedback_gain_per_s=0.0` is the arm this declaration spells `plume:feedback=off` -- so
+`flyverse/navigation.py` and `flyverse/instruments.py` no longer carry the hashes in this section's
+`source_sha256_lf` set. The v3 room runner therefore refuses the tree ("source or protocol differs from frozen
+plan; do not run"), exactly as designed. The arms, the starts and the measures are unchanged and `plume:feedback=off`
+still names the same arm; only the declaration's hashes are stale. The re-freeze is Astra's, not this branch's: no
+v4 plan is generated here. The CPU characterisation was re-run on the merged tree and every measured leaf of
+`data/plume_transduced/characterisation.json` is unchanged (4,120 of 4,127 leaves; the differences are
+`history.sha256`, `provenance.commit`, the two moved `source_sha256_lf` entries, and three new `describe()`
+parameter keys -- `variant`, `variant_spec`, `walking_goal_enabled` -- that the unified API records);
+`characterisation.md` reproduces byte-for-byte. The re-run could not read the original history input
+(`out/plume_validation_v1/compass.json`, sha256 `e7e2a9bc...`): `out/` is ignored and that file is in no local
+tree, so a stand-in history carrying this section's three frozen `total_quantiles` exactly was used instead --
+which is all the script reads from it (`np.quantile(total, [0.05, 0.5, 0.95])`), hence the unchanged scenarios,
+and which is why `history.sha256` differs.
+
 Report six feeding durations and contact indicators per arm (>=1 s feeding), censored
 first-contact times, energy, distance, airborne duration, neural rates, goal offsets and
 target/measured DNa02. Each metric is a run-level summary; report mean plus across-run SD,

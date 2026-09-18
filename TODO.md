@@ -402,8 +402,12 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       closed on DNa02) feeds 0.17 +/- 0.41 rows of six with the LARGEST DNa02 |L-R| (1.97 Hz); goal-only (walking goal,
       integral gain 0) feeds 4.67 +/- 0.52 at 0.62 Hz; full 6/6 in every run. full - feedback-only +5.83 rows (result);
       full - goal-only +1.33 rows (null under the reference-SD rule, all runs separate) -- the feedback's share is the
-      fly that starts facing away (185 deg: goal-only 0/6 runs, full 6/6). Drawn starts: 6 / 4.33 / 4.00 (two of the
-      six drawn rows start on a fruit). `plume:feedback=0` / `plume:walking_goal=0` are opt-in, recorded in describe();
+      fly that starts facing away (185 deg: goal-only 0/6 runs, full 6/6; the 90 deg row is the other 0.33 rows).
+      Drawn starts: 6 / 4.33 / 4.00 -- two of the six drawn rows start 1.6 and 3.2 cm from the nearest fruit surface
+      against a 1.5 cm feeding shell and are fed in every arm and run, so every drawn figure includes two rows no arm
+      has to steer to. Both figures are SIMPLE effects: the three arms are three cells of a 2 x 2 whose fourth cell
+      (the pre-correction goal at gain 0) is not in this batch. `plume:feedback=0` / `plume:walking_goal=0` are
+      opt-in, recorded in describe();
       bare `plume` unchanged. No admission claim. The grammar is one after the merge of Astra's branch:
       `plume:feedback=off` is the canonical spelling of the gain-0 arm and `plume:feedback=0` the accepted synonym,
       beside `plume:bilateral=orn` and `plume:walking_goal=0`.
@@ -423,8 +427,11 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       L-R -2.0665 +/- 0.6461 Hz (result, Holm p 0.0065), V minus V- +4.2848 Hz (result), PS196_b L-R -36.1679 Hz
       (result), all predicted signs, all six seeds separated; the flipped afferent drives GLNO_R (2.09 Hz) and leaves
       GLNO_L at S's exact values seed for seed. The unheld ring's side report follows the afferent's sign; the held
-      arms' non-reversal (HGV-) stands and is the remaining sign question. cx9's S and V equal cx8r's in 76/76 rows
-      across two nodes. Nothing adopted.
+      arms are a separate question, and the skeptic recomputed it from cx8r: HGV vs HGV- on GLNO L-R is itself a
+      NULL (+3.1092 Hz, z +1.625, not separated), so the held arms' non-reversal is an unresolved contrast, not a
+      demonstrated absence. cx9's S and V equal cx8r's in 76/76 (arm, key) METRIC rows across two nodes
+      (`replication.csv` compares the 38 JSON keys; the 384 ledger arrays were checked separately and are bit-equal
+      too). Nothing adopted.
 - [x] **A deterministic-kernel gate before any room number is quoted again.** The native event path is not
       reproducible run to run: per-cell rate differences to 44.9 Hz (voltages to 77.6 mV, conductances to 247)
       under bit-identical `poisson_p` and `drive`. Either an exact-workload pass, or the torch-sparse path for
@@ -434,9 +441,16 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       FlyBrain, torch path, no world) repeats exactly on one B200 (31/31 arrays, 546/546 metrics); every B=6 room
       pair is one draw on BOTH paths (first differing frame 4 / 30 native, 86 / 60 torch). Frozen decision: rooms
       are >= 6 draws with the run as the replicate unit and nothing quoted beyond its across-run SD; every room
-      number quoted before the gate stays one draw. Still open: which room stage (batched SpMM, optic lobe, ray
-      tracer, readout) does not repeat -- two more pairs (FlyBrain B=6 without optics; optics with a frozen body)
-      would split it. Tooling from this item: `cluster_run.py --gpu-ids` (a strict per-job pin) and `--ship`
+      number quoted before the gate stays one draw. The skeptic narrowed it: the first difference in every pair is
+      exactly +-1 spike in exactly one of the six rows, the other five stay bit-identical for a further 215-329
+      frames (so neither the body integrator nor the air / odour field is the source), the same B=6 raw room on the
+      torch path repeats bit-exactly across two CPU processes for 120 frames (so the Python layer is excluded), and
+      the native event-scatter kernel accumulates with a float `atomicAdd` (`flyverse/kernels/neural.cu:122`) --
+      order-nondeterministic by construction and a sufficient mechanism for that path. `scripts/benchmark.py
+      --deterministic` already sets `torch.use_deterministic_algorithms(True)` with
+      `CUBLAS_WORKSPACE_CONFIG=:4096:8`: an existing, unused knob. Still open: which room stage (batched SpMM, optic
+      lobe, ray tracer, readout) does not repeat -- two more pairs (FlyBrain B=6 without optics; optics with a
+      frozen body) would split it. Tooling from this item: `cluster_run.py --gpu-ids` (a strict per-job pin) and `--ship`
       (the box checkout is behind origin/main after the history rewrite; without `--ship flyverse,scripts` a
       batch runs the box's stale copy of every file outside the local diff), and the scheduler's `completed`
       status is no receipt (it lists a crashed job as completed with `exit_code None`).
@@ -450,10 +464,37 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       both presets; taste.MN9_hz is raw's own instability, identical under the instruments; the compass row stays
       KNOWN GAP), and the room rate-half at six seed-matched runs per arm passes (110 vs 101 take-offs over 28,800
       fly-s each, one-sided exact p 0.291, run-level null). The list is ADMISSIBLE by the PRESETS_SPEC gate and
-      nothing is adopted; a fewer-meals descriptive (instrumented 1-4 vs raw 0-7 per run, null at 6 v 6) is on the
-      record. Tooling: `benchmark.py --hold-edges / --nt-override` (instrumented only), `instrumented_room.py`;
+      nothing is adopted. The result is not vacuous: under the instruments the ring's operating state moves hard
+      (wedge-drive PEN 2.01/1.78/1.08 -> 7.72/7.66/7.22 Hz, rest EPG 0.000 x3 -> 1.36/2.12/3.36, three draws against
+      three with no overlap) while every check keeps its status; values move on 20 of the 29 rows. On the record: a
+      fewer-meals descriptive (instrumented 1-4 vs raw 0-7 per run, a PREDECLARED descriptive, null at 6 v 6) and
+      `gf_max_hz`, the one measure in the set with a rank-test p below 0.05 (31-36 vs 34-38 Hz, exact U p 0.0152,
+      undeclared, null under the z >= 3 rule). Tooling: `benchmark.py --hold-edges / --nt-override` (instrumented only), `instrumented_room.py`;
       the benchmark adapter's drive setter no longer assumes a scheduler module (the first submission lost eight
       checks per instrumented draw to that).
+
+**Round-8 follow-ups (2026-09-18, after both independent skeptic passes).** Questions again, not plans; none is
+authorized as a batch and none licenses an adoption.
+
+- [ ] **A deterministic-kernels arm, then det1 repeated.** The gate left the non-repeating stage unlocalised; the
+      skeptic supplied a mechanism for the native path (the float `atomicAdd` in `cuda.event_scatter`,
+      `flyverse/kernels/neural.cu:122`) and excluded the Python layer with a two-process CPU control. The arm:
+      replace that accumulation with a deterministic reduction, run the torch path under
+      `torch.use_deterministic_algorithms(True)` + `CUBLAS_WORKSPACE_CONFIG=:4096:8` (already wired as
+      `scripts/benchmark.py --deterministic`), then repeat det1 unchanged. A repeat would let room numbers be
+      quoted again; a non-repeat would move the question to cuSPARSE SpMM, the optic path or the ray tracer.
+- [ ] **The held-ring sign question as its own declared contrast.** HGV vs HGV- on GLNO L-R is a null in cx8r
+      (+3.1092 Hz, z +1.625, p 0.0260, not separated), so nothing yet establishes that the hold plus relabel
+      removes the sign specificity the unheld ring shows. It needs a declared HGV vs HGV- family at >= 6 seeds,
+      not a re-reading of round 7.
+- [ ] **The missing (pre-correction goal, gain 0) cell.** Round 8's +5.83 and +1.33 fed rows are two simple
+      effects of a 2 x 2 with three cells filled; the fourth exists only as plume_steering.md's diagnostic (2 of 6,
+      one draw, a different batch). Six runs of `plume:feedback=off:walking_goal=0` on the same rooms would turn
+      them into a main effect and an interaction.
+- [ ] **Astra's plume v4 rooms.** The 18-room full / transduced / goal-only comparison is frozen as v3 and the
+      room runner now refuses the tree: this round's merge moved `flyverse/navigation.py` and
+      `flyverse/instruments.py` out of the v3 `source_sha256_lf` set. The arms and starts are unchanged, so a v4
+      re-freeze (Astra's) is what stands between it and submission.
 
 Most useful experimental data, ranked by leverage: (1) receptor / conductance profiles for the unprofiled
 types and for DA / OA / 5-HT receptors; (2) per-type baseline firing in behaving flies (DN / AN / CX imaging);
@@ -517,6 +558,25 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
       execution host, so **those JSONs must not be committed raw** -- strip or placeholder `execution.host`
       (and any path-bearing field) in whatever writes them to a tracked file, and add a test that a committed
       benchmark JSON carries no host.
+- [ ] **The scheduler's receipt as a file, one per batch** (INTERP 10.4 rule 21; the round-3 debt above, still
+      open). Round 8 fetched none: `det1`, `cx9`, `suite-inst`, `suite-inst-room` and `plume-go` record their
+      submissions only in the git-ignored client console, and both audits had to corroborate job indices from it.
+      The scheduler also reports `exit_code None` for every job and classed a crashed job as `completed`, so the
+      receipt is worth having as a file precisely because its status field is not evidence.
+- [ ] **`cx_wedge` records no `CUDA_VISIBLE_DEVICES` and no timestamp.** det1's cxS rows carry the field empty
+      (`summary.json` has `"cuda_visible": [null, null]`) and cx9's 18 runs carry no wall-clock time at all, so the
+      GPU a run landed on and the moment it ran are only in the ignored client log. Both belong in the run record,
+      as the room wrapper already writes them.
+- [ ] **`cluster_run.py --ship` records nothing about what it shipped.** The run tree is a hybrid (target
+      checkout + local diff + every tracked file under the shipped paths) and `source_fingerprint.git.commit` is
+      `unknown`, identity falling back to content (rule 6); the only record of the flag is a truncated client
+      console line. `--ship` should write the paths and the per-file hashes it copied into each run's provenance.
+      Second limitation to record with it: the overlay only copies, so a file deleted locally but present on the
+      target is never removed.
+- [ ] **Three loaded paths fall outside `source_hashes()`** and are therefore not covered by any predeclaration's
+      loaded-source check: `flyverse/data/manifest.json`, `scripts/interp_export.py`,
+      `scripts/probe_object_sweep.py`. det1's check silently skipped all three in all ten runs. Either widen the
+      hash set or have the check report what it could not verify.
 - [ ] Observatory UI: NT readout of the `health` tool; a "why did it do that" panel that runs `decompose` on
       the current frame's DN inputs.
 
