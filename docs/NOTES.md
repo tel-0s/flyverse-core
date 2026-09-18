@@ -3109,6 +3109,25 @@ pre-rewrite bundle is kept outside the repository. Audit prose that quoted a run
 placeholder, which is the convention the audits already used. `tests/test_cluster_run.py`'s canned scheduler
 fixture was renamed by the same map and still passes (74 passed with the bit-identity and instrument files).
 
+## Session 13, continued: the transduced-contrast plume law (2026-09-17)
+
+Astra answered TODO B's question on the CPU before any room ran: read the bilateral cue from the model's own ORN
+population rates (708 L / 1,396 R, weighted to equal glomerular mass per side -- the imbalance is a reconstruction
+artefact, per-glomerulus ratios 0.08-13) instead of the physical field, and at the shipped ORN law
+`1 + 150c/(c+0.5)`, the 100 ms rate filter and the 250 ms contrast filter, the 0.26-1.1 % contrast the rooms saw
+arrives at **0.02-0.06 Hz against 0.22-0.27 Hz of window noise -- cascade SNR 0.16-0.34**, correct sign in
+0.667 of windows (analytic 0.635), the commanded turn indistinguishable from the zero-contrast one. The estimate is
+conservative (every ORN has synaptic input; shared drive lowers the ratio). So the shipped plume instrument finds
+food on a cue the fly's sensory neurons cannot resolve at these concentrations. The independent skeptic reproduced
+every number and **refuted the mechanism as shipped**: the per-glomerulus weights were applied to the wrong cells
+because the scheduler sorts read selections and the group builder did not (+3.58 Hz L-R under symmetric odour, a
+constant +88.8 deg goal offset; the tests missed it because the fixture's order coincided with the table's).
+Fixed at 9c74945 with a regression test on a non-ascending fixture, corrections applied, merged at ca23768. The
+18-room comparison (full / transduced / goal-only, six seed-drawn starts) is frozen as v3 and waits for the GPU
+pool; it will be quoted as mean +- across-run SD, and it answers a different question than the SNR does -- whether a
+moving, casting loop can use a 64 %-correct sign at 4 Hz, and whether it is the DNa02 feedback bridge rather than
+the cue that finds food. Nothing adopted; raw untouched (532 passed / 19 skipped).
+
 ## Batched brains and the RL environment
 
 * `Brain(c, batch=B)` and `OpticLobe(c, r, batch=B)` keep state as (B, N): one sparse matmul serves all

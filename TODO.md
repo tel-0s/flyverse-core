@@ -397,7 +397,7 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       the diagnostic and the validation (0.057-0.074 -> 0.036-0.083) while mean |yaw| tripled (0.038-0.067 ->
       0.106-0.245 rad/s), so the feedback bridge looks like the load-bearing change -- but that is an inference,
       and a goal-only arm is what would measure it. Same rooms, same seeds, feedback off.
-- [ ] **A transduced-contrast plume law.** The shipped correction reads the bilateral contrast off the physical
+- [x] **A transduced-contrast plume law.** ANSWERED on the CPU (Astra, `plume_transduced.md`, merged ca23768 after an independent skeptic refuted-then-fixed a weight/index pairing bug): the model's own ORNs deliver the rooms' 0.26-1.1 % contrast at SNR < 1 (0.16-0.34), correct sign in 0.667 of windows; the `plume:bilateral=orn` and `plume:feedback=off` options ship opt-in. Still owed: the 18-room v3 batch (full / transduced / goal_only x 6 seed-drawn starts; frozen, `predeclared_v3.json`) once the GPU pool is free, quoted as mean +- across-run SD only. The shipped correction reads the bilateral contrast off the physical
       concentration field (noise-free, pre-transduction) at a gain of 200, and the observed contrast is
       0.26-0.57 %. Through the model's own ORN law (1 + 150c/(c+0.5)) that is ~0.1 Hz per ORN, under the Poisson
       noise of the 0.25 s window. The question: does a law that reads the ORN RATES still find food? If not, the
