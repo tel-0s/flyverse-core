@@ -411,15 +411,17 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       bare `plume` unchanged. No admission claim. The grammar is one after the merge of Astra's branch:
       `plume:feedback=off` is the canonical spelling of the gain-0 arm and `plume:feedback=0` the accepted synonym,
       beside `plume:bilateral=orn` and `plume:walking_goal=0`.
-- [x] **A transduced-contrast plume law.** ANSWERED on the CPU (Astra, `plume_transduced.md`, merged ca23768 after an independent skeptic refuted-then-fixed a weight/index pairing bug): the model's own ORNs deliver the rooms' 0.26-1.1 % contrast at SNR < 1 (0.16-0.34), correct sign in 0.667 of windows; the `plume:bilateral=orn` and `plume:feedback=off` options ship opt-in. Still owed: the 18-room v3 batch (full / transduced / goal_only x 6 seed-drawn starts; frozen, `predeclared_v3.json`) once the GPU pool is free, quoted as mean +- across-run SD only. The shipped correction reads the bilateral contrast off the physical
+- [x] **A transduced-contrast plume law.** ANSWERED on the CPU (Astra, `plume_transduced.md`, merged ca23768 after an independent skeptic refuted-then-fixed a weight/index pairing bug): the model's own ORNs deliver the rooms' 0.26-1.1 % contrast at SNR < 1 (0.16-0.34), correct sign in 0.667 of windows; the `plume:bilateral=orn` and `plume:feedback=off` options ship opt-in. The rooms completed as v5 on 2026-09-18: 18/18 rooms (full / transduced / goal_only x 6 seed-drawn starts), fed for at least one second in 6/6 / 1/6 / 3/6, quoted as mean +- across-run SD only; descriptive only, independent skeptic done (mostly sound, merge with fixes), nothing adopted. The shipped correction reads the bilateral contrast off the physical
       concentration field (noise-free, pre-transduction) at a gain of 200, and the observed contrast is
       0.26-0.57 %. Through the model's own ORN law (1 + 150c/(c+0.5)) that is ~0.1 Hz per ORN, under the Poisson
       noise of the 0.25 s window. The question: does a law that reads the ORN RATES still find food? If not, the
       200x gradient is doing the navigating and the instrument should say so in one sentence.
       CPU implementation/characterization: `plume:bilateral=orn`, [audit](docs/audits/plume_transduced.md).
-      The 18-run full/transduced/goal-only comparison is prepared, not submitted; await pool release -- and the v3
-      freeze now refuses on source hashes after the round-8 merge changed `flyverse/navigation.py` and
-      `flyverse/instruments.py`, so it needs a v4 re-freeze (Astra's) before submission.
+      The 18-run full/transduced/goal-only comparison completed as v5 on 2026-09-18: 18/18 rooms, full 6/6 /
+      transduced 1/6 / goal_only 3/6 fed for at least one second, descriptive only, independent skeptic done,
+      nothing adopted. V3 was never submitted (the round-8 merge moved `flyverse/navigation.py` and
+      `flyverse/instruments.py` out of its `source_sha256_lf` set); v4 re-froze and then crashed in a scalar
+      motor logger at B=1; v5 fixed the logger and changed placement only.
 - [x] **A V- arm for the GLNO sign.** Round 7 declared no sign-flipped counterpart of V, and in the held arms
       GLNO L-R does not reverse (+0.6862 +- 1.9132 Hz, positive in four of six seeds), so primary 3's sign
       specificity is untested where it was measured. One arm: the afferent at k 0.5, sign -1, no hold, no relabel.
@@ -491,10 +493,13 @@ authorized as a batch and none licenses an adoption.
       effects of a 2 x 2 with three cells filled; the fourth exists only as plume_steering.md's diagnostic (2 of 6,
       one draw, a different batch). Six runs of `plume:feedback=off:walking_goal=0` on the same rooms would turn
       them into a main effect and an interaction.
-- [ ] **Astra's plume v4 rooms.** The 18-room full / transduced / goal-only comparison is frozen as v3 and the
-      room runner now refuses the tree: this round's merge moved `flyverse/navigation.py` and
-      `flyverse/instruments.py` out of the v3 `source_sha256_lf` set. The arms and starts are unchanged, so a v4
-      re-freeze (Astra's) is what stands between it and submission.
+- [x] **Astra's plume rooms.** DONE as v5 on 2026-09-18 (v3 was frozen but never submitted after this round's
+      merge moved `flyverse/navigation.py` and `flyverse/instruments.py` out of its `source_sha256_lf` set; v4
+      re-froze and crashed in the scalar motor logger; v5 fixed the logger, arms and starts unchanged throughout).
+      18/18 rooms completed: full 6/6, transduced 1/6, goal_only 3/6 fed for at least one second. Descriptive
+      only, independent skeptic done (mostly sound, merge with fixes), nothing adopted. Still open from that
+      pass: a fourth arm with no plume cue at all as the zero-information floor, the paired-by-start reading the
+      six shared starts license, and B=1 room-level determinism, which is untested anywhere.
 
 Most useful experimental data, ranked by leverage: (1) receptor / conductance profiles for the unprofiled
 types and for DA / OA / 5-HT receptors; (2) per-type baseline firing in behaving flies (DN / AN / CX imaging);

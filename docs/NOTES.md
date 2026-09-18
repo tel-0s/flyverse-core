@@ -3128,6 +3128,72 @@ pool; it will be quoted as mean +- across-run SD, and it answers a different que
 moving, casting loop can use a 64 %-correct sign at 4 Hz, and whether it is the DNa02 feedback bridge rather than
 the cue that finds food. Nothing adopted; raw untouched (532 passed / 19 skipped).
 
+## Session 14, continued: the transduced-plume rooms (2026-09-18)
+
+The 18 rooms owed since session 13 ran and completed. Three arms -- `full` (the shipped `plume`,
+reading the physical antennal concentration difference), `transduced` (`plume:bilateral=orn`, the model's own ORN
+population rates at the same 200x small-contrast gain) and `goal_only` (`plume:feedback=off`, physical goal, DNa02
+gain 0) -- over six seed-drawn 60 s starts **shared across the arms**, one fly per room (B=1), on the first house
+node's authorized GPUs 4-7 through round 8's `--gpu-ids` and `--ship flyverse,scripts` (round 8 had used the second
+node; it was full). The route there was long: v3 froze but never submitted once the round-8 merge moved
+`flyverse/navigation.py` and `flyverse/instruments.py` out of its `source_sha256_lf` set; v4 re-froze and was
+submitted twice, failing twice -- the first withdrawn while still queued when the remote preflight found the shared
+cache differing from all three frozen MD5s, the second dispatched and crashing all 18 jobs at the first 100 ms
+sample -- and both failures are preserved. V5 fixed the harness and changed nothing else.
+Receipts throughout: a remote preflight over all 72 frozen source hashes, the declaration SHA-256 and three cache
+MD5s; per-job GPU pins agreeing in the plan, the job spec, an inline runtime assert, the run JSON, a `.gpu.txt`
+sidecar and the console; 54 remote SHA-256s re-checked after transfer.
+
+**The result, as the independent skeptic established it.** Fed for at least one second: **full 6/6, transduced 1/6,
+goal_only 3/6**. The reviewer went past the tables and measured the cue itself against the physical lateral
+contrast the two antennae actually saw. In the transduced arm the two are **uncorrelated** -- per-run Pearson r
+-0.07 to +0.24, the cue's sign right in **0.52 +/- 0.10** of samples against 0.87-0.98 in the full arm -- and
+`|200*atanh(contrast)| > 1` in **66-87 %** of samples, so the commanded turn was saturating on the sign of noise,
+not steering on an odour gradient. The single transduced run that fed is the only one whose cue tracked the truth
+(r 0.24, sign 0.687), and it started at the largest physical contrast of the six, where both other arms also fed;
+at n = 1 the easiest start and the least-degraded cue are inseparable. goal_only's three successes are exactly the
+three starts whose initial heading already pointed near fruit (bearing error 19-88 deg) and its three failures are
+the starts facing away (102-157 deg), so that arm is closer to **"hold the start heading"** than to a
+plume-competence floor. Two of the six starts begin 3.9 and 5.7 cm from a fruit surface; excluding them leaves
+**4/4 full, 1/4 transduced, 3/4 goal_only**, so the contrast is unchanged or stronger. Measured in the rooms, the
+cue noise is **1.3-2.6x** the isolated-forcing estimate from the CPU half -- that estimate was conservative, as
+section 3 claimed. What the rooms do **not** do is confirm the CPU's SNR number: the in-room ORN L-R and its
+temporal SD are different quantities from the CPU's fixed-contrast signal and 250 ms counting-window noise and are
+not an SNR. The licensed statement is the one now in the audit: the rooms add that in-room cue noise is 1.3-2.6x
+the analytical estimate and that the cue's sign was right in only 0.52 +/- 0.10 of samples.
+
+**The design caveat, unflagged until the skeptic pass.** The six runs of an arm differ in start *and* seed, so the
+across-run SD is start heterogeneity and bounds nothing about B=1 run-to-run nondeterminism; no start is ever
+repeated. The arms do share their six starts, so the paired-by-start reading -- full fed at all six, transduced at
+one of the same six -- is the stronger statement, and it is not the one the tables make.
+
+**What it means for the milestone.** The shipped plume instrument finds food on the physical concentration
+difference between the antennae, and that is information the model's own ORNs cannot deliver at these
+concentrations: substituting them at the matched gain drops food-finding from 6/6 to 1/6 and leaves the steering
+cue uncorrelated with the truth. The instrument should say so. The skeptic's proposed README sentence, quoted for
+the owner to place: "In six 60 s tabletop rooms per arm, the shipped `plume` instrument -- which reads the physical
+odour-concentration difference between the antennae -- fed in 6/6 rooms, while the opt-in `plume:bilateral=orn`
+variant, which substitutes the model's own ORN population rates at the same gain, fed in 1/6 and steered on a cue
+uncorrelated with the true lateral contrast; a descriptive room observation, not a significance test, an SNR
+measurement, or a claim about flies." Nothing is adopted, no default moved, and the gain of 200 stays underived.
+
+**Process notes.** V4's 18 crashes were one line: `MotorRates` deliberately returns scalars at B=1 and the room
+logger indexed `sim.motor.turn_L[0]`, which the tests never exercised because they only ran the analysis fixtures;
+the fix is a `row(0)` sampling function with a regression that fails before it, at B=1 and B=2. The runs used the
+reconstructed **frozen** cache in isolation, not the cluster's shared cache -- their `sign0_counts.npz` differ, the
+frozen 916,626 entries against the shared 926,233 -- so these rooms are reproducible against the frozen cache only,
+and the audit now says so. Five source files in the recording tree have **mixed line endings**, so their recorded
+raw hashes match nowhere else; the reporter's source check now falls back to the recorded LF-normalised hashes,
+and with that the published
+reproduce command regenerates tables.md, per_run.csv, descriptive.csv and summary.json byte for byte on a clean
+checkout. The scheduler receipt records 18 completed but **exit_code null** for every job, so "0 failed" is not
+used as success evidence on its own; the console, output, metadata and source checks are.
+
+**What is next.** A fourth arm with **no plume cue at all** is the missing zero-information floor -- without it,
+"transduced 1/6 < goal_only 3/6" is not a comparison against zero. The paired-by-start analysis the shared starts
+already license. The 29-check instrumented suite for this exact instrument list. And B=1 room determinism, which
+the gate never tested and nothing here tests either, so no rerun of any of the 18 is claimed to reproduce.
+
 ## Session 14, round 8: the determinism gate, the sign control, the admissible instrument list, the goal-only arm (2026-09-18)
 
 Four predeclared batches, all on the second node's GPUs 4-7 through two new `cluster_run.py` options: `--gpu-ids`

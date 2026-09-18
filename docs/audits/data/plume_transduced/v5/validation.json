@@ -1,0 +1,403 @@
+{
+  "runs": [
+    {
+      "run": "full_0",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "4",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "full_1",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "5",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "full_2",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "7",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "full_3",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "5",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "full_4",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "6",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "full_5",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "4",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "transduced_0",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "5",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "transduced_1",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "7",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "transduced_2",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "4",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "transduced_3",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "6",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "transduced_4",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "4",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "transduced_5",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "5",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "goal_only_0",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "6",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "goal_only_1",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "4",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "goal_only_2",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "6",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "goal_only_3",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "7",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "goal_only_4",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "5",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    },
+    {
+      "run": "goal_only_5",
+      "device": "cuda",
+      "device_name": "NVIDIA B200",
+      "gpu": "7",
+      "source_match": {
+        "scope": "glob",
+        "n_recorded": 55,
+        "n_identical": 55,
+        "differ": [],
+        "missing_here": [],
+        "verified": true,
+        "analysis_git": {
+          "commit": "c17f5ceaeb1143b8ea1466921f03d9d723271194",
+          "dirty": false,
+          "modified_files": []
+        },
+        "line_endings": "text files are matched on content, not bytes: a run's file counts as identical when its SHA-256 equals this checkout's raw, LF-normalised or CRLF-normalised hash. `scripts/cluster_run.py` copies the CLUSTER's own checkout (LF) and overlays only the files that differ from origin/main, so a Windows working tree (CRLF) and the job's tree hash differently on identical source.",
+        "note": "every source file the run imported (glob) holds the content this checkout has"
+      }
+    }
+  ],
+  "result_sha256": {
+    "full_0.json": "a5fb1e0d5b4b60086ac06b2e5ce97d12291fe315e77ff94ebcdb78586c3c0e45",
+    "full_1.json": "ae13623f3387894b9a53e011a838c86a3fdd90361979933172c77e2ebba8e915",
+    "full_2.json": "f7e4fb26e4095430a25a241e2195d4e3e85b0dcfa79c44e7a93635adcd83b276",
+    "full_3.json": "03805f969c0fafaa7579f9f97d88e041b798fcdddce896eb0e2c1e1c2cb81a67",
+    "full_4.json": "cd1e09d8420239e6e9423bd80dbc2563e245e48ca9bf8952abbef3a828af2157",
+    "full_5.json": "6c2e44cb0e3d086bedae8d3da951b44d9e6c806dc220105b6388312e330a7f0e",
+    "transduced_0.json": "714663935dd86224dc6acf58c8c14fd117b816399bd5a0ce48786a3f44c6198a",
+    "transduced_1.json": "72d48490220d951b395da51e7765ba07da984655d5ca094bca6278d6ed1d1108",
+    "transduced_2.json": "3c56a9b70a326266dbf14169476add6d1e7d8dfb1b8f35e0fe71dfec9273e857",
+    "transduced_3.json": "c30c0522ddafee39e36e6d1bacc91fa174e90fcf808b9ef6974f28ddc5973c63",
+    "transduced_4.json": "696c64decc213afa6d76da429685558bbdcffab626314962545e185b546ce101",
+    "transduced_5.json": "e796620b9823db0a0965bc9d40fbc8223502e0bf28bd098e711350e0daa80c47",
+    "goal_only_0.json": "5e265ef86966e2a6acfa755b5e099b18809eef99153a8b678b3cb5fde3ed441b",
+    "goal_only_1.json": "16102b25cc82332162d1386bfc7166b89e071dca5e76f89d794dcf2f3079d345",
+    "goal_only_2.json": "7e24ac5dbde80dfc04f1667c3c137eadceffb038eb211f42838e7a7840b3ddbf",
+    "goal_only_3.json": "b41a3e0ebac31333a654ebf2c41f22ed799b21644cd725f4494ccfa1063b45ff",
+    "goal_only_4.json": "482cbac377bf41d4d1cd29dc46f00e0ddae830f076e5da0b498a198bcaeeee82",
+    "goal_only_5.json": "cc704841bc5b92e2d55f17dd462be8a651cc52fb7119c457c3414ff49e905928"
+  },
+  "analysis_source_sha256_lf": "384a6a4f693803fd0c481f0a0bb346052289346ab24fc5727376265ea285e2d6"
+}
