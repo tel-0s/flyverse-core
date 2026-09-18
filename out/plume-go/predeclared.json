@@ -1,0 +1,563 @@
+{
+  "batch": "plume-go",
+  "arms": {
+    "full": [
+      "compass",
+      "plume",
+      "hunger",
+      "flight"
+    ],
+    "goal-only": [
+      "compass",
+      "plume:feedback=0",
+      "hunger",
+      "flight"
+    ],
+    "feedback-only": [
+      "compass",
+      "plume:walking_goal=0",
+      "hunger",
+      "flight"
+    ]
+  },
+  "starts": {
+    "shipped": [
+      {
+        "x": -0.5,
+        "y": 0.05,
+        "z": 0.75,
+        "heading_deg": 5.0
+      },
+      {
+        "x": -0.5,
+        "y": 0.05,
+        "z": 0.75,
+        "heading_deg": 90.0
+      },
+      {
+        "x": -0.5,
+        "y": 0.05,
+        "z": 0.75,
+        "heading_deg": -90.0
+      },
+      {
+        "x": -0.5,
+        "y": 0.05,
+        "z": 0.75,
+        "heading_deg": 185.0
+      },
+      {
+        "x": -0.5,
+        "y": 0.05,
+        "z": 0.75,
+        "heading_deg": 5.0
+      },
+      {
+        "x": -0.5,
+        "y": 0.05,
+        "z": 0.75,
+        "heading_deg": 5.0
+      }
+    ],
+    "drawn": [
+      {
+        "x": -0.19033049573388322,
+        "y": -0.043482688814040826,
+        "z": 0.75,
+        "heading_deg": -113.49663953961064
+      },
+      {
+        "x": 0.536004527671718,
+        "y": -0.08907576783745286,
+        "z": 0.75,
+        "heading_deg": -110.20876239444814
+      },
+      {
+        "x": -0.19941807766593161,
+        "y": -0.2751324824690579,
+        "z": 0.75,
+        "heading_deg": 112.97796125580754
+      },
+      {
+        "x": 0.3174038294020318,
+        "y": -0.014724182086098103,
+        "z": 0.75,
+        "heading_deg": -27.725692268078518
+      },
+      {
+        "x": 0.4068861628658377,
+        "y": -0.18105349844072238,
+        "z": 0.75,
+        "heading_deg": -87.86861814303862
+      },
+      {
+        "x": -0.11980671280688665,
+        "y": -0.16999832601420917,
+        "z": 0.75,
+        "heading_deg": 32.725026635548176
+      }
+    ]
+  },
+  "runs": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "brain_seed0": 31,
+  "draw_seed": 8,
+  "seconds": 60.0,
+  "energy": 0.1,
+  "flags": {
+    "cuda_graphs": true,
+    "cuda_kernels": true,
+    "event_driven": true,
+    "cuda_sparse": "torch"
+  },
+  "family": [
+    [
+      "1_fed_rows_full_vs_goal-only_shipped",
+      "fed_rows",
+      "full",
+      "goal-only",
+      "shipped",
+      "positive"
+    ],
+    [
+      "2_fed_rows_full_vs_feedback-only_shipped",
+      "fed_rows",
+      "full",
+      "feedback-only",
+      "shipped",
+      "none"
+    ],
+    [
+      "3_dna_lr_full_vs_goal-only_shipped",
+      "mean_abs_dna_lr_hz",
+      "full",
+      "goal-only",
+      "shipped",
+      "positive"
+    ],
+    [
+      "4_fed_rows_full_vs_goal-only_drawn",
+      "fed_rows",
+      "full",
+      "goal-only",
+      "drawn",
+      "positive"
+    ],
+    [
+      "5_fed_rows_full_vs_feedback-only_drawn",
+      "fed_rows",
+      "full",
+      "feedback-only",
+      "drawn",
+      "none"
+    ],
+    [
+      "6_dna_lr_full_vs_goal-only_drawn",
+      "mean_abs_dna_lr_hz",
+      "full",
+      "goal-only",
+      "drawn",
+      "positive"
+    ]
+  ],
+  "gpu_pool": "4,5,6,7",
+  "node": "<cluster-node-2>",
+  "jobs": [
+    {
+      "arm": "full",
+      "starts": "shipped",
+      "run": 0,
+      "brain_seed": 31,
+      "stem": "out/plume-go/full_shipped_r0",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts shipped --run 0 --out out/plume-go/full_shipped_r0 > out/plume-go/full_shipped_r0.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_shipped_r0.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "shipped",
+      "run": 0,
+      "brain_seed": 31,
+      "stem": "out/plume-go/goal-only_shipped_r0",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts shipped --run 0 --out out/plume-go/goal-only_shipped_r0 > out/plume-go/goal-only_shipped_r0.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_shipped_r0.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "shipped",
+      "run": 0,
+      "brain_seed": 31,
+      "stem": "out/plume-go/feedback-only_shipped_r0",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts shipped --run 0 --out out/plume-go/feedback-only_shipped_r0 > out/plume-go/feedback-only_shipped_r0.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_shipped_r0.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "shipped",
+      "run": 1,
+      "brain_seed": 32,
+      "stem": "out/plume-go/full_shipped_r1",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts shipped --run 1 --out out/plume-go/full_shipped_r1 > out/plume-go/full_shipped_r1.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_shipped_r1.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "shipped",
+      "run": 1,
+      "brain_seed": 32,
+      "stem": "out/plume-go/goal-only_shipped_r1",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts shipped --run 1 --out out/plume-go/goal-only_shipped_r1 > out/plume-go/goal-only_shipped_r1.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_shipped_r1.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "shipped",
+      "run": 1,
+      "brain_seed": 32,
+      "stem": "out/plume-go/feedback-only_shipped_r1",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts shipped --run 1 --out out/plume-go/feedback-only_shipped_r1 > out/plume-go/feedback-only_shipped_r1.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_shipped_r1.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "shipped",
+      "run": 2,
+      "brain_seed": 33,
+      "stem": "out/plume-go/full_shipped_r2",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts shipped --run 2 --out out/plume-go/full_shipped_r2 > out/plume-go/full_shipped_r2.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_shipped_r2.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "shipped",
+      "run": 2,
+      "brain_seed": 33,
+      "stem": "out/plume-go/goal-only_shipped_r2",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts shipped --run 2 --out out/plume-go/goal-only_shipped_r2 > out/plume-go/goal-only_shipped_r2.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_shipped_r2.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "shipped",
+      "run": 2,
+      "brain_seed": 33,
+      "stem": "out/plume-go/feedback-only_shipped_r2",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts shipped --run 2 --out out/plume-go/feedback-only_shipped_r2 > out/plume-go/feedback-only_shipped_r2.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_shipped_r2.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "shipped",
+      "run": 3,
+      "brain_seed": 34,
+      "stem": "out/plume-go/full_shipped_r3",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts shipped --run 3 --out out/plume-go/full_shipped_r3 > out/plume-go/full_shipped_r3.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_shipped_r3.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "shipped",
+      "run": 3,
+      "brain_seed": 34,
+      "stem": "out/plume-go/goal-only_shipped_r3",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts shipped --run 3 --out out/plume-go/goal-only_shipped_r3 > out/plume-go/goal-only_shipped_r3.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_shipped_r3.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "shipped",
+      "run": 3,
+      "brain_seed": 34,
+      "stem": "out/plume-go/feedback-only_shipped_r3",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts shipped --run 3 --out out/plume-go/feedback-only_shipped_r3 > out/plume-go/feedback-only_shipped_r3.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_shipped_r3.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "shipped",
+      "run": 4,
+      "brain_seed": 35,
+      "stem": "out/plume-go/full_shipped_r4",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts shipped --run 4 --out out/plume-go/full_shipped_r4 > out/plume-go/full_shipped_r4.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_shipped_r4.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "shipped",
+      "run": 4,
+      "brain_seed": 35,
+      "stem": "out/plume-go/goal-only_shipped_r4",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts shipped --run 4 --out out/plume-go/goal-only_shipped_r4 > out/plume-go/goal-only_shipped_r4.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_shipped_r4.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "shipped",
+      "run": 4,
+      "brain_seed": 35,
+      "stem": "out/plume-go/feedback-only_shipped_r4",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts shipped --run 4 --out out/plume-go/feedback-only_shipped_r4 > out/plume-go/feedback-only_shipped_r4.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_shipped_r4.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "shipped",
+      "run": 5,
+      "brain_seed": 36,
+      "stem": "out/plume-go/full_shipped_r5",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts shipped --run 5 --out out/plume-go/full_shipped_r5 > out/plume-go/full_shipped_r5.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_shipped_r5.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "shipped",
+      "run": 5,
+      "brain_seed": 36,
+      "stem": "out/plume-go/goal-only_shipped_r5",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts shipped --run 5 --out out/plume-go/goal-only_shipped_r5 > out/plume-go/goal-only_shipped_r5.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_shipped_r5.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "shipped",
+      "run": 5,
+      "brain_seed": 36,
+      "stem": "out/plume-go/feedback-only_shipped_r5",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts shipped --run 5 --out out/plume-go/feedback-only_shipped_r5 > out/plume-go/feedback-only_shipped_r5.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_shipped_r5.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "drawn",
+      "run": 0,
+      "brain_seed": 31,
+      "stem": "out/plume-go/full_drawn_r0",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts drawn --run 0 --out out/plume-go/full_drawn_r0 > out/plume-go/full_drawn_r0.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_drawn_r0.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "drawn",
+      "run": 0,
+      "brain_seed": 31,
+      "stem": "out/plume-go/goal-only_drawn_r0",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts drawn --run 0 --out out/plume-go/goal-only_drawn_r0 > out/plume-go/goal-only_drawn_r0.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_drawn_r0.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "drawn",
+      "run": 0,
+      "brain_seed": 31,
+      "stem": "out/plume-go/feedback-only_drawn_r0",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts drawn --run 0 --out out/plume-go/feedback-only_drawn_r0 > out/plume-go/feedback-only_drawn_r0.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_drawn_r0.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "drawn",
+      "run": 1,
+      "brain_seed": 32,
+      "stem": "out/plume-go/full_drawn_r1",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts drawn --run 1 --out out/plume-go/full_drawn_r1 > out/plume-go/full_drawn_r1.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_drawn_r1.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "drawn",
+      "run": 1,
+      "brain_seed": 32,
+      "stem": "out/plume-go/goal-only_drawn_r1",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts drawn --run 1 --out out/plume-go/goal-only_drawn_r1 > out/plume-go/goal-only_drawn_r1.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_drawn_r1.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "drawn",
+      "run": 1,
+      "brain_seed": 32,
+      "stem": "out/plume-go/feedback-only_drawn_r1",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts drawn --run 1 --out out/plume-go/feedback-only_drawn_r1 > out/plume-go/feedback-only_drawn_r1.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_drawn_r1.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "drawn",
+      "run": 2,
+      "brain_seed": 33,
+      "stem": "out/plume-go/full_drawn_r2",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts drawn --run 2 --out out/plume-go/full_drawn_r2 > out/plume-go/full_drawn_r2.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_drawn_r2.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "drawn",
+      "run": 2,
+      "brain_seed": 33,
+      "stem": "out/plume-go/goal-only_drawn_r2",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts drawn --run 2 --out out/plume-go/goal-only_drawn_r2 > out/plume-go/goal-only_drawn_r2.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_drawn_r2.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "drawn",
+      "run": 2,
+      "brain_seed": 33,
+      "stem": "out/plume-go/feedback-only_drawn_r2",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts drawn --run 2 --out out/plume-go/feedback-only_drawn_r2 > out/plume-go/feedback-only_drawn_r2.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_drawn_r2.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "drawn",
+      "run": 3,
+      "brain_seed": 34,
+      "stem": "out/plume-go/full_drawn_r3",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts drawn --run 3 --out out/plume-go/full_drawn_r3 > out/plume-go/full_drawn_r3.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_drawn_r3.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "drawn",
+      "run": 3,
+      "brain_seed": 34,
+      "stem": "out/plume-go/goal-only_drawn_r3",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts drawn --run 3 --out out/plume-go/goal-only_drawn_r3 > out/plume-go/goal-only_drawn_r3.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_drawn_r3.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "drawn",
+      "run": 3,
+      "brain_seed": 34,
+      "stem": "out/plume-go/feedback-only_drawn_r3",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts drawn --run 3 --out out/plume-go/feedback-only_drawn_r3 > out/plume-go/feedback-only_drawn_r3.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_drawn_r3.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "drawn",
+      "run": 4,
+      "brain_seed": 35,
+      "stem": "out/plume-go/full_drawn_r4",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts drawn --run 4 --out out/plume-go/full_drawn_r4 > out/plume-go/full_drawn_r4.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_drawn_r4.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "drawn",
+      "run": 4,
+      "brain_seed": 35,
+      "stem": "out/plume-go/goal-only_drawn_r4",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts drawn --run 4 --out out/plume-go/goal-only_drawn_r4 > out/plume-go/goal-only_drawn_r4.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_drawn_r4.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "drawn",
+      "run": 4,
+      "brain_seed": 35,
+      "stem": "out/plume-go/feedback-only_drawn_r4",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts drawn --run 4 --out out/plume-go/feedback-only_drawn_r4 > out/plume-go/feedback-only_drawn_r4.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_drawn_r4.txt; exit \\$st"
+    },
+    {
+      "arm": "full",
+      "starts": "drawn",
+      "run": 5,
+      "brain_seed": 36,
+      "stem": "out/plume-go/full_drawn_r5",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm full --starts drawn --run 5 --out out/plume-go/full_drawn_r5 > out/plume-go/full_drawn_r5.txt 2>&1; st=\\$?; tail -3 out/plume-go/full_drawn_r5.txt; exit \\$st"
+    },
+    {
+      "arm": "goal-only",
+      "starts": "drawn",
+      "run": 5,
+      "brain_seed": 36,
+      "stem": "out/plume-go/goal-only_drawn_r5",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm goal-only --starts drawn --run 5 --out out/plume-go/goal-only_drawn_r5 > out/plume-go/goal-only_drawn_r5.txt 2>&1; st=\\$?; tail -3 out/plume-go/goal-only_drawn_r5.txt; exit \\$st"
+    },
+    {
+      "arm": "feedback-only",
+      "starts": "drawn",
+      "run": 5,
+      "brain_seed": 36,
+      "stem": "out/plume-go/feedback-only_drawn_r5",
+      "line": "mkdir -p out/plume-go && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py room --arm feedback-only --starts drawn --run 5 --out out/plume-go/feedback-only_drawn_r5 > out/plume-go/feedback-only_drawn_r5.txt 2>&1; st=\\$?; tail -3 out/plume-go/feedback-only_drawn_r5.txt; exit \\$st"
+    }
+  ],
+  "generated_utc": "2026-09-18T00:14:43Z",
+  "status": "PREDECLARED, not submitted",
+  "written_before_submission": true,
+  "stamped_utc": "2026-09-18T00:14:43Z",
+  "batch_sha256": "54f204e0ccc252a14936e14a7f3030d265da61a2ce14b641aee9a140fa2a1c21",
+  "jobs_sha256": "2f2fdf354d15fa5f5fb5c99c92b360081db179b88165d6e110f4f728f6a0fb6e",
+  "source_sha256_lf": {
+    "flyverse/__init__.py": "db45a1ea8b389fae15f287586f8fed65dfdb7e711a0bb5dc297d837d0b85b8e9",
+    "flyverse/air.py": "e65a94d9789b5695cbdfcf5ff763fc375692c461978a7d0758f6954eb41fe52a",
+    "flyverse/async_brain.py": "67dab3f3817cdbef07a1aa11382dd38fe986ada5e8fdd6b574deb6e87197bd78",
+    "flyverse/backends/__init__.py": "8df26b4775463e8d22583f81a79c807ea08122708c32167e227556d5377c51ec",
+    "flyverse/backends/banc.py": "a97f9941908c29cfe4d6a9899d73f3ca8d0ac0c16bb72f3d23eb3c696e489ba2",
+    "flyverse/backends/common.py": "9d5efd20532efbbed727588a85575a2094aa8deb2687721522b9249da85e9faf",
+    "flyverse/backends/fafb.py": "7985caf782eeeb211187aacb8c69486e8401e915bc4daf97173920842a0954dd",
+    "flyverse/backends/malecns.py": "f19304784e4feeb48fd949a52b723a1a1fd405d87cfb384211be64453e5e1853",
+    "flyverse/banc_vision.py": "bd9cca547a99623392d53905289af2d830e119631e802c70e40f3dcb3ee93faa",
+    "flyverse/batch_air.py": "91cb85afd1d552520ce06aa544238cefd63d6e78b663c98de808355c93b9c0ae",
+    "flyverse/batch_body.py": "20dafd0d81863121615380309a7c93a3c82190c6e9cbb1a4a60451a6933db935",
+    "flyverse/batch_sim.py": "5c0727aaa19d4ad14384ee81f2004008808091bb17f49bf56c93cc8ec939e891",
+    "flyverse/batch_surfaces.py": "a4199be42dea5ceecb55a42b56004c754f72d4f28e019d896f3c1ea54eec1f79",
+    "flyverse/batch_world.py": "cb3330d2d201f17f7f87ea83d7584cb39421f1aeebdd2fb7c0e5dd7fc5f328a3",
+    "flyverse/body.py": "f0db425305cccb1978881a210995ae5d1cefcf972aa62d9f7b421aaf20039daf",
+    "flyverse/brain.py": "4575ef23ab994e90fa698d0614d8b5b87aeaf719f207111e46d1729006b720d5",
+    "flyverse/brainmap.py": "d33c3b085d73de94a7eb75fe4abfcf8578e8aacd7043556951a320b743c60926",
+    "flyverse/compass.py": "58090358f7989d0627a266cebeb8597f7b994495fe6eb045480ab88e3a80070a",
+    "flyverse/connectome.py": "67560f2e825931940554092b47fa0d82f378f49fbad065121b354df67544fb7f",
+    "flyverse/cuda.py": "3fc25333536890631b8ede2d79d273e5eee6c8aa30a65de89ba5c4a4138794d2",
+    "flyverse/cx.py": "e69d076fa6abdab7530bc0cc4e4a3031d359cd2117de3096de78b9adf56191ef",
+    "flyverse/data/banc_candidate_columns.csv": "60181451e52435ff31ca950d63d71833eb43740c470ab32d78721c2c74716e3d",
+    "flyverse/data/expected_responses.csv": "2f4ae50a2d1f5edb403705f89be2b11983d07e139f0d006d6c003476cc109b94",
+    "flyverse/data/expression_central.csv": "4d1ce2d81967dfcde3af9e49aa5cd426f64a8f9516b6dfab930cd3d4a1dc711a",
+    "flyverse/data/expression_davis2020.csv": "32509eca752dbc00b395c68494a32539e93c6f33acf3f670c494dddb3048193e",
+    "flyverse/data/expression_kurmangaliyev2020.csv": "707f28d2b3e3f694d91a86ca7fdde4a70325150cb9def40f1fcc3b7d472b7f42",
+    "flyverse/data/expression_ozel2021.csv": "4106527975f28163f1df024fea75cd2c1f75ade358ec426b31ac148cdf5edd31",
+    "flyverse/data/expression_ozel2021_mm.csv": "756b692d006dcee0aadf75049df1742bd7801eb90012ca14a2e5ad4cdea17981",
+    "flyverse/data/nt_by_type_transcriptome.csv": "02e7d50381f1aa813b331418f61fed52c77e78bfb91ff3704d3e7423d80ee7ae",
+    "flyverse/data/receptors_by_type.csv": "0ec5355def2067733061e41abe674dc66961a8b4cc92a58cd92e7dbdd0064326",
+    "flyverse/data/taste_grns.csv": "ff1aa30a6c825ad9260e451d324867e8674fddfca531a8acbfc5bbcb242b5c01",
+    "flyverse/data/type_aliases.csv": "fce527842d4b5d26c013f5e82d89adfcc715d05d6066c86d9c5cc37e8e882ee5",
+    "flyverse/data/type_aliases_nern2025.csv": "7168de1475f83b8aea32b6f1b507fa5ed3b40e00daa90e749bd9bf1f28ce5050",
+    "flyverse/data/type_aliases_typing.csv": "4aec4df3acc2843270c07f7524b8360a2cf525ccd942ec6d4e62291eeeb1546e",
+    "flyverse/data/type_map_central.csv": "0587336134b763da7bb87f29784db755b7ad76e611a285003dd4a1ea2907843d",
+    "flyverse/data/type_map_davis2020.csv": "918f105085d9de97cc681bd65f5d9cc1c6716f15f33d690e8257780280c425d8",
+    "flyverse/data/type_map_kurmangaliyev2020.csv": "d7749759a2518ec83a394407c83f9ab541035c97c62e29f476564850e6041759",
+    "flyverse/data/type_map_nern2025.csv": "54e96610f858225d592e5f27f2ea309cda0da943094141dee54811489bab8714",
+    "flyverse/data/type_map_ozel2021.csv": "912b6378fdc6cc2b085b489e92f135124a6e0e8cc2fb202e2d7484a5f2174833",
+    "flyverse/data/type_map_typing.csv": "2304f2d3b30be654ba15652c9a1d946cad676d0ca1923f25822ebb28843114bf",
+    "flyverse/device.py": "41d4d44f222250be56ffe3f322479efc03458ba429d79c3fcb880f2455491fbf",
+    "flyverse/env.py": "e45e711d81da1daa184052dbf355e8477040370dad8498b9e01dff60cab8a058",
+    "flyverse/fly.py": "00bb04204d292f66a1e0b7844b267476ccfce00759e1727ec3c31f6fc0c892f9",
+    "flyverse/instruments.py": "453920da482e1059e4e8e4a28c6bebb516a7b8581446a2c35fc951ed3899c70e",
+    "flyverse/interp/__init__.py": "ba9708a0e4e91f20a6b465f4bd794a867a5cfb18820056d654e3fee155eeb1d2",
+    "flyverse/interp/atlas.py": "3571c8ee3f2309977aa4d11ef32fa6a0be026993241f6c9c56f8e02a94791449",
+    "flyverse/interp/common.py": "0461b3edc6f4f4eb20d084e2d5a887a98b630b8e55ac1b530c7cb72c71af3826",
+    "flyverse/interp/decompose.py": "6da4b0efa71cfcb2dd02298e19fecded009182e1305119c6971323f47ba7ed78",
+    "flyverse/interp/export.py": "91a732e7ec63edcbd7bf68a7a6a1c04de60ad171f3d624704e11cd099743d6db",
+    "flyverse/interp/health.py": "03621d7b8c1d5c340602f293f75910b605ad496a7705b7fad028004b72514786",
+    "flyverse/interp/ledger.py": "4133aa9c19a8ebddbb318e92fd51f95cb9944ece588f48b6058cc54f9e2ca8d6",
+    "flyverse/interp/lesion.py": "b5dfed17a17703e9e77801c54361c6a67bd61f8f27f6871305ad38d451e7e3ac",
+    "flyverse/interp/paths.py": "215c0021d1f3d042b05b4a990c4e0e0ed15fca8d3d2334930684b0535e7a610e",
+    "flyverse/interp/trace.py": "1fe16ec4a654461691772f30c15765986351c64e586849d09c0a024ae0938f5c",
+    "flyverse/metal.py": "65b0ab934b78497187f2358e483e364fb21ed31c7ef3f146ded52ac51db1fe33",
+    "flyverse/modules.py": "96c27c76a376081f57404129a16b9c3e6e352f8202ea2d78c39fba29cf383b25",
+    "flyverse/motor.py": "6bc759806cf38564dd6f3b3aff648ca654bf5ded1d705f579851115987c897fc",
+    "flyverse/navigation.py": "ec454d6334a54a6a7b0581151b370d72ea9b236554102bc43c3f6e29fcb09217",
+    "flyverse/nt_readout.py": "273566ad99ea53ae2970990952648470fbe8374cf5cb82540fcf7253ebc1ea17",
+    "flyverse/olfaction.py": "05929cfd0af8ef592dec57b190b53018954cbc51248f8454a42407fd6ddb1dcc",
+    "flyverse/optic.py": "f5e0fc0747910e59006f64c716a52eef206ef58625924d02169b89f5496b1208",
+    "flyverse/programs.py": "3b5045223d75843f9a0761656e4023ac6e3b9b5441b3e432b0bb6520f32ef1f5",
+    "flyverse/regions.py": "af68964eba75cbdcd0e6e593830255d44ed0cd99c717e69994a4f4b411f11f12",
+    "flyverse/retina.py": "3a5927f8d4327d5741cf364f40ab6a8a4202a643f63302dd4418c22d83adf19b",
+    "flyverse/room_ui.py": "e5f90ac8c7269a8d0fdf4793bc924218b0f6a1fe68c10de539d6dc8dafdb1aea",
+    "flyverse/screen.py": "d72d7bfa8e35da348da06718bea7ea11d3d06f8ae78a31fd722f4e86fc0085bc",
+    "flyverse/senses.py": "bc6a47fad929eb13a15647971d10e50cea86aa15fee16e767c367cfe9b89e59e",
+    "flyverse/surfaces.py": "3523da0637f988ab62d40127d03e0217c4820a06640a98c38cf8de9f73aa8920",
+    "flyverse/world.py": "f7720104aa85024dc42efd31b19d476a53d69593c08b724c642f9c70ebc9e6c6",
+    "scripts/cluster_run.py": "cc9767a8ec0385d302dd28d8c3e53c3569bf4c78760facf97a1371998e1a4342",
+    "scripts/navigation_probe.py": "51ced180ee551529261925b9fadc97f4e9b18a8fe1d6143d69790566cc3ef677",
+    "scripts/plume_goal_only.py": "22435c257bec7bf1a4126f21d1d2cd78a8874b7e71a4f2740778e54e8fbde052",
+    "scripts/plume_steering_probe.py": "cc27e7745e9758a1e916b2c500d64313b72d599c584ed4fb581b2f46d2f8f8e8"
+  },
+  "replicate_unit": "runs: one B=6 room per job, six per (arm, start set), brain seeds 31-36; a row is not a replicate",
+  "multiplicity": "one Holm family, m = 6 (6 v 6 exact-U floor 0.0021645 x 6 = 0.013, satisfiable); a missing p counts toward m",
+  "measures": {
+    "fed_rows": "rows of the six that feed for >= 1 s in 60 s (the plume_steering.md criterion)",
+    "mean_first_contact_s": "mean over the fed rows of the first frame with feeding (NaN when none fed; descriptive only)",
+    "mean_abs_dna_lr_hz": "mean over rows and 0.1 s samples of |DNa02 L - R| (Hz)",
+    "mean_path_m": "mean over rows of the path length (m)"
+  },
+  "predictions": {
+    "1_fed_rows_full_vs_goal-only_shipped": "positive",
+    "2_fed_rows_full_vs_feedback-only_shipped": "none",
+    "3_dna_lr_full_vs_goal-only_shipped": "positive",
+    "4_fed_rows_full_vs_goal-only_drawn": "positive",
+    "5_fed_rows_full_vs_feedback-only_drawn": "none",
+    "6_dna_lr_full_vs_goal-only_drawn": "positive"
+  },
+  "prediction_note": "`positive` = full minus the other arm > 0 (the feedback is load-bearing: goal-only feeds fewer rows and moves DNa02 less); `none` = no sign predicted for feedback-only (the walking goal's own contribution is the question)",
+  "verdict_rule": "flyverse.interp.common.compare (result / null / underpowered / undetermined); a result with the unpredicted sign is `result, opposite sign`; fed_rows is an integer count so ties are expected and p_floor is reported",
+  "quoting_rule": "determinism_gate.md: no number is quoted to more than its across-run SD; the shipped-seed run (full, shipped, r0, brain seed 31) is the plume_steering.md configuration and its values are one draw beside the audit's",
+  "validity": "36 runs; device cuda; backend native flags; preset instrumented with the four instruments; the plume record's `variant` equal to the arm's; brain seed 31 + r; the six starts / headings equal to the frozen list; every loaded source at the predeclared hash",
+  "nothing_adopted": "no admission claim, no default change, no gain selected"
+}
