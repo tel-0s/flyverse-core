@@ -438,7 +438,8 @@ class EdgeGain(EdgeHold):
 REGISTRY = {"sided_turn_afferent": SidedTurnAfferent}
 SPEC_HELP = ("NAME[:key=value]... e.g. sided_turn_afferent:k=0.5:sign=-1:cells=CB0675  "
              "(keys for sided_turn_afferent: k = Hz per deg/s in {0.25, 0.5, 1.0}, sign = +1 | -1, "
-             "cells = AN07B037 | CB0675 | GNG580 | PS047_b | all, max_hz)")
+             "cells = AN07B037 | CB0675 | GNG580 | PS047_b | all, max_hz); "
+             "plume:bilateral=concentration|orn:feedback=on|off")
 
 
 def parse_instrument(spec, c):
@@ -450,7 +451,7 @@ def parse_instrument(spec, c):
     parts = [p.strip() for p in spec.split(":")]
     name, kv = parts[0], parts[1:]
     if name not in {*REGISTRY, 'plume'}:
-        raise ValueError(f"unknown instrument {name!r}; choose from {sorted(REGISTRY)}")
+        raise ValueError(f"unknown instrument {name!r}; choose from {sorted(set(REGISTRY) | set(NAMED_INSTRUMENTS))}")
     kwargs = {}
     seen = set()
     for item in kv:

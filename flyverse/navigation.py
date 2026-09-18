@@ -365,8 +365,11 @@ def bilateral_orn_groups(c):
             ix = smell.orn_idx[(smell.glom == row["glomerulus"]) & (smell.side == sign)]
             indices.extend(ix.tolist())
             values.extend([row["mass"] / total / row[key]] * len(ix))
-        groups[side] = np.asarray(indices, dtype=np.int64)
-        weights[side] = np.asarray(values, dtype=np.float32)[:, None]
+        # The scheduler canonicalizes read selections with np.unique (sorted).
+        # Keep cell identities and their weights paired through that boundary.
+        order = np.argsort(np.asarray(indices, dtype=np.int64))
+        groups[side] = np.asarray(indices, dtype=np.int64)[order]
+        weights[side] = np.asarray(values, dtype=np.float32)[order][:, None]
     return groups, weights, table
 
 
@@ -509,7 +512,7 @@ class PlumeNavigation(NeuralInstrument):
                     "orn_pooling": "glomerulus mass nL*nR/(nL+nR), normalized; equal mass per side",
                     "orn_glomeruli": table,
                     "rate_contrast_gain": 200.0,
-                    "rate_contrast_gain_status": "unverified; inherited small-contrast response slope, not concentration inversion",
+                    "rate_contrast_gain_status": "unverified and underived; retained for comparability, not concentration inversion",
                     "walking_goal": "heading + atan(200 * atanh(EMA_0.25s((rL-rR)/(rL+rR))))",
                     "smell_input": "brain.rate only; no observe_smell receiver or inverse ORN transduction",
                 }

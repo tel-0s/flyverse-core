@@ -20,10 +20,13 @@ from flyverse.instruments import make_instrument
 from flyverse.navigation import PlumeNavigation
 
 
-def sensory_graph():
+def sensory_graph(*, reverse_glomeruli=False):
     rows = graph().neurons.to_dict("records")
     links = []
-    for glom, counts in (("DM1", (2, 5)), ("DM2", (4, 1))):
+    glomeruli = [("DM1", (2, 5)), ("DM2", (4, 1))]
+    if reverse_glomeruli:
+        glomeruli.reverse()
+    for glom, counts in glomeruli:
         for side, count in zip(("L", "R"), counts):
             pn = len(rows)
             rows.append(
@@ -140,6 +143,31 @@ def test_frame_reads_brain_rate_and_never_physical_concentrations():
     assert torch.all(m.bilateral < 0)
 
 
+def test_orn_reads_are_in_scheduler_canonical_order():
+    m = PlumeNavigation(sensory_graph(reverse_glomeruli=True), bilateral="orn")
+    for side in ("L", "R"):
+        indices = m.reads["antenna_" + side]
+        np.testing.assert_array_equal(indices, np.unique(indices))
+
+
+def test_scheduler_preserves_glomerular_weights_on_permuted_graph():
+    c = sensory_graph(reverse_glomeruli=True)
+    fb = brain(c, "plume:bilateral=orn")
+    m = fb.instruments["plume"]
+    # Set rates by biological type, independently of the module's selection order.
+    # resolve() sorts every read array before gathering frame-start brain.rate.
+    for glom, hz in (("DM1", 10.0), ("DM2", 100.0)):
+        fb.brain.rate[:, np.flatnonzero(c.neurons.type.eq("ORN_" + glom))] = hz
+    fb.step(10)
+    torch.testing.assert_close(
+        m.odor_L, torch.full((2, 1), 42.307692), atol=8e-6, rtol=0
+    )
+    torch.testing.assert_close(m.odor_L, m.odor_R, atol=8e-6, rtol=0)
+    torch.testing.assert_close(
+        m.bilateral, torch.zeros_like(m.bilateral), atol=1e-8, rtol=0
+    )
+
+
 def test_transduced_lifecycle_and_configuration_identity():
     c = sensory_graph()
     fb = brain(c, "plume:bilateral=orn")
@@ -220,6 +248,11 @@ def test_draft_has_eighteen_independent_guarded_rooms(tmp_path, monkeypatch):
     out = tmp_path / "draft"
     batch.plan(out)
     p = json.loads((out / "predeclared.json").read_text(encoding="utf-8"))
+    from datetime import datetime
+
+    assert p["stamped_utc"].endswith("Z")
+    assert datetime.fromisoformat(p["stamped_utc"]).utcoffset().total_seconds() == 0
+    assert b"\r" not in (out / "predeclared.json").read_bytes()
     assert len(p["commands"]) == 18
     assert len({tuple(s["position"]) for s in p["starts"]}) == 6
     assert p["arms"]["goal_only"][1] == "plume:feedback=off"

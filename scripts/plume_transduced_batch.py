@@ -10,6 +10,7 @@ import os
 import shlex
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +27,7 @@ ARMS = {
 def save(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8") as f:
+    with path.open("x", encoding="utf-8", newline="\n") as f:
         json.dump(value, f, indent=2, allow_nan=False)
         f.write("\n")
 
@@ -84,6 +85,7 @@ def plan(
             }
         )
     protocol = {
+        "stamped_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "status": "PREPARED ONLY; no submission authorized until Fable releases the pool",
         "seconds": 60,
         "results_dir": rel,
@@ -120,6 +122,7 @@ def plan(
             "transduced versus full: sensory-cue replacement with the same feedback",
             "goal_only versus full: physical goal retained, DNa02 feedback removed",
         ],
+        "contrast_compression": "at median historical total, rate/physical contrast is 0.371 lime, 0.429 apple, 0.447 banana, 0.639 all-fruit; gain 200 is unverified and underived, so transduced/full also changes small-contrast gain to 0.37-0.64x",
         "precision": "mean and across-run SD at two significant digits in SD, unless a matching execution path passes docs/audits/determinism_gate.md; exact JSON retained as machine records",
         "provenance": {
             "preset": "instrumented",

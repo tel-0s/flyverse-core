@@ -205,7 +205,9 @@ def characterize(history):
             "dataset": c.dataset,
             "release": c.release,
             "cache_md5": {
-                name: hashlib.md5((connectome.CACHE_DIR / name).read_bytes()).hexdigest()
+                name: hashlib.md5(
+                    (connectome.CACHE_DIR / name).read_bytes()
+                ).hexdigest()
                 for name in ("neurons.parquet", "W_post_pre.npz", "sign0_counts.npz")
             },
             "preset": "instrumented",
@@ -278,7 +280,9 @@ if __name__ == "__main__":
     result = characterize(args.history)
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "characterisation.json").write_text(
-        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+        json.dumps(result, indent=2) + "\n", encoding="utf-8", newline="\n"
     )
-    (args.out / "characterisation.md").write_text(report(result), encoding="utf-8")
+    (args.out / "characterisation.md").write_text(
+        report(result), encoding="utf-8", newline="\n"
+    )
     print(report(result))
