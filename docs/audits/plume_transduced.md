@@ -278,3 +278,36 @@ the fix remains pending; no merge or cluster submission.
 
 Author freeze record: `data/plume_transduced/predeclared_v3.json`,
 `stamped_utc=2026-09-18T00:06:24Z`, fixed runtime source `9c74945`.
+
+## 6. V4 room execution (2026-09-18; independent skeptic pending)
+
+The corrected implementation was reviewed and merged at `ca23768`; the merge record is
+in [receptor_verification.md](receptor_verification.md). Round 8 subsequently reconciled
+the plume API. V3 was never submitted and is preserved. The v4 declaration was generated
+from **main `03ddeb2`**, with no simulation or analysis source change:
+[predeclared_v4.json](data/plume_transduced/predeclared_v4.json),
+`stamped_utc=2026-09-18T02:53:34Z`, SHA-256
+`99feae9d9be66c646347800d83868d44337de1dc800b37ce18424f9ce231c7c8`.
+All 72 source hashes match that main revision. Arms, six starts, durations, measures and
+descriptive analysis are unchanged from v3 (checked as parsed JSON).
+
+The generated [batch_v4.sh](data/plume_transduced/batch_v4.sh) was adapted before this
+stamp to the authorized placement: house target, the released second node selected through
+`CLUSTER_NODE_2`, GPUs 4-7 round-robin, one pinned GPU per job, and `--ship flyverse,scripts`.
+Each job checks `CUDA_VISIBLE_DEVICES` against its assigned id and writes it to a `.gpu.txt`
+sidecar before the room runs. The wrapper SHA-256 is
+`fc1f3c261a20c5086c6c17247b6c867f3e0058a346e05d0cd060bc4fc7d3b6b0`.
+It retains the release guard, preserved Python exit status and named fetch directory
+`out/plume_transduced_rooms_v4/`. Both the public and ignored declaration/wrapper copies
+are identical LF bytes. The operational wrapper and placement metadata were finalized
+after `plan` generated the unchanged experimental design, before any submission.
+
+[determinism_gate.md](determinism_gate.md) found neither tested B=6 room path repeats.
+Exact repetition of this B=1 room protocol has not been established. All room comparisons
+here therefore use six independent runs per arm, means and across-run sample SD only.
+No significance or physiological claim, fit, or default adoption is planned.
+
+Preflight: 38 targeted CPU tests passed, with 10 subtests, covering the plume law, unified
+API, navigation instruments and original MaleCNS bit-identity gate. The three cache MD5s
+match section 5. Bash syntax checks passed. Submission/results are recorded below when
+available; this freeze was committed before execution.
