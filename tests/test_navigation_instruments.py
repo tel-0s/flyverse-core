@@ -343,6 +343,60 @@ def test_steering_feedback_can_cross_a_threshold_and_track_signed_demand():
     assert not m.steer_integral.any()
 
 
+def test_plume_variants_are_opt_in_and_recorded(monkeypatch):
+    """Round 8 item 4 (docs/audits/plume_goal_only.md): `plume:feedback=0` is the goal-only variant (integral gain 0,
+    the one-way clip(80 * turn) bridge), `plume:walking_goal=0` the feedback-only variant (the pre-correction goal law);
+    bare `plume` is the shipped law, parameter for parameter, and every variant says what it is in describe()."""
+    from flyverse.instruments import make_instrument
+
+    shipped = make(["compass", "plume", "hunger"])
+    p0 = shipped.instruments["plume"].describe()["parameters"]
+    assert p0["steering_integral_gain_per_s"] == 5.0 and p0["walking_goal_enabled"] is True and p0["variant"] == "full"
+    # the grammar
+    g = make_instrument(shipped.c, "plume:feedback=0")
+    assert g.describe()["parameters"]["variant"] == "goal-only" and g.describe()["parameters"]["steering_integral_gain_per_s"] == 0.0
+    f = make_instrument(shipped.c, "plume:walking_goal=0")
+    assert f.describe()["parameters"]["variant"] == "feedback-only" and f.describe()["parameters"]["walking_goal_enabled"] is False
+    assert make_instrument(shipped.c, "plume").describe()["parameters"] == p0
+    for bad in ("plume:feedback", "plume:gain=1", "plume:feedback=-1"):
+        with pytest.raises(ValueError):
+            make_instrument(shipped.c, bad)
+    # goal-only: the walking goal still turns toward the stronger antenna, the integral never moves, the input is the
+    # bounded one-way bridge
+    fb = make(["compass", "plume:feedback=0", "hunger"], batch=2)
+    m = fb.instruments["plume"]
+    from flyverse.interp.common import provenance
+    assert provenance(fb.c, fb=fb)["instruments"][1]["parameters"]["variant"] == "goal-only"
+    fb.interoception(0.1)
+    fb.smell({"DM1": [1.02, 1]}, {"DM1": [1, 1.02]})
+    fb.wind([0, 1], [1, 0])
+    inputs = plume_inputs(m)
+    inputs["dna_L"][:] = 30.0                                 # a large measured DNa02 error that the integral would chase
+    for _ in range(300):
+        out = m.step(10, inputs)
+    assert m.turn[0] > 0 and m.turn[1] < 0
+    assert not m.steer_integral.any()
+    torch.testing.assert_close(m.steer_input, (80 * m.turn).clamp(-80, 80), rtol=0, atol=1e-5)
+    assert out["pfl_R"][0].min() > 0 and out["pfl_L"][1].min() > 0
+    # feedback-only: the bilateral samples are held (checkpointed) but the goal ignores them -- with equal antennae
+    # and a left wind the goal is the upwind law, whatever the contrast says
+    fb = make(["compass", "plume:walking_goal=0", "hunger"], batch=2)
+    m = fb.instruments["plume"]
+    fb.interoception(0.1)
+    fb.smell({"DM1": [1.5, 1.5]}, {"DM1": [1, 1]})           # a strong leftward contrast in both rows
+    fb.wind([1, 0], [0, 1])
+    inputs = plume_inputs(m)
+    for _ in range(200):
+        m.step(10, inputs)
+    assert m.bilateral[0] > 0.1                                # tracked ...
+    upwind = m.heading + torch.atan2(m.wind_y, m.wind_x)
+    torch.testing.assert_close(torch.remainder(m.goal - upwind + math.pi, 2 * math.pi) - math.pi,
+                               torch.zeros_like(m.goal), rtol=0, atol=1e-5)   # ... and not used for the goal
+    assert m.turn[0] != m.turn[1]                              # the wind rows differ, so the upwind law is what steers
+    assert m.steer_integral.abs().sum() > 0                    # the feedback runs
+    assert "steer_integral" in m.state_dict() and "bilateral" in m.state_dict()
+
+
 def test_smell_receiver_validates_both_sides_and_requires_explicit_instrument():
     fb = make(["compass", "plume"])
     assert fb.olfaction is None and "smell" in fb.available_senses

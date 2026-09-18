@@ -95,6 +95,23 @@ def make_instrument(c, name):
     if name in NAMED_INSTRUMENTS:
         from .navigation import RecurrentCompass, PlumeNavigation, HungerGain, FlightDrive
         return {'compass_ring':RecurrentCompass,'plume':PlumeNavigation,'hunger':HungerGain,'flight':FlightDrive}[name](c)
+    if isinstance(name,str) and name.split(':',1)[0]=='plume' and ':' in name:
+        # plume:feedback=0 (goal-only) / plume:walking_goal=0 (feedback-only): the opt-in variants of
+        # docs/audits/plume_goal_only.md; bare `plume` is the shipped law
+        from .navigation import PlumeNavigation
+        kwargs={}
+        for item in name.split(':')[1:]:
+            if '=' not in item:
+                raise ValueError(f"plume option {item!r} is not key=value (keys: feedback, walking_goal)")
+            key,value=item.split('=',1)
+            key=key.strip()
+            if key in ('feedback','feedback_gain_per_s'):
+                kwargs['feedback_gain_per_s']=float(value)
+            elif key=='walking_goal':
+                kwargs['walking_goal']=value.strip().lower() not in ('0','false','off','no')
+            else:
+                raise ValueError(f"unknown plume option {key!r} (keys: feedback, walking_goal)")
+        return PlumeNavigation(c,**kwargs)
     if isinstance(name,str) and name.split(':',1)[0] in REGISTRY:
         return parse_instrument(name,c)
     raise ValueError(f'unknown instrument {name!r}; named instruments: {", ".join(NAMED_INSTRUMENTS)}')

@@ -150,7 +150,19 @@ class Context:
         if self.fast:
             self.seeds = self.seeds[:1]
         self.cache_dir = args.cache_dir or os.environ.get("FLYVERSE_CACHE") or None   # a scratch cache (e.g. TYPE_NT_OVERRIDE trials)
-        self.c = connectome.load(verbose=False) if self.cache_dir is None else connectome.load(cache_dir=self.cache_dir, verbose=False)
+        # instrumented only (docs/audits/instrumented_suite.md): --hold-edges holds a class of edges in EVERY brain built here;
+        # --nt-override compiles the relabel into cx_wedge's scratch cache; both are attached as configuration records
+        self.hold_edges = list(getattr(args, "hold_edges", None) or [])
+        self.nt_override = dict(getattr(args, "nt_override", None) or {})
+        if self.nt_override:
+            if self.cache_dir is not None:
+                raise SystemExit("--nt-override compiles its own scratch cache; do not combine it with --cache-dir / FLYVERSE_CACHE")
+            import cx_wedge as _cxw
+            self.c, scratch, table = _cxw.load_connectome(self.nt_override)
+            self.cache_dir = str(scratch)
+            print(f"connectome from scratch cache {scratch} (TYPE_NT_OVERRIDE = {table})", flush=True)
+        else:
+            self.c = connectome.load(verbose=False) if self.cache_dir is None else connectome.load(cache_dir=self.cache_dir, verbose=False)
         connectome.load = lambda *a, **k: self.c        # every FlyBrain / demo Sim built here shares this one graph
         self.receptor_table, self.dopamine_lead_info = None, None
         if getattr(args, "receptor_table", None):                 # --receptor-table PATH -> LIFParams.receptor_table
@@ -168,7 +180,7 @@ class Context:
 
     def new_brain(self, c, p, **kwargs):
         """Keep the plain path unchanged; instrumented legacy probes use the real module scheduler."""
-        instruments = getattr(self.args, 'instrument', [])
+        instruments = self.instrument_list()
         draw_seed = getattr(self.args, 'draw_seed', None)
         if draw_seed is not None:
             kwargs['seed'] = draw_seed
@@ -191,7 +203,18 @@ class Context:
     def has_overrides(self):
         a = self.args
         return any(v is not None for v in [a.std_u, a.std_tau, a.adapt_jump, a.same_type_gain, a.norm_alpha, a.norm_ref,
-                                           a.w_syn, a.conn_cap, a.dn_vnc_gain, a.vp_dn_gain, a.gain_out, a.t4_gain]) or self.args.receptor_model != "default"
+                                           a.w_syn, a.conn_cap, a.dn_vnc_gain, a.vp_dn_gain, a.gain_out, a.t4_gain]) or self.args.receptor_model != "default" \
+            or bool(self.hold_edges)
+
+    def instrument_list(self):
+        """What every brain built here attaches: the --instruments specs, plus -- under instrumented -- the `edges` record
+        of each --hold-edges hold and the `relabel` record of each --nt-override, as cx_wedge attaches them (fresh objects
+        per brain: a record is bound to the FlyBrain it verifies). [] under raw whatever the flags."""
+        if not (self.hold_edges or self.nt_override):
+            return list(getattr(self.args, 'instrument', []))
+        import cx_wedge as _cxw
+        return _cxw.build_instruments(self.c, getattr(self.args, 'instrument', []), getattr(self.args, 'preset', 'raw'),
+                                      hold_edges=self.hold_edges, nt_override=self.nt_override)
 
     @property
     def receptor_model(self):
@@ -211,10 +234,20 @@ class Context:
                            (r"^visual_projection$", r"^descending_neuron$", 2.0 if a.vp_dn_gain is None else a.vp_dn_gain)]
         return p
 
+    def _apply_holds(self, p):
+        """--hold-edges (instrumented only): the held classes appended to the LIFParams' type_path_gain -- the shipped
+        default list when the params carry None, the section's own list otherwise -- so every brain built here, the
+        legacy probes' Brain, the demo Sims' FlyBrain and the shiu row alike, carries the hold its `edges` record names."""
+        if self.hold_edges:
+            base = list(brain.DEFAULT_TYPE_PATH_GAIN if p.type_path_gain is None else p.type_path_gain)
+            p.type_path_gain = base + [h for h in self.hold_edges if h not in base]
+        return p
+
     def _apply_receptor(self, p):
         """The receptor-model flags (model, net rule, class fallback, the slow term's mode / class scales / taus and the
-        --dopamine-lead table) on a LIFParams; a no-op with --receptor-model off."""
+        --dopamine-lead table) on a LIFParams, and the --hold-edges hold; a no-op with --receptor-model off and no hold."""
         a = self.args
+        self._apply_holds(p)
         if self.receptor_model is None:                      # --receptor-model off: the presynaptic-sign rule, explicitly
             p.receptor_model = None
             return p
@@ -301,9 +334,10 @@ class Context:
         with self.patched_params():
             draw_seed = getattr(self.args, 'draw_seed', None)
             seed = seed if draw_seed is None else draw_seed
+            instruments = self.instrument_list()
             sim = rd.Sim(seed, trail_seconds=0.0, preset=getattr(self.args, 'preset', 'raw'),
-                         instruments=getattr(self.args, 'instrument', []), **flags, **kw)
-            if getattr(self.args, 'instrument', []):
+                         instruments=instruments, **flags, **kw)
+            if instruments:
                 from flyverse.interp.common import provenance
                 self.controllers.append(provenance(sim.c, fb=sim.fb, seeds=[seed],
                                                    stimulus={'name':'benchmark room probe','motion_input':'body yaw_rate'}))
@@ -765,7 +799,7 @@ def sec_hops(ctx):
     flags = dict(cuda_kernels=True, cuda_graphs=True, event_driven=True, cuda_sparse="torch") if ctx.native else {}   # batches need the torch CSR path
     with ctx.patched_params():
         sim = BatchSim(B, c=ctx.c, seed=getattr(ctx.args,'draw_seed',None) or 0, seeds=range(B), start=(-0.15, 0.15, 0.75), program="cx", fruit_set="apple", fence=True,
-                       preset=getattr(ctx.args,'preset','raw'), instruments=getattr(ctx.args,'instrument',[]), **flags)
+                       preset=getattr(ctx.args,'preset','raw'), instruments=ctx.instrument_list(), **flags)
     from flyverse.interp.common import provenance
     draw_seed = getattr(ctx.args, 'draw_seed', None) or 0
     ctx.controllers.append(provenance(sim.c, fb=sim.fb, seeds=[draw_seed], env_seeds=list(sim.seeds), batch=B,
@@ -875,6 +909,13 @@ def main():
     ap.add_argument('--preset', choices=['raw','instrumented'], default='raw')
     from flyverse.instruments import add_cli_arguments
     add_cli_arguments(ap)
+    ap.add_argument("--hold-edges", action="append", default=None, metavar="PRE_REGEX:POST_REGEX",
+                    help="instrumented only: hold every edge of this class at factor 0 through LIFParams.type_path_gain in EVERY section's "
+                         "brain and demo Sim, and attach the `edges` record (cx_wedge.build_instruments: the 6A hold is `ring_dc_hold`); "
+                         "docs/audits/instrumented_suite.md")
+    ap.add_argument("--nt-override", action="append", default=None, metavar="TYPE=nt",
+                    help="instrumented only: compile the connectome with this transmitter relabel into the scratch cache out/cache_<hash>/ "
+                         "(cx_wedge.load_connectome) and attach the `relabel` record (GLNO is `glno_sign`)")
     ap.add_argument('--draw-seed', type=int, default=None, help='override every neural seed in this suite draw; omitted preserves original section seeds')
     ap.add_argument("--deterministic", action="store_true",
                     help="torch.use_deterministic_algorithms(True) + cudnn.benchmark off: every op must have a deterministic "
@@ -919,8 +960,13 @@ def main():
     args = ap.parse_args()
     if args.instrument and args.preset != 'instrumented':
         ap.error('--instruments requires --preset instrumented')
+    if (args.hold_edges or args.nt_override) and args.preset != 'instrumented':
+        ap.error('--hold-edges / --nt-override require --preset instrumented (under raw the benchmark is the shipped model)')
     from flyverse.instruments import validate_cli
     validate_cli(ap, args.instrument)
+    import cx_wedge as _cxw
+    args.hold_edges = _cxw.parse_hold_edges(args.hold_edges)          # [] or [(pre_re, post_re, 0.0), ...]
+    args.nt_override = _cxw.parse_nt_override(args.nt_override)       # {} or {TYPE: nt}
     t_all = time.time()
     det_cfg = {"flag": bool(args.deterministic), "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG")}
     if args.deterministic:
@@ -972,7 +1018,9 @@ def main():
               "gf_hz": float(body.Flight().gf_hz), "neurons": int(ctx.c.n),
               "cache_dir": str(ctx.cache_dir or connectome.CACHE_DIR),
               "nt_counts": {k: int(v) for k, v in ctx.c.neurons.nt.value_counts().items()}}
-    config.update(preset=args.preset,instruments=args.instrument,draw_seed=args.draw_seed)
+    config.update(preset=args.preset,instruments=args.instrument,draw_seed=args.draw_seed,
+                  hold_edges=[list(h) for h in ctx.hold_edges], nt_override=dict(ctx.nt_override),
+                  instrument_records=[getattr(i, "name", i) for i in ctx.instrument_list()])
     print("LIF:", config["lif"], " gain_out", op.gain_out_mv, " backend:", config["backend"], " fast:", ctx.fast, flush=True)
     for letter, name, fn in select_sections(args.sections, ctx.fast):
         print(f"\n=== [{letter or '-'}] {name}", flush=True)

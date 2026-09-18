@@ -372,10 +372,22 @@ class PlumeNavigation(NeuralInstrument):
     }
     state_flags = ("inside", "seen", "airborne", "feeding", "smell_observed")
 
-    def __init__(self, c):
+    def __init__(self, c, *, feedback_gain_per_s=None, walking_goal=True):
+        """Opt-in variants for docs/audits/plume_goal_only.md (round 8, item 4); the defaults are the shipped law.
+
+        `feedback_gain_per_s`: the DNa02 L-R integral gain onto PFL3 (default None = the shipped 5.0 /s); 0 keeps the
+        integral at zero, so the PFL3 input is the one-way `clip(80 * turn)` bridge of the diagnostic (goal-only).
+        `walking_goal`: True (shipped) sets the local walking goal from the bilateral concentration gradient; False keeps
+        the pre-correction upwind / entry-memory goal law (feedback-only). Both are recorded in describe()['parameters']
+        (`steering_integral_gain_per_s`, `walking_goal_enabled`, `variant`)."""
         super().__init__(c)
         from .motor import LH_ODOUR_CHANNELS
 
+        gain = 5.0 if feedback_gain_per_s is None else float(feedback_gain_per_s)
+        if not (math.isfinite(gain) and gain >= 0):
+            raise ValueError("feedback_gain_per_s must be finite and >= 0")
+        self._feedback_gain = gain
+        self._walking_goal = bool(walking_goal)
         idx, w = epg_columns(c)
         self.reads = {"epg": idx}
         self._epg_weights = (
@@ -424,8 +436,14 @@ class PlumeNavigation(NeuralInstrument):
             "flight_cast_half_period_s": 1.5,
             "minimum_heading_strength": 0.6,
             "steering_target_difference_hz": 40.0,
-            "steering_integral_gain_per_s": 5.0,
-            "steering_feedback": "DNa02 L-R; bounded integral correction to PFL3 input",
+            "steering_integral_gain_per_s": self._feedback_gain,
+            "steering_feedback": ("DNa02 L-R; bounded integral correction to PFL3 input" if self._feedback_gain > 0 else
+                                  "none (gain 0): the one-way clip(80 * turn) PFL3 bridge of the diagnostic"),
+            "walking_goal_enabled": self._walking_goal,
+            "variant": ("full" if (self._feedback_gain == 5.0 and self._walking_goal) else
+                        "goal-only" if (self._feedback_gain == 0 and self._walking_goal) else
+                        "feedback-only" if (self._feedback_gain == 5.0 and not self._walking_goal) else
+                        f"custom (gain {self._feedback_gain:g}, walking goal {self._walking_goal})"),
             "bilateral_tau_s": 0.25,
             "antenna_separation_m": 0.001,
             "gradient_length_m": 0.1,
@@ -614,7 +632,10 @@ class PlumeNavigation(NeuralInstrument):
             & (self.airborne == 0)
             & (torch.maximum(self.odor_L, self.odor_R) > 1e-12)
         )
-        self.goal.copy_(torch.where(local, local_goal, self.goal))
+        if self._walking_goal:
+            self.goal.copy_(torch.where(local, local_goal, self.goal))
+        # walking_goal False (feedback-only variant): the bilateral state is still tracked and checkpointed, the goal
+        # stays the pre-correction upwind / entry-memory law above
         rates = _pfl3(self.heading, self.goal, self.hpref, self.gpref)
         # With the paper's negated preferred-angle arrays, R-L follows positive goal error.
         # This frame convention is tested over heading and goal angles, before any behavioral run.

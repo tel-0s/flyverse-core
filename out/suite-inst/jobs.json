@@ -1,0 +1,67 @@
+{
+ "batch": "suite-inst",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "instruments": "sided_turn_afferent:k=0.5",
+ "hold_edges": "^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)",
+ "nt_override": "GLNO=glutamate",
+ "record_names": [
+  "sided_turn_afferent",
+  "ring_dc_hold",
+  "glno_sign"
+ ],
+ "declared_gap_rows": [
+  "compass.wedge_cells_persisting"
+ ],
+ "gpu_pool": "4,5,6,7",
+ "node": "<cluster-node-2>",
+ "jobs": [
+  {
+   "preset": "raw",
+   "seed": 0,
+   "stem": "out/suite-inst/suite_raw_s0",
+   "command": "python scripts/benchmark.py --sections all --draw-seed 0 --seeds 0 --preset raw --json out/suite-inst/suite_raw_s0.json > out/suite-inst/suite_raw_s0.txt 2>&1",
+   "line": "mkdir -p out/suite-inst && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/benchmark.py --sections all --draw-seed 0 --seeds 0 --preset raw --json out/suite-inst/suite_raw_s0.json > out/suite-inst/suite_raw_s0.txt 2>&1; st=\\$?; tail -3 out/suite-inst/suite_raw_s0.txt; exit \\$st"
+  },
+  {
+   "preset": "instrumented",
+   "seed": 0,
+   "stem": "out/suite-inst/suite_instrumented_s0",
+   "command": "python scripts/benchmark.py --sections all --draw-seed 0 --seeds 0 --preset instrumented --instruments sided_turn_afferent:k=0.5 --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)' --nt-override GLNO=glutamate --json out/suite-inst/suite_instrumented_s0.json > out/suite-inst/suite_instrumented_s0.txt 2>&1",
+   "line": "mkdir -p out/suite-inst && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/benchmark.py --sections all --draw-seed 0 --seeds 0 --preset instrumented --instruments sided_turn_afferent:k=0.5 --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)' --nt-override GLNO=glutamate --json out/suite-inst/suite_instrumented_s0.json > out/suite-inst/suite_instrumented_s0.txt 2>&1; st=\\$?; tail -3 out/suite-inst/suite_instrumented_s0.txt; exit \\$st"
+  },
+  {
+   "preset": "raw",
+   "seed": 1,
+   "stem": "out/suite-inst/suite_raw_s1",
+   "command": "python scripts/benchmark.py --sections all --draw-seed 1 --seeds 1 --preset raw --json out/suite-inst/suite_raw_s1.json > out/suite-inst/suite_raw_s1.txt 2>&1",
+   "line": "mkdir -p out/suite-inst && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/benchmark.py --sections all --draw-seed 1 --seeds 1 --preset raw --json out/suite-inst/suite_raw_s1.json > out/suite-inst/suite_raw_s1.txt 2>&1; st=\\$?; tail -3 out/suite-inst/suite_raw_s1.txt; exit \\$st"
+  },
+  {
+   "preset": "instrumented",
+   "seed": 1,
+   "stem": "out/suite-inst/suite_instrumented_s1",
+   "command": "python scripts/benchmark.py --sections all --draw-seed 1 --seeds 1 --preset instrumented --instruments sided_turn_afferent:k=0.5 --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)' --nt-override GLNO=glutamate --json out/suite-inst/suite_instrumented_s1.json > out/suite-inst/suite_instrumented_s1.txt 2>&1",
+   "line": "mkdir -p out/suite-inst && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/benchmark.py --sections all --draw-seed 1 --seeds 1 --preset instrumented --instruments sided_turn_afferent:k=0.5 --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)' --nt-override GLNO=glutamate --json out/suite-inst/suite_instrumented_s1.json > out/suite-inst/suite_instrumented_s1.txt 2>&1; st=\\$?; tail -3 out/suite-inst/suite_instrumented_s1.txt; exit \\$st"
+  },
+  {
+   "preset": "raw",
+   "seed": 2,
+   "stem": "out/suite-inst/suite_raw_s2",
+   "command": "python scripts/benchmark.py --sections all --draw-seed 2 --seeds 2 --preset raw --json out/suite-inst/suite_raw_s2.json > out/suite-inst/suite_raw_s2.txt 2>&1",
+   "line": "mkdir -p out/suite-inst && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/benchmark.py --sections all --draw-seed 2 --seeds 2 --preset raw --json out/suite-inst/suite_raw_s2.json > out/suite-inst/suite_raw_s2.txt 2>&1; st=\\$?; tail -3 out/suite-inst/suite_raw_s2.txt; exit \\$st"
+  },
+  {
+   "preset": "instrumented",
+   "seed": 2,
+   "stem": "out/suite-inst/suite_instrumented_s2",
+   "command": "python scripts/benchmark.py --sections all --draw-seed 2 --seeds 2 --preset instrumented --instruments sided_turn_afferent:k=0.5 --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)' --nt-override GLNO=glutamate --json out/suite-inst/suite_instrumented_s2.json > out/suite-inst/suite_instrumented_s2.txt 2>&1",
+   "line": "mkdir -p out/suite-inst && source .venv/bin/activate && python -c 'import torch; assert torch.cuda.is_available()' && python scripts/benchmark.py --sections all --draw-seed 2 --seeds 2 --preset instrumented --instruments sided_turn_afferent:k=0.5 --hold-edges '^(ExR6|ER6|ER4m)$:^(PEN_|EPG$)' --nt-override GLNO=glutamate --json out/suite-inst/suite_instrumented_s2.json > out/suite-inst/suite_instrumented_s2.txt 2>&1; st=\\$?; tail -3 out/suite-inst/suite_instrumented_s2.txt; exit \\$st"
+  }
+ ],
+ "generated_utc": "2026-09-18T00:00:58Z",
+ "status": "DRAFT, not submitted"
+}
