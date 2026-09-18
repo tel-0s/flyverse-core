@@ -164,7 +164,7 @@ older `plume` checkpoints lack the new sensory/feedback state and are rejected.
 An optional sensory-noise experiment uses `--instruments compass plume:bilateral=orn hunger flight`.
 It replaces the walking concentration cue with matched left/right ORN population rates from
 `brain.rate`, filtered over 0.25 s. Glomerulus weights balance unequal antenna cell counts;
-the rate-contrast gain remains explicitly unverified. This variant receives no physical-smell
+the rate-contrast gain remains explicitly unverified and underived. This variant receives no physical-smell
 samples in the instrument itself. The CPU characterization predicts weak lateral signal and
 large noise-driven goal offsets; no food-finding result is established. See the
 [transduced-plume audit](audits/plume_transduced.md). The default `plume` is unchanged.
