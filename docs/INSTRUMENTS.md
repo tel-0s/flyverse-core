@@ -161,6 +161,16 @@ native source-localization circuit. See [the steering audit](audits/plume_steeri
 The room and BatchSim already supply both antennae. Start a fresh episode after updating:
 older `plume` checkpoints lack the new sensory/feedback state and are rejected.
 
+An optional sensory-noise experiment uses `--instruments compass plume:bilateral=orn hunger flight`.
+It replaces the walking concentration cue with matched left/right ORN population rates from
+`brain.rate`, filtered over 0.25 s. Glomerulus weights balance unequal antenna cell counts;
+the rate-contrast gain remains explicitly unverified and underived. This variant receives no physical-smell
+samples in the instrument itself. The CPU characterization predicts weak lateral signal and
+large noise-driven goal offsets; no food-finding result is established. See the
+[transduced-plume audit](audits/plume_transduced.md). The default `plume` is unchanged.
+`plume:feedback=off` is the separate physical-goal-only control, disabling DNa02 feedback.
+In Python use `PlumeNavigation(c, bilateral="orn")` or `PlumeNavigation(c, feedback=False)`.
+
 The flight-priority policy applies whenever `flight` is attached, including without `hunger`.
 Its timers, reserve/odor hysteresis and landing latch are included in checkpoints and row resets.
 Older checkpoints containing the original `flight` state are rejected; start a fresh episode.

@@ -95,7 +95,7 @@ def make_instrument(c, name):
     if name in NAMED_INSTRUMENTS:
         from .navigation import RecurrentCompass, PlumeNavigation, HungerGain, FlightDrive
         return {'compass_ring':RecurrentCompass,'plume':PlumeNavigation,'hunger':HungerGain,'flight':FlightDrive}[name](c)
-    if isinstance(name,str) and name.split(':',1)[0] in REGISTRY:
+    if isinstance(name,str) and name.split(':',1)[0] in {*REGISTRY, 'plume'}:
         return parse_instrument(name,c)
     raise ValueError(f'unknown instrument {name!r}; named instruments: {", ".join(NAMED_INSTRUMENTS)}')
 
@@ -438,7 +438,8 @@ class EdgeGain(EdgeHold):
 REGISTRY = {"sided_turn_afferent": SidedTurnAfferent}
 SPEC_HELP = ("NAME[:key=value]... e.g. sided_turn_afferent:k=0.5:sign=-1:cells=CB0675  "
              "(keys for sided_turn_afferent: k = Hz per deg/s in {0.25, 0.5, 1.0}, sign = +1 | -1, "
-             "cells = AN07B037 | CB0675 | GNG580 | PS047_b | all, max_hz)")
+             "cells = AN07B037 | CB0675 | GNG580 | PS047_b | all, max_hz); "
+             "plume:bilateral=concentration|orn:feedback=on|off")
 
 
 def parse_instrument(spec, c):
@@ -449,8 +450,8 @@ def parse_instrument(spec, c):
         return make_instrument(c,spec)
     parts = [p.strip() for p in spec.split(":")]
     name, kv = parts[0], parts[1:]
-    if name not in REGISTRY:
-        raise ValueError(f"unknown instrument {name!r}; choose from {sorted(REGISTRY)}")
+    if name not in {*REGISTRY, 'plume'}:
+        raise ValueError(f"unknown instrument {name!r}; choose from {sorted(set(REGISTRY) | set(NAMED_INSTRUMENTS))}")
     kwargs = {}
     seen = set()
     for item in kv:
@@ -461,6 +462,13 @@ def parse_instrument(spec, c):
         if key in seen:
             raise ValueError(f"duplicate instrument option {key!r}")
         seen.add(key)
+        if name == "plume":
+            if key == "bilateral" and value.strip() in ("concentration", "orn"):
+                kwargs[key] = value.strip()
+            elif key == "feedback" and value.strip() in ("on", "off"):
+                kwargs[key] = value.strip() == "on"
+            else:
+                raise ValueError("plume options: bilateral=concentration|orn, feedback=on|off")
         if name == "sided_turn_afferent":
             if key == "k":
                 kwargs["k_hz_per_deg_s"] = float(value)
@@ -472,6 +480,9 @@ def parse_instrument(spec, c):
                 kwargs["max_hz"] = float(value)
             else:
                 raise ValueError(f"unknown option {key!r} for {name}: {SPEC_HELP}")
+    if name == "plume":
+        from .navigation import PlumeNavigation
+        return PlumeNavigation(c, **kwargs)
     return REGISTRY[name](c, **kwargs)
 
 
