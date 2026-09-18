@@ -7,7 +7,7 @@ comes from the brain's antennal ORN population rates. No physical concentration 
 is installed on this variant. The default `plume`, `raw`, sensory transduction, weights
 and body constants are unchanged. Nothing adopted. The independent skeptic refuted the
 original runtime pairing at 4258468; the correction and regression tests are recorded below.
-The correction was reviewed and merged at `ca23768`; the v4 room experiment in section 6
+The correction was reviewed and merged at `ca23768`; the completed v5 room experiment in section 7
 awaits its own independent skeptic.
 
 The CPU characterization is unfavorable for reliable instantaneous lateralization. At
@@ -18,13 +18,15 @@ SD in a 250 ms counting window. Including the existing 100 ms rate filter and th
 still below one. This is an independent sensory-input model, not observed full-brain
 ORN activity. More gain amplifies noise as well as signal.
 
-Eighteen independent room runs are frozen as **v4 from main `03ddeb2`**, following Fable's
-pool release. The first submission was withdrawn while all jobs were still queued: the
-shared worker cache failed the frozen MD5s. A separate cache now matches the three frozen
-files exactly; the shared cache is untouched. Execution is still blocked by an unrelated
-training job occupying the authorized GPU pool. No room result or adoption is claimed.
-See section 6 for the submission record. The determinism gate permits only mean and
-across-run SD reporting for these rooms; no exact-repetition exception is assumed.
+The corrected **v5** batch completed all 18 independent 60 s rooms on the first house
+node's authorized GPUs 4-7. Feeding for at least one second: **full 6/6, transduced 1/6, goal_only 3/6**.
+The generated tables in section 7 report means and across-run SD. The transduced arm
+retained food finding in fewer of these six frozen starts than the physical-goal full
+arm. This is descriptive, not a significance result, an SNR measurement, or a physiological
+claim. The gain remains underived; nothing is adopted. Both failed v4 attempts are
+preserved: one withdrawn before dispatch for cache mismatch, the other crashing in a
+scalar motor logger at the first sample. V5 fixes the logger and changes placement,
+with no simulation, controller, start or measurement change.
 
 ## 1. Population choice and side bias
 
@@ -244,11 +246,12 @@ MaleCNS cache MD5s remain `c50c598a708b5b373cbaffca7d6a9d82` (neurons),
 `ac131529cebf98decde58d0c227b7954` (W) and `bf01d724acf2a1fec8fdb60ef8a9e066` (sign-0 counts).
 
 This is the author's self-review. The original independent skeptic is quoted below; the
-correction was subsequently reviewed and merged at `ca23768`. Pending experimental
-work: GPU lifecycle/capture checks and the authorized v4 room comparison;
-measure actual neural rates and correlations, then assess whether any approach improvement
-survives the low sensory SNR; the 29-check `instrumented` suite column (PRESETS_SPEC
-section 2 item 5) remains required before any adoption. No GPU result is implied by a prepared harness.
+correction was subsequently reviewed and merged at `ca23768`. The v5 room comparison and
+observed ORN rates are now recorded in section 7. The rooms
+exercise native CUDA kernels and graph capture through completion; GPU checkpoint/partial
+reset lifecycle tests, stimulus-controlled noise/correlation measurements, and the 29-check
+suite for this exact instrument list remain pending before any adoption. Round 8's suite
+used a different list and does not fill that last item.
 
 
 ## Skeptic pass (independent, Opus, 2026-09-17)
@@ -342,7 +345,7 @@ complete archive MD5 were checked. All three isolated files now match the origin
 MD5s exactly (`isolated_cache_md5_receipt.json`). No shared cache, model source, declaration,
 start, arm or hash guard was changed. The node's training processes were untouched.
 
-### 6.2 Retry submitted; awaiting the authorized pool
+### 6.2 Retry submitted; historical queue snapshot
 
 Retry `plume_transduced_v4-6cd353` was submitted at `2026-09-18T03:02:09Z` through the
 unchanged v4 wrapper with the isolated source/cache base. The scheduler submission receipt
@@ -392,3 +395,102 @@ is changed. [predeclared_v5.json](data/plume_transduced/predeclared_v5.json) and
 [batch_v5.sh](data/plume_transduced/batch_v5.sh) are committed before submission. GPU
 assignment remains 4,5,6,7 round-robin with runtime pin checks, explicit source shipping,
 and a named fetch directory. The comparison and precision rules remain unchanged.
+
+
+### 7.1 Completed execution and verification
+
+V5 stamp: `2026-09-18T03:19:27Z`; declaration SHA-256
+`79fba517543c589148f812a6313238ab7c04e212845c370c938310e71ea1f5ae`. Freeze commit `d585d98` preceded submission
+`plume_transduced_v5-6ebfff` at `2026-09-18T03:19:46Z`; all jobs finished by
+`2026-09-18T03:23:25Z`. The jobs used the first house node, single-GPU pins 4-7 and
+NVIDIA B200 throughout, with native kernels, event-driven stepping, graph capture and
+torch sparse. No job fell back to CPU. Runtime GPU ids agree in each job's recorded
+JSON, console and sidecar. The release flag was scoped to this batch.
+
+All 18 consoles end with frame 6000 and their matching summary, and all 18 results carry
+600 finite samples on the 0.1-60 s grid, the declared start, arm, seeds and instrument
+records. Every run's 35 imported source files matches the local source content, as do
+all 55 files in its source glob. The separate remote preflight checked all 72 frozen
+source hashes, the declaration SHA-256 and three cache MD5s. The 54 fetched result/log/GPU
+sidecar files match their remote SHA-256s, compared after transfer. No cache or source
+hash refusal was bypassed. The portable [validation record](data/plume_transduced/v5/validation.json)
+carries file hashes and per-run check counts.
+
+The scheduler completion receipt records 18 completed but **exit_code null** for every
+job; no exit-code sidecar exists under the run's logs. Consequently "0 failed" is not
+used alone as success evidence. Success here means all console, output, metadata and
+source checks above passed. The private receipts are in
+`out/plume_transduced_rooms_v5/{scheduler_completion_receipt,active_run_preflight_receipt,remote_sha256_receipt,fetch_hash_verification}.json`.
+
+### 7.2 Descriptive outcomes
+
+The following text/tables are copied from the generated
+[tables.md](data/plume_transduced/v5/tables.md). Exact per-run values, including contact
+times and censoring, are in [per_run.csv](data/plume_transduced/v5/per_run.csv); aggregate
+values and their conditioning are in [descriptive.csv](data/plume_transduced/v5/descriptive.csv).
+The frozen reducer's primary summaries are [summary.json](data/plume_transduced/v5/summary.json).
+
+Means +/- across-run sample SD (six independent runs per arm).
+
+| Arm | Fed >=1 s | Feeding s | Final energy | Minimum fruit-surface distance m | Goal offset deg | Airborne s |
+|---|---:|---:|---:|---:|---:|---:|
+| full | 6/6 | 14.81 +/- 0.31 | 0.841 +/- 0.040 | -0.016 +/- 0.028 | 24.5 +/- 6.6 | 0.44 +/- 0.46 |
+| transduced | 1/6 | 2.4 +/- 5.9 | 0.13 +/- 0.32 | 0.10 +/- 0.12 | 61.3 +/- 6.3 | 0.78 +/- 0.51 |
+| goal_only | 3/6 | 7.4 +/- 8.2 | 0.43 +/- 0.47 | 0.07 +/- 0.12 | 21 +/- 19 | 0.60 +/- 0.46 |
+
+| Arm | ORN L Hz | ORN R Hz | ORN L-R Hz | Temporal SD of ORN L-R Hz | DNa02 target Hz | DNa02 measured L-R Hz | Mean absolute tracking error Hz |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| full | 5.81 +/- 0.93 | 5.79 +/- 0.92 | 0.023 +/- 0.016 | 0.275 +/- 0.024 | -0.34 +/- 0.55 | -0.36 +/- 0.55 | 0.80 +/- 0.36 |
+| transduced | 3.0 +/- 2.3 | 3.0 +/- 2.3 | 0.017 +/- 0.027 | 0.184 +/- 0.070 | 0.34 +/- 0.35 | 0.40 +/- 0.39 | 3.4 +/- 1.5 |
+| goal_only | 3.9 +/- 2.7 | 3.9 +/- 2.7 | 0.006 +/- 0.035 | 0.216 +/- 0.087 | 0.0 +/- 1.6 | -0.03 +/- 0.36 | 1.11 +/- 0.71 |
+
+All trace-derived quantities use the same 600 post-frame samples, 0.1-60 s, without a behavior mask.
+ORN rates are post-frame; target/plume state used frame-start rates; DNa02 motor rates are the post-frame readout.
+Temporal SD includes changing stimuli and behavior; it is not a stationary noise estimate or an SNR.
+Tracking error is the sampled target-minus-measured magnitude, not a causal lag or servo-gain estimate.
+Minimum fruit distance is distance to the fruit surface, including the fly's height.
+first_feed_s is first contact at any frame; blank means censored at 60 s. Contact-time statistics condition on uncensored runs.
+The >=1 s indicator uses cumulative feeding duration. Goal offset is commanded-turn magnitude, not true-bearing error.
+
+### 7.3 Reading and limits (author self-review; independent skeptic pending)
+
+The full physical-goal arm reached the cumulative feeding criterion in every run;
+removing its DNa02 feedback did so in half, and replacing its cue with ORN rates did so
+in one. This does not establish a significance threshold or separate the transduced
+cue's noise from its changed effective gain. There is no gain search or post-result
+controller modification. The physical field remains privileged information in the
+full and goal-only arms, and the ORN gain of 200 remains unverified and underived.
+
+The actual full-brain rates are now measured, but the fly and stimuli move and each
+arm follows a different trajectory. Comparing temporal fluctuation to a signed mean
+across a whole room would not estimate sensory SNR. Nor can these weighted population
+summaries recover cell-to-cell noise correlations or determine whether PN processing
+would help. A stimulus-matched, controlled neural measurement is still needed for that
+mechanism question. Broad starts, six runs per arm, one 60 s duration and one execution
+platform are the scope of the behavioral observation.
+
+The original sample logger was inadequately covered: the earlier tests exercised
+module state and analysis fixtures but never the real scalar room sampling operation.
+The new regression did fail before the fix and now covers that complete operation for
+B=1 and B=2. All 40 targeted CPU tests and the MaleCNS golden pass; the runtime and
+biological cache are unchanged. The 18 v5 rooms additionally exercise the corrected
+sampler on CUDA through completion.
+
+As an author arithmetic check, a separate Python `statistics` calculation reproduced
+66 comparisons against the raw JSONs (summary means/SDs plus each run's ORN difference
+mean/temporal SD). This is not an independent reviewer. Its record is
+`out/plume_transduced_rooms_v5/independent_arithmetic_check.json`. The report initially
+rejected a matching mixed-line-ending source because its added check omitted the raw
+byte hash; the check now accepts raw, LF and CRLF encodings just like the existing
+`match_sources`. This affected only post-run validation, not simulation or results.
+
+Reproduce the complete report into a fresh directory (raw inputs stay in the ignored
+`out/plume_transduced_rooms_v5/`; do not resubmit the batch):
+
+```sh
+python scripts/plume_transduced_report.py --plan docs/audits/data/plume_transduced/predeclared_v5.json --out out/plume_transduced_rooms_v5/analysis_reproduced
+```
+
+The completed analysis used `analysis_complete/`. All printed trace summaries share
+one frame mask; no trace samples serve as replicates. An independent skeptic is pending
+Fable. No performance, physiology or default-adoption claim is made.
