@@ -393,23 +393,47 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
 **Instrumented-preset follow-ups (2026-09-17, from the four independent skeptic passes).** All five are
 questions, not plans; none of them is authorized as a batch yet, and none licenses an adoption.
 
-- [ ] **A goal-only plume arm, with no DNa02 feedback.** No such arm exists. Mean |demand| did not rise between
+- [x] **A goal-only plume arm, with no DNa02 feedback.** No such arm exists. Mean |demand| did not rise between
       the diagnostic and the validation (0.057-0.074 -> 0.036-0.083) while mean |yaw| tripled (0.038-0.067 ->
       0.106-0.245 rad/s), so the feedback bridge looks like the load-bearing change -- but that is an inference,
       and a goal-only arm is what would measure it. Same rooms, same seeds, feedback off.
+      **ANSWERED by round 8 item 4** (`docs/audits/plume_goal_only.md`, batch plume-go, 36 runs): the inference was
+      wrong -- the walking goal is the load-bearing part. Shipped rooms, six runs per arm: feedback-only (upwind goal
+      closed on DNa02) feeds 0.17 +/- 0.41 rows of six with the LARGEST DNa02 |L-R| (1.97 Hz); goal-only (walking goal,
+      integral gain 0) feeds 4.67 +/- 0.52 at 0.62 Hz; full 6/6 in every run. full - feedback-only +5.83 rows (result);
+      full - goal-only +1.33 rows (null under the reference-SD rule, all runs separate) -- the feedback's share is the
+      fly that starts facing away (185 deg: goal-only 0/6 runs, full 6/6). Drawn starts: 6 / 4.33 / 4.00 (two of the
+      six drawn rows start on a fruit). `plume:feedback=0` / `plume:walking_goal=0` are opt-in, recorded in describe();
+      bare `plume` unchanged. No admission claim.
 - [ ] **A transduced-contrast plume law.** The shipped correction reads the bilateral contrast off the physical
       concentration field (noise-free, pre-transduction) at a gain of 200, and the observed contrast is
       0.26-0.57 %. Through the model's own ORN law (1 + 150c/(c+0.5)) that is ~0.1 Hz per ORN, under the Poisson
       noise of the 0.25 s window. The question: does a law that reads the ORN RATES still find food? If not, the
       200x gradient is doing the navigating and the instrument should say so in one sentence.
-- [ ] **A V- arm for the GLNO sign.** Round 7 declared no sign-flipped counterpart of V, and in the held arms
+- [x] **A V- arm for the GLNO sign.** Round 7 declared no sign-flipped counterpart of V, and in the held arms
       GLNO L-R does not reverse (+0.6862 +- 1.9132 Hz, positive in four of six seeds), so primary 3's sign
       specificity is untested where it was measured. One arm: the afferent at k 0.5, sign -1, no hold, no relabel.
-- [ ] **A deterministic-kernel gate before any room number is quoted again.** The native event path is not
+      **ANSWERED by round 8 item 2** (`docs/audits/compass_sign_control.md`, batch cx9, 18 runs): V- minus S GLNO
+      L-R -2.0665 +/- 0.6461 Hz (result, Holm p 0.0065), V minus V- +4.2848 Hz (result), PS196_b L-R -36.1679 Hz
+      (result), all predicted signs, all six seeds separated; the flipped afferent drives GLNO_R (2.09 Hz) and leaves
+      GLNO_L at S's exact values seed for seed. The unheld ring's side report follows the afferent's sign; the held
+      arms' non-reversal (HGV-) stands and is the remaining sign question. cx9's S and V equal cx8r's in 76/76 rows
+      across two nodes. Nothing adopted.
+- [x] **A deterministic-kernel gate before any room number is quoted again.** The native event path is not
       reproducible run to run: per-cell rate differences to 44.9 Hz (voltages to 77.6 mV, conductances to 247)
       under bit-identical `poisson_p` and `drive`. Either an exact-workload pass, or the torch-sparse path for
       the quoted rooms, or repeated draws with the spread reported -- until one of those, first-contact times and
       end energies are one draw and not a number.
+      **ANSWERED by round 8 item 1** (`docs/audits/determinism_gate.md`, batch det1): the cx_wedge protocol (B=1
+      FlyBrain, torch path, no world) repeats exactly on one B200 (31/31 arrays, 546/546 metrics); every B=6 room
+      pair is one draw on BOTH paths (first differing frame 4 / 30 native, 86 / 60 torch). Frozen decision: rooms
+      are >= 6 draws with the run as the replicate unit and nothing quoted beyond its across-run SD; every room
+      number quoted before the gate stays one draw. Still open: which room stage (batched SpMM, optic lobe, ray
+      tracer, readout) does not repeat -- two more pairs (FlyBrain B=6 without optics; optics with a frozen body)
+      would split it. Tooling from this item: `cluster_run.py --gpu-ids` (a strict per-job pin) and `--ship`
+      (the box checkout is behind origin/main after the history rewrite; without `--ship flyverse,scripts` a
+      batch runs the box's stale copy of every file outside the local diff), and the scheduler's `completed`
+      status is no receipt (it lists a crashed job as completed with `exit_code None`).
 - [ ] **The 29-check suite under `instrumented`, three draws, with the three-instrument list**, beside the `raw`
       column, as PRESETS_SPEC section 2 item 5 requires. The compass stand-in's own run already rejected
       admission on `taste.MN9_hz` (seed 1, 1.690456 -> 4.295961 Hz, FAIL -> PASS outside the declared heading
