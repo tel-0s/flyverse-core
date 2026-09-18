@@ -361,3 +361,34 @@ ignored directory. No room or behavioral numbers are available yet. After dispat
 run still needs its console, GPU sidecar, complete trace, loaded provenance and output
 checks, followed by the frozen analysis and the independent skeptic. No resource outside
 the released pool is used.
+
+### 6.3 V4 failure after dispatch
+
+The queued retry subsequently dispatched; **all 18 jobs crashed at the first 100 ms
+sample**, with `TypeError: 'float' object is not subscriptable` in the logger's
+`sim.motor.turn_L[0]`. `MotorRates` deliberately returns scalars for B=1. This was a
+harness defect missed by the earlier tests, not a neural failure or a food-finding
+outcome. The 18 complete error logs and scheduler completion receipt are retained in
+`out/plume_transduced_rooms_v4/`; zero room result JSON files were produced. The queue
+status in section 6.2 describes the earlier observation, not the final state.
+
+The sampling operation is now a separately exercised function using `MotorRates.row(0)`.
+A regression constructs a real CPU `BatchSim`, advances ten frames, assigns distinct
+nonzero DNa02 rates, and records the complete sample. The B=1 case reproduced the original
+crash before the fix; after the fix both B=1 and B=2 produce the expected 22 finite columns
+and preserve left/right values. Targeted CPU validation: **40 passed, 10 subtests**,
+including the unchanged MaleCNS golden. Logs: `out/plume_v5_red.log` and
+`out/plume_v5_green.log`. The harness also records the visible GPU and periodic frame
+progress. No simulation source or controller changed.
+
+## 7. V5 rerun on the owner's newly authorized node
+
+The owner authorized moving the corrected batch to the first house node. GPU ids 4-7
+were idle at preflight. V4 is preserved; v5 uses a new plan/results directory and public
+declaration, with exactly the same 18 arm/start combinations, measures and instrument
+descriptions. Only `scripts/plume_transduced_batch.py` changes among the 72 frozen source
+hashes (fix commit `ceae6dc`). The isolated cache from section 6 is reused; no shared data
+is changed. [predeclared_v5.json](data/plume_transduced/predeclared_v5.json) and
+[batch_v5.sh](data/plume_transduced/batch_v5.sh) are committed before submission. GPU
+assignment remains 4,5,6,7 round-robin with runtime pin checks, explicit source shipping,
+and a named fetch directory. The comparison and precision rules remain unchanged.
