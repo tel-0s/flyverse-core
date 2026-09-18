@@ -65,17 +65,26 @@ def report(plan_path, out):
             assert f"device cuda arm {arm} seed {seed}" in log, stem
             assert "frame 6000/6000" in log and "Traceback" not in log, stem
             assert json.loads(log.splitlines()[-1]) == record["summary"], stem
-            sources = match_sources(record["provenance"]["source_fingerprint"], ROOT)
+            fingerprint = record["provenance"]["source_fingerprint"]
+            sources = match_sources(fingerprint, ROOT)
+            if not sources["verified"]:
+                # A tree with mixed line endings hashes differently byte-for-byte; the recorded
+                # LF-normalised hashes are the portable comparison (room() already pinned the
+                # batch script's LF hash through the plan's source_sha256_lf guard).
+                sources = match_sources({"files": fingerprint["files_lf"]}, ROOT)
             assert sources["verified"], (stem, sources)
             validation.append({"run": stem, "device": execution["device"],
                                "device_name": execution["device_name"], "gpu": gpu,
                                "source_match": sources})
-            # Check each imported file directly too, with Windows/Linux line endings.
-            for name, digest in record["provenance"]["source_fingerprint"]["files_loaded"].items():
+            # Check each imported file directly too, with Windows/Linux line endings, falling
+            # back to the recorded LF-normalised hash for files whose recording tree mixed them.
+            for name, digest in fingerprint["files_loaded"].items():
                 raw = (ROOT / name).read_bytes()
                 content = raw.replace(b"\r\n", b"\n")
-                assert digest in {hashlib.sha256(b).hexdigest() for b in
-                                  (raw, content, content.replace(b"\n", b"\r\n"))}, (stem, name)
+                assert (digest in {hashlib.sha256(b).hexdigest() for b in
+                                   (raw, content, content.replace(b"\n", b"\r\n"))}
+                        or fingerprint["files_lf"].get(name)
+                        == hashlib.sha256(content).hexdigest()), (stem, name)
             values = np.asarray(record["samples"])
             assert np.allclose(values[:, 0], np.arange(1, 601) / 10, rtol=0, atol=1e-14)
             columns = dict(zip(record["columns"], values.T))
