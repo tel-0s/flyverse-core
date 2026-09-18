@@ -439,6 +439,26 @@ class CxWedgeTests(unittest.TestCase):
         import importlib
         self.cw = importlib.import_module("cx_wedge")
 
+    def test_benchmark_adapter_drive_setter_works_without_a_scheduler_module(self):
+        """scripts/instrumented_benchmark.py's drive setter wrote `fb._extensions.base_drive`; the extension scheduler
+        exists only when a module is attached, so an instrument list of a sense-side transducer plus configuration
+        records (round 8's `sided_turn_afferent` + `ring_dc_hold` + `glno_sign`) crashed every legacy section that sets
+        `b.drive` (suite-inst's first submission: walk / loom / rotate / motion MISSING in all three instrumented draws)."""
+        import importlib
+        import torch
+        ib = importlib.import_module("instrumented_benchmark")
+        c = graph()
+        hold = ("^AN07B037_a$", "^PS196_b$", 0.0)
+        p = LIFParams(receptor_model=None, type_path_gain=[hold])
+        insts = [fi.parse_instrument("sided_turn_afferent:k=0.5", c), fi.EdgeHold(*hold, name="test_hold")]
+        b = ib.InstrumentedBenchmarkBrain(c, p, preset="instrumented", instruments=insts, device="cpu", seed=3)
+        self.assertIsNone(b.fb._extensions)                          # no scheduler module in this list
+        value = torch.full_like(b.fb.brain.drive, 0.25)
+        b.drive = value                                              # used to raise AttributeError on NoneType
+        torch.testing.assert_close(b.fb.brain.drive, value, rtol=0, atol=0)
+        b.step(2)
+        self.assertEqual([d["name"] for d in common.provenance(c, fb=b.fb)["instruments"]], ["sided_turn_afferent", "test_hold"])
+
     def test_preset_resolution_and_turn_window(self):
         cw = self.cw
         self.assertEqual(cw.resolve_preset(None, None), "raw")

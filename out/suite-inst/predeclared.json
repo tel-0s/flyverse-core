@@ -65,7 +65,7 @@
   "generated_utc": "2026-09-18T00:00:58Z",
   "status": "PREDECLARED, not submitted",
   "written_before_submission": true,
-  "stamped_utc": "2026-09-18T00:00:58Z",
+  "stamped_utc": "2026-09-18T00:26:46Z",
   "batch_sha256": "8942092498e3a7d818e29d8f1f9587a2218aa11b2ef86e53e11ef8ddc8c85e71",
   "jobs_sha256": "bb6121a8fb5122ee7c16f14fc1b6d10cf3d0d944f957231a2dead20416c44f6f",
   "source_sha256_lf": {
@@ -141,8 +141,8 @@
     "scripts/benchmark.py": "6c0349832b6765ed5b6a2032cc0bf0caf4d0f56e762b91c8692cbe46b0541b11",
     "scripts/cluster_run.py": "cc9767a8ec0385d302dd28d8c3e53c3569bf4c78760facf97a1371998e1a4342",
     "scripts/cx_wedge.py": "18f7fb47bbcb2be5a3b6fc47ad982de820855d39906fd3bcbdb49b896e13fb7c",
-    "scripts/instrumented_benchmark.py": "75cca0726d75a7392a31a44aef450e014f68ca08ffa54241b343a8ef6f74c76c",
-    "scripts/instrumented_suite.py": "d203562747f1291f97c5b37108af6098b654d26c33fd03c30848d7345fdfd199",
+    "scripts/instrumented_benchmark.py": "025c502a2433dd649a2b4c881343cee5ad9ff33382da3c7946b559dfbd429b7e",
+    "scripts/instrumented_suite.py": "1f44dff37e0339398662c15cca18398a5e18f83aeaf92652cd1452462a551b24",
     "scripts/room_demo.py": "946aa78bb83419c19a12f9dc6cac387fd0cef64c763f06c249d101d802b9b2f3"
   },
   "rule": {

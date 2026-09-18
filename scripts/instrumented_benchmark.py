@@ -26,7 +26,11 @@ class InstrumentedBenchmarkBrain:
     def drive(self, value):
         # The legacy probe computes the optic current outside FlyBrain, before each 10 ms frame.
         self.fb.brain.drive = value
-        self.fb._extensions.base_drive = value.clone()
+        # The extension scheduler exists only when a module is attached (`compass`, the navigation instruments); a
+        # sense-side transducer (`sided_turn_afferent`) or a configuration record (`ring_dc_hold`, `glno_sign`) attaches
+        # none, and then the brain's own drive is the whole story (round 8, docs/audits/instrumented_suite.md).
+        if self.fb._extensions is not None:
+            self.fb._extensions.base_drive = value.clone()
 
     def step(self, n_steps):
         return self.fb.step(n_steps * self.fb.brain.p.dt)

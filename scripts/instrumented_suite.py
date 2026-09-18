@@ -186,8 +186,10 @@ def analyse(runs_dir: Path, out_dir: Path):
                 if stale:
                     bad.append(f"controller {i} loaded source differs from the predeclared tree: {stale[:4]}"); break
             console = p.with_suffix(".txt")
-            if not (console.is_file() and "NVIDIA" in console.read_text(encoding="utf-8", errors="replace")):
-                bad.append("console lacks the CUDA device line")
+            if not (console.is_file() and "device cuda" in console.read_text(encoding="utf-8", errors="replace")):
+                bad.append("console lacks 'device cuda'")
+            if console.is_file() and "Traceback" in console.read_text(encoding="utf-8", errors="replace"):
+                bad.append("console carries a Traceback (a section died: its checks are MISSING)")
             data[(preset, seed)] = d
             tally = {"pass": sum(ch["status"].startswith("PASS") for ch in checks), "fail": sum(ch["status"] == "FAIL" for ch in checks),
                      "gap": sum(ch["status"] == "KNOWN GAP" for ch in checks), "missing": sum(ch["status"] == "MISSING" for ch in checks)}
