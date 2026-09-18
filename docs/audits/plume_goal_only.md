@@ -30,6 +30,9 @@ shipped law (`tests/test_navigation_instruments.py::test_plume_variants_are_opt_
 | runs | six per (arm, start set), brain seeds 31-36 (r0 with the shipped starts is the plume_steering.md configuration); one B=6 room per job, env seeds 0-5, all fruit, no fence, energy 0.1, 60 s, the shipped native path |
 
 36 jobs in two `cluster_run.py` calls of 18, every job pinned to one GPU of the pool 4-7 of the second node.
+Carried forward from [plume_steering.md](plume_steering.md) (skeptic item 5): the six shipped rooms are
+near-repeats -- `world.make_room` places apple, orange, banana and lime at seed-independent coordinates, only the
+grapes and blueberries jitter, the start is identical, and three rows share the 5 deg heading.
 Measures per run: `fed_rows` (rows of six feeding >= 1 s, the plume_steering.md criterion), `mean_first_contact_s`
 (over the fed rows; descriptive), `mean_abs_dna_lr_hz` (|DNa02 L - R| over rows and 0.1 s samples), `mean_path_m`,
 and the instrument's own |turn|, |PFL3 input|, |integral| and the body's |yaw|. One Holm family, m = 6 (6 v 6 floor
@@ -45,7 +48,12 @@ and the instrument's own |turn|, |PFL3 input|, |integral| and the body's |yaw|. 
 | 6 | mean_abs_dna_lr_hz | full - goal-only | drawn | positive |
 
 Verdicts from `common.compare` (result / null / underpowered / undetermined); [determinism_gate.md](determinism_gate.md):
-no room repeats, so every number below is a mean +/- SD over runs and nothing is quoted beyond that.
+no room repeats, so every summary number below is a mean +/- SD over runs; the per-room-row values in section 3.3
+and the single-draw times quoted in section 4 are one draw each, pasted from `rows.csv` under INTERP 10.4 rule 28
+and labelled as such.
+
+**Withdrawn:** "every number below is a mean +/- SD over runs and nothing is quoted beyond that" -- section 3.3
+quotes 36 x 6 single-draw values and section 4 items 1, 2 and 4 quote single draws.
 
 ## 3. Results (`out/plume-go/analysis/`; 36 runs, 0 problems)
 
@@ -139,11 +147,17 @@ mean +/- SD.
    alone.
 2. **The feedback adds the last rows and is what turns the fly facing away.** Full feeds 6/6 in every run; the row
    goal-only never feeds (0 of 6 runs) is row 3, the 185 deg heading, which full feeds in 6 of 6 runs at 31.8-50.0 s.
+   Row 1 (90 deg) also fails in 2 of the 6 goal-only runs, so row 3 is 1.00 of the +1.33 rows and row 1 the
+   remaining 0.33. The shipped set has one room per heading, so heading and room are not separable here; with the
+   drawn starts the row goal-only never feeds is row 4 (heading -87.9 deg), not a downwind start.
    The 80 Hz one-way input is too weak to recruit a large DNa02 asymmetry (goal-only mean |PFL3 input| 4.4 Hz), so a
    fly that starts facing downwind is not turned round; the integral (4.7 Hz mean, up to 80) is. That is the
    +1.33 rows of test 1, the +1.19 Hz of test 3 and the shorter path of full (0.65 m: the flies arrive and stop).
-3. **The drawn starts are less discriminating than intended.** Two of the six drawn rows (0 and 3) begin within a
-   fruit's reach and feed at 0.4-1.9 s in every arm and run; over the other four, full feeds 4/4 in every run,
+3. **The drawn starts are less discriminating than intended.** Two of the six drawn rows start just outside a fruit
+   -- row 3 at 0.0163 m and row 0 at 0.0318 m from the nearest fruit surface, against the 0.015 m feeding radius --
+   and are fed in every arm and run (first contact 0.4-1.9 s, once 13.1 s). They are counted in every drawn
+   `fed_rows` figure, so full 6, goal-only 4.33 and feedback-only 4.00 each include two rows no arm has to steer to.
+   Over the other four, full feeds 4/4 in every run,
    goal-only 2.33 +/- 0.82 (row 4 never, rows 1 and 2 sometimes) and feedback-only exactly 2 (rows 2 and 5 always, 1
    and 4 never). The drawn set therefore says the same thing with less range, and its 60 s mean |DNa02 L-R| (test 6,
    null) is dominated by the post-feeding phase in every arm. The draw had no exclusion zone around the fruit; a
@@ -153,8 +167,18 @@ mean +/- SD.
    the same outcome, different times, as determinism_gate.md says it must be. Over six runs the shipped-start first
    contact is 27.8 +/- 1.9 s (per-run means 24.6-29.6).
 5. What this does not say: nothing about the model's own nose (the 200x pre-transduction gradient is still the
-   instrument's, follow-up 2 of the skeptics, not run here), nothing about hunger (energy reaches zero before every
-   first contact as before), no admission, no default.
+   instrument's, follow-up 2 of the skeptics, not run here), nothing about hunger. The shipped-start rooms still
+   deplete before every first contact under `full`, but that is no longer general: over the 36 runs 143 of 216 rows
+   reach energy 0 (17.8-19.6 s) and 74 of 151 first contacts precede it -- 28 of 36 under `full` with the drawn
+   starts, all 24 under feedback-only drawn, and 7 of 28 under goal-only with the shipped starts. The drawn set
+   therefore does exercise the hunger gain below 1.0, which the shipped set did not. No admission, no default.
+
+**Withdrawn:** "energy reaches zero before every first contact as before" -- it holds for the shipped-start `full`
+rooms only; 74 of 151 first contacts in this batch precede energy zero.
+
+**Withdrawn:** "Two of the six drawn rows (0 and 3) begin within a fruit's reach" -- neither row starts inside the
+feeding shell (0.0163 m and 0.0318 m against a 0.015 m feeding radius); they are counted in every drawn figure, not
+excluded.
 
 ## 5. Reproduction
 
@@ -165,15 +189,21 @@ PYTHONIOENCODING=utf-8 python scripts/plume_goal_only.py analyse --runs out/plum
 Committed: `out/plume-go/{batch.sh,jobs.json,predeclared.json}` and `out/plume-go/analysis/{runs,rows,compare,descriptive}.csv`,
 `analysis.md`, `summary.json`. Run JSONs, NPZs and consoles stay ignored (host paths).
 
-## 6. Author self-review (the independent skeptic pass is not this section)
+## 6. Author self-review (the independent skeptic pass is the section after the Report block below)
 
 - The family was frozen with signs; tests 1 and 4 are nulls under the declared rule although the samples separate
   fully -- the reference-SD z is the rule the round chose and the Welch t is printed beside it; the reader may weigh
   them, the audit does not upgrade them.
 - `fed_rows` is a count of six with a 15 s satiety ceiling (`feeding_s` 15.00 means "reached the meal length"), so
   ties and SD-0 arms are expected; test 5's `undetermined` is that, not a missing measurement.
-- Two drawn rows start on the fruit (item 3 above); the drawn half is weaker than designed and I say so rather than
-  re-drawing after the fact.
+- Two drawn rows start just outside a fruit -- row 3 at 0.0163 m and row 0 at 0.0318 m from the nearest fruit
+  surface, against the 0.015 m feeding radius -- and are fed in every arm and run (item 3 above); the drawn half is
+  weaker than designed and I say so rather than re-drawing after the fact.
+- The three arms are three cells of a 2 x 2: (bilateral goal, gain 5), (bilateral goal, gain 0) and (pre-correction
+  goal, gain 5). The fourth -- pre-correction goal with gain 0 -- is not in this batch; it exists only as
+  plume_steering.md's diagnostic (2 of 6, one draw, a different batch). So +5.83 and +1.33 are simple effects, not
+  main effects, and the +5.83 includes whatever the feedback costs when it chases a goal that does not point at
+  food. "Load-bearing" is a comparison of those two simple effects.
 - Six runs per arm are six draws of a non-repeating room; the brain seeds keep the draws honest, they do not
   identify anything.
 - The feedback-only arm uses the pre-correction goal law with the shipped 5 /s gain, the walking-goal arm the shipped
@@ -181,6 +211,11 @@ Committed: `out/plume-go/{batch.sh,jobs.json,predeclared.json}` and `out/plume-g
   `variant` field in every provenance record says which.
 - "Load-bearing" is a statement about these rooms with 19 odour sources and the 200x gradient; it is not a claim about
   a fly's olfactory steering.
+
+This is the author's review, not the independent skeptic pass. That pass ran on 2026-09-18 (Opus, verdict
+mostly sound for this audit); its verdict line and all ten of its claim lines are quoted verbatim in
+[Skeptic pass (independent, Opus, 2026-09-18)](#skeptic-pass-independent-opus-2026-09-18), after the Report
+block, and the corrections it required are applied above.
 
 ## Report
 
@@ -193,14 +228,18 @@ summary: |-
   6/6 in every run (first contact 27.8 +/- 1.9 s). Full minus feedback-only is +5.83 rows (result, Holm p 0.013);
   full minus goal-only is +1.33 rows (null under the reference-SD rule, though all six runs separate) and +1.19 Hz
   of DNa02 |L-R| (result) -- the feedback's contribution is the fly that starts facing away (row 3, 185 deg: goal-only
-  0/6 runs, full 6/6). Six drawn starts say the same with less range (full 6, goal-only 4.33, feedback-only 4.00 rows;
-  two drawn rows begin on a fruit). Every number is a mean over six non-repeating runs. No admission claim; the plume
-  law is unchanged; the variants are opt-in keywords recorded in describe().
+  0/6 runs, full 6/6; row 1 at 90 deg also fails in 2 of 6). Six drawn starts say the same with less range (full 6,
+  goal-only 4.33, feedback-only 4.00 rows; two drawn rows start just outside a fruit -- 0.0163 and 0.0318 m from the
+  nearest fruit surface against the 0.015 m feeding radius -- and are fed in every arm and run, so every drawn
+  fed_rows figure includes two rows no arm has to steer to). Every summary number is a mean over six non-repeating
+  runs; the per-row values are one draw each. No admission claim; the plume law is unchanged; the variants are opt-in
+  keywords recorded in describe(). The three arms are three cells of a 2 x 2 -- the (pre-correction goal, gain 0)
+  cell is not in this batch -- so these are simple effects, not main effects.
 key_claims:
 - feedback-only feeds 0.17 +/- 0.41 rows of six with the shipped starts; full minus feedback-only +5.83 rows, result.
 - goal-only feeds 4.67 +/- 0.52 rows at DNa02 |L-R| 0.62 Hz, inside the range the skeptic read as non-steering.
-- full minus goal-only +1.33 rows (null under the declared rule; all runs separate) and +1.19 Hz DNa02 |L-R| (result); the difference is the 185 deg row.
-- With the drawn starts full 6, goal-only 4.33, feedback-only 4.00 rows; two drawn rows start on a fruit.
+- full minus goal-only +1.33 rows (null under the declared rule; all runs separate) and +1.19 Hz DNa02 |L-R| (result); the difference is 1.00 row at 185 deg and 0.33 at 90 deg.
+- With the drawn starts full 6, goal-only 4.33, feedback-only 4.00 rows; two drawn rows start just outside a fruit (0.0163 / 0.0318 m from the surface against the 0.015 m feeding radius) and are fed in every arm and run.
 validation:
 - 36 runs, 36/36 consoles device cuda, NVIDIA B200 x 36, backend native, variant per arm verified in every provenance record, starts equal to the frozen list, 0 analysis problems.
 - Frozen before submission (out/plume-go/predeclared.json 2026-09-18T00:14:43Z; runs plume-go-c574f6 and plume-go-1c49fb).
@@ -210,4 +249,41 @@ recommendations:
 - The transduced-contrast law (the skeptics' follow-up 2) is the next question; the goal is where the steering is.
 open_questions:
 - Whether a walking goal read from ORN rates (not the physical field) still carries 4-5 rows of six.
+```
+
+
+## Skeptic pass (independent, Opus, 2026-09-18)
+
+An independent skeptic pass ran on 2026-09-18 (Opus, CPU only, no cluster job, nothing adopted). Its verdict line
+and its claim lines are quoted verbatim below. The CORRECTIONS REQUIRED list is applied in place in the sections
+above; where a correction replaced a sentence that stated a finding, the original sentence stays in the record
+marked **Withdrawn:** (INTERP 10.4 rule 29 iii). The pass's NOT CHECKED list is recorded verbatim with this
+round's entry in [receptor_verification.md](receptor_verification.md).
+
+One pass covered round-8 items 3 and 4 -- this audit and [instrumented_suite.md](instrumented_suite.md) -- and carried one verdict
+line per audit; the line for this audit is quoted below, and all ten claims are quoted in each of the two.
+
+### Verdict
+
+```text
+VERDICT
+- plume_goal_only: mostly sound
+
+All three analysis scripts reproduce their committed CSVs byte-for-byte on the CPU (suite_rows/runs/suite_table, room_runs/room_tests, plume compare/descriptive/rows/runs -- all diff-identical, 0 problems). Branch tests: 514 passed / 15 skipped / 220 subtests, 1 failure (test_connectome_data.py::test_loading_malecns_never_rewrites_cache) that is an artefact of the cache junction, not a branch defect; test_bit_identity.py and test_plume_variants_are_opt_in_and_recorded pass.
+```
+
+### Claims
+
+```text
+CLAIMS 1-10
+1. Suite half + instruments live -- confirmed, and NOT vacuous. Rebuilt the 29 x 6 status table from the JSONs: 27/0/2, 26/1/2, 27/0/2 under both presets, 0 status changes, taste.MN9_hz the only non-uniform row and bit-identical between presets at every seed (10.93417739868164 / 1.6904562711715698 / 3.1295931339263916) -- same seed (1) flips in both arms. Instruments provably active: (a) all 19 instrumented controllers carry the three records and the hold in lif.type_path_gain, cache md5 7a10d93b vs ef23cc27, nt_counts glutamate 29707->29711 / unknown 2361->2357 (the 4 GLNO cells); (b) the compass section moves hard -- during.PEN_hz raw 2.01/1.78/1.08 -> inst 7.72/7.66/7.22, rest_EPG_hz 0.000x3 -> 1.36/2.12/3.36, wedge_hz 61-67 -> 69-80, non-overlapping 3 v 3, exactly the direction of releasing the ExR6/ER6/ER4m hold, with wedge_cells_persisting still 0; (c) on rows that repeat bit-exactly under raw, raw vs instrumented still differ (bitter.shiu_sugar_MN9_hz all 3 seeds incl. 138.934->149.314; walk.power_max/sustained at s2). The audit reports none of (b) or (c). Adapter fix verified: attempt1 lost exactly the 8 named checks, attempt2 has 0 MISSING, the fix and its regression test are on the branch and pass. Re-freeze honest: the diff changes only stamped_utc and two script hashes; rule/jobs_sha256/batch_sha256 unchanged.
+2. Apples to apples on seeds/suite/check list -- yes; on instrument scope -- no. Same 29 keys in the same order, same draw seeds 0,1,2; the REFS criteria table untouched; raw column bit-identical on 18 of 29 rows including taste.MN9_hz s1 = 1.6904562711715698, the exact row the stand-in was rejected on. But compass wrote 50 Hz into 46 EPG cells in every brain (it perturbed even the B=1 probes: taste 10.934->2.479 at s0), whereas the round-8 list is bit-identical to raw on 8 of 29 rows by construction -- the afferent is body-less in the legacy probes and the hold/relabel are confined to the CX. Part of why it survives is that it is inert where the stand-in was not; the audit does not say this.
+3. Room rate-half -- reproduces exactly; one omission. Exposure 28,800 fly-s/arm verified; hops = escape + voluntary in all 12; 0 problems. The declared test is the two-sample exact Poisson = conditional binomial binomtest(K_inst, K_inst+K_raw, 0.5) one-sided (INTERP 10.4 rule 17) -- recomputed: 110 vs 101, 3.8194/3.5069 per 1,000, one-sided p 0.2910, two-sided 0.5819, run-level compare diff +1.500 z +0.437 p 0.9372 null; escape 42/39 p 0.4122; voluntary 68/62 p 0.3306. The pooled Poisson ignores run clustering, which makes the PASS conservative. Swept every row field: gf_max_hz is the one measure with a rank-test p below 0.05 (inst 31.4/31.6/30.8/33.6/33.2/35.8 vs raw 36.7/36.7/33.9/38.2/34.2/34.9; diff -3.01, z -1.79, Welch -2.94, MW p 0.0152; null under the z>=3 rule). The audit reports the walking-GF median instead and singles out meals (p 0.394) while never mentioning gf_max_hz. Everything else flat. Yaw SD and DNa02 rates are not in the room records at all.
+4. The gate is satisfied as written and the audit does not over-claim (one wording defect). PRESETS_SPEC 2.5: 3 draws, 0 changes, 6 runs, p 0.291. The declared touch set is a single row (conservative). Answer == Report.summary word-for-word; self-review labelled; "nothing adopted / raw stays default / law still unverified" all present. Only "this list, unlike the compass stand-in, moves no suite row" over-reaches: values move on 20 of 29 rows, statuses on none.
+5. Plume arm means and Holm family -- reproduce exactly. fed_rows recomputed from feeding_s >= 1.0 matches metrics.fed_rows in all 36 runs. feedback-only shipped 0.167+-0.408 at DNa02 1.972+-0.076; goal-only 4.667+-0.516 at 0.623+-0.097; full 6/6. t1 +1.3333 z +2.582 Welch +6.325 null; t2 +5.8333 z +14.289 result; t3 +1.1870 z +12.264 result; t4 +1.6667 z +2.041 null; t5 +2.0000 SD-0 undetermined; t6 -0.0905 p 0.5887 null; Holm 0.012987 (t1-t5) / 0.588745 (t6). Drawn starts reproduce exactly from numpy.random.default_rng(8). Orientation caveat correctly stated by the audit. Sound.
+6. "the feedback's share is the fly starting at 185 deg" -- true but incomplete. Goal-only shipped loses 8 row-instances, not 6: row 3 (185 deg) fails 6/6 and row 1 (90 deg) fails 2/6 (runs r1, r2). So row 3 is ~75% of the +1.333. Row 3 is confounded with env seed 3. The single feedback-only success is also row 3 (1.64 s, contact 58.4 s). With the drawn starts the never-fed goal-only row is row 4 (heading -87.9 deg, not "facing away"), so the mechanism does not carry over. The earlier skeptic's finding that the six shipped rooms are near-repeats is not carried forward.
+7. "two drawn rows start on a fruit" -- refuted as worded; counted, not excluded. fruit_distance = nearest-fruit-centre distance minus that fruit's radius; feeding is < 0.015 m. At t=0 the six drawn rows sit at 0.03184, 0.17550, 0.14324, 0.01633, 0.13898, 0.07716 m (identical in all 18 drawn runs; shipped rows all 0.226 m). Row 3 is 1.3 mm outside the feeding shell, row 0 is 2.1x the shell -- neither starts on a fruit. They are fed in all 18 drawn runs and are included in 6 / 4.333 / 4.000; the over-the-other-four figures (4/4, 2.33+-0.82, exactly 2) check out. One exception to "0.4-1.9 s in every arm and run": feedback-only drawn r1 row 0 first contacts at 13.11 s.
+8. The refutation is earned; the headline is a simple-effect claim, not a main effect. The three arms are the (new goal, gain 5), (new goal, gain 0) and (old goal, gain 5) cells of a 2x2; the (old goal, gain 0) cell is absent, so the interaction is unidentified. Goal-only keeps everything and sets steering_integral_gain_per_s to 0 so steer_input = clip(80*turn, +-80); feedback-only keeps gain 5 and skips exactly one line (the local goal copy), falling back to the pre-correction upwind/entry-memory goal. So +5.83 is "swap the goal given gain 5" and contains whatever harm the servo does when chasing a bad goal -- an upper bound on the goal's share. Nonetheless the core refutation stands: the earlier skeptic predicted a goal-only arm "would probably still show 0.28-0.69 Hz DNa02 differences" and inferred the feedback was load-bearing; goal-only shows 0.623+-0.097 Hz and still feeds 4.67 of 6, so the prediction was right and the inference is refuted.
+9. Determinism-gate compliance -- two defects. (a) Section 2 declares "every number below is a mean +/- SD over runs and nothing is quoted beyond that", but section 3.3 quotes 36x6 single-draw values and section 4 items 1/2/4 quote single draws. Legitimate under rule 28 (pasted from rows.csv) and item 4 labels its numbers "one draw" -- but the blanket sentence is false. (b) "energy reaches zero before every first contact as before" is FALSE here. zero_energy_s spans 17.81-19.57 s and only 143 of 216 rows reach 0 at all; 74 of 151 first contacts precede energy zero (full drawn 28/36 at 0.4-14.0 s; goal-only shipped 7/28 at 16.6-18.0 s; goal-only drawn 15/26; feedback-only drawn 24/24). Only shipped-start full and feedback-only satisfy the old statement.
+10. Code -- clean. PlumeNavigation(c, *, feedback_gain_per_s=None, walking_goal=True); the diff from the merge base is two kwargs, three parameters entries and one if self._walking_goal: guard. The integral reads self.parameters["steering_integral_gain_per_s"], literally 5.0 for bare plume, so bare plume is arithmetically unchanged; test_bit_identity.py passes and test_plume_variants_are_opt_in_and_recorded asserts the shipped parameters. Grammar plume:feedback=0 / plume:walking_goal=0 with the three ValueError cases tested. describe() records variant / walking_goal_enabled / steering_integral_gain_per_s -- verified in all 36 plume records and the suite/room records. Stamps precede runs in all three batches. No infrastructure identifiers in the branch diff. Answer == Report.summary in instrumented_suite.md; plume_goal_only.md uses "## 4. Reading" with no Answer section, matching determinism_gate.md, and its summary's claims all check out. Self-review labelled in both. Integration note: feat/round8 branched at a455bcf and main has since merged astra/plume-transduced, which gives PlumeNavigation.__init__ an incompatible signature (bilateral=, feedback=) -- flyverse/navigation.py and flyverse/instruments.py will conflict on merge and the two feedback semantics need reconciling.
 ```

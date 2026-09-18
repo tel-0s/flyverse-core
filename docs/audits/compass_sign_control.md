@@ -22,7 +22,10 @@ job lines are `cx_velocity_route.arm_command` / `job_line` verbatim (`out/cx9/ba
 
 Six seeds (0-5) per arm, 18 jobs, one `cluster_run.py` call, every job pinned to one GPU of the pool 4-7 of the second
 node (`--gpu-ids 4,5,6,7 --node <cluster-node-2>`), `--ship flyverse,scripts` because the box checkout is behind
-`origin/main` ([determinism_gate.md](determinism_gate.md) section 2).
+`origin/main` ([determinism_gate.md](determinism_gate.md) section 2). The instrument's own status is a stop-gap:
+`sided_turn_afferent` declares `kind` stop-gap with an `unverified` gain (`docs/PRESETS_SPEC.md` section 3,
+`flyverse/instruments.py`), so "the GLNO side report follows the afferent's sign" is a statement about this
+instrument on this ring and cannot be read as a claim about the fly.
 
 ## 2. Predeclaration (`out/cx9/predeclared.json`, stamped 2026-09-17T23:43:39Z; submitted as run `cx9-2daa4d` at ~23:44Z)
 
@@ -49,7 +52,9 @@ source file at the predeclared hash, wall 40.5-96.0 s. The scheduler listed 16 j
 `failure_class infrastructure` ("Failed to get PID from job launch", empty pid file, "no logs available") -- jobs 5
 and 6, `V-_s1` and `S_s2`; both job scripts nevertheless ran to the end on the node: their consoles say `device
 cuda`, their JSON rows carry all 800 frames and their ledger NPZs exist, and the analysis's per-run checks pass them.
-The receipt is therefore 18 valid runs by content and 16 + 2 by the scheduler's own accounting.
+The receipt is therefore 18 valid runs by content and 16 + 2 by the scheduler's own accounting. The scheduler's
+receipt was not fetched as a file into `out/cx9/` (INTERP 10.4 rule 21); the job indices and arms are corroborated
+by `client_stdout_0.txt` (`cx9-2daa4d-5` = `V-_s1`, `-6` = `S_s2`), which is ignored.
 
 ### 3.1 The family (`compare.csv`)
 
@@ -73,7 +78,9 @@ Primary 1's z (-1557) is the -2.0665 Hz difference divided by S's near-zero SD (
 
 The pedestal is the point: V's +2.2183 Hz is GLNO_L 2.59 over GLNO_R 0.37; V-'s -2.0665 Hz is GLNO_R 2.09 over GLNO_L
 0.02, and V-'s GLNO_L values equal S's GLNO_L values exactly in all six seeds (0.0000, 0.0005, 0.1101, 0.0011, 0.0002,
-0.0010; `per_seed.csv`) -- the side the flipped afferent does not drive is untouched, seed for seed. The afferent
+0.0010; `per_seed.csv`) -- the side the flipped afferent does not drive is untouched, seed for seed. That statement
+holds for V- and not for V: V's GLNO_R equals S's in only three of six seeds (2, 3, 5), the other three reading
+0.3316 / 1.3144 / 0.4936 against S's 0.0018 / 0.0020 / 0.0000 (`per_seed.csv`). The afferent
 (AFF) and PS196_b reports mirror to within their scatter (42.61 / 0.00 -> 0.00 / 44.25; 0.00 / 18.16 -> 18.01 / 0.00);
 the GLNO response is 7 % smaller in the flipped direction (2.07 vs 2.22 Hz), a difference well inside the
 across-seed SDs (0.65 / 0.75) and given no verdict. PEN L-R and DNa02 L-R are as in round 7: at the pedestal
@@ -107,7 +114,11 @@ DNa02 L-R, DNa02 L and R and frac_confined_post are 0.0000 in all 18 runs (`per_
 ### 3.4 Replication of cx8r (`replication.csv`)
 
 cx8r's S and V ran on node 1 on 2026-09-15; cx9's ran on node 2 on 2026-09-17 from a different submission. **76 of
-76 (arm, key) rows are exactly equal in all six seeds** (every one of the 38 keys of both arms; max |diff| 0). With
+76 (arm, key) *metric* rows are exactly equal in all six seeds** (every one of the 38 keys of both arms; max |diff|
+0): `replication.csv` compares the run JSON's 38 keys; the ledger arrays are not compared by it. The skeptic pass
+extended the check: the 384 ledger arrays of the 12 S / V runs are bit-equal too (31 per S run, 33
+per V run), and the full numeric record matches 6894 of 6906 leaves, the 12 differences being solely
+`provenance.source_fingerprint.n_files` (55 vs 53, a `--ship` bookkeeping artefact). With
 [determinism_gate.md](determinism_gate.md)'s same-GPU repeat this makes the cx_wedge protocol reproduced exactly in
 three draws across two nodes and three submissions. It is recorded as an observation about the software; no verdict
 above rests on it, and it says nothing about any room (which repeats nowhere).
@@ -118,10 +129,17 @@ The GLNO side report follows the afferent's sign where round 7 measured it: with
 ring, sign -1 gives GLNO L-R -2.0665 +/- 0.6461 Hz against S's 0.0000 +/- 0.0013 (result, Holm p 0.0065), V minus V- is
 +4.2848 Hz (result), and the PS196_b report reverses with it (-36.1679 Hz, result); all six seeds separate in each
 test. The response is one-sided at the pedestal: V- drives GLNO_R (2.09 Hz) and leaves GLNO_L exactly at S's values
-in every seed, the mirror of V (GLNO_L 2.59 / GLNO_R 0.37). This closes the sign-specificity gap of round 7's primary 3
-for the unheld ring only. It does not touch the held arms: HGV-'s non-reversal (+0.69 +/- 1.91 Hz) stands as
-measured, so what the hold plus relabel does to the crossing is still open; nothing here is a bump, a following
-compass, a receptor sign or an adoption. cx9's S and V reproduce cx8r's values exactly in 76/76 rows across two nodes.
+in every seed; V is the same picture with the sides exchanged (GLNO_L 2.59 / GLNO_R 0.37), but not exactly: V's
+GLNO_R equals S's in only three of six seeds (2, 3, 5) -- 0.3316 / 1.3144 / 0.4936 against S's 0.0018 / 0.0020 /
+0.0000 in the others -- so the untouched-side statement holds for V- and not for V. This closes the sign-specificity
+gap of round 7's primary 3 for the unheld ring only. It does not touch the held arms: HGV-'s non-reversal (+0.69 +/-
+1.91 Hz) stands as measured, so what the hold plus relabel does to the crossing is still open; nothing here is a
+bump, a following compass, a receptor sign or an adoption. cx9's S and V reproduce cx8r's values exactly in 76/76
+metric rows across two nodes.
+
+**Withdrawn:** "the mirror of V (GLNO_L 2.59 / GLNO_R 0.37)" as an exact mirror -- V's GLNO_R equals S's in only
+three of six seeds; and "76 of 76 (arm, key) rows are exactly equal in all six seeds" without "metric" --
+`replication.csv` compares the run JSON's 38 keys per arm and no array.
 
 ## 5. Reproduction
 
@@ -133,13 +151,15 @@ Committed: `out/cx9/{batch.sh,arms.json,predeclared.json}` and `out/cx9/analysis
 `analysis.md`, `analysis.json`. The run JSONs, NPZs and consoles stay ignored (host paths). cx8r's runs are read from
 `out/cx8r/` (ignored; the owner's copy).
 
-## 6. Author self-review (the independent skeptic pass is not this section)
+## 6. Author self-review (the independent skeptic pass is the section after the Report block below)
 
 - The three primaries are the ones frozen; the sign rule (`result, opposite sign`) was frozen with them and did not
   bite. Holm m = 3 over p = 0.0022 x 3 gives 0.0065 for all three: the exact-U floor, as expected for fully separated
   6 v 6 samples; nothing finer than "separated" is claimed.
 - `compare`'s z is orientation-dependent (the round-7 skeptic's point); the Welch t is printed beside it and the
-  verdicts also hold in the symmetric reading (|t| 7.8-47.6).
+  verdicts also hold in the symmetric reading (|t| 7.8-47.6); reversing the arms in `compare` itself gives |z| 3.20,
+  5.72 and 20.78 -- all still `result`, but primary 1 clears the |z| >= 3 gate by 0.20, where round 7's primary 3
+  reversed gave 2.963 and became null.
 - The 7 % asymmetry between |V| and |V-| at GLNO is inside the SDs and is not read; a reader who wants it tested needs
   a declared contrast, not this one.
 - "V-'s GLNO_L equals S's GLNO_L exactly" is a statement about identical draws on a repeating protocol, not a
@@ -151,6 +171,11 @@ Committed: `out/cx9/{batch.sh,arms.json,predeclared.json}` and `out/cx9/analysis
   cross-hardware claim.
 - Nothing adopted; raw untouched; no default changed; no compass room follows from this.
 
+This is the author's review, not the independent skeptic pass. That pass ran on 2026-09-18 (Opus, verdict
+mostly sound for this audit); its verdict line and all ten of its claim lines are quoted verbatim in
+[Skeptic pass (independent, Opus, 2026-09-18)](#skeptic-pass-independent-opus-2026-09-18), after the Report
+block, and the corrections it required are applied above.
+
 ## Report
 
 ```yaml
@@ -159,15 +184,18 @@ summary: |-
   ring, sign -1 gives GLNO L-R -2.0665 +/- 0.6461 Hz against S's 0.0000 +/- 0.0013 (result, Holm p 0.0065), V minus V- is
   +4.2848 Hz (result), and the PS196_b report reverses with it (-36.1679 Hz, result); all six seeds separate in each
   test. The response is one-sided at the pedestal: V- drives GLNO_R (2.09 Hz) and leaves GLNO_L exactly at S's values
-  in every seed, the mirror of V (GLNO_L 2.59 / GLNO_R 0.37). This closes the sign-specificity gap of round 7's primary 3
-  for the unheld ring only. It does not touch the held arms: HGV-'s non-reversal (+0.69 +/- 1.91 Hz) stands as
-  measured, so what the hold plus relabel does to the crossing is still open; nothing here is a bump, a following
-  compass, a receptor sign or an adoption. cx9's S and V reproduce cx8r's values exactly in 76/76 rows across two nodes.
+  in every seed; V is the same picture with the sides exchanged (GLNO_L 2.59 / GLNO_R 0.37), but not exactly: V's
+  GLNO_R equals S's in only three of six seeds (2, 3, 5) -- 0.3316 / 1.3144 / 0.4936 against S's 0.0018 / 0.0020 /
+  0.0000 in the others -- so the untouched-side statement holds for V- and not for V. This closes the sign-specificity
+  gap of round 7's primary 3 for the unheld ring only. It does not touch the held arms: HGV-'s non-reversal (+0.69 +/-
+  1.91 Hz) stands as measured, so what the hold plus relabel does to the crossing is still open; nothing here is a
+  bump, a following compass, a receptor sign or an adoption. cx9's S and V reproduce cx8r's values exactly in 76/76
+  metric rows across two nodes.
 key_claims:
 - V- minus S GLNO L-R -2.0665 Hz, result (Holm p 0.0065, Welch t -7.83, all six separated), the predicted sign.
 - V minus V- GLNO L-R +4.2848 Hz and PS196b L-R -36.1679 Hz, both results with the predicted sign.
-- The flipped afferent drives the other side and leaves the unstimulated side at S's exact values (pedestals quoted).
-- cx9's S and V equal cx8r's in 76/76 (arm, key) rows across two nodes; recorded as an observation.
+- The flipped afferent drives the other side and leaves the unstimulated side at S's exact values (pedestals quoted); V is the sides exchanged but not exactly -- V's GLNO_R equals S's in three of six seeds.
+- cx9's S and V equal cx8r's in 76/76 (arm, key) metric rows across two nodes (replication.csv compares the 38 JSON keys, not the arrays); recorded as an observation.
 validation:
 - 18 runs, 18/18 consoles device cuda, NVIDIA B200 x 18, cache ef23cc27 x 18, resolved LIF equal to the frozen record, every loaded source at the predeclared hash, 0 analysis problems.
 - Frozen before submission (out/cx9/predeclared.json 2026-09-17T23:43:39Z; run cx9-2daa4d).
@@ -175,5 +203,43 @@ validation:
 recommendations:
 - Nothing adopted; the held-arm crossing (HGV-) is the remaining sign question and needs its own declared arm pair.
 open_questions:
-- Why the hold plus relabel removes the sign specificity that the unheld ring shows.
+- Whether the hold plus relabel removes the sign specificity the unheld ring shows: HGV vs HGV- on GLNO L-R is a null in cx8r (+3.1092 Hz, z +1.625, p 0.0260, not separated), so the held arms' non-reversal is an unresolved contrast, not a demonstrated absence.
+```
+
+
+## Skeptic pass (independent, Opus, 2026-09-18)
+
+An independent skeptic pass ran on 2026-09-18 (Opus, CPU only, no cluster job, nothing adopted). Its verdict line
+and its claim lines are quoted verbatim below. The CORRECTIONS REQUIRED list is applied in place in the sections
+above; where a correction replaced a sentence that stated a finding, the original sentence stays in the record
+marked **Withdrawn:** (INTERP 10.4 rule 29 iii). The pass's NOT CHECKED list is recorded verbatim with this
+round's entry in [receptor_verification.md](receptor_verification.md).
+
+One pass covered round-8 items 1 and 2 -- this audit (batch `det1`) and
+[determinism_gate.md](determinism_gate.md) (batch `cx9`) -- and carried one verdict line per audit; the line for this audit is
+quoted below, and all ten claims are quoted in each of the two.
+
+### Verdict
+
+```text
+VERDICT
+- compass_sign_control: mostly sound
+
+Both audits' quantitative content reproduced exactly; every correction below is documentation-level or an under-statement, none overturns a verdict.
+```
+
+### Claims
+
+```text
+CLAIMS 1-10
+1. det1 cxS "31/31 arrays, 546/546 metrics" -- REPRODUCED; GPU-id provenance REFUTED in part. Own comparator gives cxS 31/31 arrays and 532/532 numeric leaves equal (booleans dropped), max |d| 0. Re-running `determinism_gate.py analyse` reproduces pairs.csv / arrays.csv / runs.csv byte-identically, 0 problems; summary.json.analysis_sha256 = LF sha256 of the script at HEAD. Same GPU: the eight room runs record cuda_visible_devices 5,5/6,6/7,7/4,4 -- both runs of each pair on one id. cxS records no GPU id at all: runs.csv rows cxS_r1/r2 have the field empty, summary.json has "cuda_visible": [null, null]; "id 4" comes only from the client log. Shipped source: the loaded-file check recomputed for all 10 runs against predeclared.json.source_sha256_lf (73 paths) -- 0 stale, no CRLF fallback needed; but 3 loaded paths are outside the predeclared set and silently skipped (flyverse/data/manifest.json, scripts/interp_export.py, scripts/probe_object_sweep.py). The four stale box files, recomputed from out/det1_attempt1: flyverse/compass.py, fly.py, instruments.py, navigation.py -- as stated (the attempt-1 room runs also show scripts/determinism_gate.py, which changed at the third stamp).
+2. "Every B=6 room pair is one draw; native 4/30, torch 86/60" -- REPRODUCED, and the divergence IS partly localisable. Frames 4/30/60/86 confirmed. The first difference in every pair is exactly +-1 spike in exactly one of six rows (plume_native row 0 @30, plume_torch row 4 @60, raw_native row 5 @4, raw_torch row 0 @86); that row's body follows 1-51 frames later, its antenna/plume columns later still, and the other five rows stay bit-identical for a further 215-329 frames. So the source is upstream of the body integrator and of the air/odour field. New CPU control: the same B=6 raw room (world + optics + body, torch flags) run 120 frames in two separate processes on the CPU is bit-equal in body, cumulative spikes and the full v and g tensors (max |d| 0), with Python hash randomisation on -- this excludes an RNG-seeding or dict/set-ordering bug in the Python layer; the non-repeat is CUDA-kernel-level. Two mechanisms visible in the repo: flyverse/kernels/neural.cu:122 uses a float atomicAdd in the event-scatter kernel (cuda.event_scatter), order-nondeterministic by construction -- a sufficient mechanism for the native path; and the torch path's Brain._matmul_add cuSPARSE CSR SpMM, deterministic at B=1 (cxS repeats) but B=6 in the room. Also: scripts/benchmark.py --deterministic already sets torch.use_deterministic_algorithms(True) + CUBLAS_WORKSPACE_CONFIG=:4096:8 -- the gate's own open question has an existing, unused knob. "Not localised" is honest but understated.
+3. Frozen-before-results -- CONFIRMED from git. Stamps 23:14:57Z / 23:17:01Z / 23:31:08Z = commits c4fbb9d / 091e268 / 2d70edb. The comparison_rule (which contains decision_for_items_3_and_4) hashes identically across all three (5fcecaa5...), as do pairs -- the decision was frozen at the first stamp, before attempt 1 and the valid submission. Runs loaded determinism_gate.py at the third stamp's hash; room() unchanged after the runs. The audit applies the decision to itself.
+4. Three re-freezes / superseded data -- RECORDED, two defects. (a) The stated reason for the third re-stamp is partly wrong: git diff 2d70edb^..2d70edb adds only the loaded-source check; runs.csv was added later, in the post-run analysis commit 113f737. (b) out/det1_attempt1/ is untracked -- kept, unused, but not reproducible by a reader. The scheduler caveat IS stated in sections 2 and 4.4 and the audit never quotes "0 failed" as evidence -- but no scheduler receipt file was fetched into out/det1/ or out/cx9/ (INTERP 10.4 rule 21); only the gitignored client console.
+5. cx9 three primaries -- REPRODUCED exactly, including against the MAIN checkout's out/cx8r. -2.0665 / Holm 0.0065 / Welch -7.83; +4.2848 / +6.63 / +10.61; -36.1679 / -54.66 / -47.58; all separated; 18 runs, 0 problems; compare.csv/descriptive.csv/per_seed.csv/replication.csv/runs.csv byte-identical to the committed ones. Family satisfiable (6v6 floor 0.0021645 x 3 = 0.0065). Bit-equality confirmed at full precision: V-'s GLNO_L_hz_turn = S's to the last bit in all six seeds; 96 of 138 numeric metrics are exactly equal V- vs S in all six seeds. Arm reversal survives all three (reversed z = +3.20, -5.72, +20.78, all still result) -- but primary 1 clears |z| >= 3 by only 0.20, where round 7's analogous primary 3 reversed gave 2.963 and flipped to null. The "mirror of V" is overstated: V's GLNO_R equals S's exactly in only 3 of 6 seeds (2,3,5); seeds 0/1/4 give 0.3316/1.3144/0.4936 vs S's 0.0018/0.0020/0.0000.
+6. "76/76 rows equal across two nodes" -- TRUE, but a METRICS-ONLY check, and understated. replication.csv compares the run JSON's 38 KEYS x 2 arms = 76 rows; no array is compared. Reproduced against D:\Projects\flyverse\out\cx8r, max |diff| 0. Extended: the ledger NPZs are bit-equal too -- 384/384 arrays over the 12 S/V runs (31 per S run, 33 per V run), and the full numeric JSON record matches 6894/6906 leaves, the 12 differences being solely provenance.source_fingerprint.n_files (55 vs 53, a --ship bookkeeping artefact).
+7. The two failed/infrastructure runs -- COMPLETE and not treated differently. V-_s1 and S_s2: device cuda, NVIDIA B200, frames 800, ledger NPZ present (33 and 31 arrays), cache md5 ef23cc27..., wall 75.7 / 40.5 s, consoles end with the full closing summary line, checks column empty. load_runs globs *_s*.json and applies identical checks. Caveat: cx_wedge records carry no timestamp at all. Dropping both seeds: all three still result (5v5 -2.1246; 6v5 +4.3432; 6v5 -36.3768), all separated, Holm 0.013. Job indices corroborated by the client log (cx9-2daa4d-5 = V-_s1, -6 = S_s2), but the receipt itself is in no file.
+8. Scope of the inference -- CORRECT in section 4, OVERREACHED once in the Report. Three unheld, unrelabelled arms can only speak to the unheld ring, and section 4 says exactly that. Section 4 "Answer" == Report summary verbatim (925 chars each). But Report open_questions says "Why the hold plus relabel removes the sign specificity...", which presupposes a removal that is not established: recomputed from out/cx8r, HGV vs HGV- on GLNO_LR_hz is a null by the project's own rule (diff +3.1092, z +1.625, p 0.0260, not separated; HGV +3.7955 +- 1.8362 vs HGV- +0.6862 +- 1.9132, HG +2.5705 +- 1.2286).
+9. Rule checks -- PASS. 14/14 spot-checked per-seed/per-run values re-derived from the run JSONs (10 cx9 + 4 det1) match at the stated precision; det1's cxS GLNO_LR -0.001827 / PEN_LR 0.032198 / survival 0.0 identical in both runs and bit-equal to cx9's S_s0. Stamps precede runs (det1 23:31:08Z vs runs 23:32-23:36Z; cx9 23:43:39Z vs 23:46-23:47Z). Holm families satisfiable. git diff a455bcf..1972568 scanned for hostnames / IPs / beegfs / /mnt / ssh / user@host: zero hits. No commit ids are quoted in either audit -- note INTERP rule 30 exists on main but not on this branch, so re-check on merge. No unfilled ALL_CAPS placeholders. Both self-review sections carry "(the independent skeptic pass is not this section)". The items 1-2 commits (9f93871..6111bbc) touch no file under flyverse/ -- "nothing adopted" is verifiable.
+10. Tool changes -- SOUND, with two unrecorded consequences. tests/test_cluster_run.py: 52 passed. --gpu-ids: validated before anything ships (rejects "", "4,x", "-1", "4,4"); round-robin pool[i % len(pool)] in command order; gpus: 1 + gpu_ids: [id] set only with the flag, vram_gb untouched, and with no flag no gpu_ids key and no "gpu pool" log line. Empirically honoured (det1 requested 4,5,6,7,4 and the room runs recorded CUDA_VISIBLE_DEVICES 5,6,7,4; cx9's 18 jobs end at [gpu 5]). "The scheduler treats gpu_ids as a strict pin" is an assertion about the scheduler that neither the tests nor the tool can enforce; a pool smaller than the job count means jobs share a GPU (det1 5/4, cx9 18/4). --ship does loosen "checkout == provenance" -- the run tree is a hybrid (box checkout + local diff + all tracked files under the shipped paths), recorded as source_fingerprint.git.commit = "unknown", identity falling back to content (rule 6). What shipped is NOT recorded in any run's provenance: the only record is a truncated client-console line in a gitignored file. Second limitation: the overlay only copies -- a file deleted locally but present on the box is never removed, so --ship can only bring a stale box tree closer, never make it equal.
 ```

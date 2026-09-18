@@ -56,10 +56,22 @@ the hold in `config.type_path_gain`).
 
 **No row changes status in any draw.** The only row whose statuses are not uniform is `taste.MN9_hz` (FAIL in draw 1
 under both presets, 1.69046 Hz against `> 2`): raw's own instability, identical under the instruments, reported and not
-counted. The compass row is KNOWN GAP (0 persisting cells) in all six runs. The raw tallies and values reproduce
-compass_standin's raw column exactly on eight rows (rest, taste, smell, dn, walk.GF_max, bitter.calibrated -- the B=1
-legacy probes; these repeat like cx_wedge does) and differ on the room-derived rows (walk.power, loom, rotate,
-walk_gf, loom_escape), as determinism_gate.md says they must.
+counted. The compass row is KNOWN GAP (0 persisting cells) in all six runs. The raw column reproduces exactly on 18
+of the 29 rows and differs on 11, both against compass_standin's raw column and against this batch's own first
+submission (a same-code repeat of the raw arm: `out/suite-inst_attempt1`). The 11 that do not repeat are
+loom.GF_peak, rotate.DNp20, motion.min_dsi, loom_escape.GF_peak, walk_gf.p99, rotation.group_flip, object.LC10a,
+wind.DNp18, wind.DNp33 and the two odour rows. walk.power_max / power_sustained and the two bitter.shiu rows repeat
+exactly, so the raw-vs-instrumented differences there (walk.power at seed 2; shiu at all three seeds, 138.934 ->
+149.314 at seed 1) are attributable to the instruments, not to the non-repeating path. Note that walk.power, loom
+and rotate come from the legacy B=1 `sec_walk` probe, not from a room section, and that flyverse/fly.py, modules.py,
+instruments.py, compass.py and batch_sim.py changed between compass_standin's commit and this branch, so the
+cross-batch differences are not attributable to determinism_gate.md alone.
+
+**Withdrawn:** "The raw tallies and values reproduce compass_standin's raw column exactly on eight rows (rest,
+taste, smell, dn, walk.GF_max, bitter.calibrated -- the B=1 legacy probes; these repeat like cx_wedge does) and
+differ on the room-derived rows (walk.power, loom, rotate, walk_gf, loom_escape), as determinism_gate.md says they
+must." -- the repeat set is 18 of 29 rows, the non-repeating rows are not the room-derived ones, and five package
+files changed between the two batches.
 
 Per row, values by draw seed [0, 1, 2] and statuses (`out/suite-inst/analysis/suite_rows.csv`, columns `value`,
 `status`; pasted, INTERP 10.4 rule 28; P PASS, F FAIL, G KNOWN GAP):
@@ -96,6 +108,12 @@ Per row, values by draw seed [0, 1, 2] and statuses (`out/suite-inst/analysis/su
 | odour.apple_channel_clean_hz (<= 6) | 4.40823, 4.39386, 4.68342 | 4.39271, 4.25439, 4.48907 | PPP / PPP |
 | compass.wedge_cells_persisting (>= 6) | 0, 0, 0 | 0, 0, 0 | GGG / GGG (declared gap row) |
 
+The compass section's own rates show the hold acting: during the 2 s wedge drive, PEN_hz is 2.01 / 1.78 / 1.08 under
+raw and 7.72 / 7.66 / 7.22 under the instruments, rest_EPG_hz 0.000 x 3 against 1.36 / 2.12 / 3.36, wedge_hz 61-67
+against 69-80 -- three draws against three with no overlap -- while wedge_cells_persisting stays 0 in all six. The
+"no status change" result is therefore not vacuous: the ring's operating state moves substantially and no check
+changes status.
+
 Suite verdict: **admissible by the suite half** (no status change outside the declared gap rows); the room rate-half
 is owed and was run.
 
@@ -120,14 +138,24 @@ wall 2,251-2,400 s.
 | escape | descriptive | 42 | 39 | 1.458 / 1.354 | 0.412 | 0.824 | null (diff +0.50, z +0.21, p 0.818) | 5, 7, 5, 7, 7, 11 | 4, 8, 6, 10, 7, 4 |
 | voluntary | descriptive | 68 | 62 | 2.361 / 2.153 | 0.331 | 0.661 | null (diff +1.00, z +0.83, p 1.000) | 13, 9, 7, 10, 10, 19 | 9, 10, 11, 12, 11, 9 |
 
-**Rate-half verdict: PASS -- the instrumented take-off rate is not higher (one-sided exact p 0.291).** Undeclared
-descriptives from the same runs (`room_runs.csv`, run lists in seed order; a 6 v 6 `compare` each, none a verdict):
+**Rate-half verdict: PASS -- the instrumented take-off rate is not higher (one-sided exact p 0.291).** Descriptives
+from the same runs (meals, path and the walking-GF median are named in `predeclared.json`'s `rule.descriptive`; rows
+at the GF threshold is not) (`room_runs.csv`, run lists in seed order; a 6 v 6 `compare` each, none a verdict):
 meals instrumented 1, 1, 2, 2, 4, 4 against raw 4, 7, 1, 6, 7, 0 (diff -1.83, z -0.60, p 0.394, null); path m 3.705,
 3.695, 3.663, 3.708, 3.635, 3.696 against 3.602, 3.610, 3.703, 3.678, 3.617, 3.693 (null); walking-GF median Hz 30.15,
 30.80, 31.07, 31.51, 30.80, 33.37 against 31.03, 32.64, 31.04, 32.12, 31.36, 31.48 (null); rows at the GF threshold 3,
 6, 3, 5, 6, 9 against 4, 7, 5, 7, 7, 4 (null). The meals difference is the one a reader should look at: it is not part of
 the rule, it is null at 6 v 6, and it is the kind of thing the rule's "rows the instrument is declared to touch" does
 not cover (the hold and the relabel change the ring's operating state in a room the compass program `cx` steers).
+
+The per-row maximum GF rate (gf_max_hz, including airborne frames) is the descriptive that moves most: 31.4, 31.6,
+30.8, 33.6, 33.2, 35.8 Hz instrumented against 36.7, 36.7, 33.9, 38.2, 34.2, 34.9 raw (diff -3.01, z -1.79, Welch
+-2.94, exact U p 0.0152; null under the z >= 3 rule). It is undeclared, it is the only measure in the set with a
+rank-test p below 0.05, and it belongs on the record beside meals.
+
+**Withdrawn:** "Undeclared descriptives from the same runs" as a description of meals, path and the walking-GF
+median -- all three are named in `predeclared.json`'s `rule.descriptive`; only rows at the GF threshold (and
+gf_max_hz) are undeclared.
 
 ## 4. Answer
 
@@ -136,10 +164,14 @@ status in three instrumented draws beside three raw draws (27/0/2, 26/1/2, 27/0/
 uniform row, taste.MN9_hz, is raw's own instability and identical under the instruments; the compass row stays KNOWN
 GAP), and the room rate-half at six seed-matched runs per arm passes: 110 take-offs against 101 over 28,800 fly-s each
 (3.82 vs 3.51 per 1,000 fly-s; one-sided exact p 0.291; run-level null). The expected rejection did not come: this
-list, unlike the compass stand-in, moves no suite row. Admissible is all it is -- nothing is adopted, `raw` stays the
-default, the afferent's law is still `unverified` and the relabel still has no transmitter source; and a fewer-meals
-descriptive (1-4 against 0-7 per run, null at 6 v 6) is on the record for the next reader. The first submission's
+list, unlike the compass stand-in, moves no suite row's status (values move on 20 of the 29 rows; 8 rows are
+bit-identical to raw). Admissible is all it is -- nothing is adopted, `raw` stays the default, the afferent's law is
+still `unverified` and the relabel still has no transmitter source; and a fewer-meals descriptive (1-4 against 0-7
+per run, a predeclared descriptive, null at 6 v 6) is on the record for the next reader. The first submission's
 instrumented draws lost eight checks to a benchmark adapter gap (fixed, tested, re-frozen, re-run).
+
+**Withdrawn:** "this list, unlike the compass stand-in, moves no suite row." -- values move on 20 of the 29 rows;
+what does not move is any row's status.
 
 ## 5. Reproduction
 
@@ -153,7 +185,7 @@ Committed: `out/suite-inst/{batch.sh,jobs.json,predeclared.json}`, `out/suite-in
 `out/suite-inst-room/analysis/{room_runs,room_tests}.csv`, `room_analysis.md`, `room_summary.json`. Run JSONs and
 consoles stay ignored (host paths); attempt 1 under `out/suite-inst_attempt1/`, ignored.
 
-## 6. Author self-review (the independent skeptic pass is not this section)
+## 6. Author self-review (the independent skeptic pass is the section after the Report block below)
 
 - The suite half's rule is the status rule the round inherited; it has no power against a value that moves inside a
   PASS band (loom.GF_peak_hz 52.9 -> 45.5 in draw 2; walk_gf.p99 22.5 -> 16.3 / 13.5 -> 25.9), and these rows do not
@@ -164,12 +196,21 @@ consoles stay ignored (host paths); attempt 1 under `out/suite-inst_attempt1/`, 
   afferent in the legacy probes would need a body it does not have.
 - The rate-half's direction is one-sided by the frozen rule (more take-offs = worse); a two-sided reading gives
   p 0.58 and changes nothing. Six seed-matched runs per arm is the rule-17 replication.
-- The meals descriptive was not declared; it is reported with its run lists and its null and is not turned into a
-  finding after the fact.
+- Meals, path and the walking-GF median are declared descriptives (`rule.descriptive`); rows at the GF threshold
+  and gf_max_hz are not. All are reported with their run lists and their nulls and none is turned into a finding
+  after the fact. (**Withdrawn:** "The meals descriptive was not declared" -- it is named in `predeclared.json`.)
+- The hold and the relabel are shown to act (the compass PEN / rest-EPG rates, and the bitter.shiu and walk.power
+  rows that repeat under raw). The afferent is not: no run record carries its rate, so both halves establish that it
+  was attached, not that it fired.
 - Two submissions for the suite half: the first's instrumented draws were invalid for a reason that is now a test;
   the raw draws of both submissions carry the same B=1 legacy values (they repeat) and different room values (they do
   not); the second submission is the one analysed, whole.
 - "Admissible" means the PRESETS_SPEC gate; it does not mean the afferent's gain, the hold or the relabel are right.
+
+This is the author's review, not the independent skeptic pass. That pass ran on 2026-09-18 (Opus, verdict
+mostly sound for this audit); its verdict line and all ten of its claim lines are quoted verbatim in
+[Skeptic pass (independent, Opus, 2026-09-18)](#skeptic-pass-independent-opus-2026-09-18), after the Report
+block, and the corrections it required are applied above.
 
 ## Report
 
@@ -180,15 +221,16 @@ summary: |-
   uniform row, taste.MN9_hz, is raw's own instability and identical under the instruments; the compass row stays KNOWN
   GAP), and the room rate-half at six seed-matched runs per arm passes: 110 take-offs against 101 over 28,800 fly-s each
   (3.82 vs 3.51 per 1,000 fly-s; one-sided exact p 0.291; run-level null). The expected rejection did not come: this
-  list, unlike the compass stand-in, moves no suite row. Admissible is all it is -- nothing is adopted, `raw` stays the
-  default, the afferent's law is still `unverified` and the relabel still has no transmitter source; and a fewer-meals
-  descriptive (1-4 against 0-7 per run, null at 6 v 6) is on the record for the next reader. The first submission's
+  list, unlike the compass stand-in, moves no suite row's status (values move on 20 of the 29 rows; 8 rows are
+  bit-identical to raw). Admissible is all it is -- nothing is adopted, `raw` stays the default, the afferent's law is
+  still `unverified` and the relabel still has no transmitter source; and a fewer-meals descriptive (1-4 against 0-7
+  per run, a predeclared descriptive, null at 6 v 6) is on the record for the next reader. The first submission's
   instrumented draws lost eight checks to a benchmark adapter gap (fixed, tested, re-frozen, re-run).
 key_claims:
 - Suite half: no status change on any of 29 rows in 3 + 3 draws; tallies identical under both presets.
 - Room rate-half: 110 vs 101 take-offs at equal exposure, one-sided exact p 0.291, run-level null; escape 42 vs 39, voluntary 68 vs 62.
 - The list is admissible by the PRESETS_SPEC gate; nothing adopted.
-- Meals per run 1-4 (instrumented) vs 0-7 (raw), undeclared, null at 6 v 6, on the record.
+- Meals per run 1-4 (instrumented) vs 0-7 (raw), a predeclared descriptive, null at 6 v 6, on the record; gf_max_hz (undeclared) is the one measure with a rank-test p below 0.05.
 validation:
 - suite-inst-4b511a: 6 runs, 6/6 consoles device cuda, no traceback, 29 checks each, caches ef23cc27 (raw) / 7a10d93b (instrumented), the three records in every instrumented controller, 0 problems.
 - suite-inst-room-dab10c: 12 runs, 12/12 device cuda, room blocks with no problems, 0 analysis problems.
@@ -198,4 +240,41 @@ recommendations:
 - Nothing adopted. If the list is ever proposed for adoption, the meals descriptive needs a declared arm pair first.
 open_questions:
 - Whether the fewer-meals descriptive is a real effect of the hold plus relabel on the cx program's steering.
+```
+
+
+## Skeptic pass (independent, Opus, 2026-09-18)
+
+An independent skeptic pass ran on 2026-09-18 (Opus, CPU only, no cluster job, nothing adopted). Its verdict line
+and its claim lines are quoted verbatim below. The CORRECTIONS REQUIRED list is applied in place in the sections
+above; where a correction replaced a sentence that stated a finding, the original sentence stays in the record
+marked **Withdrawn:** (INTERP 10.4 rule 29 iii). The pass's NOT CHECKED list is recorded verbatim with this
+round's entry in [receptor_verification.md](receptor_verification.md).
+
+One pass covered round-8 items 3 and 4 -- this audit and [plume_goal_only.md](plume_goal_only.md) -- and carried one verdict
+line per audit; the line for this audit is quoted below, and all ten claims are quoted in each of the two.
+
+### Verdict
+
+```text
+VERDICT
+- instrumented_suite: mostly sound
+
+All three analysis scripts reproduce their committed CSVs byte-for-byte on the CPU (suite_rows/runs/suite_table, room_runs/room_tests, plume compare/descriptive/rows/runs -- all diff-identical, 0 problems). Branch tests: 514 passed / 15 skipped / 220 subtests, 1 failure (test_connectome_data.py::test_loading_malecns_never_rewrites_cache) that is an artefact of the cache junction, not a branch defect; test_bit_identity.py and test_plume_variants_are_opt_in_and_recorded pass.
+```
+
+### Claims
+
+```text
+CLAIMS 1-10
+1. Suite half + instruments live -- confirmed, and NOT vacuous. Rebuilt the 29 x 6 status table from the JSONs: 27/0/2, 26/1/2, 27/0/2 under both presets, 0 status changes, taste.MN9_hz the only non-uniform row and bit-identical between presets at every seed (10.93417739868164 / 1.6904562711715698 / 3.1295931339263916) -- same seed (1) flips in both arms. Instruments provably active: (a) all 19 instrumented controllers carry the three records and the hold in lif.type_path_gain, cache md5 7a10d93b vs ef23cc27, nt_counts glutamate 29707->29711 / unknown 2361->2357 (the 4 GLNO cells); (b) the compass section moves hard -- during.PEN_hz raw 2.01/1.78/1.08 -> inst 7.72/7.66/7.22, rest_EPG_hz 0.000x3 -> 1.36/2.12/3.36, wedge_hz 61-67 -> 69-80, non-overlapping 3 v 3, exactly the direction of releasing the ExR6/ER6/ER4m hold, with wedge_cells_persisting still 0; (c) on rows that repeat bit-exactly under raw, raw vs instrumented still differ (bitter.shiu_sugar_MN9_hz all 3 seeds incl. 138.934->149.314; walk.power_max/sustained at s2). The audit reports none of (b) or (c). Adapter fix verified: attempt1 lost exactly the 8 named checks, attempt2 has 0 MISSING, the fix and its regression test are on the branch and pass. Re-freeze honest: the diff changes only stamped_utc and two script hashes; rule/jobs_sha256/batch_sha256 unchanged.
+2. Apples to apples on seeds/suite/check list -- yes; on instrument scope -- no. Same 29 keys in the same order, same draw seeds 0,1,2; the REFS criteria table untouched; raw column bit-identical on 18 of 29 rows including taste.MN9_hz s1 = 1.6904562711715698, the exact row the stand-in was rejected on. But compass wrote 50 Hz into 46 EPG cells in every brain (it perturbed even the B=1 probes: taste 10.934->2.479 at s0), whereas the round-8 list is bit-identical to raw on 8 of 29 rows by construction -- the afferent is body-less in the legacy probes and the hold/relabel are confined to the CX. Part of why it survives is that it is inert where the stand-in was not; the audit does not say this.
+3. Room rate-half -- reproduces exactly; one omission. Exposure 28,800 fly-s/arm verified; hops = escape + voluntary in all 12; 0 problems. The declared test is the two-sample exact Poisson = conditional binomial binomtest(K_inst, K_inst+K_raw, 0.5) one-sided (INTERP 10.4 rule 17) -- recomputed: 110 vs 101, 3.8194/3.5069 per 1,000, one-sided p 0.2910, two-sided 0.5819, run-level compare diff +1.500 z +0.437 p 0.9372 null; escape 42/39 p 0.4122; voluntary 68/62 p 0.3306. The pooled Poisson ignores run clustering, which makes the PASS conservative. Swept every row field: gf_max_hz is the one measure with a rank-test p below 0.05 (inst 31.4/31.6/30.8/33.6/33.2/35.8 vs raw 36.7/36.7/33.9/38.2/34.2/34.9; diff -3.01, z -1.79, Welch -2.94, MW p 0.0152; null under the z>=3 rule). The audit reports the walking-GF median instead and singles out meals (p 0.394) while never mentioning gf_max_hz. Everything else flat. Yaw SD and DNa02 rates are not in the room records at all.
+4. The gate is satisfied as written and the audit does not over-claim (one wording defect). PRESETS_SPEC 2.5: 3 draws, 0 changes, 6 runs, p 0.291. The declared touch set is a single row (conservative). Answer == Report.summary word-for-word; self-review labelled; "nothing adopted / raw stays default / law still unverified" all present. Only "this list, unlike the compass stand-in, moves no suite row" over-reaches: values move on 20 of 29 rows, statuses on none.
+5. Plume arm means and Holm family -- reproduce exactly. fed_rows recomputed from feeding_s >= 1.0 matches metrics.fed_rows in all 36 runs. feedback-only shipped 0.167+-0.408 at DNa02 1.972+-0.076; goal-only 4.667+-0.516 at 0.623+-0.097; full 6/6. t1 +1.3333 z +2.582 Welch +6.325 null; t2 +5.8333 z +14.289 result; t3 +1.1870 z +12.264 result; t4 +1.6667 z +2.041 null; t5 +2.0000 SD-0 undetermined; t6 -0.0905 p 0.5887 null; Holm 0.012987 (t1-t5) / 0.588745 (t6). Drawn starts reproduce exactly from numpy.random.default_rng(8). Orientation caveat correctly stated by the audit. Sound.
+6. "the feedback's share is the fly starting at 185 deg" -- true but incomplete. Goal-only shipped loses 8 row-instances, not 6: row 3 (185 deg) fails 6/6 and row 1 (90 deg) fails 2/6 (runs r1, r2). So row 3 is ~75% of the +1.333. Row 3 is confounded with env seed 3. The single feedback-only success is also row 3 (1.64 s, contact 58.4 s). With the drawn starts the never-fed goal-only row is row 4 (heading -87.9 deg, not "facing away"), so the mechanism does not carry over. The earlier skeptic's finding that the six shipped rooms are near-repeats is not carried forward.
+7. "two drawn rows start on a fruit" -- refuted as worded; counted, not excluded. fruit_distance = nearest-fruit-centre distance minus that fruit's radius; feeding is < 0.015 m. At t=0 the six drawn rows sit at 0.03184, 0.17550, 0.14324, 0.01633, 0.13898, 0.07716 m (identical in all 18 drawn runs; shipped rows all 0.226 m). Row 3 is 1.3 mm outside the feeding shell, row 0 is 2.1x the shell -- neither starts on a fruit. They are fed in all 18 drawn runs and are included in 6 / 4.333 / 4.000; the over-the-other-four figures (4/4, 2.33+-0.82, exactly 2) check out. One exception to "0.4-1.9 s in every arm and run": feedback-only drawn r1 row 0 first contacts at 13.11 s.
+8. The refutation is earned; the headline is a simple-effect claim, not a main effect. The three arms are the (new goal, gain 5), (new goal, gain 0) and (old goal, gain 5) cells of a 2x2; the (old goal, gain 0) cell is absent, so the interaction is unidentified. Goal-only keeps everything and sets steering_integral_gain_per_s to 0 so steer_input = clip(80*turn, +-80); feedback-only keeps gain 5 and skips exactly one line (the local goal copy), falling back to the pre-correction upwind/entry-memory goal. So +5.83 is "swap the goal given gain 5" and contains whatever harm the servo does when chasing a bad goal -- an upper bound on the goal's share. Nonetheless the core refutation stands: the earlier skeptic predicted a goal-only arm "would probably still show 0.28-0.69 Hz DNa02 differences" and inferred the feedback was load-bearing; goal-only shows 0.623+-0.097 Hz and still feeds 4.67 of 6, so the prediction was right and the inference is refuted.
+9. Determinism-gate compliance -- two defects. (a) Section 2 declares "every number below is a mean +/- SD over runs and nothing is quoted beyond that", but section 3.3 quotes 36x6 single-draw values and section 4 items 1/2/4 quote single draws. Legitimate under rule 28 (pasted from rows.csv) and item 4 labels its numbers "one draw" -- but the blanket sentence is false. (b) "energy reaches zero before every first contact as before" is FALSE here. zero_energy_s spans 17.81-19.57 s and only 143 of 216 rows reach 0 at all; 74 of 151 first contacts precede energy zero (full drawn 28/36 at 0.4-14.0 s; goal-only shipped 7/28 at 16.6-18.0 s; goal-only drawn 15/26; feedback-only drawn 24/24). Only shipped-start full and feedback-only satisfy the old statement.
+10. Code -- clean. PlumeNavigation(c, *, feedback_gain_per_s=None, walking_goal=True); the diff from the merge base is two kwargs, three parameters entries and one if self._walking_goal: guard. The integral reads self.parameters["steering_integral_gain_per_s"], literally 5.0 for bare plume, so bare plume is arithmetically unchanged; test_bit_identity.py passes and test_plume_variants_are_opt_in_and_recorded asserts the shipped parameters. Grammar plume:feedback=0 / plume:walking_goal=0 with the three ValueError cases tested. describe() records variant / walking_goal_enabled / steering_integral_gain_per_s -- verified in all 36 plume records and the suite/room records. Stamps precede runs in all three batches. No infrastructure identifiers in the branch diff. Answer == Report.summary in instrumented_suite.md; plume_goal_only.md uses "## 4. Reading" with no Answer section, matching determinism_gate.md, and its summary's claims all check out. Self-review labelled in both. Integration note: feat/round8 branched at a455bcf and main has since merged astra/plume-transduced, which gives PlumeNavigation.__init__ an incompatible signature (bilateral=, feedback=) -- flyverse/navigation.py and flyverse/instruments.py will conflict on merge and the two feedback semantics need reconciling.
 ```
