@@ -1,0 +1,7 @@
+preset,seed,file,device,cache_md5,backend,n_checks,pass,fail,gap,missing,n_controllers,checks_ok
+raw,0,suite_raw_s0.json,NVIDIA B200,ef23cc27bea13be7f6a96f3c04fd3737,"native (cuda_kernels, cuda_graphs, event_driven, warp)",29,27,0,2,0,13,
+raw,1,suite_raw_s1.json,NVIDIA B200,ef23cc27bea13be7f6a96f3c04fd3737,"native (cuda_kernels, cuda_graphs, event_driven, warp)",29,26,1,2,0,13,
+raw,2,suite_raw_s2.json,NVIDIA B200,ef23cc27bea13be7f6a96f3c04fd3737,"native (cuda_kernels, cuda_graphs, event_driven, warp)",29,27,0,2,0,13,
+instrumented,0,suite_instrumented_s0.json,NVIDIA B200,7a10d93ba2086f2c76bcdabdca79b4ec,"native (cuda_kernels, cuda_graphs, event_driven, warp)",29,27,0,2,0,19,
+instrumented,1,suite_instrumented_s1.json,NVIDIA B200,7a10d93ba2086f2c76bcdabdca79b4ec,"native (cuda_kernels, cuda_graphs, event_driven, warp)",29,26,1,2,0,19,
+instrumented,2,suite_instrumented_s2.json,NVIDIA B200,7a10d93ba2086f2c76bcdabdca79b4ec,"native (cuda_kernels, cuda_graphs, event_driven, warp)",29,27,0,2,0,19,

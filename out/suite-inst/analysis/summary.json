@@ -1,0 +1,53 @@
+{
+ "runs_dir": "out/suite-inst",
+ "verdict": "admissible by the suite half (no status change outside the declared gap rows); the room rate-half is owed",
+ "rejecting_rows": [],
+ "gap_row_changes": [],
+ "unstable_raw_rows": [
+  "taste.MN9_hz"
+ ],
+ "status_changes_pooled": [],
+ "problems": [],
+ "n_runs": 6,
+ "tallies": {
+  "raw_s0": {
+   "pass": 27,
+   "fail": 0,
+   "gap": 2,
+   "missing": 0
+  },
+  "raw_s1": {
+   "pass": 26,
+   "fail": 1,
+   "gap": 2,
+   "missing": 0
+  },
+  "raw_s2": {
+   "pass": 27,
+   "fail": 0,
+   "gap": 2,
+   "missing": 0
+  },
+  "instrumented_s0": {
+   "pass": 27,
+   "fail": 0,
+   "gap": 2,
+   "missing": 0
+  },
+  "instrumented_s1": {
+   "pass": 26,
+   "fail": 1,
+   "gap": 2,
+   "missing": 0
+  },
+  "instrumented_s2": {
+   "pass": 27,
+   "fail": 0,
+   "gap": 2,
+   "missing": 0
+  }
+ },
+ "stamped_utc": "2026-09-18T00:26:46Z",
+ "analysis_sha256": "1f44dff37e0339398662c15cca18398a5e18f83aeaf92652cd1452462a551b24",
+ "created_utc": "2026-09-18T00:40:08Z"
+}
