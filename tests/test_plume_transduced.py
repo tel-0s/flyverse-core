@@ -291,6 +291,38 @@ def test_draft_has_eighteen_independent_guarded_rooms(tmp_path, monkeypatch):
         batch.room(None)  # guard precedes any graph, CUDA or room construction
 
 
+@pytest.mark.parametrize("batch_size", [1, 2])
+def test_room_sample_reads_scalar_and_batched_motor_snapshots(batch_size):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from plume_transduced_batch import room_sample
+
+    from flyverse import BatchSim
+    from flyverse.navigation import bilateral_orn_groups
+
+    c = sensory_graph()
+    sim = BatchSim(
+        batch_size, c=c, device="cpu", program="none", preset="instrumented",
+        instruments=["compass", "plume:bilateral=orn", "hunger", "flight"],
+    )
+    for _ in range(10):
+        sim.step()
+    # Distinct nonzero rates make an incorrect row/side observable too.
+    for side, hz in (("L", 7.0), ("R", 13.0)):
+        sim.brain.rate[0, c.select(type="DNa02", somaSide=side)] = hz
+    sim.motor = sim.fb.motor()
+    assert np.isscalar(sim.motor.turn_L) == (batch_size == 1)
+    groups, weights, _ = bilateral_orn_groups(c)
+    row = room_sample(
+        sim, sim.fb.instruments["plume"],
+        {s: torch.as_tensor(v) for s, v in groups.items()},
+        {s: torch.as_tensor(v) for s, v in weights.items()},
+        0.1, float(sim.nearest_fruit()[1][0]),
+    )
+    assert len(row) == 22 and np.isfinite(row).all()
+    assert row[0] == 0.1 and row[-2:] == [7.0, 13.0]
+    json.dumps(row, allow_nan=False)
+
+
 def test_room_analysis_uses_runs_and_rejects_incomplete_records(tmp_path):
     import hashlib
     from types import SimpleNamespace

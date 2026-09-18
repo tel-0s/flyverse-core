@@ -183,6 +183,47 @@ def plan(
     print(f"Prepared {len(commands)} independent rooms in {rel}; NOT submitted")
 
 
+def room_sample(sim, plume, ix, w, time_s, distance):
+    """One post-frame row, using the same boundary as the CUDA room logger."""
+    import torch
+
+    # Post-frame neural measurements are explicitly labelled; the controller
+    # used frame-start rates. Its filtered cue/goal/servo state is sampled too.
+    neural = (
+        torch.cat(
+            [sim.brain.rate[:, ix[s]] @ w[s] for s in ("L", "R")]
+            + [
+                plume.odor,
+                plume.strength,
+                plume.heading,
+                plume.goal,
+                plume.bilateral,
+                plume.target_difference,
+                plume.steer_input,
+            ],
+            1,
+        )
+        .cpu()
+        .numpy()[0]
+    )
+    f, m, motor = sim.flies[0], sim.metabolisms[0], sim.motor.row(0)
+    return [
+        time_s,
+        f.x,
+        f.y,
+        f.z,
+        f.heading,
+        f.yaw_rate,
+        m.energy,
+        distance,
+        float(sim.feeding[0]),
+        *[float(sum(d.values())[0]) for d in sim.smell_values],
+        *neural.tolist(),
+        float(motor.turn_L),
+        float(motor.turn_R),
+    ]
+
+
 def room(args):
     if os.environ.get("FLYVERSE_PLUME_GPU_RELEASED") != "1":
         raise RuntimeError("room execution blocked pending Fable's GPU-pool release")
@@ -229,6 +270,7 @@ def room(args):
     ix = {s: torch.as_tensor(v, device="cuda") for s, v in groups.items()}
     w = {s: torch.as_tensor(v, device="cuda") for s, v in weights.items()}
     print("device", sim.brain.device, "arm", args.arm, "seed", args.seed, flush=True)
+    print("CUDA_VISIBLE_DEVICES", os.environ.get("CUDA_VISIBLE_DEVICES"), flush=True)
     columns = [
         "time_s",
         "x",
@@ -266,43 +308,11 @@ def room(args):
         if sim.feeding[0] and first_feed is None:
             first_feed = (frame + 1) * 0.01
         if frame % 10 == 9:
-            # Post-frame neural measurements are explicitly labelled; the controller
-            # used frame-start rates. Its filtered cue/goal/servo state is sampled too.
-            neural = (
-                torch.cat(
-                    [sim.brain.rate[:, ix[s]] @ w[s] for s in ("L", "R")]
-                    + [
-                        plume.odor,
-                        plume.strength,
-                        plume.heading,
-                        plume.goal,
-                        plume.bilateral,
-                        plume.target_difference,
-                        plume.steer_input,
-                    ],
-                    1,
-                )
-                .cpu()
-                .numpy()[0]
-            )
-            f, m = sim.flies[0], sim.metabolisms[0]
             samples.append(
-                [
-                    (frame + 1) * 0.01,
-                    f.x,
-                    f.y,
-                    f.z,
-                    f.heading,
-                    f.yaw_rate,
-                    m.energy,
-                    distance,
-                    float(sim.feeding[0]),
-                    *[float(sum(d.values())[0]) for d in sim.smell_values],
-                    *neural.tolist(),
-                    float(sim.motor.turn_L[0]),
-                    float(sim.motor.turn_R[0]),
-                ]
+                room_sample(sim, plume, ix, w, (frame + 1) * 0.01, distance)
             )
+        if (frame + 1) % 1000 == 0:
+            print(f"frame {frame + 1}/6000", flush=True)
     a = np.asarray(samples)
     error = np.angle(
         np.exp(
@@ -326,6 +336,7 @@ def room(args):
         },
         "sampling": "neural ORN rates post-frame; plume state derived from frame-start brain.rate; every 100 ms",
         "declaration_sha256": hashlib.sha256(args.plan.read_bytes()).hexdigest(),
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "provenance": provenance(
             c,
             fb=sim.fb,
