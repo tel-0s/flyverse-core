@@ -798,7 +798,7 @@ and a `provenance` block in every JSON (`flyverse.interp.common.provenance`: the
 the compiled-connectome fingerprint, source fingerprint, execution record). Identity of the runs: compiled `W`
 md5 `ef23cc27...` (sum|W| 121,460,584, 25,578,600 nnz, the shipped cache), `type_path_gain`
 `[LC4|LPLC2 -> DNp01 x3]`, `path_gain` `[DN -> vnc_ x3, VP -> DN x2]`, `flyverse_commit` `unknown` in the run copy
-(no `.git`; the 43-file source fingerprint is in each JSON), local commit `653179b4` with a dirty tree -- the
+(no `.git`; the 43-file source fingerprint is in each JSON), local commit `c78cb93d` with a dirty tree -- the
 working-tree diff `cluster_run.py` ships (26 files) is the concurrent tasks' opt-in work (`senses.Proprioception`,
 the optic stream hooks, `batch_sim`'s `proprioception=None` argument), every field defaulting to off; the check that
 none of it touched these sections is that the baseline reproduces round 5's shipped-default **walk** values

@@ -4,20 +4,37 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))  # this checkout's flyverse, whatever the cwd
+
+from flyverse.interp.common import resolve_commit  # noqa: E402
+
+
+def stamp_commit(recorded):
+    """How a derived table names a commit a frozen record recorded.
+
+    '<new id> (recorded <old id>)' when the 2026-09-17 history rewrite renamed
+    it, the id alone when it still resolves (docs/INTERP.md 10.4 rule 30)."""
+    recorded = str(recorded).strip()
+    resolved = resolve_commit(recorded)
+    return resolved if resolved == recorded else f"{resolved} (recorded {recorded})"
 
 
 def verify_frozen(source, commit):
     frozen = json.loads((source / "predeclared.json").read_text())
     hashes = frozen["source_sha256_lf"]
+    # The record is frozen and keeps its pre-rewrite id; the map says which
+    # commit that is in this checkout.
+    resolved = resolve_commit(commit)
     runtime = {}
     for name, wanted in hashes.items():
         data = subprocess.check_output(
-            ["git", "show", f"{commit}:{name}"], cwd=ROOT
+            ["git", "show", f"{resolved}:{name}"], cwd=ROOT
         ).replace(b"\r\n", b"\n")
         assert hashlib.sha256(data).hexdigest() == wanted, (
             f"frozen source mismatch: {name}"
@@ -30,6 +47,8 @@ def verify_frozen(source, commit):
             name
         )
         runtime[name] = {hashlib.sha256(shipped).hexdigest()}
+    if frozen.get("commit"):  # the copy the derived tables publish names both ids
+        frozen = {**frozen, "commit": stamp_commit(frozen["commit"])}
     return frozen, runtime
 
 
@@ -69,7 +88,7 @@ def analyse(source, destination, commit, correction, correction_commit):
         assert p["preset"] == "instrumented"
         assert len(p["instruments"]) == 4
     summary = {
-        "source_commit": commit,
+        "source_commit": stamp_commit(commit),
         "frozen_sources": len(hashes),
         "runtime_verification": checked,
         "runtime_source_sha256": {k: next(iter(v)) for k, v in runtime.items()},
@@ -81,7 +100,7 @@ def analyse(source, destination, commit, correction, correction_commit):
         },
         "lifecycle": lifecycle["records"],
         "lifecycle_correction": {
-            "source_commit": correction_commit,
+            "source_commit": stamp_commit(correction_commit),
             "frozen_sources": len(corrected_frozen["source_sha256_lf"]),
             "artifact_sha256": hashlib.sha256(
                 (correction / "lifecycle.json").read_bytes()
@@ -212,9 +231,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--source", default="out/navigation_v1")
     ap.add_argument("--destination", default="docs/audits/data/navigation")
-    ap.add_argument("--source-commit", default="3cac3cc")
+    ap.add_argument("--source-commit", default="bbb0e2f")
     ap.add_argument("--lifecycle-correction", default="out/navigation_v2")
-    ap.add_argument("--correction-commit", default="c7ead86")
+    ap.add_argument("--correction-commit", default="b2e521e")
     a = ap.parse_args()
     analyse(
         a.source,

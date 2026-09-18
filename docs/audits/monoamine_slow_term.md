@@ -1,6 +1,6 @@
 # The monoamine slow class at data-anchored magnitudes (behaviour round 3, thread:monoamines)
 
-Written 2026-09-14 on HEAD 6ec2de1 (working tree; nothing committed). Files of this thread:
+Written 2026-09-14 on HEAD d2abf3c (working tree; nothing committed). Files of this thread:
 `scripts/build_monoamine_tables.py` (coverage + bracket, CPU), `scripts/probe_monoamines.py` (`arms` / `batch` / `record` /
 `analyse` / `taste`, the last a CPU replay of the benchmark's taste section with the realised tone read off the Brain),
 `tests/test_monoamines.py` (7 tests, CPU, 5 s), five `lit.*` op-report rows appended to

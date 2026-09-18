@@ -6,8 +6,8 @@ cluster batch; `--report` CPU). Data: `out/cx_shift_structure.{json,md,txt}` (st
 (experiment 2, 12 runs), tables `out/cx_shift_shift.{md,csv}`, `out/cx_shift_rotation.{md,csv}`, batch console log
 `out/cx_shift_cluster.log`; replication (seeds 3-5) `out/vcx_{base,gaba}_hz40_s345.{json,txt}`,
 `out/vcx_rot_default_g2_15_s345.{json,txt}`, log `out/cxshift_verify_cluster.log`. Tree: the runs' tree differs from
-ec281f2 only in `scripts/` (`scripts/batch_sustain.py`, another thread; `cluster_run.py` ships every modified file) --
-`git diff ec281f2 -- flyverse/` is empty, so no model file changed. The brain.py / fly.py / connectome.py / body.py md5s
+560aaf3 only in `scripts/` (`scripts/batch_sustain.py`, another thread; `cluster_run.py` ships every modified file) --
+`git diff 560aaf3 -- flyverse/` is empty, so no model file changed. The brain.py / fly.py / connectome.py / body.py md5s
 recorded in every JSON row are not a portable check (they differ under CRLF vs LF); use the git diff against the commit.
 Ring protocol and gains as in `docs/audits/cx_wedge.md` section 6 /
 `cx_glno.md` section 5: EPG <-> PEN and EPG <-> PEG x gE, Delta7 -> EPG x gD (Delta7 -> PEN x1), ER/ExR x1, compass
@@ -283,7 +283,7 @@ conditions (`out/vcx_{base,gaba}_hz40_s345.json`) and seeds 3-5 of the rotation 
 is byte-identical to `out/cx_shift_shift.{md,csv}` (the `--report` recompute reproduced the table exactly). The
 corrections the pass produced are folded in above: the 3-seed permutation floor (p 0.25), the gaba == glutamate identity
 under `NT_SIGN` with `receptor_model=None`, five expression sources not six, PS196_b's second-step optic share
-0.4-23.2 %, IbSpsP's total optic share 10.3 %, and the provenance sentence (`git diff ec281f2 -- flyverse/` is empty;
+0.4-23.2 %, IbSpsP's total optic share 10.3 %, and the provenance sentence (`git diff 560aaf3 -- flyverse/` is empty;
 md5s are not portable across line endings). One defect remains in the data: `out/vcx_rot_default_g2_15_s345.json` holds
 2 rows (seeds 3, 4) although its `.txt` logs three seeds and ends "3 rows -> ..."; seed 5's numbers are therefore
 available only from the console log, at 2 dp (all four phases \|drift\| <= 0.005 wedges / s), which does not change the

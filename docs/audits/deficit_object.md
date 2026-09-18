@@ -480,7 +480,7 @@ cuda` NVIDIA B200, torch 2.11.0+cu128, the shipped model `sign` / `abs`, 12 s wi
 `_retina.npz` per size). Then `PYTHONIOENCODING=utf-8 python scripts/interp_apply_object.py ladder --dir
 out/apply_object/ladder --out out/export --json out/interp/apply_object/ladder.json` (CPU; console
 `ladder_console.txt`): one export per size and one summary export, every one `verify: problems none`, LC11 143 /
-LC10a 275 bodies with both quantities, 167,106 known bodies, commit `0d32fd6e` verified by source hash on all 28
+LC10a 275 bodies with both quantities, 167,106 known bodies, commit `2dede310` verified by source hash on all 28
 loaded files.
 
 **Run directories for hand-off** (the interchange of NEUROME_INTERFACE section 1; `manifest.json` +

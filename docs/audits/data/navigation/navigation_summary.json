@@ -1,5 +1,5 @@
 {
-  "source_commit": "3cac3cc",
+  "source_commit": "bbb0e2f",
   "frozen_sources": 77,
   "runtime_verification": [
     {
@@ -221,7 +221,7 @@
     }
   ],
   "lifecycle_correction": {
-    "source_commit": "c7ead86",
+    "source_commit": "b2e521e",
     "frozen_sources": 77,
     "artifact_sha256": "179bcb6abb579cf1264b051f0e99faeb496fc717361f10ba5aeb6b0d587b1472",
     "controllers": 4,

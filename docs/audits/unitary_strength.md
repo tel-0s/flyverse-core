@@ -9,7 +9,7 @@ section 2). Ledger rows: `unitary.*` in `flyverse/data/expected_responses.csv` (
 `fam_suite_<arm>_r<k>.{json,txt}`, `fam_room_<arm>_s<k>.{json,txt}`, `report.{md,json}`, `unit2.blocks.json`, `batch{1,2}_*.sh`), console logs
 `out/unitary_batch1_cluster.log`, `out/unitary_batch2_cluster.log`. Nothing adopted; every default is where it was.
 
-Dependencies not at `origin/main` at submission (HEAD 6ec2de1): `flyverse/brain.py` (+30 / -1 lines: the field, `_nt_factor`, the two
+Dependencies not at `origin/main` at submission (HEAD d2abf3c): `flyverse/brain.py` (+30 / -1 lines: the field, `_nt_factor`, the two
 `_shaped_weights` lines, the fan-in cache key; this thread), `scripts/probe_unitary.py`, `tests/test_unitary.py`, the 8 ledger rows (this thread).
 `cluster_run.py` ships the working tree, so whatever the concurrent threads had modified at submission time is in the run
 copy as well; the code identity of every number below is the JSONs' `provenance.source_fingerprint` / `effective_weights`
@@ -404,5 +404,5 @@ know that `brain.py` carries an unmerged field from thread unitary.
   `python scripts/interp_paths.py --lif 'w_syn_by_nt={...}'` for the scaled links (`paths_{default,mid}.json`).
 * The run copies carried the working tree at submission (the concurrent threads' edits to `body.py` / `motor.py` /
   `senses.py` / `batch_body.py` included, all opt-in and OFF by default); the code identity of every number is the
-  JSON's `provenance.source_fingerprint` (44 files hashed), not HEAD 6ec2de1.
+  JSON's `provenance.source_fingerprint` (44 files hashed), not HEAD d2abf3c.
 

@@ -161,6 +161,22 @@ native source-localization circuit. See [the steering audit](audits/plume_steeri
 The room and BatchSim already supply both antennae. Start a fresh episode after updating:
 older `plume` checkpoints lack the new sensory/feedback state and are rejected.
 
+An optional sensory-noise experiment uses `--instruments compass plume:bilateral=orn hunger flight`.
+It replaces the walking concentration cue with matched left/right ORN population rates from
+`brain.rate`, filtered over 0.25 s. Glomerulus weights balance unequal antenna cell counts;
+the rate-contrast gain remains explicitly unverified and underived. This variant receives no physical-smell
+samples in the instrument itself. The CPU characterization predicts weak lateral signal and
+large noise-driven goal offsets; no food-finding result is established. See the
+[transduced-plume audit](audits/plume_transduced.md). The default `plume` is unchanged.
+`plume:feedback=off` is the separate physical-goal-only control, disabling DNa02 feedback; `plume:feedback=0`
+is the same arm (round 8's spelling of the gain-0 variant), and `plume:walking_goal=0` is its complement -- the
+feedback with the pre-correction upwind / entry-memory goal law
+([the goal-only audit](audits/plume_goal_only.md)). In Python one constructor takes all three levers:
+`PlumeNavigation(c, bilateral="orn")`, `PlumeNavigation(c, feedback_gain_per_s=0.0)`,
+`PlumeNavigation(c, walking_goal=False)`. Every configuration records its own canonical spec in
+`describe()['parameters']['variant_spec']` beside `variant`, `walking_goal_enabled` and
+`steering_integral_gain_per_s`.
+
 The flight-priority policy applies whenever `flight` is attached, including without `hunger`.
 Its timers, reserve/odor hysteresis and landing latch are included in checkpoints and row resets.
 Older checkpoints containing the original `flight` state are rejected; start a fresh episode.

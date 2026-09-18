@@ -124,7 +124,7 @@ prose:
 `out/objr3rect/submit_console.txt`: `block rect: 12 job(s) -> @r3-h200a (round-robin, largest first)`; all 12
 jobs queued on **r3-h200a** (NVIDIA H200) behind 62 jobs of the other workflow already on that box (r3-h200b held 46,
 r3-h200d 7, r3-h200c 0 at submission). The block rule places a block on a target regardless of its load, so the
-batch waited in the box's queue rather than being resubmitted (the task's cluster rule). Tree: commit `6ec2de1a`
+batch waited in the box's queue rather than being resubmitted (the task's cluster rule). Tree: commit `d2abf3cd`
 plus other tasks' uncommitted edits (`flyverse/body.py`, `brain.py`, `senses.py`, `motor.py`, `batch_*.py`,
 `flyverse/data/expected_responses.csv`, ...; `out/objr3rect/tree_state.json` lists them with sha256), so
 `provenance.source_fingerprint`, not the commit, identifies the code of every run. **CPU bit-identity of the shipped

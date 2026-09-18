@@ -9,7 +9,7 @@ Data: `out/cx5/structure/{structure.json, structure.md, matrices.npz, evidence_g
 submission), `out/cx5/tree_state.json`, `out/cx5/batch.sh`, `out/cx5/<arm>_s<seed>.{json,txt,npz}` (48 runs),
 `out/cx5/scheduler_receipt.json` (the scheduler's own job records), `out/cx5_cluster.log` (the client console),
 `out/cx5/analysis/{analysis.md, runs.csv, compare.csv, decision.csv, analysis.json, scatter.png}`.
-Tree: HEAD b4ebf9a (= origin/main); nothing committed by this thread. The working-tree files shipped with the batch are listed
+Tree: HEAD 0b3668f (= origin/main); nothing committed by this thread. The working-tree files shipped with the batch are listed
 with their sha256 in `tree_state.json`: this thread's `scripts/cx_wedge.py`; another thread's concurrent `flyverse/body.py`,
 `flyverse/senses.py`, `scripts/probe_vnc_drive.py`, `tests/*`, `docs/audits/level_controls.md`, and the untracked
 `scripts/glno_relabel.py` / `docs/audits/glno_relabel.md` -- none on the simulated path (`cx_wedge.py --sim` builds a FlyBrain
@@ -519,7 +519,7 @@ key_claims:
   - "THE FIRST SUBMISSION'S CANCELLATION: cx5-fd8b02 was cancelled 8/8; the client ran 3.7 min and reported '8 job(s), 8 failed' with FETCH FAILED, so no artefact was retrieved -- but its archived console client_console_fd8b02_cancelled.txt carries 21 of the 48 runs' result lines, 7 with a surviving bump, every one identical to the second batch's (F s3 5.00 s / 151.1 Hz / width 3.0; CFG s2 156.3, s3 156.4; CF s3 4.92 s / 144.4; R s3 5.00 s / 200.8 / 3.0), as determinism requires. They appear only inside the client's cancellation log dump, written at 05:43:46Z -- AFTER the resubmission stamp 05:42:48Z -- so the resubmission decision demonstrably preceded them; 'cancelled within two minutes and before any result was read' is wrong as written and predeclared.json submission_history's wording is superseded by section 2. No pre-amendment copy of predeclared.json was archived, so 'arms and primaries unchanged' is verifiable only for the ARMS: the 8 job lines recovered from the cancelled console are identical to batch.sh's once the exit expression is normalised."
   - "the receptor stage is a BIT-EXACT NO-OP on the ring core, stronger than 'no sign changes': over 57,261 nonzero core x core entries (EPG, PEN, PEG, Delta7, EPGt, ER/ExR, GLNO) max |A_receptor_off - A_shipped| = 0.000 -- 0 sign changes AND 0 weight changes"
   - "the references match cx_glno.md's `base` config (receptor model OFF) and its identical sign-class rows, NOT its sign-abs rows (201/10, 200/9, 203/9 at 2.0/15), although cx5's arms declare --receptor-model shipped = sign/abs -- consistent with the receptor stage being a bit-exact no-op on the ring core. R 201/10 (11,1), 201/9 (10,3), 204/9 (11,2); RG 180/10, 181/9, 184/9; RG175 10/13 (0,7), 12/15 (2,7), 8/11 (0,4); and R175 164/10 (10,1), 42/42 (3,9), 169/9 (9,2) reproduces cx_glno's base 1.75/15 too, one row more than the audit claimed."
-  - "code identity per INTERP.md 10.2 is provenance.compiled_connectome.md5 + files.effective_weights_md5 + provenance.source_fingerprint: the fingerprint hashes 51 flyverse files per run, and after line-ending normalisation only flyverse/body.py and flyverse/senses.py differ from this tree (another thread's later edits) -- the cluster ran this working tree; tree_state HEAD = origin/main = b4ebf9a4"
+  - "code identity per INTERP.md 10.2 is provenance.compiled_connectome.md5 + files.effective_weights_md5 + provenance.source_fingerprint: the fingerprint hashes 51 flyverse files per run, and after line-ending normalisation only flyverse/body.py and flyverse/senses.py differ from this tree (another thread's later edits) -- the cluster ran this working tree; tree_state HEAD = origin/main = 0b3668fc"
   - "cross-batch determinism: R / RG / RG175 seeds 0-2 reproduce cx_glno.md 3-4's B200 rows exactly"
 files_written:
   - scripts/cx_ring_structure.py (new: structure pass, --plan-batch, --analyse)
@@ -773,7 +773,7 @@ visible verbatim (`exit $(( |  |  |  |  | ))`). Reducer identity: `analysis.json
 / `common_sha256` = `tree_state.json`'s = the current files' (`b484fec7` / `e77a8daf` / `f61045a3`); `n_runs` 48,
 `problems` [], `txt_missing` []. `source_fingerprint` (51 flyverse files): after CRLF->LF normalisation only
 `flyverse/body.py` and `flyverse/senses.py` differ from the current tree (the other thread's later edits) -- the cluster
-ran this working tree. `tree_state` HEAD = origin/main = b4ebf9a4.
+ran this working tree. `tree_state` HEAD = origin/main = 0b3668fc.
 
 **Script hygiene.** `scripts/cx_wedge.py` diff vs HEAD is +136 / -22: new flags only (`--ledger`, `--ledger-npz`,
 `--lif`, `--arm`, `--block`, `--device`, `--pulse-s`, and a `shipped` choice added to `--receptor-model`); every

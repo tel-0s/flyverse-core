@@ -2,7 +2,7 @@
 
 Author: Astra. This records implementation follow-ups to the independent
 [backend review](connectome_backends_review.md); it is not part of the reviewer's verdict. B1-B4 and nits
-1/3/9/12-15 were resolved by Fable in 34c2eb0. In particular, the original decision 11.7 was superseded:
+1/3/9/12-15 were resolved by Fable in cfaa694. In particular, the original decision 11.7 was superseded:
 MaleCNS load/save defaults remain pinned to CACHE_DIR; only female caches use FLYVERSE_CACHE.
 
 | Remaining nit | Resolution |
@@ -47,7 +47,7 @@ batch was submitted for this follow-up.
 
 ## Integration status
 
-Fable merged `281a68b` in `347c800`, refreshed main's female caches from this worktree, and recorded the
-[independent follow-up review](connectome_backends_followups_review.md) in `442c420`. The cache-copy and
+Fable merged `acdfd91` in `8050971`, refreshed main's female caches from this worktree, and recorded the
+[independent follow-up review](connectome_backends_followups_review.md) in `67c76a4`. The cache-copy and
 360/364-test counts above describe the pre-merge checkpoints, not current main. At integration Fable reported
 371 passed / 19 skipped. The earlier main neuron tables/manifests were superseded by the refreshed caches.

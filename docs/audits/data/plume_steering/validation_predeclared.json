@@ -1,6 +1,6 @@
 {
   "stamped_utc": "2026-09-16T17:43:21Z",
-  "commit": "ef90c2386ecd00563b1be43c92c418421ee1b047",
+  "commit": "32acee20d7b6aa9a4f0a63e5909e7cc5f4e3cc0b (recorded ef90c2386ecd00563b1be43c92c418421ee1b047)",
   "status": "frozen before submission",
   "commands": [
     "python scripts/plume_steering_probe.py --mode lifecycle --out out/plume_validation_v1/lifecycle.json",

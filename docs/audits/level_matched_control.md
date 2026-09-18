@@ -472,7 +472,7 @@ level does not.
   family / spec, so the compass L arm's `--mn-ref-hz 8.84` is verifiable only from the job line in
   `out/vncd4_cluster.log` (and from its realised pinned level, 85.5-92.1 Hz against the default's ~23).
   The run directory is a snapshot of this working tree: `tree_state.json` records `git diff --stat` at submission
-  (HEAD 4db2e8c; this task's two files plus other threads' `README.md`, `docs/INSTALL.md`, `docs/OVERVIEW.md`,
+  (HEAD 28e862f; this task's two files plus other threads' `README.md`, `docs/INSTALL.md`, `docs/OVERVIEW.md`,
   `docs/REPRODUCIBILITY.md`, `docs/audits/column_ground_truth.md`, `scripts/probe_column_ground_truth.py`, none
   imported by any job here).
 * Analysis: `out/vncd4/analysis_console.txt` (beside the directory, not inside it) and `out/vncd4/analysis/`

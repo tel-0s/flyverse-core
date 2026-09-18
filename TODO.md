@@ -26,7 +26,7 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
 - [x] **CI** (2026-09-13: `.github/workflows/ci.yml`, data-free subset via `tests/conftest.py` markers — 236 passed locally, first GitHub run green in 1m43s; `ruff --select F821` reports 12 undefined names in `scripts/cx_shift.py` / `cx_wedge.py` nested closures — verify whether those paths are dead or rely on an enclosing scope, then fix). Original item: GitHub Actions running the CPU test subset (`tests/test_control.py`, `test_world.py`,
       `test_nt_readout.py`, `test_interp.py -k "not cluster"`, `test_receptor_model.py`) on a synthetic /
       subset connectome so it needs no 3 GB download; lint.
-- [x] **README pass** (2026-09-14, at `4db2e8c`): one page a newcomer can follow — run it, what is simulated, what emerges unprompted,
+- [x] **README pass** (2026-09-14, at `28e862f`): one page a newcomer can follow — run it, what is simulated, what emerges unprompted,
       what we added and why (every stop-gap named), the benchmark table with statuses, the three localized
       deficits stated plainly (straight walking, small object, compass rotation input), how to embed the brain,
       how to run the toolkit when a behaviour fails. Move the long form to `docs/`.
@@ -46,7 +46,7 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
 - [x] **Demo media** (2026-09-15, `docs/media/`: `loom.gif` / `loom.mp4` (25 s, loom at 8 s, giant-fibre jump and re-landing),
       `wind_apple.gif` / `.mp4` (25 s; honestly captioned: no wind orientation and no feeding can be claimed from the clip),
       `toolkit_loom_gf.png` (`paths` stage map + `atlas` readout); every command line, commit and device in
-      `docs/media/README.md`; generator `scripts/make_demo_media.py`; rendered on the house B200 at 442c420). Original item: a 20-30 s GIF/MP4 of the room (observatory UI, loom escape, wind orientation, feeding
+      `docs/media/README.md`; generator `scripts/make_demo_media.py`; rendered on the house B200 at 67c76a4). Original item: a 20-30 s GIF/MP4 of the room (observatory UI, loom escape, wind orientation, feeding
       approach) and one figure of the toolkit output (a `trace` stage map or the atlas), committed under
       `docs/media/` (git-ignore rule currently excludes `*.gif`/`*.mp4` — carve out `docs/media/`).
 - [x] **Reproducibility statement** (2026-09-14, `docs/REPRODUCIBILITY.md`, linked from the README): the shipped default model (LIFParams / OpticParams / gains) with the cache
@@ -61,10 +61,10 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       (`scratchpad/r3_results/critique.json`, owner notes 0(d)). Every number in
       `docs/NOTES.md` "Session 11" is quoted against that tree; **nothing was adopted in round 3 and no default
       moved**, so the shipped model the statement describes is unchanged.
-      DONE: 8 sections. Every fingerprint RECOMPUTED at `4db2e8c`, not copied -- sum|W| **121,460,584**, W md5
+      DONE: 8 sections. Every fingerprint RECOMPUTED at `28e862f`, not copied -- sum|W| **121,460,584**, W md5
       **ef23cc27bea13be7f6a96f3c04fd3737**, cache md5s neurons.parquet `c50c598a...` / W_post_pre.npz
       `ac131529...` / sign0_counts.npz `bf01d724...`, receptor table `0381a446...`; the **44 files** of the
-      round-3 `source_fingerprint` verified by enumerating `eac71e0` against its own `export.SOURCE_PATTERNS`
+      round-3 `source_fingerprint` verified by enumerating `f9e9fea` against its own `export.SOURCE_PATTERNS`
       (the current tree is 51, the backends having added six patterns). Carries: LIFParams / OpticParams /
       every DEFAULT_* gain as field-by-field tables with the stop-gaps marked; the female fingerprints;
       MaleCNS / FAFB / BANC file names and sha256s; the GPU non-reproducibility with `compare.txt` quoted
@@ -72,9 +72,9 @@ mechanism the connectome or physiology data imply, tested with the interpretabil
       was measured at which commit. **The benchmark table predates the anchor and this is stated**: the
       14-section table in `docs/audits/benchmark_suite.md` is 2026-09-11 on an RTX 4090 at `069deb0`, and its
       own JSON `config` proves it is not the shipped model (GF x0.3 damping still present, retired at
-      `ec281f2`; `gf_hz` 38 not 33; receptor model not yet default, adopted at `b5e6ae2`). The authoritative
-      per-check numbers are the round-3 guard suite (`guard7-97ce35`, tree `6ec2de1` + inert `LegCycle` =
-      `eac71e0`'s defaults).
+      `560aaf3`; `gf_hz` 38 not 33; receptor model not yet default, adopted at `79769c3`). The authoritative
+      per-check numbers are the round-3 guard suite (`guard7-97ce35`, tree `d2abf3c` + inert `LegCycle` =
+      `f9e9fea`'s defaults).
 - [x] **Owed bookkeeping before the numbers are quoted publicly** (all four edits made 2026-09-13, in the
       working tree): de-score `walk.power_max` — **decided from the data** (`docs/audits/anti_runaway.md`
       round 6; 12/12 draws at 48.48, margin inside the worst single-arm scatter, non-monotone, Spearman
@@ -196,7 +196,7 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           Nothing adopted. **Independent skeptic pass done** (Opus, 2026-09-17, mostly sound): all seven claims
           reproduced, no conclusion moved, eleven corrections applied in the audit. What it changed in the record
           is bookkeeping only -- the receipt time, two line-ending "source-stamp differences" that are not edits,
-          the driver script missing from the 52-file fingerprint, and the rule-7 breach in commit 62cdefb.
+          the driver script missing from the 52-file fingerprint, and the rule-7 breach in commit ad2efc0.
     - [ ] **more runs of the REFERENCE arm for DNa02_R / the clean yaw SD** (`level_controls_r2.md` 9 item 6): both
           rows reproduce as DIFFERENCES in all three batches (DNa02_R +0.103 / +0.107 / +0.094 Hz; clean yaw SD
           +0.572 / +0.490 / +0.588 deg/s) and as verdicts only sometimes (DNa02_R `result` in rounds 4 and 4b at
@@ -278,7 +278,7 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
           gate-passing runs the confined-frame centre slope is +0.137 / -0.086 / -0.069 wedges/s against an ideal
           +4.0, and the gate fails mostly on its `out_above <= 3` clause, not on an absent bump. So the open
           question is not "is there a bump" but "why does a bump that exists not follow the side signal".
-    - [x] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate, -- ANSWERED by Astra (2026-09-16, `docs/audits/exr6_evidence.md`, merged 4fcfdf7): ExR6 glutamate and ER6 GABA have direct EASI-FISH support (Wolff et al. 2025 eLife 104764 Fig. 9 source data: SS53617 vGlut strong, SS58833 Gad1 weak -- worksheet rows verified locally); the model's labels stand; peptide / monoamine co-transmission untested; the open question is receptor placement and kinetics at the EB/GA contacts (a 2026 Turner-Evans-lab preprint reports glutamate inhibiting E-PG but exciting P-EN in the PB -- not isolated to ExR6). Nothing adopted.
+    - [x] **ExR6's transmitter and receptor -- a relabel with sources, not a gain**: 2 cells, MaleCNS `nt` glutamate, -- ANSWERED by Astra (2026-09-16, `docs/audits/exr6_evidence.md`, merged ad4f9dd): ExR6 glutamate and ER6 GABA have direct EASI-FISH support (Wolff et al. 2025 eLife 104764 Fig. 9 source data: SS53617 vGlut strong, SS58833 Gad1 weak -- worksheet rows verified locally); the model's labels stand; peptide / monoamine co-transmission untested; the open question is receptor placement and kinetics at the EB/GA contacts (a 2026 Turner-Evans-lab preprint reports glutamate inhibiting E-PG but exciting P-EN in the PB -- not isolated to ExR6). Nothing adopted.
     - [x] **PS196_b, from the compass side too** -- ANSWERED by round 7 and its one follow-up; the remaining
           bump question moved to the instrumented-preset follow-ups at the end of this section.
           (2026-09-15, literature note in `docs/NOTES.md`): Wang's MaleCNS mining (`fly-circuit-exploration`, finding 3) names PS196_b as GLNO's largest input outside the ring (1,801 syn, 19-21 %; every count reproduced to the synapse in our cache) and FB3A as a PFNd input; rounds 1-4 reach the same cell from the body (AN04B003 -> PS196_b is where the self-turn report breaks; its L-R is unsigned under the Coriolis stop-gap). Owed before any compass room is called: PS196_b's afferent budget by side (AN07B037_a/_b 419 / 52, CB0675 / GNG580 / PS047_b) and a sided ascending-stimulus arm, so a signed PS196_b L-R exists to test whether GLNO carries it into PEN -- a labelled diagnostic, never a default. His "compass brake" (the EPG -> PEN write-position recurrence, 3 : 1 in hemibrain; not checkable in our cache, no per-ROI edges) is the other term of 6A's balance: both readings predict the saturated ring H3 gives. hDelta path integration (Janke 2025 hDeltaG / vDeltaE; Avritzer 2026 hDeltaA, ~7-10 s) goes on the expectation side once a bump exists.
@@ -393,7 +393,7 @@ Where each stands, and the data-implied route (from `docs/audits/deficit_*.md`, 
 **Instrumented-preset follow-ups (2026-09-17, from the four independent skeptic passes).** All five are
 questions, not plans; none of them is authorized as a batch yet, and none licenses an adoption.
 
-- [x] **A goal-only plume arm, with no DNa02 feedback.** No such arm exists. Mean |demand| did not rise between
+- [x] **A goal-only plume arm, with no DNa02 feedback.** Mean |demand| did not rise between
       the diagnostic and the validation (0.057-0.074 -> 0.036-0.083) while mean |yaw| tripled (0.038-0.067 ->
       0.106-0.245 rad/s), so the feedback bridge looks like the load-bearing change -- but that is an inference,
       and a goal-only arm is what would measure it. Same rooms, same seeds, feedback off.
@@ -404,12 +404,18 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       full - goal-only +1.33 rows (null under the reference-SD rule, all runs separate) -- the feedback's share is the
       fly that starts facing away (185 deg: goal-only 0/6 runs, full 6/6). Drawn starts: 6 / 4.33 / 4.00 (two of the
       six drawn rows start on a fruit). `plume:feedback=0` / `plume:walking_goal=0` are opt-in, recorded in describe();
-      bare `plume` unchanged. No admission claim.
-- [ ] **A transduced-contrast plume law.** The shipped correction reads the bilateral contrast off the physical
+      bare `plume` unchanged. No admission claim. The grammar is one after the merge of Astra's branch:
+      `plume:feedback=off` is the canonical spelling of the gain-0 arm and `plume:feedback=0` the accepted synonym,
+      beside `plume:bilateral=orn` and `plume:walking_goal=0`.
+- [x] **A transduced-contrast plume law.** ANSWERED on the CPU (Astra, `plume_transduced.md`, merged ca23768 after an independent skeptic refuted-then-fixed a weight/index pairing bug): the model's own ORNs deliver the rooms' 0.26-1.1 % contrast at SNR < 1 (0.16-0.34), correct sign in 0.667 of windows; the `plume:bilateral=orn` and `plume:feedback=off` options ship opt-in. Still owed: the 18-room v3 batch (full / transduced / goal_only x 6 seed-drawn starts; frozen, `predeclared_v3.json`) once the GPU pool is free, quoted as mean +- across-run SD only. The shipped correction reads the bilateral contrast off the physical
       concentration field (noise-free, pre-transduction) at a gain of 200, and the observed contrast is
       0.26-0.57 %. Through the model's own ORN law (1 + 150c/(c+0.5)) that is ~0.1 Hz per ORN, under the Poisson
       noise of the 0.25 s window. The question: does a law that reads the ORN RATES still find food? If not, the
       200x gradient is doing the navigating and the instrument should say so in one sentence.
+      CPU implementation/characterization: `plume:bilateral=orn`, [audit](docs/audits/plume_transduced.md).
+      The 18-run full/transduced/goal-only comparison is prepared, not submitted; await pool release -- and the v3
+      freeze now refuses on source hashes after the round-8 merge changed `flyverse/navigation.py` and
+      `flyverse/instruments.py`, so it needs a v4 re-freeze (Astra's) before submission.
 - [x] **A V- arm for the GLNO sign.** Round 7 declared no sign-flipped counterpart of V, and in the held arms
       GLNO L-R does not reverse (+0.6862 +- 1.9132 Hz, positive in four of six seeds), so primary 3's sign
       specificity is untested where it was measured. One arm: the afferent at k 0.5, sign -1, no hold, no relabel.
@@ -525,23 +531,23 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
 ## F. Cross-connectome: FlyWire FAFB v783 and BANC v888 (female brain; female brain + VNC)
 
 Survey: `docs/audits/flywire_banc_survey.md` (2026-09-14); implementation spec: `docs/CONNECTOME_BACKENDS_SPEC.md`
-(Astra, 2026-09-14: items 1-3 and the BANC walking replicate delivered on `feat/connectome-backends`, merged as 34c2eb0.
+(Astra, 2026-09-14: items 1-3 and the BANC walking replicate delivered on `feat/connectome-backends`, merged as cfaa694.
 Headline: the female CNS walks straighter than the male at the shipped defaults (clean yaw SD 0.28 vs 2.64 deg/s,
 DNa02 silent bilaterally); the leg-cycle yaw increase replicates qualitatively (0.38 -> 2.65 deg/s, `result`
 within-dataset) but the neural pattern does not (BANC DNa02_L stays silent, PS059 ~0 Hz vs 20 Hz) -- descriptive,
 not a sex test; `docs/audits/connectome_backends.md`.) Both releases are public; type names overlap MaleCNS
 exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` already bridges the rest.
 
-- [x] `scripts/cross_connectome.py` (merged 34c2eb0): every anatomical claim of rounds 1-3 (DNa02's inhibitory budget, PS049 /
+- [x] `scripts/cross_connectome.py` (merged cfaa694): every anatomical claim of rounds 1-3 (DNa02's inhibitory budget, PS049 /
       PS059 / VES051 / AOTU019, AN04B003 and LT51 excitation, IN12B014's symmetric contralateral pair, the
       PS196a -> PS059 loop, the haltere-afferent route, LC11 / LC10a inputs) printed MaleCNS / FAFB / BANC side by
       side with a per-release synapse scale (counts run ~1 : 0.6 : 0.3). CPU, a day. The README's "not a
       reconstruction artefact" table.
-- [x] `Connectome.load(dataset="fafb" | "banc")` (merged 34c2eb0; review `docs/audits/connectome_backends_review.md`, merge with fixes B1-B4 applied; nits 2/4/5/6/7/8/10/11 resolved in Astra's 281a68b, reviewed in `connectome_backends_followups_review.md` and merged 347c800): `root_id` -> `bodyId` (int64 fits), alias-normalised types,
+- [x] `Connectome.load(dataset="fafb" | "banc")` (merged cfaa694; review `docs/audits/connectome_backends_review.md`, merge with fixes B1-B4 applied; nits 2/4/5/6/7/8/10/11 resolved in Astra's acdfd91, reviewed in `connectome_backends_followups_review.md` and merged 8050971): `root_id` -> `bodyId` (int64 fits), alias-normalised types,
       vocabulary maps for superclass / NT / side / neuropil; the receptor table and ledger transfer by type name.
       BANC = the female CNS as a whole-animal replicate of the walking result (either outcome is a finding);
       FAFB = the complete female optic lobe. ~2 days; the biggest scientific payoff and the best release story.
-- [x] NT sources 4 and 5 for `docs/NT_INTEGRATION.md` (section 8, merged 34c2eb0): FAFB per-cell probabilities, BANC verified transmitters
+- [x] NT sources 4 and 5 for `docs/NT_INTEGRATION.md` (section 8, merged cfaa694): FAFB per-cell probabilities, BANC verified transmitters
       (65,369 cells). Conflict rows to add: PFL3 (ACh in MaleCNS / FAFB, TYR predicted in BANC; PFL2 verified
       tyramine), Delta7 (`glutamate,serotonin` verified), LAL074; ~400 MaleCNS `unknown` (silenced) cells carry a
       classical-transmitter prediction in BANC; MaleCNS `serotonin` splits SER / DA / tyramine across sources.

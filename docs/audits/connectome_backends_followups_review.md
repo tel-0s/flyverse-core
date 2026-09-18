@@ -1,8 +1,8 @@
-# Review of `fix/connectome-review-followups` @ 281a68b
+# Review of `fix/connectome-review-followups` @ acdfd91
 
 Read-only review (Opus, 2026-09-14) of Astra's follow-up commit in the worktree `D:\Projects\flyverse-connectome`
-(branch `fix/connectome-review-followups`, `281a68b` on `4db2e8c`). Nothing edited or committed in either repo;
-the worktree was left clean (`git status` empty at 281a68b). CPU only, no cluster job. Every number below was
+(branch `fix/connectome-review-followups`, `acdfd91` on `28e862f`). Nothing edited or committed in either repo;
+the worktree was left clean (`git status` empty at acdfd91). CPU only, no cluster job. Every number below was
 recomputed by the reviewer; script outputs live in this scratchpad (`acceptance.json`, `cache_comparison.json`,
 `pytest_wt.txt`).
 
@@ -14,7 +14,7 @@ goes red on main (verified below, F1), and `TODO.md:317` still advertises the ni
 
 ## 1. Diff map: 12 files, +268/-11
 
-`git diff 4db2e8c..281a68b --stat`
+`git diff 28e862f..acdfd91 --stat`
 
 | file | +/- | maps to |
 |---|---|---|
@@ -185,17 +185,17 @@ i.e. `fast_sign / fast_gain / slow_sign / slow_gain / slow_class / tier` and the
 
 * No infrastructural strings anywhere in the diff: grepped the full patch for IPs, `beegfs`, `<cluster-domain>`, `<cluster-user>`,
   `vast`, `/mnt/`, `ssh`, `slurm`, `sbatch`, `.edu`, `hpc` — zero hits.
-* `git ls-tree -r 281a68b` has nothing under `out/` or `cache/`; `.gitignore:1,4` covers both.
+* `git ls-tree -r acdfd91` has nothing under `out/` or `cache/`; `.gitignore:1,4` covers both.
 * The two commands the appendix documents write into `out/` (gitignored). No generated artefact is tracked.
 * Worktree left clean; all reviewer output went to the scratchpad.
 
-## 5. Merge-conflict map against `D:\Projects\flyverse` main @ 78d36c3 — **no conflicts**
+## 5. Merge-conflict map against `D:\Projects\flyverse` main @ 65d29d1 — **no conflicts**
 
-`git merge-tree --write-tree 78d36c3 281a68b` → tree `f471195c8cd1252838e352a2c1d9b6b88223f50c`, exit 0, zero
-conflict records. Main gained `27d265c` (`CITATION.cff`, `README.md`, `TODO.md`, `docs/INSTALL.md`,
-`docs/OVERVIEW.md`, `docs/REPRODUCIBILITY.md`), `5838c20` (`TODO.md`, `docs/audits/column_ground_truth.md`,
+`git merge-tree --write-tree 65d29d1 acdfd91` → tree `f471195c8cd1252838e352a2c1d9b6b88223f50c`, exit 0, zero
+conflict records. Main gained `4ebf680` (`CITATION.cff`, `README.md`, `TODO.md`, `docs/INSTALL.md`,
+`docs/OVERVIEW.md`, `docs/REPRODUCIBILITY.md`), `a93dcb1` (`TODO.md`, `docs/audits/column_ground_truth.md`,
 `object_baseline_r2.md`, `object_rectangles_r3.md`, `receptor_verification.md`, `scripts/probe_column_ground_truth.py`,
-`tests/test_column_ground_truth.py`) and `78d36c3` (`docs/NEUROME_INTERFACE.md`). **281a68b touches none of them.**
+`tests/test_column_ground_truth.py`) and `65d29d1` (`docs/NEUROME_INTERFACE.md`). **acdfd91 touches none of them.**
 Semantic check of main's new code against this commit's API changes: `probe_column_ground_truth.py:67` builds a
 `Connectome` with `dataset=c.dataset` (registered), `tests/test_column_ground_truth.py:61-64` uses a synthetic
 `hex_graph()` on the default `malecns` and only reads `n_columns` — both safe under the new validation.
@@ -215,8 +215,8 @@ The appendix does say "copy those or recompile after merging", but it is buried 
 Copy `D:\Projects\flyverse-connectome\cache\{banc,fafb}` over main's, or recompile both, as part of the merge.
 (`fafb` has no test that detects its staleness, but leave the two consistent.)
 
-**F2. `TODO.md:317` on main still reads "open nits 2/4/5/6/7/8/10/11 listed there"** and 281a68b does not touch
-`TODO.md`. Tick it in the merge commit, the way `4db2e8c` did for the B-fixes.
+**F2. `TODO.md:317` on main still reads "open nits 2/4/5/6/7/8/10/11 listed there"** and acdfd91 does not touch
+`TODO.md`. Tick it in the merge commit, the way `28e862f` did for the B-fixes.
 
 ### Nits (non-blocking)
 
@@ -259,7 +259,7 @@ the intended assertion.
 
 **N8. Process: the follow-up record was appended into the reviewer's audit file.** The diff is a clean append
 (`@@ -419,3 +419,49 @@` — 3 context lines, 46 added, **nothing above the appended section altered**; I diffed the
-whole file), and the new section 12 is explicitly labelled "Astra, after merge at 4db2e8c" and says "the
+whole file), and the new section 12 is explicitly labelled "Astra, after merge at 28e862f" and says "the
 independent review above is unchanged". That is about as careful as an in-place append can be. Still, an
 independent audit that accumulates author-written resolutions becomes ambiguous in authorship for a later reader,
 and the file's top-line **Verdict: merge with fixes (B1-B4)** no longer describes the file's end state. A sibling

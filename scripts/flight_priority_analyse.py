@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from navigation_analyse import verify_frozen
+from navigation_analyse import stamp_commit, verify_frozen
 
 
 def analyse(source, destination):
@@ -29,7 +29,7 @@ def analyse(source, destination):
             checked.append({"artifact": name, "shared_source_files": len(common)})
         results[name] = result
     summary = {
-        "source_commit": declaration["commit"],
+        "source_commit": stamp_commit(declaration["commit"]),
         "frozen_source_files": len(runtime),
         "runtime_verification": checked,
         "runtime_source_sha256": {k: next(iter(v)) for k, v in runtime.items()},

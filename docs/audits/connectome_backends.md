@@ -1,6 +1,6 @@
 # Connectome backends: FAFB v783 and BANC v888
 
-Implemented on `feat/connectome-backends`, based on `eac71e0`. The loader preserves the MaleCNS model and cache; female graphs use independent annotations and no MaleCNS transmitter overrides.
+Implemented on `feat/connectome-backends`, based on `f9e9fea`. The loader preserves the MaleCNS model and cache; female graphs use independent annotations and no MaleCNS transmitter overrides.
 
 ## Reproduce
 
@@ -17,7 +17,7 @@ GPU checks and walking runs use the house cluster. Results live under `out/conne
 
 ## MaleCNS compatibility
 
-The baseline at eac71e0 was **338 passed / 19 skipped**. With backend tests added, the CPU suite is **357 passed / 19 skipped**, including the unchanged recorded golden in `test_bit_identity.py`. A fresh MaleCNS compilation produced an exactly equal neuron DataFrame and complete legacy fingerprint. No cache file was rewritten.
+The baseline at f9e9fea was **338 passed / 19 skipped**. With backend tests added, the CPU suite is **357 passed / 19 skipped**, including the unchanged recorded golden in `test_bit_identity.py`. A fresh MaleCNS compilation produced an exactly equal neuron DataFrame and complete legacy fingerprint. No cache file was rewritten.
 
 | File | MD5 before and after |
 |---|---|

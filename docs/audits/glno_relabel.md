@@ -132,7 +132,7 @@ candidate is fully described by section 1.3.
 
 `python scripts/glno_relabel.py plan --dir out/cx5b --name cx5b --minutes 45` wrote `predeclared.json` (the questions, the
 adoption rule in one direction, the primary families with their tests and Holm sizes, the expectations written before the runs,
-the provenance every run must carry), `tree_state.json` (HEAD `b4ebf9a`, the porcelain status, sha256 of every `flyverse/*.py`,
+the provenance every run must carry), `tree_state.json` (HEAD `0b3668f`, the porcelain status, sha256 of every `flyverse/*.py`,
 `flyverse/interp/*.py`, `flyverse/backends/*.py` and the seven scripts the jobs load, and the shipped `scripts/probe_vnc_drive.py`
 against HEAD's), `probe_diff_vs_HEAD.txt` (419 lines), `jobs.json` and `batch.sh`. ONE `cluster_run.py` submission, `--arm-block
 fam`, house target (B200), 22 jobs:
@@ -168,9 +168,9 @@ submission). The independent check is that the only behavioural lines the diffs 
 is `if self.unsided:` (refused together with `leg_cycle`) and `body.py`'s is `if self.flat_amplitude:` on a default-False
 field; every run JSON's `sense.tokens` records `unsided false, leg_cycle_flat false, haltere_sided false` and
 `leg_cycle_params.flat_amplitude false`. `docs/INTERP.md` 10.1(7)(b) requires a cross-task dependency to be COMMITTED before
-submission; it was not at 05:35:08Z. The owning thread has since committed exactly these files as `e18179b` ("Round 4b: the
+submission; it was not at 05:35:08Z. The owning thread has since committed exactly these files as `286dca3` ("Round 4b: the
 three level controls ... and the AN04B003 single-cell check"), and `scripts/probe_vnc_drive.py` there still hashes
-`dbd8b115...` -- the file the batch ran. Cite `e18179b` as the code identity of the compass numbers and say the rule was met
+`dbd8b115...` -- the file the batch ran. Cite `286dca3` as the code identity of the compass numbers and say the rule was met
 after the fact. CPU smokes before submission (`glno_relabel.py smoke`, `out/cx5b/smoke/`): the compass wrapper on the shipped cache
 at the experiment gains and on the candidate at the shipped gains (`--quick --device cpu`), both exit 0, `problems []`, the right
 md5 / GLNO label / gains / spec in each run JSON.
@@ -369,9 +369,9 @@ Five points the independent pass adds that are not refutations (its section 3):
    defect, not this thread's (section 4.4).
 2. **`docs/INTERP.md` 10.1(7)(b) was met after the fact, not before.** `flyverse/body.py`, `flyverse/senses.py` and
    `scripts/probe_vnc_drive.py` went to the box uncommitted; the mitigation at submission was the sha256s, the 419-line diff
-   and the diffstat. The owning thread has since committed exactly those files as **`e18179b`** ("Round 4b: the three level
+   and the diffstat. The owning thread has since committed exactly those files as **`286dca3`** ("Round 4b: the three level
    controls ... and the AN04B003 single-cell check"), where `scripts/probe_vnc_drive.py` still hashes `dbd8b115...` -- the
-   file this batch ran. `e18179b` is the code identity of the compass numbers (section 2).
+   file this batch ran. `286dca3` is the code identity of the compass numbers (section 2).
 3. **"PEN raw fan-in totals unchanged in range" was loose.** Every PEN's capped raw fan-in rises by exactly **+120**
    (2 GLNO x cap 60): 867-1597.5 -> 987-1717.5. What is unchanged is that all 42 stay far below `input_norm_ref` 5000, so
    the scale stays 1.00 and the +120 buys no renormalisation (section 1.3).
@@ -804,9 +804,9 @@ Consistent on every point I could check.
    `flyverse/senses.py` and `scripts/probe_vnc_drive.py` went to the box uncommitted. The audit records the sha256s, a
    419-line diff and a diffstat, which is the best available mitigation and more than 5A does, and I verified arm C is
    unaffected. **Update, mid-review:** the owning thread committed those files during this review as
-   **`e18179b` "Round 4b: the three level controls (unsided, channel-matched, modulation-only) and the AN04B003
-   single-cell check"**, on top of `b4ebf9a`; `scripts/probe_vnc_drive.py` still hashes `dbd8b115...`, i.e. the exact file
-   the cx5b batch ran is now in history. The audit should cite `e18179b` as the code identity of the compass numbers
+   **`286dca3` "Round 4b: the three level controls (unsided, channel-matched, modulation-only) and the AN04B003
+   single-cell check"**, on top of `0b3668f`; `scripts/probe_vnc_drive.py` still hashes `dbd8b115...`, i.e. the exact file
+   the cx5b batch ran is now in history. The audit should cite `286dca3` as the code identity of the compass numbers
    (it was written when only the sha256 existed) and say plainly that the rule was met after the fact, not before --
    and name the owning thread, as 10.1(7)(b) requires.
 3. **"PEN raw fan-in totals unchanged in range" (1.3) is loose.** Every PEN's capped raw fan-in rises by **exactly
@@ -924,7 +924,7 @@ and after `ExR8 0.4 -> 0.0` **insert**
 > * The expectation ledger: `struct.GLNO_PEN.sign` (`flyverse/data/expected_responses.csv`, `expected 0`, `op == 0`, `gap 1`, "the largest single input of PEN carries no sign and is silent in the model") is the row this relabel is about, and the 29-check suite does not carry it (no `check_key`). An adoption must re-score it; as written its polarity also looks inverted (meeting `== 0` prints "PASS (gap closed)" for what is the gap).
 
 **C13 -- section 2, the working-tree paragraph, after "...arm C of family `level` is `all+leg_cycle` in both versions". Insert**
-> The independent check is that the only behavioural lines the diffs add on arm C's path are guarded off: `sense_kwargs_of("C", "level", args)` returns `{}` (the `ARM_MN_REF` table has only the `L` key and `ARM_SENSE_KW` only `level2/K`), `attach_cycle` builds the default `body.LegCycle()` because `leg_cycle_flat` is off, `senses.py`'s one new branch is `if self.unsided:` (refused together with `leg_cycle`) and `body.py`'s is `if self.flat_amplitude:` on a default-False field; every run JSON's `sense.tokens` records `unsided false, leg_cycle_flat false, haltere_sided false` and `leg_cycle_params.flat_amplitude false`. `docs/INTERP.md` 10.1(7)(b) requires a cross-task dependency to be COMMITTED before submission; it was not at 05:35:08Z. The owning thread has since committed exactly these files as `e18179b` ("Round 4b: the three level controls ... and the AN04B003 single-cell check"), and `scripts/probe_vnc_drive.py` there still hashes `dbd8b115...` -- the file the batch ran. Cite `e18179b` as the code identity of the compass numbers and say the rule was met after the fact.
+> The independent check is that the only behavioural lines the diffs add on arm C's path are guarded off: `sense_kwargs_of("C", "level", args)` returns `{}` (the `ARM_MN_REF` table has only the `L` key and `ARM_SENSE_KW` only `level2/K`), `attach_cycle` builds the default `body.LegCycle()` because `leg_cycle_flat` is off, `senses.py`'s one new branch is `if self.unsided:` (refused together with `leg_cycle`) and `body.py`'s is `if self.flat_amplitude:` on a default-False field; every run JSON's `sense.tokens` records `unsided false, leg_cycle_flat false, haltere_sided false` and `leg_cycle_params.flat_amplitude false`. `docs/INTERP.md` 10.1(7)(b) requires a cross-task dependency to be COMMITTED before submission; it was not at 05:35:08Z. The owning thread has since committed exactly these files as `286dca3` ("Round 4b: the three level controls ... and the AN04B003 single-cell check"), and `scripts/probe_vnc_drive.py` there still hashes `dbd8b115...` -- the file the batch ran. Cite `286dca3` as the code identity of the compass numbers and say the rule was met after the fact.
 
 **C14 -- 4.3b, add to the paragraph on 5A.** Append
 > (iv) 5A's C-family arms run `receptor_model 'sign+gain'`, where glutamate and gaba are NOT the same model on GLNO's FB / EPG targets (section 1.4): 35 of the 213 entries differ in resolved gain there. 5A's ring conclusions are unaffected -- the 84 PEN edges are identical under every receptor mode -- but the "bit-identical to the gaba cache" statement is a `sign`-mode statement and should be qualified when it is carried into a `sign+gain` discussion.

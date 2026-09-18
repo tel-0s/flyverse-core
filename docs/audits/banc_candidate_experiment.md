@@ -6,7 +6,7 @@ experiment after the diagnostic merge; the anatomical validation gates remain cl
 
 ## Predeclared model and acceptance
 
-The pinned map is the clean `3deec1b` diagnostic, generated with NumPy 2.3.5,
+The pinned map is the clean `79ba161` diagnostic, generated with NumPy 2.3.5,
 SciPy 1.17.0 and no OMP/OPENBLAS/MKL thread override. Its LF-normalised CSV SHA-256 is
 `60181451e52435ff31ca950d63d71833eb43740c470ab32d78721c2c74716e3d`.
 It has 64 initial collisions and 136 displaced seeds. The full diagnostic checks,
@@ -99,7 +99,7 @@ The controls and the DRA gate's interpretation are recorded in the sibling
 ## Results
 
 **Both functional gates passed**, on the first and only submission. The tested code
-is `59edac0`, descended from main `b4ebf9a` through the review-fix commit `3deec1b`.
+is `39a8e16`, descended from main `0b3668f` through the review-fix commit `79ba161`.
 House run `banc-candidate-gate-3b6b23`, job `205215ec9038`, ran on **<cluster-node> / NVIDIA B200 /
 PyTorch 2.11.0+cu128**: one job, four sequential probe processes, zero job failures.
 No parameter was changed after seeing these results. These are functional results
@@ -193,7 +193,7 @@ Each Result passed `Result.check()`. An independent read of the saved response
 vectors reproduced all sixteen direction decisions and both GF peaks. Male/BANC
 LIF, optic, body and receptor-table parameters match within each probe. The cluster
 snapshot has no `.git`, so each Result carries source-content fingerprints; the
-local committed source used for shipping is `59edac0`.
+local committed source used for shipping is `39a8e16`.
 `export.match_sources` verified every loaded source for all five Results (19-21
 files each, no differing or missing files). After attaching the completed evidence,
 a fresh CPU build reproduced the same candidate CSR and unchanged biological block.

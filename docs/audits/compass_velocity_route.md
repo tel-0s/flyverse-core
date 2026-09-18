@@ -42,7 +42,7 @@ Primary (Holm, m = 6, 6 v 6 exact U, floor 0.0022 x 6 = 0.013 -- satisfiable; m 
 6. `frac_confined_post` HGVp vs HGV: keeping EPG's DC input confines the bump (added with the HGVp arm, 2026-09-15, before submission).
 
 Descriptive (no verdict): bump survival / rate / width per arm as in 6A, the k-sweep (HGVk025, HGVk1 on HGV only),
-per-type ring rates (6B's recorded groups, merged at a41d0f2), PS196_b's own L-R at each k, the afferent / PS196_b /
+per-type ring rates (6B's recorded groups, merged at be549c8), PS196_b's own L-R at each k, the afferent / PS196_b /
 GLNO / PEN / DNa02 L-R per side. The turn in `cx_wedge` is a prescribed protocol parameter (`--turn 90
 --turn-window 0.5:3.5`), not a body: the instrument reads the prescribed yaw, and the body-driven version is the
 room run that follows a result. Batch: 8 arms x 6 seeds = 48 jobs in two `cluster_run.py` calls, `out/cx8/batch.sh`,
@@ -342,7 +342,7 @@ is pasted from the same file (`files`, `run_ids`), so every value below has an e
 
 ### 5.6 Provenance, invalid attempt and validation
 
-Valid source: `2b3df26`; batch generated before submission and declaration frozen after main merge/push.
+Valid source: `8d0c6ac`; batch generated before submission and declaration frozen after main merge/push.
 Freeze: `2026-09-15T21:12:44Z`; submission: `2026-09-15T21:13:05.390018+00:00`.
 Frozen JSON SHA-256: `1e220af99ae700c9617bb0ecb538d62d78ba128405820799fdfc733147e214aa`.
 Wrapper SHA-256: `4a65f69adb42cc72a170c7d75616e9c84fe130838bbd5d5cc1ec0d42239d3444`; manifest SHA-256: `50a3474d642e03b43bb6bc55f11775484da24ab75a972e3606fab51f7b84f25c`.
@@ -701,7 +701,7 @@ list means no qualifying measurement; it is distinct from the literal statistica
 
 ### 6.7 Provenance, self-review and handback
 
-The declaration was frozen at **2026-09-15 21:46:49 UTC** on merged/pushed main `dc98bfe`.
+The declaration was frozen at **2026-09-15 21:46:49 UTC** on merged/pushed main `036e512`.
 The one house submission began at **21:47:13.104742 UTC**; all six seed jobs completed, zero failures,
 and all 36 JSON/NPZ/console triplets were fetched. The local `submitted_at.txt`, `client_stdout.txt`
 and unchanged `predeclared_archive.json` preserve the submission record.
@@ -722,7 +722,7 @@ Reproduction, CPU only after fetch:
 
 ```text
 python scripts/cx8_transfer.py analyse --out out/cx8t
-python scripts/cx8_transfer_verify.py --runs out/cx8t --reference out/cx8r --commit dc98bfe
+python scripts/cx8_transfer_verify.py --runs out/cx8t --reference out/cx8r --commit 036e512
 python scripts/cx8_transfer_plot.py --runs out/cx8t/analysis/runs.csv --out out/cx8t/analysis/transfer.png
 ```
 
@@ -736,7 +736,7 @@ confinement rule and a 5e-5 absolute / 1e-6 relative float32 reduction tolerance
 The separate source/control verifier ties **all 72 frozen source hashes and all 58 recorded source
 hashes** to the submitted commit. Three recorded files were not in the frozen source list:
 `flyverse/data/manifest.json`, `scripts/interp_export.py`, `scripts/probe_object_sweep.py`; their
-hashes agree with `dc98bfe` as a retrospective source check. They are not described as frozen.
+hashes agree with `036e512` as a retrospective source check. They are not described as frozen.
 All six H0 seeds exactly reproduce the earlier HG run's **138 metrics and 31 NPZ arrays per seed**.
 Output: `out/cx8t/verification/sources_and_control.json`. The separate verifier and plot generator
 were added after submission and do not change any simulation or analysis result.
@@ -837,10 +837,10 @@ VERDICT: mostly sound
 ```text
 CLAIMS:
 1. cx8 invalidation -- REPRODUCED, and the runs were fine: declarations differ only in protocol.receptor_net_rule class/abs; all 96 run records say sign/abs; cx8 vs cx8r 6,966/6,966 metrics and 1,560/1,560 NPZ arrays exactly equal. "144 metadata issues" reproduces only from the retained out/cx8/invalid_analysis/analysis.json (48 x 3, reducer analysis_sha256 307ede2c...); the corrected reducer gives 48, and cx8_verify.py gives 48 model-to-declaration issues.
-2. cx8r's six primaries -- REPRODUCED exactly, twice: +2.2183/z 1671.8089/p 0.0021645/p_holm 0.012987; 0v2 and 0v1 with eligible ids HG_s0#0, HG_s4#0, HGV-_s4#0; +0.7813/z 0.4221; 0.0000/p 1.0; -0.2637/z -2.3613/p_holm 0.012987. Gate was frozen pre-submission -- follow_gate_confined_frac 0.5 is in out/cx8/predeclared.json (20:59:55Z, submitted 21:00:59Z) and audit sections 1-4 are byte-identical from a20d0ed to HEAD. Vocabulary -- NOT REPRODUCED: common.compare([], vb) returns underpowered (n_min 0), the script never calls it for those rows (cx_velocity_route.py 424-425 hardcodes the string), and INTERP 2.4/10.2 reserve undetermined for a deterministic (SD 0) reference.
+2. cx8r's six primaries -- REPRODUCED exactly, twice: +2.2183/z 1671.8089/p 0.0021645/p_holm 0.012987; 0v2 and 0v1 with eligible ids HG_s0#0, HG_s4#0, HGV-_s4#0; +0.7813/z 0.4221; 0.0000/p 1.0; -0.2637/z -2.3613/p_holm 0.012987. Gate was frozen pre-submission -- follow_gate_confined_frac 0.5 is in out/cx8/predeclared.json (20:59:55Z, submitted 21:00:59Z) and audit sections 1-4 are byte-identical from 838d999 to HEAD. Vocabulary -- NOT REPRODUCED: common.compare([], vb) returns underpowered (n_min 0), the script never calls it for those rows (cx_velocity_route.py 424-425 hardcodes the string), and INTERP 2.4/10.2 reserve undetermined for a deterministic (SD 0) reference.
 3. Physical picture -- REPRODUCED. Afferent reaches both cells with a side: AFF 42.61/0.00, PS196b 0.00/18.16, GLNO 2.59/0.37 in V and 69.17/65.37 in HGV. The bump is not absent in HG/HGV/HGV-: vector strength ~0.72, in-block fraction 0.95-1.00, 158-163 Hz, 3.92 wedges, survival ~4.8 s -- the confined predicate fails mostly on its out_above <= 3 clause (epg_out_mean_post 14-52 Hz). S, V and HGVp have no bump at all (all six frac_confined_post = 0.0000). Joint ledger 0/48. Confined-frame slopes: HG_s0 +0.137, HG_s4 -0.086, HGV-_s4 -0.069, HGV_s3 +0.171 w/s vs ideal +4.0; HGV_s4's +13.2114 collapses to +3.315 on its confined frames. So a hump forms and does not rotate. Sign control partly fails, unreported: GLNO L-R does not reverse in HGV- (+0.6862 +- 1.9132, positive in 4/6) and no V- arm exists.
 4. cx8t -- REPRODUCED exactly: 36 runs / 0 problems / 648 trace checks; +149.0748 z 16.8905, +2.9939 z 3.1904, +12.5861 z 12.6558, +9.7340 z 9.0518, all p 0.0021645 / p_holm 0.0086580. Suppression reproduced (24.0426 -> 5.0211/3.6345; stimulated side 90.2/90.1, opposite 18.52/12.74). The HR-CR sign failure IS an artefact of the operating-state shift: cut alone H0-C0 = +11.3997; challenge HL-H0 = +1.4585, HR-H0 = -1.5353; challenge-attributable part of contrast 3 = +1.1864 and of contrast 4 = -1.6657, i.e. the predicted sign in both. The baseline shift is ~7x the challenge, so contrast 4 as declared could not have been negative at any biology. The audit's refusal to infer unitary transfer or a receptor sign is justified, not over-cautious -- but it hides this decomposition.
-5. H0 == HG -- REPRODUCED: 138 metrics / 31 arrays for all six seeds, 72 frozen + 58 recorded hashes tied to dc98bfe.
+5. H0 == HG -- REPRODUCED: 138 metrics / 31 arrays for all six seeds, 72 frozen + 58 recorded hashes tied to 036e512.
 6. Provenance -- REPRODUCED. Presets/instruments/holds per arm exactly as tabled; md5 sharing ef23cc27... for S+V (12 runs) and 7a10d93b... for the 36 relabelled cx8r runs + all 36 cx8t runs; 48/48 and 36/36 consoles say device cuda, all NVIDIA B200 on one node, blocks fam_s0..s5 (8 and 6 jobs, no one-job block, no device crossing); declarations 1e220af9.../16a9230d... byte-equal to archives; 70/70, 70/70, 72/72 frozen source hashes match their commits, zero recorded-hash mismatches.
 7. Per-seed lists and plots -- REPRODUCED: 202/202 audit rows (88 + 114) match an emitted per_seed.csv row exactly; 20/20 spot-checks re-derived from run JSONs; both docs/audits/assets/ PNGs md5-identical to the analysis outputs. Caption REFUTED: cx8_plot.py loops ('HG','HGV','HGV-') x 6 seeds = 18 of 48 NPZs, not "every NPZ".
 8. Prose/tables/vocabulary/branch -- REPRODUCED: 5.1 Answer and Report.summary byte-identical; 5.4's three tables reproduce cell for cell; "all six V exceed all six S" true (V min 0.8462 vs S max 0.0015). "The round-7 afferent following gate remains unmet" is true as written. The branch chosen is exactly the one the freeze prescribes, one batch only. No claim beyond what the arms can show.

@@ -15,6 +15,7 @@ import numpy as np
 
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from probe_compass_driver import measure
+from flyverse.interp.common import resolve_commit
 
 
 def read(path):
@@ -265,15 +266,18 @@ def publication(root, capture_dir, lifetime_dir):
         assert 'flyverse/compass.py' in shared and len(shared)==51
         assert all(files[k]==frozen['source_sha256_lf'][k] for k in shared)
         verified.append(dict(record=i,matched_files=len(shared)))
-    revisions=('61d9415','efdfbb7','f7bcd48','ac7ebc3','8ba1818','45eb6b6')
+    revisions=('497589d','89bf14b','07cf966','3aa676c','17205bb','3742a57')
     snapshots=[]
     for n,commit in enumerate(revisions,1):
         folder=root if n==1 else root.with_name(root.name+f'_r{n}')
         wanted=read(folder/'predeclared.json')['source_sha256_lf']
+        # An id from before the 2026-09-17 rewrite is read through the map (docs/INTERP.md 10.4 rule 30).
+        resolved=resolve_commit(commit)
         for path,h in wanted.items():
-            data=subprocess.check_output(['git','show',f'{commit}:{path}'],cwd=ROOT)
+            data=subprocess.check_output(['git','show',f'{resolved}:{path}'],cwd=ROOT)
             assert hashlib.sha256(data.replace(b'\r\n',b'\n')).hexdigest()==h,(commit,path)
-        snapshots.append(dict(batch=folder.name,archive_commit=commit,matched_files=len(wanted)))
+        stamped=resolved if resolved==commit else f'{resolved} (recorded {commit})'
+        snapshots.append(dict(batch=folder.name,archive_commit=stamped,matched_files=len(wanted)))
     data=dict(source_snapshots=snapshots,final_provenance=verified,final_cuda_checks=fixture['checks'],
               final_profile=profile(lifetime_dir/'profile_native.json'),final_matched_input_identity=final['identity'])
     (out/'final_checks.json').write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')

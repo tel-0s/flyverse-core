@@ -1,6 +1,6 @@
-# Review of `feat/extensibility` (0321b56) against `docs/EXTENSIBILITY_SPEC.md`
+# Review of `feat/extensibility` (4f56dcb) against `docs/EXTENSIBILITY_SPEC.md`
 
-Independent read-only review (Opus, 2026-09-13) of Astra's implementation branch (one commit on `d89155b`, 21 files,
+Independent read-only review (Opus, 2026-09-13) of Astra's implementation branch (one commit on `b5463af`, 21 files,
 +2,242), run in its worktree `flyverse-refactor`; nothing edited. **Verdict: merge with fixes** (B1-B3), after the
 round-2 working tree lands, because the surrogate-gradient optic substep must be rewritten against main's final
 `_recurrent`.

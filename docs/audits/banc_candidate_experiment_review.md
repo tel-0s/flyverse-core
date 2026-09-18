@@ -1,6 +1,6 @@
-# Review: `docs/banc-lattice-review` (3deec1b) and `feat/banc-candidate-experiment` (4b25b37)
+# Review: `docs/banc-lattice-review` (79ba161) and `feat/banc-candidate-experiment` (715d1ac)
 
-Read-only review. Worktree `D:\Projects\flyverse-connectome`; main `D:\Projects\flyverse` at `b4ebf9a`, read
+Read-only review. Worktree `D:\Projects\flyverse-connectome`; main `D:\Projects\flyverse` at `0b3668f`, read
 but never written. Both worktrees are byte-unchanged by this review (`git status` clean in the review
 worktree; main still carries exactly the other agents' edits). All runs CPU-only
 (`PYTHONIOENCODING=utf-8 CUDA_VISIBLE_DEVICES=-1`), no cluster job. Everything I ran went to the scratchpad
@@ -15,21 +15,21 @@ matters because the reconstruction is thread- and BLAS-sensitive (see B2 below).
 
 | branch | verdict |
 |---|---|
-| `docs/banc-lattice-review` @ 3deec1b | **Merge.** Every B1-B3 fix and every nit is present and every number I recomputed reproduces, including the root cause of B2 that the review could not find. |
-| `feat/banc-candidate-experiment` @ 4b25b37 | **Merge with fixes.** The isolation is real and complete, the acceptance runs reproduce bit-for-bit on my CPU, and the construction is honest. Three things must change first: a now-false statement in `docs/CONTROL_SURFACE.md`, two undisclosed asymmetries that inflate the one cross-dataset number the branch reports (the loom GF row), and an unsourced cartridge rule. |
+| `docs/banc-lattice-review` @ 79ba161 | **Merge.** Every B1-B3 fix and every nit is present and every number I recomputed reproduces, including the root cause of B2 that the review could not find. |
+| `feat/banc-candidate-experiment` @ 715d1ac | **Merge with fixes.** The isolation is real and complete, the acceptance runs reproduce bit-for-bit on my CPU, and the construction is honest. Three things must change first: a now-false statement in `docs/CONTROL_SURFACE.md`, two undisclosed asymmetries that inflate the one cross-dataset number the branch reports (the loom GF row), and an unsourced cartridge rule. |
 
-3deec1b is an ancestor of 4b25b37, so merging branch 2 brings branch 1 with it.
+79ba161 is an ancestor of 715d1ac, so merging branch 2 brings branch 1 with it.
 
 ---
 
-# Branch 1 — `docs/banc-lattice-review` @ 3deec1b
+# Branch 1 — `docs/banc-lattice-review` @ 79ba161
 
-`git diff b4ebf9a..3deec1b --stat`: 3 files, +202 / -27.
+`git diff 0b3668f..79ba161 --stat`: 3 files, +202 / -27.
 `docs/audits/banc_column_reconstruction.md` +91, `scripts/recover_banc_columns.py` +133,
 `tests/test_banc_columns.py` +5. **`flyverse/` untouched.** Nothing under `out/` or `cache/`.
 
-`scripts/recover_banc_columns.py` and `tests/test_banc_columns.py` are byte-identical at 3deec1b and
-4b25b37, so everything below tests branch 1's script exactly even though I ran it from the branch-2
+`scripts/recover_banc_columns.py` and `tests/test_banc_columns.py` are byte-identical at 79ba161 and
+715d1ac, so everything below tests branch 1's script exactly even though I ran it from the branch-2
 checkout (whose only `flyverse/` deltas are inert on this path — verified in branch 2, section 1).
 
 ## 1. Every B1-B3 fix is present and correct
@@ -54,7 +54,7 @@ My run of `python scripts/recover_banc_columns.py --out <scratch> --fafb-control
 **B2 (BANC diagnostics not regenerable).** The audit's tables are regenerated and a fingerprint block
 sits beside them (`:79-96`). Every figure reproduces on my machine to the digit:
 
-| quantity | audit @ 3deec1b | my run |
+| quantity | audit @ 79ba161 | my run |
 |---|---:|---:|
 | right: Mi1 seeds / sites / neighbour edges | 878 / 877 / 2,374 | 878 / 877 / 2,374 |
 | right: collisions / displaced / step agreement | 64 / 136 / 82.39 % | **64 / 136 / 82.3926 %** |
@@ -68,16 +68,16 @@ Note the T4d cosine: the independent review's table said `.9996363`; the *audit*
 the audit is right — my run gives 0.99962629. The reviewer's digit was the transposed one.
 
 The fingerprint block also checks out: `generator SHA256 a0630eca…` is exactly
-`git show b4ebf9a:scripts/recover_banc_columns.py | sha256sum`, i.e. the block correctly identifies the
-*b4ebf9a* generator for a table regenerated with the b4ebf9a reconstruction code, and my own run's
-generator hash is the different `c276340…` of the 3deec1b script (which changed only in ways that do
+`git show 0b3668f:scripts/recover_banc_columns.py | sha256sum`, i.e. the block correctly identifies the
+*0b3668f* generator for a table regenerated with the 0b3668f reconstruction code, and my own run's
+generator hash is the different `c276340…` of the 79ba161 script (which changed only in ways that do
 not touch the solve). The raw-data hashes match my disk:
 `neurons.csv.gz 40a2201554a8c34d…`, `connections_princeton.csv.gz 8772298eb6945575…`.
 
 **And the branch found the cause the review could not.** The audit claims (`:88-92`) that setting
-`OMP_NUM_THREADS`/`OPENBLAS_NUM_THREADS` to 4 reproduces the *original* 7ffe957 numbers. I reran the
+`OMP_NUM_THREADS`/`OPENBLAS_NUM_THREADS` to 4 reproduces the *original* ebd6f26 numbers. I reran the
 committed script under `OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4` and got **right 65 collisions /
-139 displaced / 82.013 % step agreement, left 116 / 179** — the 7ffe957 row exactly. So B2 was a
+139 displaced / 82.013 % step agreement, left 116 / 179** — the ebd6f26 row exactly. So B2 was a
 BLAS-thread-count difference at the `np.rint` boundary, not a different script or cache, and
 `report.json` now records `thread_environment` so a future run is self-identifying. This is a
 better resolution than the fix the review asked for.
@@ -122,7 +122,7 @@ My run printed
 `Integration gate: {'i_dra_rim': 'fail', 'ii_lr_mirror': 'unavailable', 'iii_t4_direction': 'pass',
 'iv_column_count': 'pass'}` and **exited 2** — as designed and as documented. Exit 2, not 0, and not
 because of the new holdout: the holdout controls run in a separate `review_controls` block and never
-feed `checks`, so the gate's inputs are unchanged from b4ebf9a. `unchanged_fingerprints`
+feed `checks`, so the gate's inputs are unchanged from 0b3668f. `unchanged_fingerprints`
 `{malecns: true, banc: true}`, `synthetic_nodes_added: 0`, `synthetic_edges_added: 0`,
 `malecns_cache_md5` all three matching.
 
@@ -130,7 +130,7 @@ feed `checks`, so the gate's inputs are unchanged from b4ebf9a. `unchanged_finge
 
 - `docs/audits/banc_column_reconstruction.md:246-253` ("Subsequent owner scope") announces the branch-2
   experiment inside branch 1. It is accurate and it says the diagnostic gate remains closed, but it makes
-  3deec1b non-self-contained: merged alone, it forward-references an audit file that does not exist.
+  79ba161 non-self-contained: merged alone, it forward-references an audit file that does not exist.
 - `review_controls()` re-runs `recover_eye` four times and re-reads FAFB, roughly doubling wall time
   (my full `--fafb-control --review-controls` run was ~4 min). Fine for a flag, worth a docstring note.
 - `review_controls()` raises `ValueError` if the DNa02 budgets are unavailable, so a release without raw
@@ -139,9 +139,9 @@ feed `checks`, so the gate's inputs are unchanged from b4ebf9a. `unchanged_finge
 
 ---
 
-# Branch 2 — `feat/banc-candidate-experiment` @ 4b25b37
+# Branch 2 — `feat/banc-candidate-experiment` @ 715d1ac
 
-`git diff b4ebf9a..4b25b37 --stat`: 16 files, +15,649 / -48. 10,600 of those lines are
+`git diff 0b3668f..715d1ac --stat`: 16 files, +15,649 / -48. 10,600 of those lines are
 `flyverse/data/banc_candidate_columns.csv` and 3,941 are `flyverse/data/banc_candidate_vision.json`.
 Nothing under `out/` or `cache/` is committed (both are in `.gitignore`); `docs/HANDOFF_CONNECTOME_REPLY.md`
 is correctly ignored by `docs/HANDOFF_*.md`.
@@ -177,7 +177,7 @@ I could not find anything that runs on the MaleCNS path.
 
 I wrote an independent harness (`scratchpad/harness_gate.py`) that loads MaleCNS, BANC and FAFB, computes
 the CSR md5 itself rather than trusting `connectome_fingerprint`, and ran it against **both** the branch-2
-worktree and main at b4ebf9a.
+worktree and main at 0b3668f.
 
 | check | result |
 |---|---|
@@ -195,7 +195,7 @@ identical, so this is not a regression. One caveat for whoever reruns it: on thi
 `PermissionError: [WinError 5] … \Temp\pytest-of-ethee` unless `--basetemp` is redirected — a sandbox
 permission on the system temp root, not a code defect. With `--basetemp=<scratch>` all four pass.
 
-**Plain `load(dataset="banc")` is unchanged.** Harness run on branch 2 vs on main b4ebf9a, every field
+**Plain `load(dataset="banc")` is unchanged.** Harness run on branch 2 vs on main 0b3668f, every field
 identical except the new `vision` attribute existing and returning `None`:
 
 | | value |
@@ -517,8 +517,8 @@ the literature — which is in fact what the code does, and is a perfectly good 
 
 ## 7. Merge map
 
-- `git merge-tree` against main `b4ebf9a`: **clean for both branches**, zero conflict markers.
-- 3deec1b is an ancestor of 4b25b37.
+- `git merge-tree` against main `0b3668f`: **clean for both branches**, zero conflict markers.
+- 79ba161 is an ancestor of 715d1ac.
 - **Neither branch touches any file with uncommitted work in `D:\Projects\flyverse`**:
   `flyverse/body.py`, `flyverse/senses.py`, `scripts/probe_vnc_drive.py`, `scripts/cx_wedge.py`,
   `tests/test_proprioception.py`, `tests/test_body_cycle.py` — 0 hits each. The untracked files there

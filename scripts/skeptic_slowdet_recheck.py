@@ -48,7 +48,7 @@ def commands() -> list[str]:
 def cpu_checks():
     """CPU-only re-checks of the two scripts/benchmark.py edits (no GPU, no simulation):
 
-    1. the with_counts crash the round-4 report claims for HEAD b5e6ae2: `rs = brain._receptor(c, lif)` (no counts)
+    1. the with_counts crash the round-4 report claims for HEAD 79769c3: `rs = brain._receptor(c, lif)` (no counts)
        handed to a Brain whose slow class has a non-zero scale must raise
        ValueError('the slow term needs receptor_signs(..., with_counts=True)') in brain._slow_weights;
     2. the fix's inertness: receptor_signs(c, net_rule='abs') with and without with_counts must agree entry for

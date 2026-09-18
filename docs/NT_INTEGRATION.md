@@ -407,7 +407,7 @@ contested-flip table (48,295 entries = 0.148 % of |W|; `None` restores the presy
 (pre-round-3) -- all pinned in `tests/test_receptor_model.py`. Suite 27/0/2 (walk.power_max 48.5 vs a hand-set 50 Hz
 bound); costs: KC_active 816 vs 1426, and the room take-off excess (voluntary 2.2 + escape 1.7 vs 0 + 0.6 per 1,000
 fly-s), which neither the KC / DN1 holds nor the DNp01 inhibition accounts for. **Dynamics round 1 (2026-09-12)
-changed no default**: `git diff -- flyverse/` is empty at 305f507, and every gain it used -- the compass gE / gD
+changed no default**: `git diff -- flyverse/` is empty at b2cfe15, and every gain it used -- the compass gE / gD
 operating points, the GLNO=gaba relabel, the feeding drain scales -- was an experiment override, stated as such in
 its own audit. The weight md5s above therefore still describe the shipped model.
 

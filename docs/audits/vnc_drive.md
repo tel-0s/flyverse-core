@@ -507,7 +507,7 @@ input" and the tonic terms are input.
 
 ## 9. Open items on the transducer's own files (not this task's; carried here so the record is straight)
 
-Checked on the tree at submission (`git status`: the transducer's edits are uncommitted; HEAD 653179b):
+Checked on the tree at submission (`git status`: the transducer's edits are uncommitted; HEAD c78cb93):
 
 1. `proprioception_transducer.md` 1 and KEY CLAIM 9 still read "agree on the sign on 176 of the 180 cells where the
    laterality is decisive (|lat| > 0.2) and disagree on 4"; the skeptic's count is **173 of 177 decisive, 4 disagree**,

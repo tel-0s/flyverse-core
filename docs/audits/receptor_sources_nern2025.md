@@ -327,7 +327,7 @@ and the experimental data do not support (T1 expresses none of the standard mark
 
 ## 8. Round-2 changes (verify:tables:nern2025 corrections applied; old -> new)
 
-All values from this run of `scripts/build_type_map_nern2025.py` versus the round-1 doc (git HEAD c0332e3).
+All values from this run of `scripts/build_type_map_nern2025.py` versus the round-1 doc (git HEAD 5d6198d).
 
 | item | round 1 | round 2 |
 |---|---|---|

@@ -29,7 +29,7 @@ One `cluster_run.py` call, 30 jobs (2 protocols x 3 arms x 5 runs), 0 failed, 8.
 `out/trv/*.txt`); the JSON sidecars carry the resolved LIFParams (receptor `sign` / `abs`) and OpticParams, the cache
 fingerprint `ef23cc27bea13be7f6a96f3c04fd3737`, the backend flags (event_driven, cuda_kernels, cuda_sparse warp) and
 the retina record (1,466 columns, column -> photoreceptor bodies). `flyverse_commit` is `unknown` inside the per-run
-cluster copy (no `.git` there); the analysis block of every Result records the local commit (`0d32fd6`, dirty with the
+cluster copy (no `.git` there); the analysis block of every Result records the local commit (`2dede31`, dirty with the
 untracked toolkit files).
 
 ```

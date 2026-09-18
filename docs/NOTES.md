@@ -1418,7 +1418,7 @@ through the suite again -- none of the 29 existing checks scores it.
 ## Session 10, dynamics round 1 (2026-09-12)
 
 Five threads (compass-room, compass-shift, optic-audit, takeoff-hold, feeding-horizon), five Opus skeptics,
-~60 cluster jobs, 0 failed. **No model default changed**: `git diff -- flyverse/` is empty at 305f507, and the
+~60 cluster jobs, 0 failed. **No model default changed**: `git diff -- flyverse/` is empty at b2cfe15, and the
 compass gains (gE / gD) and the drain scales were experiment overrides, stated as such. Audits:
 `docs/audits/compass_room.md` and `cx_shift.md` (both still stubs -- see the process lessons; R2-0 fills them),
 `optic_measures.md`, `feeding_horizon.md`, `receptor_integration.md` G.5.
@@ -2026,7 +2026,7 @@ number unchanged and the primary families identical) and the ladder re-exported
 `spearman_p_perm` there). One cost of the re-emit: the 2026-09-14 directories were written from a
 working tree that had drifted since the batch, so their `flyverse_commit` reads `unknown` with
 `source_match.verified false` (19/29 loaded, 30/43 glob), where the 2026-09-13 directories carry
-commit `653179b4...` verified 29/29 and 43/43. The compare audit doc was stamped 22:07:27Z, after
+commit `c78cb93d...` verified 29/29 and 43/43. The compare audit doc was stamped 22:07:27Z, after
 the 22:06:37Z submission; its `predeclared.json` (22:04:04Z) is the real stamp and the two are
 byte-identical.
 
@@ -2356,7 +2356,7 @@ sources. Ranked uses are in `TODO.md` section F; nothing here changed a model.
 
 ### Session 11 addendum: connectome backends merged (2026-09-14)
 
-Astra implemented `docs/CONNECTOME_BACKENDS_SPEC.md` on `feat/connectome-backends` (d9f8cf2) and an independent Opus
+Astra implemented `docs/CONNECTOME_BACKENDS_SPEC.md` on `feat/connectome-backends` (7937f01) and an independent Opus
 review (`docs/audits/connectome_backends_review.md`) verified it with its own harness: a full MaleCNS recompile with the
 branch code reproduces the shipped cache byte for byte, file for file (neurons.parquet c50c598a..., W_post_pre.npz
 ac131529..., sign0_counts.npz bf01d724...; fingerprint md5 ef23cc27... unchanged, key set unchanged); the FAFB column map
@@ -2365,7 +2365,7 @@ hex1 = q + 18, hex2 = p + 20 passes the mirror (max 1.583 deg over 772 shared co
 check (100/126 on the flat dorsal band; 118/126 within two rows of the curved envelope) -- recorded as an expected failure
 in the acceptance gate, not hidden. Verdict merge with fixes; B1-B4 (BANC wing MNs silently empty through a naming gap,
 `$FLYVERSE_CACHE` moving the MaleCNS default, a FAFB cache built by an earlier compiler, the gate omitting the failing
-validation) fixed in 34c2eb0 and merged fast-forward. CPU suite 360 passed / 19 skipped. `docs/audits/connectome_backends.md`
+validation) fixed in cfaa694 and merged fast-forward. CPU suite 360 passed / 19 skipped. `docs/audits/connectome_backends.md`
 carries the numbers; the walking replicate (BANC, 5 seeds x 16 flies, house B200, one submission) is the first
 cross-connectome behavioural result: the female CNS walks straighter than the male at the shipped defaults (clean yaw SD
 0.275 +/- 0.004 vs 2.641 +/- 0.146 deg/s; DNa02 silent bilaterally) and the leg-cycle yaw increase replicates
@@ -3053,7 +3053,7 @@ flies and feeds":
   Re-running the same command with the same seeds gives a different trajectory and could give a different feeding
   outcome.
 
-**The code state.** `raw` is byte-identical: the bit-identity golden predates the instrument branch (96c9a24, an
+**The code state.** `raw` is byte-identical: the bit-identity golden predates the instrument branch (96cfdaf, an
 ancestor of it), the three cache MD5s are unchanged (`c50c598a...`, `ac131529...`, `bf01d724...`) with compiled
 CSR `ef23cc27bea13be7f6a96f3c04fd3737`, and the CPU suite is 503 passed / 19 skipped. **No default moved**
 anywhere in `flyverse/` or `scripts/`; every change is a new trailing keyword with a neutral default. Three
@@ -3068,9 +3068,9 @@ program-shaped stand-ins as instruments and they have to say so; `_check_instrum
 body-derived inputs and effect route in `describe()`: `hunger`'s record used to read `reads {} / writes {}`, which
 implied it did nothing while it gates plume's turn and flight's lift.
 
-**Process notes.** The first is Fable's own: the WIP commit 62cdefb's message said "the Report block is complete"
+**Process notes.** The first is Fable's own: the WIP commit ad2efc0's message said "the Report block is complete"
 while the file still carried five `PENDING_*` placeholders -- a breach of `docs/INTERP.md` 10.4 rule 7's
-placeholder gate, recorded here rather than quietly fixed. `instruments_review.md` reviewed `a41d0f2..6d1c501`
+placeholder gate, recorded here rather than quietly fixed. `instruments_review.md` reviewed `be549c8..c37d0b4`
 and reported 468/469 passing; it never saw `compass.py`, `navigation.py`, `interoception()` or the four
 navigation instruments, and it now says so at the top -- its "no new body-to-neural-module interface was
 introduced" is scoped to that range, because `interoception()` plus the four `observe_*` receivers are exactly
@@ -3108,6 +3108,25 @@ full-history grep returning nothing. Every commit SHA changed; the ten remote br
 pre-rewrite bundle is kept outside the repository. Audit prose that quoted a run directory or a host now reads the
 placeholder, which is the convention the audits already used. `tests/test_cluster_run.py`'s canned scheduler
 fixture was renamed by the same map and still passes (74 passed with the bit-identity and instrument files).
+
+## Session 13, continued: the transduced-contrast plume law (2026-09-17)
+
+Astra answered TODO B's question on the CPU before any room ran: read the bilateral cue from the model's own ORN
+population rates (708 L / 1,396 R, weighted to equal glomerular mass per side -- the imbalance is a reconstruction
+artefact, per-glomerulus ratios 0.08-13) instead of the physical field, and at the shipped ORN law
+`1 + 150c/(c+0.5)`, the 100 ms rate filter and the 250 ms contrast filter, the 0.26-1.1 % contrast the rooms saw
+arrives at **0.02-0.06 Hz against 0.22-0.27 Hz of window noise -- cascade SNR 0.16-0.34**, correct sign in
+0.667 of windows (analytic 0.635), the commanded turn indistinguishable from the zero-contrast one. The estimate is
+conservative (every ORN has synaptic input; shared drive lowers the ratio). So the shipped plume instrument finds
+food on a cue the fly's sensory neurons cannot resolve at these concentrations. The independent skeptic reproduced
+every number and **refuted the mechanism as shipped**: the per-glomerulus weights were applied to the wrong cells
+because the scheduler sorts read selections and the group builder did not (+3.58 Hz L-R under symmetric odour, a
+constant +88.8 deg goal offset; the tests missed it because the fixture's order coincided with the table's).
+Fixed at 9c74945 with a regression test on a non-ascending fixture, corrections applied, merged at ca23768. The
+18-room comparison (full / transduced / goal-only, six seed-drawn starts) is frozen as v3 and waits for the GPU
+pool; it will be quoted as mean +- across-run SD, and it answers a different question than the SNR does -- whether a
+moving, casting loop can use a 64 %-correct sign at 4 Hz, and whether it is the DNa02 feedback bridge rather than
+the cue that finds food. Nothing adopted; raw untouched (532 passed / 19 skipped).
 
 ## Batched brains and the RL environment
 
@@ -3328,7 +3347,7 @@ all 36 runs; no run passes the joint compass ledger and no stimulated arm has a 
 challenge-window confinement. The suite/odour-room gate from the afferent experiment remains unmet.
 
 All 36 runs match the frozen declaration and all 648 trace checks pass. The source/control verifier
-checks 72 frozen and 58 recorded source hashes against submitted commit dc98bfe; the three recorded
+checks 72 frozen and 58 recorded source hashes against submitted commit 036e512; the three recorded
 files outside the frozen list are identified as retrospective checks. All six H0 controls reproduce
 the earlier HG metrics and arrays exactly. Every per-seed row and the operating-state plot are in
 `docs/audits/compass_velocity_route.md` section 6. Nothing adopted; no second follow-up submitted.
@@ -3385,7 +3404,7 @@ All-four brain-frame timing observations: 1.015 / 4.152 / 13.969 ms at B=1/8/32 
 gate fails, including rate/spike differences at B=8/32, so no clean causal overhead or whole-room equality
 claim. UI smoke with brain map passes. No gains fitted, no preset admission/default adoption; independent
 skeptic pending. Sources, declarations, every per-room row, failures and reproducible derived tables:
-`audits/navigation_instruments.md`. Implementation 3cac3cc; lifecycle provenance correction c7ead86.
+`audits/navigation_instruments.md`. Implementation bbb0e2f; lifecycle provenance correction b2e521e.
 
 ## Flight gives foraging priority (Astra, 2026-09-15)
 
@@ -3405,7 +3424,7 @@ is still unreliable. This fixes perpetual flight, not the remaining navigation p
 CPU 500 passed / 19 skipped / 220 subtests; original golden and both cache copies unchanged.
 All constants frozen before submission, no tuning or default adoption. Audit, exact per-row
 table, provenance checks and reproduction: `audits/flight_foraging_priority.md`.
-Implementation 266d274. Author self-review complete; independent skeptic pending Fable.
+Implementation be1d893. Author self-review complete; independent skeptic pending Fable.
 
 ## Plume steering reaches the motor circuit and local odor sources (Astra, 2026-09-16)
 
@@ -3424,7 +3443,7 @@ at least 1 s. The scalar room-demo check reaches food at 21.6 s, feeds 15 s and 
 some flies reach zero energy before feeding, and zero is not death in the shipped metabolism.
 
 CPU 503 passed / 19 skipped / 220 subtests; original golden and caches unchanged. Headless UI
-with brain map passes, without an interactive FPS claim. Source ef90c23, scalar harness 74f64de.
+with brain map passes, without an interactive FPS claim. Source 32acee2, scalar harness 6863f39.
 Exact rows, source-verified reproduction, trajectories, source limits and author self-review:
 `audits/plume_steering.md`. Independent skeptic pending Fable. Restart old plume episodes:
 the expanded sensory/feedback checkpoint state is intentionally incompatible.

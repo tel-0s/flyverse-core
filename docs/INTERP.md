@@ -1029,6 +1029,18 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
     thesis repositories, bioRxiv and the pages of the labs that own the circuit, and the search is named in the
     sentence; (iii) a withdrawn claim stays in the record as withdrawn, in the audit and in NOTES, never deleted.**
 
+30. **A history rewrite is followed by a commit-id sweep, and frozen records are read through the map.** The
+    2026-09-17 scrub (`git filter-repo` over all 161 commits, infrastructure identifiers -> placeholders) changed every
+    commit id. Blobs' content hashes did not change except in the scrubbed files, so every frozen source-hash set still
+    tied to its (renamed) commit -- content identity is the durable record (item 6) -- but every audit sentence,
+    reproduction command and analyser default that named a commit went stale, and one reproduction command crashed
+    on `git show <old id>:...`. **RULE: (i) after any rewrite, sweep every tracked text file for quoted commit ids and
+    remap them from the rewrite's own commit map, committed as `docs/audits/commit_map_<date>.json`; (ii) frozen run
+    records are NOT edited, whether under ignored `out/` directories or tracked (the six `out/compass_standin*/predeclared.json`) -- analysers that `git show` a recorded commit resolve it
+    through the map when the recorded id no longer exists (`flyverse.interp.common.resolve_commit`); (iii) an audit
+    quotes a commit as "`<new id>` (pre-rewrite `<old id>`)" only where the old id is needed to find a frozen record,
+    otherwise the new id alone; (iv) the pre-rewrite repository is kept as a bundle outside the repository.**
+
 ### 10.3 The minimal command sequence (an odour-to-DN question, as an example)
 
 ```bash

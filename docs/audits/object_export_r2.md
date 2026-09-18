@@ -44,7 +44,7 @@ Each rung directory holds **six object runs against six independent blank/blank 
 the one submission `objr2-6915ce`; `paired_control_ids` names the six recordings whose arm b gave `control_value`
 and `null_reference_ids` the six blank/blank runs, and the two sets are disjoint in every directory.
 
-**Provenance, as delivered.** Every manifest reads `commit 653179b4b0e218a338ae4c00471e163f3a4f3af3` with
+**Provenance, as delivered.** Every manifest reads `commit c78cb93d6d84283f7df248fcf4d97d44e3346f88` with
 `commit_verified: "by source hash (loaded scope): every one of the 29 source files the run loaded holds the content
 of this checkout"` -- and the glob scope agrees too (**43 of 43** files identical, no differences). A cluster job has
 no `.git`, so its own `flyverse_commit.commit` is `unknown`; this is `export.match_sources` against the recorded
@@ -194,7 +194,7 @@ as the superseded delivery, and the row hashes in the two tables above are their
 
 One cost of the re-emit, recorded rather than hidden: the 2026-09-14 directories were written from a working tree
 that had drifted since the batch ran, so their `flyverse_commit` reads `unknown` with `source_match.verified false`
-(19 of 29 loaded identical, 30 of 43 glob), where the 2026-09-13 directories carry commit `653179b4...` **verified
+(19 of 29 loaded identical, 30 of 43 glob), where the 2026-09-13 directories carry commit `c78cb93d...` **verified
 29/29 loaded and 43/43 glob** (section 1). For content-pinned provenance, read the 2026-09-13 pair; for the
 corrected `preference.csv`, read the 2026-09-14 ladder summary.
 

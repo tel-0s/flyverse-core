@@ -95,24 +95,7 @@ def make_instrument(c, name):
     if name in NAMED_INSTRUMENTS:
         from .navigation import RecurrentCompass, PlumeNavigation, HungerGain, FlightDrive
         return {'compass_ring':RecurrentCompass,'plume':PlumeNavigation,'hunger':HungerGain,'flight':FlightDrive}[name](c)
-    if isinstance(name,str) and name.split(':',1)[0]=='plume' and ':' in name:
-        # plume:feedback=0 (goal-only) / plume:walking_goal=0 (feedback-only): the opt-in variants of
-        # docs/audits/plume_goal_only.md; bare `plume` is the shipped law
-        from .navigation import PlumeNavigation
-        kwargs={}
-        for item in name.split(':')[1:]:
-            if '=' not in item:
-                raise ValueError(f"plume option {item!r} is not key=value (keys: feedback, walking_goal)")
-            key,value=item.split('=',1)
-            key=key.strip()
-            if key in ('feedback','feedback_gain_per_s'):
-                kwargs['feedback_gain_per_s']=float(value)
-            elif key=='walking_goal':
-                kwargs['walking_goal']=value.strip().lower() not in ('0','false','off','no')
-            else:
-                raise ValueError(f"unknown plume option {key!r} (keys: feedback, walking_goal)")
-        return PlumeNavigation(c,**kwargs)
-    if isinstance(name,str) and name.split(':',1)[0] in REGISTRY:
+    if isinstance(name,str) and name.split(':',1)[0] in {*REGISTRY, 'plume'}:
         return parse_instrument(name,c)
     raise ValueError(f'unknown instrument {name!r}; named instruments: {", ".join(NAMED_INSTRUMENTS)}')
 
@@ -455,7 +438,11 @@ class EdgeGain(EdgeHold):
 REGISTRY = {"sided_turn_afferent": SidedTurnAfferent}
 SPEC_HELP = ("NAME[:key=value]... e.g. sided_turn_afferent:k=0.5:sign=-1:cells=CB0675  "
              "(keys for sided_turn_afferent: k = Hz per deg/s in {0.25, 0.5, 1.0}, sign = +1 | -1, "
-             "cells = AN07B037 | CB0675 | GNG580 | PS047_b | all, max_hz)")
+             "cells = AN07B037 | CB0675 | GNG580 | PS047_b | all, max_hz); "
+             "plume:bilateral=concentration|orn:feedback=on|off:walking_goal=0|1 -- feedback=off and feedback=0 "
+             "are the same arm (DNa02 integral gain 0 /s; a number sets the gain), walking_goal=0 keeps the "
+             "pre-correction upwind / entry-memory goal; the canonical spelling of a configuration is in the "
+             "instrument's own describe()['parameters']['variant_spec']")
 
 
 def parse_instrument(spec, c):
@@ -466,8 +453,8 @@ def parse_instrument(spec, c):
         return make_instrument(c,spec)
     parts = [p.strip() for p in spec.split(":")]
     name, kv = parts[0], parts[1:]
-    if name not in REGISTRY:
-        raise ValueError(f"unknown instrument {name!r}; choose from {sorted(REGISTRY)}")
+    if name not in {*REGISTRY, 'plume'}:
+        raise ValueError(f"unknown instrument {name!r}; choose from {sorted(set(REGISTRY) | set(NAMED_INSTRUMENTS))}")
     kwargs = {}
     seen = set()
     for item in kv:
@@ -478,6 +465,24 @@ def parse_instrument(spec, c):
         if key in seen:
             raise ValueError(f"duplicate instrument option {key!r}")
         seen.add(key)
+        if name == "plume":
+            # `feedback=off` and `feedback=0` are the same arm (the DNa02 integral gain at 0 /s); a number sets the
+            # gain in Hz per unit error per second. docs/audits/plume_transduced.md, docs/audits/plume_goal_only.md.
+            text = value.strip()
+            if key == "bilateral" and text in ("concentration", "orn"):
+                kwargs[key] = text
+            elif key in ("feedback", "feedback_gain_per_s"):
+                if text == "on":
+                    kwargs["feedback_gain_per_s"] = None
+                elif text == "off":
+                    kwargs["feedback_gain_per_s"] = 0.0
+                else:
+                    kwargs["feedback_gain_per_s"] = float(text)     # "0" is the same arm as "off"
+            elif key == "walking_goal" and text.lower() in ("0", "off", "false", "1", "on", "true"):
+                kwargs["walking_goal"] = text.lower() in ("1", "on", "true")
+            else:
+                raise ValueError("plume options: bilateral=concentration|orn, feedback=on|off (off == 0, or a "
+                                 "gain per s), walking_goal=0|1")
         if name == "sided_turn_afferent":
             if key == "k":
                 kwargs["k_hz_per_deg_s"] = float(value)
@@ -489,6 +494,9 @@ def parse_instrument(spec, c):
                 kwargs["max_hz"] = float(value)
             else:
                 raise ValueError(f"unknown option {key!r} for {name}: {SPEC_HELP}")
+    if name == "plume":
+        from .navigation import PlumeNavigation
+        return PlumeNavigation(c, **kwargs)
     return REGISTRY[name](c, **kwargs)
 
 

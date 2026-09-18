@@ -82,7 +82,7 @@ upstream T2 / T3 responses, and the retinal sampling (a **replay** of the scene 
 controlled size-tuning assay**, because size and retinal position change together along this ladder.
 
 **Export location** (local, git-ignored; `run_id` directories, never mutable files; each `manifest.json` carries the
-commit `0d32fd6` + a per-file source fingerprint verified against the cluster run, the cache fingerprint
+commit `2dede31` + a per-file source fingerprint verified against the cluster run, the cache fingerprint
 (sum|W| 121,460,584), the resolved `LIFParams` / `OpticParams`, device `cuda` / NVIDIA B200, seeds, stimulus geometry
 and the unit table):
 
@@ -281,7 +281,7 @@ the superseded delivery:
 One provenance cost of the re-emit, stated up front: the 2026-09-14 directories were written from
 a working tree that had drifted since the batch ran, so their `flyverse_commit` reads `unknown`
 with `source_match.verified false` (19 of 29 loaded source files identical, 30 of 43 glob). The
-2026-09-13 directories carry commit `653179b4...` **verified 29/29 loaded and 43/43 glob**. The
+2026-09-13 directories carry commit `c78cb93d...` **verified 29/29 loaded and 43/43 glob**. The
 tables are otherwise identical apart from the four preference cells named at the end of this
 section; if you need the content-pinned provenance, read it from the 2026-09-13 pair.
 
