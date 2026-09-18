@@ -434,11 +434,20 @@ questions, not plans; none of them is authorized as a batch yet, and none licens
       (the box checkout is behind origin/main after the history rewrite; without `--ship flyverse,scripts` a
       batch runs the box's stale copy of every file outside the local diff), and the scheduler's `completed`
       status is no receipt (it lists a crashed job as completed with `exit_code None`).
-- [ ] **The 29-check suite under `instrumented`, three draws, with the three-instrument list**, beside the `raw`
+- [x] **The 29-check suite under `instrumented`, three draws, with the three-instrument list**, beside the `raw`
       column, as PRESETS_SPEC section 2 item 5 requires. The compass stand-in's own run already rejected
       admission on `taste.MN9_hz` (seed 1, 1.690456 -> 4.295961 Hz, FAIL -> PASS outside the declared heading
       gap, rejected regardless of its favourable direction), so the expectation is another rejection; the point
       is to have the instrumented column on the record.
+      **ANSWERED by round 8 item 3** (`docs/audits/instrumented_suite.md`, batches suite-inst and suite-inst-room):
+      the expected rejection did not come. No row changes status in 3 + 3 draws (27/0/2, 26/1/2, 27/0/2 under
+      both presets; taste.MN9_hz is raw's own instability, identical under the instruments; the compass row stays
+      KNOWN GAP), and the room rate-half at six seed-matched runs per arm passes (110 vs 101 take-offs over 28,800
+      fly-s each, one-sided exact p 0.291, run-level null). The list is ADMISSIBLE by the PRESETS_SPEC gate and
+      nothing is adopted; a fewer-meals descriptive (instrumented 1-4 vs raw 0-7 per run, null at 6 v 6) is on the
+      record. Tooling: `benchmark.py --hold-edges / --nt-override` (instrumented only), `instrumented_room.py`;
+      the benchmark adapter's drive setter no longer assumes a scheduler module (the first submission lost eight
+      checks per instrumented draw to that).
 
 Most useful experimental data, ranked by leverage: (1) receptor / conductance profiles for the unprofiled
 types and for DA / OA / 5-HT receptors; (2) per-type baseline firing in behaving flies (DN / AN / CX imaging);
