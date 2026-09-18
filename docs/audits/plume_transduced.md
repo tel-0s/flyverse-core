@@ -341,3 +341,23 @@ existing member payloads and the frozen ZIP headers/trailer; each member SHA-256
 complete archive MD5 were checked. All three isolated files now match the original frozen
 MD5s exactly (`isolated_cache_md5_receipt.json`). No shared cache, model source, declaration,
 start, arm or hash guard was changed. The node's training processes were untouched.
+
+### 6.2 Retry submitted; awaiting the authorized pool
+
+Retry `plume_transduced_v4-6cd353` was submitted at `2026-09-18T03:02:09Z` through the
+unchanged v4 wrapper with the isolated source/cache base. The scheduler submission receipt
+records **18 queued, 0 started**, all on the authorized second node with one GPU per job
+and pins 4,5,6,7 repeated in command order. Its reason is the unrelated training job
+occupying all eight GPUs, rather than an unavailable network or a source/hash refusal.
+The receipt is `out/plume_transduced_rooms_v4/scheduler_submission_receipt.json`; it is a
+submission/queue record, not a completion receipt or evidence of successful room execution.
+
+An independent CPU-only read of the actual retry run directory confirms **72/72 source
+hashes, 3/3 cache MD5s and the declaration SHA-256** match the v4 freeze
+(`active_run_preflight_receipt.json`). The waiting client remains responsible for fetching
+the named results directory. Its private configuration, run/job ids and logs are retained
+with `active_run.json`, `isolated_cluster_config.json` and `client_stdout.txt` in the same
+ignored directory. No room or behavioral numbers are available yet. After dispatch, each
+run still needs its console, GPU sidecar, complete trace, loaded provenance and output
+checks, followed by the frozen analysis and the independent skeptic. No resource outside
+the released pool is used.
