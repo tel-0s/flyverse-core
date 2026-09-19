@@ -96,14 +96,25 @@ known-benign set, confirmed this pass at `bffbb0a`:
 |---|---|
 | `root@1.2.3.4` in `scripts/cluster_run.py` | the documented example of a target's `ssh` field, not a real host |
 | `127.0.0.1` in `cluster_run.py`, `box_status.py` | loopback, the local end of the ssh tunnel |
+| `root@1.2.3.4` / `127.0.0.1` in `tests/test_cluster_run.py` | the same documented fixture target and loopback, in the mocked cluster tests |
 | dotted quads in `uv.lock` | package version strings (excluded by the pathspec above) |
 | `p@np.exp(...)`, `profile@np.exp(...)` | numpy matrix multiplication |
 | `t@example.invalid` in `tests/test_commit_map.py` | the throwaway repository's fixture identity |
 | `beegfs` / `slurm` / `sbatch` / `/mnt/` in `audits/*.md` and `tests/test_cx_velocity_route.py` | the words appear only **inside descriptions of this grep** and in an assertion that they are absent |
 
 This pass's result: **no hit outside that set, in the tree or in the full history**, except the commit
-author address of section 1. The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`,
-`box_status.py` and `object_round3_export.py` is code, not an identifier, and stays.
+author address of section 1.
+
+**The expected count, so the re-run is pass / fail.** On the tree this checklist ships in -- this file
+and its two companions present -- the tree grep returns **40 hits across 13 files**:
+`tests/test_cluster_run.py` 14, `scripts/cluster_run.py` 7, this file's own description of the grep 7,
+`tests/test_commit_map.py` 2, `docs/audits/connectome_backends_followups_review.md` 2, and one each in
+`scripts/box_status.py`, `scripts/compass_driver_analyse.py`, `scripts/probe_compass_driver.py`,
+`tests/test_cx_velocity_route.py` and the four remaining audits. A re-run that returns that count over
+that file list closes the check; a different count, or a file not on that list, is read before the flip.
+
+The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status.py` and
+`object_round3_export.py` is code, not an identifier, and stays.
 
 - [x] Tree grep clean (this pass).
 - [x] History grep clean (this pass, over all 196 commits).
@@ -226,7 +237,7 @@ flip:
         ([`audits/determinism_gate.md`](audits/determinism_gate.md) 4.3);
       * the transduced-plume rooms are a **descriptive room observation** -- not a significance test, not
         an SNR measurement, not a claim about flies -- and they do **not** confirm the CPU SNR finding
-        ([`audits/plume_transduced.md`](audits/plume_transduced.md) section 5 and skeptic claim 7).
+        ([`audits/plume_transduced.md`](audits/plume_transduced.md) 7.3 and skeptic claim 7).
 - [ ] **Add both to the README's document table** in the same commit that adds the files, so the
       repository never has a dangling link; a link check over the tree is the last item of section 10.
 

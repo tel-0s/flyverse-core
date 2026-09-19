@@ -7,7 +7,7 @@ Everything in sections 1-3 was recomputed on **2026-09-14 at commit `28e862f`** 
 section quotes. Sections 4-8 record facts established earlier and later -- the latest are round 8 and
 session 14, 2026-09-18 -- and each names the audit, the batch and the file it comes from. Rounds 3
 through 8 and session 14 adopted nothing and moved no default (`docs/audits/determinism_gate.md` 1,
-`compass_sign_control.md` 4, `instrumented_suite.md` 5, `plume_goal_only.md` 4, `plume_transduced.md` 0;
+`compass_sign_control.md` 4, `instrumented_suite.md` 4, `plume_goal_only.md` 4, `plume_transduced.md` 0;
 `docs/NOTES.md` sessions 11-14), so the shipped model sections 1-3 describe is the model at the current
 tree. How a round that produces any of these numbers is run is [`PROCESS.md`](PROCESS.md); what is owed
 before the repository is made public is [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md).
@@ -142,12 +142,16 @@ module docstring):
 
 `describe()` is the instrument's own label, and `docs/PRESETS_SPEC.md` section 2 requires every field
 of it to be fillable before the instrument is admitted: `name`, `class`, `kind`
-(`stop-gap` / `edges` / `relabel` / `mechanism` / `program`), `law` (a source, or the word
+(`stop-gap` / `mechanism` / `edges` / `relabel` -- the four `flyverse.instruments.INSTRUMENT_KINDS`
+enforces, and `_check_instrument` rejects anything else), `law` (a source, or the word
 `unverified`), `law_text`, `parameters`, `replaces`, `gap` (which physiology it stands in for, pointing
 at the audit that established the gap), `source`, `removal` (what result would retire it) and `audits`.
 `replaces` is `"input"`, `"computation"` or `"configuration"`, and
 `flyverse.instruments._check_instrument` **requires** it, so an instrument that does not declare what it
-replaces cannot attach (`docs/PRESETS_SPEC.md` 5, the 2026-09-17 owner decision).
+replaces cannot attach (`docs/PRESETS_SPEC.md` 5, the 2026-09-17 owner decision). There is no `program`
+kind: a program-shaped stand-in -- one that replaces a *computation* rather than supplying a missing
+*input* -- is admitted under that same section-5 extension by declaring `replaces: "computation"`, and
+still carries one of the four kinds above.
 
 Nothing is adopted into `raw` by any of this. An instrument that moves a suite row its declared gap
 does not cover is rejected, in either direction (`docs/PRESETS_SPEC.md` 2 item 5; the worked run is 6.4
@@ -531,7 +535,7 @@ of a four-id pool. The instrument list is round 7's: `sided_turn_afferent:k=0.5`
 (FAIL in draw 1 under both presets, 1.69046 Hz against `> 2`): raw's own instability, identical under
 the instruments, reported and not counted. The list is therefore **admissible** under
 `docs/PRESETS_SPEC.md` section 2 item 5 -- and admissible is all it is: nothing adopted, `raw` stays the
-default, the afferent's law is still `unverified` (`instrumented_suite.md` 5).
+default, the afferent's law is still `unverified` (`instrumented_suite.md` 4).
 
 That batch also measures the reproducibility of the suite itself, which is what makes it useful here:
 the raw column **reproduces exactly on 18 of the 29 rows and differs on 11**, both against
@@ -591,14 +595,23 @@ python -m pytest -m "not gpu and not data and not cluster" -q
 ```
 CUDA_VISIBLE_DEVICES=-1 PYTHONIOENCODING=utf-8 python -m pytest tests/test_bit_identity.py -q      # 4.4; a failure means the model moved
 CUDA_VISIBLE_DEVICES=-1 PYTHONIOENCODING=utf-8 python -m pytest tests/test_commit_map.py -q        # 5.2, resolve_commit against a throwaway repo
-PYTHONIOENCODING=utf-8 python scripts/determinism_gate.py analyse --runs out/det1 --out out/det1/analysis   # 4.1, CPU, from the committed run records
+PYTHONIOENCODING=utf-8 python scripts/determinism_gate.py analyse --runs out/det1 --out out/det1/analysis
 ```
 
-The gate's raw runs, consoles and client log stay ignored under `out/det1/`; what is committed is
-`batch.sh`, `jobs.json`, `predeclared.json` and `analysis/{pairs,arrays,runs}.csv`, `analysis.md`,
-`summary.json`, and re-running `analyse` reproduces all of them byte-identically with 0 problems -- with
-one recorded exception, `summary.json`'s own `analysis_sha256`, which is the hash of the script and
-moved when `plan --ship` was added (`docs/audits/determinism_gate.md` 5).
+The third command is section 4.1's, and it is the one command in this section that **a reader of the
+repository cannot run to completion**. The gate's per-run JSON / NPZ records, consoles and client log
+are git-ignored under `out/det1/`, because they carry host paths, so `analyse` reproduces the analysis
+only where the fetched batch still exists; run against a clean checkout it reports one `missing run
+JSON(s)` problem for each of the five pairs of 4.1 and decides **UNDETERMINED** under the frozen rule.
+
+What a reader of the repository can check is what is committed: `analysis/{pairs,arrays,runs}.csv`,
+`analysis.md` and `summary.json`. Where the batch is present, re-running `analyse` reproduces the four
+files it writes -- `pairs.csv`, `arrays.csv`, `runs.csv` and `analysis.md` -- byte-identically with 0
+problems, with one recorded exception, `summary.json`'s own `analysis_sha256`, which is the hash of the
+script and moved when `plan --ship` was added. The other three committed files, `batch.sh`, `jobs.json`
+and `predeclared.json`, are plan artefacts that `analyse` does not touch: `batch.sh` was regenerated by
+`plan --ship flyverse` after the runs, and `predeclared.json` is **not** re-stamped
+(`docs/audits/determinism_gate.md` 5).
 
 ---
 
@@ -650,7 +663,7 @@ the scope their audits license.
    and its temporal SD are different quantities from the CPU's fixed-contrast signal and 250 ms
    counting-window noise. What the rooms add is that the measured in-room cue noise is **1.3-2.6x** the
    analytical estimate and that the cue's sign was right in only **0.52 +/- 0.10** of samples
-   (`docs/audits/plume_transduced.md` section 5, and its rooms skeptic claim 7 -- the licensed wording).
+   (`docs/audits/plume_transduced.md` 7.3, and its rooms skeptic claim 7 -- the licensed wording).
 2. **It never flies and feeds in the same episode.** "No run in these audits shows artificially powered
    flight and feeding in the same episode: the only powered-flight rooms are the superseded navigation
    flight arm (59.67 s airborne, zero feeding in all six rows), and `powered_s` is 0.00 in all 12

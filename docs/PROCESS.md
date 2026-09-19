@@ -66,8 +66,9 @@ so two same-code runs at the same seed are two draws (`determinism_gate.md` 3-4;
   and returns `underpowered` below four in either arm whatever the exact-U floor says (`INTERP.md`
   10.2, 10.4 rule 1).
 * **No arm is planned below 4 runs unless the predeclaration says its rows are magnitudes only**
-  (rule 24). Both of the round-4d batches ran 3 seeds per compass arm and were `underpowered` by rule
-  before a job was submitted.
+  (rule 24). Round 3's body-state and integration batches ran 3 seeds per compass arm and were
+  `underpowered` by rule before a job was submitted ([`audits/body_sided_state.md`](audits/body_sided_state.md),
+  [`audits/round3_integration.md`](audits/round3_integration.md); `INTERP.md` 10.4 rule 24).
 * The run floor is **not** the exact-U floor. `common.p_floor(n_a, n_b) = 2 / C(n_a + n_b, n_a)`:
   0.10 at 3 v 3, 0.029 at 4 v 4, **0.0079365 at 5 v 5**, **0.0021645 at 6 v 6** (`INTERP.md` 10.2 and
   its `p_floor` line; the 6 v 6 value is `NOTES.md`, "Session 12, the level-matched control").
@@ -186,8 +187,9 @@ Every element of that line is a rule:
 * **`set -o pipefail` in the generated wrapper.** A `... | tee` tail without it exits with `tee`'s
   status; a generated wrapper that omits it is a recorded defect
   ([`audits/compass_local_recurrence.md`](audits/compass_local_recurrence.md), the submission-wrapper
-  section). The round-8 and plume v5 wrappers carry `set -euo pipefail`
-  (`audits/plume_transduced.md` skeptic claim 6).
+  section). The plume v5 wrapper carries `set -euo pipefail`
+  (`audits/plume_transduced.md` skeptic claim 6); the four round-8 wrappers carry `set -o pipefail`
+  (`out/{det1,cx9,suite-inst,plume-go}/batch.sh`).
 * **`--gpu-ids ID[,ID...]`** takes a pool and gives each job `gpus 1` plus one id, round-robin in command
   order (`determinism_gate.md` 2). A pool smaller than the job count means jobs share a GPU -- det1 ran
   5 jobs over 4 ids -- so a pin is a request, not a guarantee, and the audit says which (skeptic claim
@@ -247,8 +249,16 @@ Two further receipt rules:
 
 The audit is `audits/<name>.md`, in the shape of the shipped ones: the answer first, then the protocol,
 the predeclaration, the results, the reading, the reproduction command, the author's self-review, and
-the independent skeptic pass quoted verbatim. Section 0 IS the Report summary, verbatim -- it is never
-retyped (rule 26; `determinism_gate.md` section 4 and its Report `summary` are 925 characters each).
+the independent skeptic pass quoted verbatim. The Report block is **generated from the audit's tables,
+or the audit's answer section IS it verbatim -- it is never retyped by hand** (rule 26). The worked
+example of the verbatim form is
+[`audits/compass_sign_control.md`](audits/compass_sign_control.md): its section 4 "Answer" and its
+Report `summary` are the same **1,181 characters**, byte for byte, because the skeptic's claim-5
+correction was applied to both halves; the section additionally carries the **Withdrawn:** note that
+correction left behind. Two other shapes are in the tree and both satisfy the rule: `determinism_gate.md`
+has a Report block whose section 4 is a *Reading* rather than a verbatim answer, and
+`plume_transduced.md` carries no Report block at all -- the Answer-only shape accepted in round 8
+(`plume_transduced.md` rooms skeptic claim 7).
 
 Binding rules while writing:
 
@@ -311,7 +321,7 @@ The discipline, as round 8 and session 14 executed it:
   layer, and the audit now carries both (`determinism_gate.md` 4.2, skeptic claim 2).
 * **The reader is told which reading is not licensed.** The rooms skeptic states plainly that "the rooms
   confirm the CPU SNR finding" is **not** licensed, and supplies the wording that is
-  (`audits/plume_transduced.md` skeptic claim 7, and section 5 of the same file): the rooms add that the
+  (`audits/plume_transduced.md` skeptic claim 7, and 7.3 of the same file): the rooms add that the
   measured in-room cue noise is 1.3-2.6x the analytical estimate and that the cue's sign was right in
   only 0.52 +/- 0.10 of samples.
 
@@ -346,7 +356,7 @@ Round 8 item 3 is the worked example (`audits/instrumented_suite.md`):
   (section 2). The room rate-half: 110 take-offs against 101 over 28,800 fly-s each, one-sided exact
   Poisson p 0.291, run-level null (section 3).
 * Verdict: the list is **admissible**, and admissible is all it is -- nothing adopted, `raw` stays the
-  default, the afferent's law is still `unverified` (section 5).
+  default, the afferent's law is still `unverified` (section 4).
 
 Note the two stamps: the first submission lost eight checks per instrumented draw to an adapter gap and
 is kept, ignored and unused; the plan and the rule are byte-identical across both stamps (section 2).
