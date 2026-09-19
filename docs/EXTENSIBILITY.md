@@ -5,10 +5,19 @@ synthetic cells and follows the existing numerical path. Anatomical `modules=`
 still selects a connectome subset; `attach()` registers an executable extension.
 The shipped connectome, physiological defaults, and body readout are unchanged.
 
+The **instruments** are the labelled, opt-in stand-ins this lifecycle exists for: they are named on the
+`preset="instrumented"` keyword, never built by default, and each records its `describe()` in provenance
+([PRESETS_SPEC.md](PRESETS_SPEC.md) is the contract, [INSTRUMENTS.md](INSTRUMENTS.md) the inventory). `raw` is the
+default and rejects them. Not every instrument attaches a module: the `edges` and `relabel` kinds are configuration
+records that verify a `LIFParams` gain or a compiled transmitter label before stepping and attach nothing, so a
+preset built only from those runs the extension-free path.
+
 `CompassDriver` is a concrete example: `FlyBrain(preset="instrumented", instruments=["compass"])`
 attaches a batched heading-memory module that writes only EPG Poisson Hz. The explicitly named instrument
-can receive held yaw velocity through the existing proprioception call (PRESETS_SPEC section 5). It has
-no body object, absolute heading or motor-command access. Ordinary modules still read selected neural
+can receive held yaw velocity through the existing proprioception call (PRESETS_SPEC section 5); `plume`,
+`hunger` and `flight` take held wind, smell and interoception the same way (PRESETS_SPEC section 6). None has
+a body object, absolute heading or motor-command access, and each declares in `describe()` whether it replaces an
+`input`, a `computation` or a `configuration`. Ordinary modules still read selected neural
 quantities. Reset, per-row reset, checkpoint and detach use the same extension lifecycle.
 
 Its CUDA scheduler uses an asynchronous finite-output invariant assertion and a proven positive Poisson
