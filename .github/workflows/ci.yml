@@ -50,18 +50,25 @@ jobs:
           python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
           pip check || echo "pip check reported conflicts (informational; the runner image preinstalls packages)"
 
-      # Syntax errors and undefined names only (E9, F63, F7, F82). Style is deliberately not gated:
-      # this step reports, it does not block.
+      # Syntax errors and undefined names only (E9, F63, F7, F82). Style is still deliberately not gated.
+      # This step DOES block as of 0.2.0: the 14 pre-existing F821s (scripts/cx_wedge.py 8,
+      # scripts/cx_shift.py 4, scripts/compass_driver_trace.py 2 -- every one a closed-over name that a
+      # later `del` in the enclosing scope unbound) are fixed, so the count is zero and a regression should
+      # fail the run rather than scroll past. 14 is measured, not quoted: ruff 0.16.7 at bffbb0a through
+      # this exact invocation. TODO.md section A says 12, which predates scripts/compass_driver_trace.py
+      # (added 2026-09-15 at 07cf966) and is stale. The path is `.` and not `flyverse scripts
+      # tests`, which left examples/ unlinted.
       - name: Lint (syntax and undefined names)
-        continue-on-error: true
-        run: ruff check flyverse scripts tests --select E9,F63,F7,F82
+        run: ruff check . --select E9,F63,F7,F82
 
-      # testpaths = ["tests"] comes from pyproject. tests/conftest.py auto-marks by file name:
-      #   gpu     -> tests/test_cuda.py, tests/test_metal.py
-      #   data    -> tests/test_integration.py (also gpu)
-      #   cluster -> nothing today; tests/test_cluster_run.py is fully mocked and runs here.
-      # Everything else runs: test_batch_sim, test_cluster_run, test_control, test_interp, test_nt_readout,
-      # test_object_round2, test_optic_hooks, test_packaging, test_proprioception, test_receptor_model,
-      # test_room_ui, test_world. The three files with cache-backed classes skip those classes without cache/.
+      # The command below is the one the docs give a newcomer (README "Run it"; docs/INSTALL.md;
+      # docs/REPRODUCIBILITY.md), with -rs --durations=10 added for the log. Keep the three in step.
+      # testpaths = ["tests"] comes from pyproject. tests/conftest.py is the only place a file is marked,
+      # and it marks by FILE NAME -- the authoritative list is FILE_MARKS there, which today is:
+      #   gpu     -> tests/test_cuda.py, tests/test_metal.py  (so CUDA and Metal never run here)
+      #   data    -> tests/test_connectome_data.py; tests/test_integration.py (also gpu)
+      #   cluster -> nothing; tests/test_cluster_run.py is fully mocked and runs here.
+      # Every other tests/test_*.py runs. The files with cache-backed classes guard them with
+      # skipUnless((CACHE_DIR / "W_post_pre.npz").exists(), ...) and skip those classes without cache/.
       - name: Tests (no data, no GPU, no cluster)
         run: python -m pytest -m "not gpu and not data and not cluster" -q -rs --durations=10

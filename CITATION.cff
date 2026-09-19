@@ -1,14 +1,16 @@
 cff-version: 1.2.0
 message: "If you use flyverse, please cite it as below, and cite the MaleCNS v1.0 connectome release and Shiu et al. 2024 as well -- flyverse is a simulator built on their data and their neuron model. If you use the female backends, cite the FlyWire FAFB v783 and/or BANC v888 releases and their original reconstruction papers."
 title: "flyverse: the MaleCNS fly connectome in simulations, games and other strange places"
-abstract: "A whole-CNS Drosophila simulation driven by the Janelia FlyEM MaleCNS v1.0 connectome: a graded optic lobe feeding a leaky integrate-and-fire central brain and VNC, embodied in a ray-traced room, with an interpretability toolkit for localizing behavioural deficits to populations, synapses and links."
+abstract: "A whole-CNS Drosophila simulation driven by the Janelia FlyEM MaleCNS v1.0 connectome: a graded optic lobe feeding a leaky integrate-and-fire central brain and VNC, embodied in a ray-traced room, with an interpretability toolkit for localizing behavioural deficits to populations, synapses and links, an optional instrumented preset whose labelled stand-ins each name their gap, their law (sourced, or marked unverified) and the result that would retire them -- beside the byte-identical raw default -- and three connectome backends (MaleCNS v1.0, FlyWire FAFB v783, BANC v888)."
 type: software
 authors:
   # An entity author (a handle, not a legal name); the GitHub account is tel-0s -- deliberately NOT in
   # `alias:`, because cffconvert renders the alias in place of the name ("tel-0s (2026)").
   - name: "tel0s"
-version: "0.1.0"
-date-released: "2026-09-13"
+# Kept equal to pyproject.toml's `version` (tests/test_packaging.py::CitationTests
+# ::test_citation_version_tracks_pyproject); `date-released` is the day 0.2.0 was cut.
+version: "0.2.0"
+date-released: "2026-09-19"
 license: MIT
 repository-code: "https://github.com/tel-0s/flyverse"
 url: "https://github.com/tel-0s/flyverse"

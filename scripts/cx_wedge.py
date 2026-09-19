@@ -1017,7 +1017,8 @@ def simulate(c, cells, gains, seconds=5.0, pulse_s=2.0, background_hz=10.0, puls
             f"during {fmt('during')}; " + "; ".join(f"{m}s {fmt(f't{m}')}" for m in have)
             + (f"; PEG {row['t5.0_peg']:.1f} rest {row['t5.0_rest']:.2f} Hz" if row.get("t5.0_peg") is not None else "") + f"; {row['wall_s']} s")
         out.append(row)
-        del fb
+        fb = None            # not `del`: sample() closes over fb, and ruff reads a `del` of a closed-over
+                             # name as unbinding it (F821 under the CI lint). Rebinding frees it identically.
         import torch; torch.cuda.empty_cache()
     return out
 
