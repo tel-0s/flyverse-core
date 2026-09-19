@@ -47,7 +47,7 @@ def run(out):
                             cpu_ops=[dict(name=e.key,count=e.count,self_cpu_us=e.self_cpu_time_total,
                                           self_device_us=e.self_device_time_total) for e in averages],
                             provenance=provenance(c,fb=fb,seeds=[0],stimulus={'name':'scheduler trace','params':{'mode':mode,'held_EPG_hz':50,'yaw':0}})))
-        del fb;torch.cuda.empty_cache()
+        fb=None;torch.cuda.empty_cache()   # not `del`: frame() closes over fb and ruff reads `del` as unbinding it (F821)
     (out/'summary.json').write_text(json.dumps(to_jsonable(dict(records=records)),indent=2)+'\n',encoding='utf-8')
     print('device cuda',[(r['mode'],r['local_scalar_dense'],r['module_graphs']) for r in records],flush=True)
 

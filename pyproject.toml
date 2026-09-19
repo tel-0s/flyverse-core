@@ -5,7 +5,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flyverse"
-version = "0.1.0"
+# 0.2.0, the first public release. CITATION.cff's `version` is kept equal to this one
+# (tests/test_packaging.py::CitationTests::test_citation_version_tracks_pyproject).
+version = "0.2.0"
 description = "Simulations, games and other strange places to put the MaleCNS fly connectome"
 readme = "README.md"
 # MIT, decided 2026-09-13; the text is in LICENSE at the repo root.

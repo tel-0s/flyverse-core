@@ -392,7 +392,10 @@ def shift_run(c, cells, gE, gD, seed, side, pen_hz, pen_ms=1000.0, settle_s=1.0,
         f"per Hz {m['shift_rate_per_hz']:+.4f}), drift free {m['drift_free_wedges_per_s']:+.2f} /s, after {m['drift_after_wedges_per_s']:+.2f} /s; "
         f"PEN L/R during {m['penL_during']:.1f}/{m['penR_during']:.1f} Hz (free {m['penL_free']:.1f}/{m['penR_free']:.1f}); GLNO L/R during {m['glnoL_during']:.1f}/{m['glnoR_during']:.1f}; "
         f"alive at end {m['bump_alive_at_end']}; {wall:.0f} s")
-    del fb
+    # Drop the last reference before empty_cache(), as `del fb` did. Not `del`: `counts()` above closes over
+    # `fb`, and ruff reads a `del` of a closed-over name as unbinding it for the whole enclosing scope, so the
+    # CI lint (E9,F63,F7,F82) reported the closure's `fb` as F821. Rebinding frees the FlyBrain identically.
+    fb = None
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     return row
@@ -571,7 +574,8 @@ def rotation_run(seed, condition, gains, seconds, rate, skip_s=3.0, pulse=True, 
     for _, r in show.iterrows():
         log(f"   {r['type']:>8} ({r['cells']:2d} cells): L-R rest {r['rest_LR']:+6.2f} ccw {r['ccw_LR']:+6.2f} cw {r['cw_LR']:+6.2f} Hz; flip {r['flip_hz']:+6.2f} Hz d' {r['flip_d']:+5.2f}; "
             f"rate rest/ccw/cw {r['rate_hz']['rest']:.2f}/{r['rate_hz']['ccw']:.2f}/{r['rate_hz']['cw']:.2f} Hz")
-    del sim
+    # Same as above: step() closes over `sim`, so `del sim` made the CI lint call that closure's `sim` undefined.
+    sim = None
     return row
 
 
