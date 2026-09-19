@@ -51,10 +51,12 @@ jobs:
           pip check || echo "pip check reported conflicts (informational; the runner image preinstalls packages)"
 
       # Syntax errors and undefined names only (E9, F63, F7, F82). Style is still deliberately not gated.
-      # This step DOES block as of 0.2.0: the 14 pre-existing F821s (TODO.md section A, in
-      # scripts/cx_wedge.py, scripts/cx_shift.py and scripts/compass_driver_trace.py -- every one a closed-over
-      # name that a later `del` in the enclosing scope unbound) are fixed, so the count is zero and a
-      # regression should fail the run rather than scroll past. The path is `.` and not `flyverse scripts
+      # This step DOES block as of 0.2.0: the 14 pre-existing F821s (scripts/cx_wedge.py 8,
+      # scripts/cx_shift.py 4, scripts/compass_driver_trace.py 2 -- every one a closed-over name that a
+      # later `del` in the enclosing scope unbound) are fixed, so the count is zero and a regression should
+      # fail the run rather than scroll past. 14 is measured, not quoted: ruff 0.16.7 at bffbb0a through
+      # this exact invocation. TODO.md section A says 12, which predates scripts/compass_driver_trace.py
+      # (added 2026-09-15 at 07cf966) and is stale. The path is `.` and not `flyverse scripts
       # tests`, which left examples/ unlinted.
       - name: Lint (syntax and undefined names)
         run: ruff check . --select E9,F63,F7,F82
