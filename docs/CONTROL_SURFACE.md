@@ -96,8 +96,16 @@ It uses the ordinary extension scheduler and writes only EPG Poisson input. Feed
 in rad/s through `fb.proprioception(0, 0, 0, False, yaw_rate=...)` before advancing; zero it on stopping.
 This can be used without enabling other proprioceptive channels. `BatchSim` and `room_demo.py` feed the
 body channel automatically. Initial phase is arbitrary; there is no absolute-heading or goal input.
-`raw` rejects this instrument and is still the default. [INSTRUMENTS.md](INSTRUMENTS.md) describes the
-candidate's validation limits, reset/checkpoint behavior and removal condition.
+`raw` rejects this instrument and `raw` is the default. The compass is a **computation stand-in**
+(`replaces: "computation"` in its `describe()`), admitted as an instrument only under
+[PRESETS_SPEC](PRESETS_SPEC.md) section 5, and its own admission run was **rejected** on a taste row outside
+the declared gap ([audits/compass_standin.md](audits/compass_standin.md)).
+
+The other named instruments take the same two keywords: `instruments=["compass", "plume", "hunger", "flight"]`,
+or `compass_ring` in place of `compass`. Naming both heading providers, an unmet dependency, a duplicate name or
+two writers on one cell and channel raises before anything is installed. [INSTRUMENTS.md](INSTRUMENTS.md) is the
+inventory: one block per instrument with its kind, what it replaces, its law status, the gap and audit, what it
+reads and writes, its removal condition, its admission status and the rounds it was used in.
 
 ```python
 from flyverse import FlyBrain
@@ -117,10 +125,10 @@ behavior will survive the loss of the rest of its recurrent network.
 | input | values |
 |---|---|
 | `vision(radiance)` | Nonnegative radiance `[UV, B, G, R]`, `(columns, 4)` or `(B, columns, 4)`, in `fb.retina` column order. A single frame broadcasts to the batch. |
-| `smell(cL, cR)` | Dictionaries keyed by glomerulus; values are nonnegative concentrations, scalar or `(B,)`. Omitted keys mean zero concentration. Also forwards held samples to an explicitly named instrument receiver (`plume`); such a receiver may expose smell on a subset without ORNs. Raw sensory transduction is unchanged. |
-| `wind(dL, dR)` | Backward antennal deflection, scalar or `(B,)`; `+1` is full backward deflection, `-1` full forward deflection. |
+| `smell(cL, cR)` | Dictionaries keyed by glomerulus; values are nonnegative concentrations, scalar or `(B,)`. Omitted keys mean zero concentration. Also forwards held samples to an explicitly named instrument receiver (`plume`, through `observe_smell`); such a receiver may expose smell on a subset without ORNs. The `plume:bilateral=orn` variant installs **no** concentration receiver and reads antennal ORN rates instead. Raw sensory transduction is unchanged. |
+| `wind(dL, dR)` | Backward antennal deflection, scalar or `(B,)`; `+1` is full backward deflection, `-1` full forward deflection. Also forwards the held deflections to an explicitly named instrument receiver (`plume`, through `observe_wind`); it is not a world wind angle. |
 | `taste(sugar)` | Sugar contact in `[0, 1]`, scalar or `(B,)`; full contact drives the sweet GRNs at 120 Hz. |
-| `interoception(energy, sated=False, airborne=False, feeding=False)` | Explicit named instrument receivers only; energy in `[0,1]`, Boolean flags, scalar or `(B,)`. Does not construct a receptor/hormone model. Listed in `available_senses` only when a receiver exists. |
+| `interoception(energy, sated=False, airborne=False, feeding=False)` | Explicit named instrument receivers only (`plume`, `hunger`, `flight`, through `observe_internal`); energy in `[0,1]`, Boolean flags, scalar or `(B,)`. Does not construct a receptor/hormone model. Listed in `available_senses` only when a receiver exists; `raw` has no receiver and rejects the call. |
 | `stimulate(selection, hz, ms)` | Local neuron indices, a boolean mask, or `Connectome.select` criteria. Rates broadcast to `(B, selected_neurons)`. Pulses combine with sensory forcing by maximum and expire on a LIF step boundary. |
 
 Inputs stay in effect until replaced. `step(ms)` returns actual simulated milliseconds and carries
