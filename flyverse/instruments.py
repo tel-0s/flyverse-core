@@ -385,9 +385,11 @@ class EdgeHold:
 class TypeRelabel:
     """The record of a transmitter relabel compiled into a scratch cache (``connectome.TYPE_NT_OVERRIDE`` extended by
     ``cx_wedge.py --nt-override TYPE=nt``). `glno_sign` (GLNO = glutamate) is round 7's component: GLNO's sign is 0 in
-    the shipped cache because two EM predictions disagree (docs/audits/glno_relabel.md); glutamate is the stronger of
-    the two and is safe on the suite but fixes nothing alone (5B). UNVERIFIED as a transmitter call. Removal: a
-    transmitter source for GLNO that is not one EM classifier, at which point the row enters TYPE_NT_OVERRIDE itself."""
+    the shipped cache because three EM classifiers agree only that GLNO is inhibitory and disagree on the transmitter
+    -- two call glutamate, one GABA, and none of them is confident (docs/audits/glno_relabel.md 1.2); glutamate is the call
+    two of the three make and is safe on the suite but fixes nothing alone (5B). UNVERIFIED as a transmitter call.
+    Removal: a transmitter source for GLNO that is not one EM classifier, at which point the row enters
+    TYPE_NT_OVERRIDE itself."""
     kind = "relabel"
     law = "unverified"
 
@@ -400,9 +402,11 @@ class TypeRelabel:
                 "replaces": "configuration",            # a record of a caller configuration: neither an input nor a computation
                 "law_text": f"type {self.type_name} compiled as {self.nt} (NT_SIGN sign) in a scratch cache",
                 "parameters": {"type": self.type_name, "nt": self.nt}, "trainable": False, "checkpoint_hash": None,
-                "gap": "GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5)",
-                "source": "the stronger of two disagreeing EM predictions, recorded in docs/audits/glno_relabel.md and "
-                          "docs/audits/cx_glno.md; no sourced transmitter call exists",
+                "gap": "GLNO's transmitter is unknown: three EM classifiers agree only that GLNO is inhibitory and "
+                       "disagree on the transmitter (MaleCNS `unclear` at 0.48, glutamate 51 %; BANC glutamate 4/4 at "
+                       "~0.5; FlyWire GABA 3/4 at ~0.3); none of the three is a confident call",
+                "source": "the transmitter two of those three low-confidence EM classifiers call, recorded in "
+                          "docs/audits/glno_relabel.md 1.2 and docs/audits/cx_glno.md; no sourced transmitter call exists",
                 "removal": "a transmitter source for the type that is not one EM classifier (then a TYPE_NT_OVERRIDE row)",
                 "audits": ["docs/audits/glno_relabel.md", "docs/audits/cx_glno.md"]}
 

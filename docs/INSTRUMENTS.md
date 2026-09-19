@@ -4,8 +4,9 @@ The contract is [PRESETS_SPEC.md](PRESETS_SPEC.md) (owner decision of 2026-09-15
 are acceptable if sourced, optional, and `raw` returns the pure brain). This page is the inventory, one uniform block
 per shipped instrument.
 
-**Nothing here is on by default.** `FlyBrain()` is `FlyBrain(preset="raw")`, byte-identical on every path
-(`tests/test_bit_identity.py`, `RawPresetTests`); `preset="raw"` with an instrument raises; `preset="instrumented"`
+**Nothing here is on by default.** `FlyBrain()` is `FlyBrain(preset="raw")` -- `preset="raw"` is the same model
+as `FlyBrain()`, and bit-identity is a CPU claim (`tests/test_bit_identity.py`, `RawPresetTests`;
+[REPRODUCIBILITY.md](REPRODUCIBILITY.md) 4.4); `preset="raw"` with an instrument raises; `preset="instrumented"`
 with an empty list reproduces `raw` on the original connectome and LIF parameters (PRESETS_SPEC section 1); and every
 audit states which preset it ran. Nothing on this page is adopted into `raw`, and no instrument changes a suite
 row's *status* outside the rows its gap is declared to touch -- an instrument that does is rejected, as `compass`
@@ -149,8 +150,9 @@ and not permission to change a default.
   No PS196_b / AN07B037 recording exists -- searched 2026-09-15 in Wang's fly-circuit-exploration audit, Hulse et al.
   2021 (eLife 66039) and the two Rockefeller theses (PRESETS_SPEC section 3).
 - **Gap** -- PS196_b receives no *signed* turn input in the shipped body. PS196_b is GLNO's largest non-ring input
-  (1,801 synapses, 19-21 % of GLNO's input; Wang 2026 finding 3, reproduced to the synapse --
-  [audits/compass_velocity_route.md](audits/compass_velocity_route.md) section 1), and GLNO is PEN's one nodulus
+  (1,801 synapses, 19.2 % of GLNO's input in [audits/cx_shift.md](audits/cx_shift.md) section 1, quoted as 19-21 %
+  in [audits/compass_velocity_route.md](audits/compass_velocity_route.md) section 1; Wang 2026 finding 3,
+  reproduced to the synapse), and GLNO is PEN's one nodulus
   input of size (16,371 synapses, 19.4 % of PEN's raw input, fully contralateral --
   [audits/cx_shift.md](audits/cx_shift.md) section 1). The ascending report that reaches PS196_b arrives unsigned:
   under the labelled Coriolis stop-gap its L-R moves the same way in both turn directions
@@ -281,11 +283,12 @@ The JSON carries `preset`, `instruments` and every `describe()` in `provenance`.
   `flyverse.instruments:TypeRelabel`, auto-named `glno_sign`. The relabel must already be compiled into the scratch
   cache: `install()` refuses a connectome whose GLNO cells do not carry the transmitter.
 - **Kind** `relabel`. **Replaces** `configuration`.
-- **Law** `unverified`: type GLNO compiled as glutamate (its `NT_SIGN` sign) in a scratch cache -- the stronger of
-  two disagreeing EM predictions.
-- **Gap** -- GLNO's transmitter is unknown (MaleCNS `unclear`; two EM predictions disagree and both fall below 0.5):
-  [audits/glno_relabel.md](audits/glno_relabel.md), [audits/cx_glno.md](audits/cx_glno.md). Glutamate is safe on the
-  suite and fixes nothing alone (round 5B).
+- **Law** `unverified`: type GLNO compiled as glutamate (its `NT_SIGN` sign) in a scratch cache -- the transmitter
+  two of the three low-confidence EM classifiers call.
+- **Gap** -- GLNO's transmitter is unknown: three EM classifiers agree only that GLNO is inhibitory and disagree on
+  the transmitter (MaleCNS `unclear` at 0.48, glutamate 51 %; BANC glutamate 4/4 at ~0.5; FlyWire GABA 3/4 at ~0.3),
+  none of the three a confident call: [audits/glno_relabel.md](audits/glno_relabel.md) 1.2,
+  [audits/cx_glno.md](audits/cx_glno.md). Glutamate is safe on the suite and fixes nothing alone (round 5B).
 - **Reads / writes** -- neither; it verifies a compiled label before stepping.
 - **Removal** -- a transmitter source for GLNO that is not one EM classifier, at which point the row enters
   `TYPE_NT_OVERRIDE` itself.

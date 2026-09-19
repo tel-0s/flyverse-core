@@ -17,11 +17,12 @@ suite has its own three statuses, `PASS` / `FAIL` / `KNOWN GAP`, which are state
 bound and not about a comparison between arms.
 
 **What `raw` is.** `FlyBrain()` is `FlyBrain(preset="raw")`: the unchanged connectome plus the documented
-physiological assumptions of [REPRODUCIBILITY.md](REPRODUCIBILITY.md) section 1. `raw` is byte-identical on
-every path (`tests/test_bit_identity.py`) and is the default. **Nothing in any round below was adopted into
-`raw`.** The `instrumented` preset adds labelled stand-ins; every one of them declares a `kind`, the named
+physiological assumptions of [REPRODUCIBILITY.md](REPRODUCIBILITY.md) section 1, and it is the default:
+`preset="raw"` is the same model as `FlyBrain()`, and bit-identity is a CPU claim
+(`tests/test_bit_identity.py`; [REPRODUCIBILITY.md](REPRODUCIBILITY.md) 4.4). **Nothing in any round below
+was adopted into `raw`.** The `instrumented` preset adds labelled stand-ins; every one of them declares a `kind`, the named
 gap it fills, its law (`unverified`) or its source, a removal condition, and a `replaces` field
-(`"input"` / `"computation"` / `"configuration"`) -- [PRESETS_SPEC.md](PRESETS_SPEC.md) sections 3 and 5,
+(`"input"` / `"computation"` / `"configuration"`) -- [PRESETS_SPEC.md](PRESETS_SPEC.md) section 2,
 inventory in [INSTRUMENTS.md](INSTRUMENTS.md). An instrument result is never attributed to the wiring.
 
 **The milestone, in the two sentences that are licensed.** Under the `instrumented` preset the fly turns and
@@ -37,24 +38,35 @@ with the true lateral contrast; and **no episode shows artificially powered flig
 ## A. Behaviours and status
 
 `status (raw)` is what the plain model does; "n/a (instrument)" means the behaviour exists only under
-`instrumented` and is not a property of the wiring.
+`instrumented` and is not a property of the wiring. Suite statuses are scoped to the batch that produced
+them -- "9 of 9 round-3 runs" is [guard_suites_r3.md](audits/guard_suites_r3.md) section 1, and the round-8
+raw column ([instrumented_suite.md](audits/instrumented_suite.md) section 2), which is the column
+[../README.md](../README.md)'s ledger prints, differs on 11 of the 29 rows under identical code
+([REPRODUCIBILITY.md](REPRODUCIBILITY.md) 6.4). Three rows carry the assay-level status of
+[BENCHMARK_BATTERY.md](BENCHMARK_BATTERY.md) instead (`pass` / `partial` / `program` / `gap` / `fail` /
+`untested`): a statement about a behaviour in the battery, not about a check against a bound.
 
 | behaviour | status (raw) | audit(s) | independent skeptic verdict |
 |---|---|---|---|
-| Looming escape (giant fibre) | suite `PASS`, 9 of 9 runs | [guard_suites_r3.md](audits/guard_suites_r3.md) 1-4, [anti_runaway.md](audits/anti_runaway.md) round 7 | `verify:guards  --  verdict: **mostly sound**` |
-| Direction selectivity (T4 / T5) | suite `PASS`, 9 of 9 runs | [guard_suites_r3.md](audits/guard_suites_r3.md) 1, [optic_measures.md](audits/optic_measures.md) | `verify:optic-audit  --  verdict: **mostly sound**` |
-| Wind direction (DNp18 / DNp33) | suite `PASS`, 9 of 9 runs | [guard_suites_r3.md](audits/guard_suites_r3.md) 1 | `verify:guards  --  verdict: **mostly sound**` |
-| Taste, and bitter suppression | suite `PASS`, 9 of 9 runs; knife-edge readout | [guard_suites_r3.md](audits/guard_suites_r3.md) 1, [monoamine_slow_term.md](audits/monoamine_slow_term.md) 0, [instrumented_suite.md](audits/instrumented_suite.md) 2 | `verify:monoamines  --  verdict: **mostly sound**` |
+| Looming escape (giant fibre) | suite `PASS`, 9 of 9 round-3 runs | [guard_suites_r3.md](audits/guard_suites_r3.md) 1-4, [anti_runaway.md](audits/anti_runaway.md) round 7 | `verify:guards  --  verdict: **mostly sound**` |
+| Looming escape, long mode (slow expansion) | `partial`: the wing power MNs rise more for slower looms (+41 -> +53 Hz) and earlier, but the GF still peaks +27-41 Hz at every rate and the body takes the short-mode escape in 13 of 15 runs -- no mode switch | [BENCHMARK_BATTERY.md](BENCHMARK_BATTERY.md) assay 2b | no verdict line in the record (an assay status, not a round) |
+| Landing response (gentle expansion) | **`fail`**: GF +7.5 to +15 Hz, under threshold, with no take-off in any run; wing power +35 to +58 Hz without a jump; leg MNs +2.7 to +5.1 Hz -- no leg extension, so no landing | [BENCHMARK_BATTERY.md](BENCHMARK_BATTERY.md) assay 3 | no verdict line in the record (an assay status, not a round) |
+| Direction selectivity (T4 / T5) | suite `PASS`, 9 of 9 round-3 runs | [guard_suites_r3.md](audits/guard_suites_r3.md) 1, [optic_measures.md](audits/optic_measures.md) | `verify:optic-audit  --  verdict: **mostly sound**` |
+| Optomotor response (rotating drum) | `partial`: HSN d' 4.2, DNp20 3.1 and HSE 2.2 flip with sustained yaw, and the suite rows `rotate.DNp20_flip_hz` / `rotation.group_flip_hz` are `PASS` in 9 of 9 round-3 runs -- but DNa02 is silent at 0.01 Hz, so no path runs from the horizontal system to the legs | [BENCHMARK_BATTERY.md](BENCHMARK_BATTERY.md) assay 1, [guard_suites_r3.md](audits/guard_suites_r3.md) 1, [deficit_turning.md](audits/deficit_turning.md) | `verify:guards  --  verdict: **mostly sound**` (the suite rows only) |
+| Wind direction (DNp18 / DNp33) | suite `PASS`, 9 of 9 round-3 runs | [guard_suites_r3.md](audits/guard_suites_r3.md) 1 | `verify:guards  --  verdict: **mostly sound**` |
+| Smell and odour detection | suite `PASS`, 9 of 9 round-3 runs, on all four olfactory checks (`smell.PN_hz`, `smell.KC_active`, `odour.apple_channel_8cm_hz`, `odour.apple_channel_clean_hz`) | [guard_suites_r3.md](audits/guard_suites_r3.md) 1 | `verify:guards  --  verdict: **mostly sound**` |
+| Taste, and bitter suppression | suite `PASS`, 9 of 9 round-3 runs; knife-edge readout, and `FAIL` at 1.690 Hz in one of the three round-8 raw draws (entry 4) | [guard_suites_r3.md](audits/guard_suites_r3.md) 1, [monoamine_slow_term.md](audits/monoamine_slow_term.md) 0, [instrumented_suite.md](audits/instrumented_suite.md) 2 | `verify:monoamines  --  verdict: **mostly sound**` |
 | Walking straightness | measured, localized deficit | [deficit_turning.md](audits/deficit_turning.md) 0, [connectome_backends.md](audits/connectome_backends.md) | no verdict line in the record (see entry) |
 | Small-object pathway (LC11 / LC10a) | suite `KNOWN GAP`; `null` on the matched assay | [deficit_object.md](audits/deficit_object.md) 0, [object_baseline_r2.md](audits/object_baseline_r2.md), [object_compare_r2.md](audits/object_compare_r2.md), [object_localizer_r3.md](audits/object_localizer_r3.md), [object_rectangles_r3.md](audits/object_rectangles_r3.md), [object_samedevice_r3.md](audits/object_samedevice_r3.md) | mostly sound (object round 3: samedevice, rectangles, localizer) |
 | Turning: the DNa02 choke | measured, localized deficit | [deficit_turning.md](audits/deficit_turning.md) 0, 4-6 | no verdict line in the record (see entry) |
 | Turning: the body model (leg cycle, rounds 4-4d) | `result` on the relay and DNa02-left; `null` on behaviour | [body_sided_state.md](audits/body_sided_state.md), [level_matched_control.md](audits/level_matched_control.md), [level_controls.md](audits/level_controls.md), [level_controls_r2.md](audits/level_controls_r2.md), [level_fixed_point.md](audits/level_fixed_point.md) | `VERDICT: mostly sound` (round 4d) |
 | Compass, rounds 5A-6B (cx5-cx7) | `null` at the shipped gains | [compass_ring_mechanism.md](audits/compass_ring_mechanism.md), [glno_relabel.md](audits/glno_relabel.md), [compass_dc_balance.md](audits/compass_dc_balance.md), [compass_local_recurrence.md](audits/compass_local_recurrence.md) | `**Mostly sound.**` (5A, 5B, 6A); 6B has no final verdict block (see entry) |
-| Compass, rounds 7-8 (cx8r, cx8t, cx9) | `result` on the GLNO side report; `null` on rotation | [compass_velocity_route.md](audits/compass_velocity_route.md), [compass_sign_control.md](audits/compass_sign_control.md) | `VERDICT: mostly sound`; `- compass_sign_control: mostly sound` |
+| Compass, rounds 7-8 (cx8r, cx8t, cx9) | `result` on the GLNO side report; `null` on rotation | [compass_velocity_route.md](audits/compass_velocity_route.md), [compass_sign_control.md](audits/compass_sign_control.md), [deficit_rotation.md](audits/deficit_rotation.md) | `VERDICT: mostly sound`; `- compass_sign_control: mostly sound` |
 | Flight: the octopamine state | not adoptable; `null` on behaviour, runaway above | [monoamine_slow_term.md](audits/monoamine_slow_term.md) 0 | `verify:monoamines  --  verdict: **mostly sound**` |
 | Flight: the priority policy | n/a (instrument) | [flight_foraging_priority.md](audits/flight_foraging_priority.md) | `- flight_foraging_priority: mostly sound` |
+| Directed food search | none in `raw`: no raw arm shows it -- the raw model has no odour-guided goal, and a plain fly's meals come from wandering into fruit before it leaves the table | [NOTES.md](NOTES.md) session 8 | no verdict line in the record |
 | Fruit finding: the plume instrument | n/a (instrument) | [plume_steering.md](audits/plume_steering.md), [navigation_instruments.md](audits/navigation_instruments.md) | `- plume_steering: mostly sound` |
-| Fruit finding: the goal-only arm | n/a (instrument; goal-only feeds 4.67 +/- 0.52 of six) | [plume_goal_only.md](audits/plume_goal_only.md) | `- plume_goal_only: mostly sound` |
+| Fruit finding: the goal-only arm | n/a (instrument; goal-only feeds 4.67 +/- 0.52 of six shipped starts and 4.333 +/- 0.816 of six drawn ones -- entry 14 reconciles both with the v5 rooms' 3 of 6) | [plume_goal_only.md](audits/plume_goal_only.md) | `- plume_goal_only: mostly sound` |
 | Fruit finding: the transduced cue | n/a (instrument; 1 of 6 rooms) | [plume_transduced.md](audits/plume_transduced.md) 3, 7 | `**VERDICT: mostly sound; merge with fixes.**` |
 | Monoamines (round 3) | not adoptable | [monoamine_slow_term.md](audits/monoamine_slow_term.md) | `verify:monoamines  --  verdict: **mostly sound**` |
 | Unitary strength (round 3) | not adoptable | [unitary_strength.md](audits/unitary_strength.md) | `verify:unitary  --  verdict: **mostly sound**` |
@@ -148,8 +160,9 @@ inputs -- +1,786 against -1,677 mV/s in `off` -- a knife-edge readout, and where
 shipped `slow_gain` 0.02 under `full` puts it at 1.9669914245605469 against the `> 2` bound on the CPU while
 the same configuration reads 5.0909 with the class off
 ([monoamine_slow_term.md](audits/monoamine_slow_term.md) section 0). Under round 8's three-instrument list it
-is the one non-uniform row of 29, and the instability is raw's own
-([instrumented_suite.md](audits/instrumented_suite.md) section 2).
+is the one non-uniform row of 29 -- `FAIL` at 1.690 Hz in draw 1 under both presets, against the `> 2` bound --
+and the instability is raw's own ([instrumented_suite.md](audits/instrumented_suite.md) section 2). The suite
+status above is therefore scoped to round 3: the round-8 draws carry that one FAIL.
 
 **Skeptic.** `verify:monoamines  --  verdict: **mostly sound**`
 
@@ -344,7 +357,12 @@ correctly signed +2.9939 Hz into PEN (z 3.1904) while the side-balanced PEN mean
 separated), so primary 3 is sign-specific **in the unheld ring**
 ([compass_sign_control.md](audits/compass_sign_control.md) section 3).
 
-**What it means.** A well-localized `null` on rotation with a `result` on the side report. Two verdicts in
+**What it means.** A well-localized `null` on rotation with a `result` on the side report. The rotation
+deficit these rounds attack was localized before them: at 90 deg/s an imposed visual rotation moves the bump
+0.00 +/- 0.01 wedges/s against 4.0 ideal, the link whose state blocks the signal is GLNO -> PEN (84 entries,
+16,371 synapses, 19.4 % of PEN's input, sign 0), and the population that would carry the rotation into GLNO,
+PS196_b, never fires (0.03-0.16 Hz in all 160 phases of two batches)
+([deficit_rotation.md](audits/deficit_rotation.md) 1, 3). Two verdicts in
 this pair are orientation-dependent, because `common.compare` divides by the reference arm's SD: primary 3
 reversed gives |z| 2.963 and a null, and cx8t's transfer reversed gives z -2.7036 and a null, while the
 symmetric Welch statistics are +7.26 and +5.05 and U is unchanged
@@ -446,7 +464,10 @@ with the pre-correction upwind / entry-memory goal) -- 36 runs, 0 problems
 DNa02 |L-R| of 0.62 Hz, while `feedback-only` feeds 0.17 +/- 0.41 with the **largest** DNa02 |L-R| of the
 three arms (1.97 Hz): the loop turns the fly hard toward a goal that does not point at food. `full` is 6/6,
 and the row `goal-only` never feeds is the 185 deg start
-([plume_goal_only.md](audits/plume_goal_only.md) sections 3-4).
+([plume_goal_only.md](audits/plume_goal_only.md) sections 3-4). On the six **drawn** starts of the same batch
+`goal-only` feeds 4.333 +/- 0.816 of six, which is the number the v5 rooms' 3 of 6 (entry 15) has to be read
+against: they are the same lever on different start sets, and P(X <= 3 | n = 6, p = 0.722) = 0.216 -- entirely
+within six-draw noise ([plume_transduced.md](audits/plume_transduced.md), rooms skeptic claim 5).
 
 **What it means.** The earlier skeptic's inference -- that the feedback was the load-bearing change, and that
 a goal-only arm would show 0.28-0.69 Hz DNa02 differences -- is refuted on its own prediction. The claim is a
@@ -472,8 +493,9 @@ arm the cue is uncorrelated with the physical lateral contrast the antennae actu
 -0.07 to +0.24, the cue's sign right in 0.52 +/- 0.10 of samples against 0.87-0.98 in the full arm -- and
 `|200*atanh(contrast)| > 1` in 66-87 % of samples, so the commanded turn saturates on the sign of noise.
 Excluding the two starts that begin 3.9 and 5.7 cm from a fruit surface leaves 4/4 full, 1/4 transduced, 3/4
-goal_only ([plume_transduced.md](audits/plume_transduced.md) section 7). On the CPU the same contrast arrives
-at cascade SNR 0.16-0.34 with the correct sign in 0.667 of 250 ms windows (analytic 0.635)
+goal_only ([plume_transduced.md](audits/plume_transduced.md) section 7). On the CPU, at the historical median
+total concentration and a fixed 0.57 % physical contrast over four odour-mixture scenarios, that contrast
+arrives at cascade SNR 0.16-0.34, with the correct sign in 0.667 of 250 ms windows (analytic 0.635)
 ([plume_transduced.md](audits/plume_transduced.md) section 3).
 
 **What it means.** The shipped `plume` instrument finds food on a physical antennal contrast, and substituting
@@ -486,7 +508,9 @@ that the cue's sign was right in only 0.52 +/- 0.10 of samples
 the six runs of an arm differ in start *and* seed, so the across-run SD is start heterogeneity and the
 paired-by-start reading is the stronger statement the tables do not make; and `goal_only`'s three successes
 are exactly the three starts already pointing near fruit (bearing error 19-88 deg), so that arm is closer to
-"hold the start heading" than to a plume-competence floor. The gain of 200 stays underived.
+"hold the start heading" than to a plume-competence floor; its 3 of 6 and entry 14's drawn 4.333 +/- 0.816 of
+six are the same lever on different start sets, P(X <= 3 | n = 6, p = 0.722) = 0.216, entirely within six-draw
+noise (same audit, rooms skeptic claim 5). The gain of 200 stays underived.
 
 **Skeptic.** `**VERDICT: mostly sound; merge with fixes.**`
 
@@ -697,8 +721,8 @@ change meets the source standard of the entries already in the table
 | The five navigation stand-ins (`compass`, `compass_ring`, `plume`, `hunger`, `flight`) | Admitted under `instrumented` only, never into `raw`. Round 8 found the three-instrument list **admissible** under [PRESETS_SPEC.md](PRESETS_SPEC.md) section 2 item 5 -- no row's status changes and the room rate-half passes at 110 take-offs against 101, one-sided exact Poisson p 0.291 -- "and nothing more: nothing is adopted, `raw` stays the default, the afferent's law is still `unverified` and the relabel still has no transmitter source" ([instrumented_suite.md](audits/instrumented_suite.md) 2-4; [NOTES.md](NOTES.md) Session 14 round 8). |
 | The compass stand-in as a preset default | Its own admission run rejected it: `taste.MN9_hz` moved 1.690 -> 4.296 Hz at seed 1, FAIL -> PASS outside the declared gap ([compass_standin.md](audits/compass_standin.md); [NOTES.md](NOTES.md) Session 13). |
 
-**The code state that goes with all of it.** `raw` is byte-identical: the bit-identity golden predates the
-instrument branch, the three cache MD5s are unchanged (`c50c598a...`, `ac131529...`, `bf01d724...`) with
+**The code state that goes with all of it.** `raw` is unchanged, and on the CPU it is bit-identical: the
+bit-identity golden predates the instrument branch, the three cache MD5s are unchanged (`c50c598a...`, `ac131529...`, `bf01d724...`) with
 compiled CSR `ef23cc27bea13be7f6a96f3c04fd3737`, and no default moved anywhere in `flyverse/` or `scripts/` --
 every change is a new trailing keyword with a neutral default. The same MD5s and fingerprint are recorded
 unchanged through rounds 4d, 7, 8 and the plume rooms ([NOTES.md](NOTES.md) Session 13).

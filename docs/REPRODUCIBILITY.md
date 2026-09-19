@@ -617,21 +617,28 @@ and `predeclared.json`, are plan artefacts that `analyse` does not touch: `batch
 
 ## 8. Which README number is quoted at which commit
 
+Two suite batches are quoted across the release documents and they are **not** interchangeable:
+`README.md`'s ledger and its behaviour sentences quote the **round-8 `raw` column** of
+`docs/audits/instrumented_suite.md` section 2 (batch `suite-inst`, 2026-09-18), while `docs/RESULTS.md`
+quotes the **round-3 guard batch** `docs/audits/guard_suites_r3.md` section 1 (batch `guard7-97ce35`).
+The two differ on exactly the rows 6.4 identifies: the raw column reproduces on 18 of the 29 rows and
+differs on 11, under identical code. Every row below therefore names its batch.
+
 | number in `README.md` | measured at | source |
 |---|---|---|
 | 167,106 neurons / 25,578,600 stored pairs / `sum|W|` 121,460,584 / md5 `ef23cc27...` | `28e862f` (recomputed 2026-09-14) | section 2 above |
 | FAFB 139,255 cells, BANC 157,789 cells | `28e862f` | section 2.1; `docs/audits/connectome_backends.md` |
-| 29-check suite: 27 PASS / 0 FAIL / 2 KNOWN GAP, 3 of 3 draws | `d2abf3c` + inert `LegCycle` = `f9e9fea`'s defaults | `docs/audits/guard_suites_r3.md` 1, batch `guard7-97ce35` |
+| 29-check suite tally **27/0/2, 26/1/2, 27/0/2** over three raw draws (README's ledger caption). `docs/RESULTS.md` quotes the round-3 batch instead: 27 PASS / 0 FAIL / 2 KNOWN GAP in every draw of the shipped arm | round 8, batch `suite-inst` (2026-09-18); round 3 at `d2abf3c` + inert `LegCycle` = `f9e9fea`'s defaults | `docs/audits/instrumented_suite.md` 2 and `guard_suites_r3.md` 1 (batch `guard7-97ce35`); 6.4 |
 | Behaviour statuses (optomotor `partial`, escape `pass`, landing `fail`, ...) | `f9e9fea` | `docs/BENCHMARK_BATTERY.md` |
-| `motion.min_dsi` 0.241, correct preferred direction 8/8 in 9 of 9 | `d2abf3c` + inert `LegCycle` = `f9e9fea`'s defaults | `docs/audits/guard_suites_r3.md` 1 |
-| Loom GF peak 46.7-49.5 Hz, escape in 9 of 9, walking GF p99 17-25 Hz vs the 33 Hz threshold | same | `docs/audits/guard_suites_r3.md` 1 |
+| `motion.min_dsi` **0.241-0.246** with the correct preferred direction 8/8 in three raw draws (README); 0.241 and 8/8 in 9 of 9 round-3 runs (RESULTS) | round 8, batch `suite-inst`; round 3 as above | `docs/audits/instrumented_suite.md` 2; `guard_suites_r3.md` 1; 6.4 |
+| Loom `loom_escape.GF_peak_hz` **48.1 / 55.3 / 48.8 Hz** with an escape in all three raw draws, walking `walk_gf.p99_hz` **13.5-22.5 Hz** against the 33 Hz threshold (README); 46.7-49.5 Hz, escape in 9 of 9, p99 17-25 Hz in the round-3 batch (RESULTS) | round 8, batch `suite-inst`; round 3 as above | `docs/audits/instrumented_suite.md` 2; `guard_suites_r3.md` 1; 6.4 |
 | GF spikes at ~3.5 cm range (`loom.escape_cm`, a `notnone` reported row) | session 4 reference, still the reference in `scripts/benchmark.py` | `docs/audits/benchmark_suite.md`, `probe_loom.py` |
-| Sugar -> MN9: Shiu rules 139.9 -> 0.8 Hz, calibrated 5.5 -> 0 Hz; `taste.MN9_hz` 10.93 | same | `docs/audits/guard_suites_r3.md` 1 (identical in all nine runs) |
-| Wind: `DNp18_flip_hz` +44.7 to +45.8, `DNp33_flip_hz` -49.4 to -50.0 | same | `docs/audits/guard_suites_r3.md` 1 |
-| Rotation: `rotation.group_flip_hz` -8.7 to -10.3 | same | `docs/audits/guard_suites_r3.md` 1 |
-| Odour: apple channel 17.3-17.5 Hz at 8 cm vs 4.3-4.9 Hz plume-free | same | `docs/audits/guard_suites_r3.md` 1 |
+| Sugar -> MN9: calibrated MN9 **3.93-5.52 Hz** and 0 Hz with bitter added over three raw draws (README); Shiu rules 139.9 -> 0.8 Hz, calibrated 5.5 -> 0 Hz and `taste.MN9_hz` 10.93 identical in all nine round-3 runs (RESULTS). `taste.MN9_hz` is the one row whose status is not uniform in round 8: FAIL at 1.69046 Hz in draw 1 under both presets | round 8, batch `suite-inst`; round 3 as above | `docs/audits/instrumented_suite.md` 2; `guard_suites_r3.md` 1; 6.4 |
+| Wind: `DNp18_flip_hz` **+44.8 to +47.0**, `DNp33_flip_hz` **-50.3 to -50.7** (README); +44.7 to +45.8 / -49.4 to -50.0 in the round-3 batch (RESULTS) | round 8, batch `suite-inst`; round 3 as above | `docs/audits/instrumented_suite.md` 2; `guard_suites_r3.md` 1; 6.4 |
+| Rotation: `rotation.group_flip_hz` -8.7 to -10.3 (round-3 batch) | `d2abf3c` + inert `LegCycle` = `f9e9fea`'s defaults | `docs/audits/guard_suites_r3.md` 1 |
+| Odour: apple channel 17.3-17.5 Hz at 8 cm vs 4.3-4.9 Hz plume-free (round-3 batch) | `d2abf3c` + inert `LegCycle` = `f9e9fea`'s defaults | `docs/audits/guard_suites_r3.md` 1 |
 | Take-off: 3.0 voluntary + 2.0 escape per 1,000 fly-s at the default | receptor round 5 / `560aaf3`, replicated round 3 | `docs/BENCHMARK_BATTERY.md`, `docs/audits/receptor_integration.md` G.5-G.6 |
-| Straight walking: clean-frame yaw SD 2.6-2.8 deg/s, straightness 0.995; DNa02 tonic inhibition -1.6 / -2.0 mV against a 7 mV gap | `4d55f96` (localization), `f9e9fea` (round-3 replication) | `docs/audits/deficit_turning.md`, `body_sided_state.md` |
+| Straight walking: clean-frame yaw SD 2.56 deg/s (2.45-2.57 with no fence), straightness 0.995 +/- 0.001; DNa02 tonic inhibition -1.6 / -2.0 mV against a 7 mV gap | `4d55f96` (localization), `f9e9fea` (round-3 replication) | `docs/audits/deficit_turning.md`, `body_sided_state.md` |
 | Leg cycle + sided haltere: yaw SD -> 7.7-7.9 deg/s, DNa02 0.54 / 0.38 Hz, no frame above 100 deg/s, fixed left drift | `f9e9fea` | `docs/audits/body_sided_state.md`, `round3_integration.md` |
 | Compass: 0/48 bumps at shipped gains under every per-transmitter unitary bracket; bump drift <= 0.005 wedges/s vs 4.0 ideal | `f9e9fea` | `docs/audits/unitary_strength.md` 4, `body_sided_state.md` 6 |
 | Small object: LC11 12/12 `null`, LC10a fails Holm (p_holm 0.104); no passing mechanism in 8 arms | `10ad8cc` (round 2) | `docs/audits/object_matched_assay.md`, `object_compare_r2.md` |
@@ -643,7 +650,7 @@ and `predeclared.json`, are plan artefacts that `analyse` does not touch: `batch
 | The `instrumented` column changes no suite row's status (27/0/2, 26/1/2, 27/0/2 under both presets) | round 8, batches `suite-inst` / `suite-inst-room` (2026-09-18) | `docs/audits/instrumented_suite.md` 2-3; section 6.4 |
 | Plume rooms, six 60 s seed-drawn starts per arm: full **6/6**, transduced **1/6**, goal_only **3/6** fed for >= 1 s | session 14, batch `plume_transduced_v5-6ebfff` (2026-09-18) | `docs/audits/plume_transduced.md` 0 and 7.2 |
 | Demo speed 0.5x / 0.8x / 1.3x real time on a 4090 | session 10 | `docs/NOTES.md`, `docs/PERFORMANCE.md` |
-| CPU test subset green | `28e862f` (2026-09-14, this desktop, cache present) | `364 passed, 7 skipped, 29 deselected ... in 144.62s` |
+| CPU test subset green | `bffbb0a` (2026-09-19, the release pass, this desktop, cache present) | `520 passed, 34 skipped, 30 deselected, 220 subtests passed in 203.55 s` (`RELEASE_CHECKLIST.md` 4). The earlier `364 passed, 7 skipped, 29 deselected ... in 144.62s` at `28e862f` is superseded: the suite has grown |
 
 ### 8.1 The two milestone sentences, and their licensed wording
 

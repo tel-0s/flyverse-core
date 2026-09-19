@@ -7,13 +7,13 @@ body that walks, jumps and flies, and a room with a table with fruit on it. Two 
 releases load through the same API -- FAFB v783 (brain, complete optic lobe) and BANC v888 (brain +
 VNC) -- as `connectome.load(dataset="fafb" | "banc")`.
 
-The default preset is **`raw`**: the unchanged connectome, the LIF, the receptor table, the senses and
-the motor readout, bit-identical on the CPU path (`tests/test_bit_identity.py`, a golden over a
+The default preset is **`raw`**: the unchanged connectome, the LIF, the receptor table, the senses
+and the motor readout, bit-identical on the CPU path (`tests/test_bit_identity.py`, a golden over a
 deterministic synthetic graph); no GPU rollout is claimed to repeat
-([`determinism_gate.md`](docs/audits/determinism_gate.md)). Everything added on
-top is either named in the additions table below or lives in the opt-in `instrumented` preset, where
-every instrument declares what it replaces, whether its law is sourced or `unverified`, and what
-would retire it. **Nothing is adopted into `raw`** ([`docs/PRESETS_SPEC.md`](docs/PRESETS_SPEC.md)).
+([`determinism_gate.md`](docs/audits/determinism_gate.md)). Everything added on top is either named
+in the additions table below or lives in the opt-in `instrumented` preset, where every instrument
+declares what it replaces, whether its law is sourced or `unverified`, and what would retire it.
+**Nothing is adopted into `raw`** ([`docs/PRESETS_SPEC.md`](docs/PRESETS_SPEC.md)).
 
 ![The flyverse room console](docs/demo_ui.png)
 *The room console: body camera, small orbit view, both retinal mosaics, antennal inputs, and
@@ -107,21 +107,18 @@ other -- which is the strongest lateralised signal in the model. **Sugar drives 
 bitter shuts it off** (calibrated MN9 3.93-5.52 Hz, 0 Hz with bitter added). And it **walks**, on any
 surface, with the optomotor group's L-R flipping with yaw direction. What it does not do: the ring
 holds no bump (`compass.wedge_cells_persisting` 0 in every draw); the fly does not turn (clean-frame
-yaw SD 2.6-2.8 deg/s and straightness 0.995 against an animal that saccades 200-450 deg/s every
-~250 ms, because DNa02 is held below threshold by sign-correct tonic inhibition while its three
-lateralised excitatory classes are silent at their sources -- PFL3 0.000 Hz, AOTU001 / AOTU015 at or
-near 0.000 Hz, most of LLPC1 never firing with LPT22 cancelling what survives -- and the fourth
-class, the wind through PS230, is live and lateralised but ~90x under dose, at ~0.078 mV against the
-7.0 mV threshold gap); small objects never reach the small-object channel (`object.LC10a_flip_hz`
-|0.0007-0.0098| against a 1.0 Hz criterion); there is no flight state, because the octopaminergic
-drive that would gate the wing motor neurons has no route through a graph whose monoamine synapses
-carry sign 0; and **no raw arm shows directed food search** -- the raw model has no odour-guided
-goal, and a plain fly's meals come from wandering into fruit before it leaves the table
-(`docs/NOTES.md` session 8). Sources: the 29-check ledger
-below (`out/benchmark_suite.json`, written by `scripts/benchmark.py`; latest raw column in
-[`instrumented_suite.md`](docs/audits/instrumented_suite.md) section 2),
-[`deficit_turning.md`](docs/audits/deficit_turning.md),
-[`deficit_object.md`](docs/audits/deficit_object.md),
+yaw SD 2.56 deg/s, 2.45-2.57 with no fence, straightness 0.995, against an animal that saccades
+200-450 deg/s every ~250 ms, because DNa02 is held below threshold by sign-correct tonic inhibition
+while its three lateralised excitatory classes are silent at their sources -- PFL3 0.000 Hz, AOTU001
+/ AOTU015 at or near 0.000 Hz, most of LLPC1 never firing with LPT22 cancelling what survives -- and
+the fourth class, the wind through PS230, is live and lateralised but ~90x under dose, at ~0.078 mV
+against the 7.0 mV threshold gap); small objects never reach the small-object channel
+(`object.LC10a_flip_hz` |0.0007-0.0098| against a 1.0 Hz criterion); there is no flight state,
+because the octopaminergic drive that would gate the wing motor neurons has no route through a graph
+whose monoamine synapses carry sign 0; and **no raw arm shows directed food search** -- the raw model
+has no odour-guided goal, and a plain fly's meals come from wandering into fruit before it leaves the
+table (`docs/NOTES.md` session 8). Sources: the 29-check ledger below and its caption,
+[`deficit_turning.md`](docs/audits/deficit_turning.md), [`deficit_object.md`](docs/audits/deficit_object.md),
 [`deficit_rotation.md`](docs/audits/deficit_rotation.md), `docs/NOTES.md` sessions 8 and 12-14.
 
 ## The 29-check ledger
@@ -158,8 +155,8 @@ below (`out/benchmark_suite.json`, written by `scripts/benchmark.py`; latest raw
 | `odour.apple_channel_clean_hz` (<= 6) | PASS x3 | PASS x3 |
 | `compass.wedge_cells_persisting` (>= 6) | **KNOWN GAP x3** | **KNOWN GAP x3** |
 
-*Tallies 27/0/2, 26/1/2, 27/0/2 in both columns. Six runs on NVIDIA B200 GPUs, draw seeds 0, 1, 2 per
-preset, 0 analysis problems (batch `suite-inst`,
+*Tallies 27/0/2, 26/1/2, 27/0/2 in both columns. Six runs on NVIDIA B200 GPUs, draw seeds 0, 1, 2
+per preset, 0 analysis problems (batch `suite-inst`,
 [`docs/audits/instrumented_suite.md`](docs/audits/instrumented_suite.md) section 2). The
 `instrumented` column is the **admissible three-instrument list**: `sided_turn_afferent:k=0.5`, the
 `ring_dc_hold` ExR6 / ER6 / ER4m hold on PEN / EPG, and the `glno_sign` GLNO-as-glutamate relabel.
@@ -172,12 +169,12 @@ in draw 1) and is bit-identical between the presets at every seed. Values move o
 
 ## Where the model stands
 
-Three deficits are localized to a named population and a named link rather than tuned away. **The fly
-walks straight**: DNa02 is held below a 7.0 mV gap by -1.6 / -2.0 mV of sign-correct steady
+Three deficits are localized to a named population and a named link rather than tuned away. **The
+fly walks straight**: DNa02 is held below a 7.0 mV gap by -1.6 / -2.0 mV of sign-correct steady
 inhibition while PFL3 and AOTU015 sit at 0.000 Hz and every `vnc_sensory` proprioceptor is at 0 Hz,
 so the walking VNC runs open-loop ([`deficit_turning.md`](docs/audits/deficit_turning.md)); the
-opt-in leg-cycle module closes that loop and raises yaw SD to 7.7-7.9 deg/s, but no clean frame in any
-arm exceeds 100 deg/s -- it moves yaw, it does not turn, and nothing was adopted
+opt-in leg-cycle module closes that loop and raises yaw SD to 7.7-7.9 deg/s, but no clean frame in
+any arm exceeds 100 deg/s -- it moves yaw, it does not turn, and nothing was adopted
 ([`body_sided_state.md`](docs/audits/body_sided_state.md)). **Small objects are lost at LC11 /
 LC10a's inputs**: on the matched sphere ladder no size preference is called for either type (LC11
 12/12 `null`, smallest `p_holm` 1.000; LC10a's one `result` fails Holm at `p_holm` 0.104 --
@@ -187,15 +184,16 @@ fixed-anatomy physiological arms ([`object_compare_r2.md`](docs/audits/object_co
 [`deficit_object.md`](docs/audits/deficit_object.md)); the assay itself is built and smoke-tested in
 [`object_matched_assay.md`](docs/audits/object_matched_assay.md), which claims no result about
 either type. **The compass has no rotation input**: at 90 deg/s the bump moves 0.00 +/- 0.01
-wedges/s against 4.0 ideal
-([`deficit_rotation.md`](docs/audits/deficit_rotation.md)). Behind all three sit physiological facts
-nobody has measured -- each the reason a behaviour is a gap rather than a bug:
+wedges/s against 4.0 ideal ([`deficit_rotation.md`](docs/audits/deficit_rotation.md)). Behind all
+three sit physiological facts nobody has measured -- each the reason a behaviour is a gap rather
+than a bug:
 
 1. **The GLNO transmitter.** GLNO's 4 cells are `nt` `unknown` in every MaleCNS column, so their
    17,698 output synapses are stored as explicit zeros -- 16,371 of them onto PEN, **19.4 % of PEN's
-   raw input**, every edge above the connection cap. The two EM classifiers disagree (MaleCNS T-bar
-   consensus `unclear` at confidence 0.48, glutamate 51 % / acetylcholine 37 %; BANC v888 predicts
-   GLUT on 4/4), no transcriptome profile covers it and the receptor table has no row for it
+   raw input**, every edge above the connection cap. Three EM classifiers agree only that GLNO is
+   inhibitory and disagree on the transmitter (MaleCNS T-bar consensus `unclear` at confidence 0.48,
+   glutamate 51 % / acetylcholine 37 %; BANC v888 glutamate 4/4 at ~0.5; FlyWire FAFB GABA 3/4 at
+   ~0.3), no transcriptome profile covers it and the receptor table has no row for it
    ([`glno_relabel.md`](docs/audits/glno_relabel.md) 1.1-1.2, [`cx_glno.md`](docs/audits/cx_glno.md) 1).
 2. **Receptors at the EB / GA contacts.** ExR6's glutamate and ER6's GABA identities have
    type-specific EASI-FISH support (Wolff et al. 2025, eLife, Figure 9: ExR6 vGlut strong, ER6 Gad1
@@ -225,13 +223,14 @@ nobody has measured -- each the reason a behaviour is a gap rather than a bug:
    the Wang attribution and the search are [`docs/INSTRUMENTS.md`](docs/INSTRUMENTS.md),
    [`vnc_drive.md`](docs/audits/vnc_drive.md) 6).
 6. **What the antennal contrast is worth to the model's own ORNs.** At the shipped ORN law, 2,639
-   cells, the 100 ms rate filter and the 250 ms contrast filter, 0.26-1.1 % physical contrast arrives
-   as 0.010-0.108 Hz against 0.13-0.16 Hz of filter noise (cascade SNR 0.08-0.67, below 1 across the
-   whole historical range). These are sensory-field evaluations, not neural room runs
-   ([`plume_transduced.md`](docs/audits/plume_transduced.md) 1-3).
+   cells, the 100 ms rate filter and the 250 ms contrast filter, a 0.57 % physical contrast at the
+   historical median total concentration arrives as 0.022-0.056 Hz against 0.224-0.273 Hz of 250 ms
+   counting-window noise in each of four odour-mixture scenarios -- cascade SNR 0.16-0.34, below 1.
+   These are sensory-field evaluations, not neural room runs
+   ([`plume_transduced.md`](docs/audits/plume_transduced.md) 3).
 
 What each of these predicts, and which measurement would settle it, is written up separately in
-`docs/PREDICTIONS.md`.
+[`docs/PREDICTIONS.md`](docs/PREDICTIONS.md).
 
 ## The raw / instrumented layer
 
@@ -269,30 +268,32 @@ condition**. Program-shaped stand-ins -- those that replace a *computation* rath
 *input* -- are admitted **only** under the owner's section-5 extension, and every instrument must declare
 what it replaces in a `replaces` field that `flyverse.instruments._check_instrument` enforces.
 
-| instrument | kind | replaces | law | gap it stands in for | retired by |
-|---|---|---|---|---|---|
-| `compass` | stop-gap | computation | **unverified** (integrated realized yaw; 50 Hz peak, 35 deg Gaussian) | imposed angular memory and a continuous EPG Poisson representation | a native circuit passing the same sustained-turn, reversal and stationary-memory contract |
-| `compass_ring` | stop-gap | computation | **unverified**; EB feedback a declared textbook counterfactual, angular gain uncalibrated | the same memory, as Wang's reduced recurrent EPG/PEN rate loop | a validated native heading circuit or a quantitatively validated connectome-fitted model |
-| `sided_turn_afferent` | stop-gap | input | **unverified**: no PS196_b / AN07B037 recording exists; `k` a declared level, `sign` the control | PS196_b's signed turn input (unknown 5 above) | a recording of PS196_b / AN07B037 during turning, or a sided ascending report that reaches it |
-| `ring_dc_hold` | edges | configuration | a counterfactual: no transfer claimed | the ExR6 / ER6 / ER4m DC term on PEN / EPG (1,149 entries, 37,256 synapses) held at 0 | sourced receptor placement and kinetics at the EB / GA contacts (unknown 2) |
-| `glno_sign` | relabel | configuration | **unverified**: the stronger of two disagreeing EM predictions | GLNO's sign-0 output (unknown 1) | a transmitter source for GLNO that is not one EM classifier |
-| `plume` | stop-gap | computation | **unverified**: goal policy, output bridge, 1 mm baseline, 0.1 m response length and feedback gain all declared engineering assumptions | bilateral odour-gradient walking goal, PFL3 comparator with DNa02 feedback | native odor/wind goal memory and PFL3 steering pass the same sensory controls |
-| `hunger` | stop-gap | computation | **unverified**: explicit engineering modulation, not a hormone or receptor model | `(1-energy)*(not sated)` navigation gain | a sourced metabolic transducer with verified target cells and dynamics |
-| `flight` | stop-gap | computation | **unverified**: timers, reserve / odour hysteresis and the 100 Hz target come from the body equations, not physiology | bounded wing-power bouts and a PFL3-to-wing steering bridge | validated descending/VNC flight-state and steering mechanisms supply the same control |
+| instrument | kind | replaces | law | admission | gap it stands in for | retired by |
+|---|---|---|---|---|---|---|
+| `compass` | stop-gap | computation | **unverified** (integrated realized yaw; 50 Hz peak, 35 deg Gaussian) | **rejected** | imposed angular memory and a continuous EPG Poisson representation | a native circuit that maintains and integrates a heading bump under the same turn/reversal/dark tests |
+| `compass_ring` | stop-gap | computation | **unverified**; EB feedback a declared textbook counterfactual, angular gain uncalibrated | untested by the gate | the same memory, as Wang's reduced recurrent EPG/PEN rate loop | a validated native heading circuit or a quantitatively validated connectome-fitted model |
+| `sided_turn_afferent` | stop-gap | input | **unverified**: no PS196_b / AN07B037 recording exists; `k` a declared level, `sign` the control | admissible at `k=0.5` | PS196_b's signed turn input (unknown 5 above) | a recording of PS196_b / AN07B037 during turning; a sided ascending report that reaches PS196_b on its own; or a round-7 null on measure 3 at every declared k |
+| `ring_dc_hold` | edges | configuration | a counterfactual: no transfer claimed | admissible | the ExR6 / ER6 / ER4m DC term on PEN / EPG (1,149 entries, 37,256 synapses) held at 0 | sourced receptor placement and kinetics at the EB / GA contacts (unknown 2) |
+| `glno_sign` | relabel | configuration | **unverified**: the transmitter two of the three low-confidence EM classifiers call | admissible | GLNO's sign-0 output (unknown 1) | a transmitter source for GLNO that is not one EM classifier |
+| `plume` | stop-gap | computation | **unverified**: goal policy, output bridge, 1 mm baseline, 0.1 m response length and feedback gain all declared engineering assumptions | untested by the gate | bilateral odour-gradient walking goal, PFL3 comparator with DNa02 feedback | native odor/wind goal memory and PFL3 steering pass the same sensory controls |
+| `hunger` | stop-gap | computation | **unverified**: explicit engineering modulation, not a hormone or receptor model | untested by the gate | `(1-energy)*(not sated)` navigation gain | a sourced metabolic transducer with verified target cells and dynamics |
+| `flight` | stop-gap | computation | **unverified**: timers, reserve / odour hysteresis and the 100 Hz target come from the body equations, not physiology | untested by the gate | bounded wing-power bouts and a PFL3-to-wing steering bridge | validated descending/VNC flight-state and steering mechanisms supply the same control |
 
 Every cell in the last column is that instrument's own declared `removal` -- the field
-`flyverse.instruments._check_instrument` refuses to leave empty, printed by `describe()`.
-`docs/INSTRUMENTS.md`'s navigation table carries a different third column, *dependencies and
-limitations*, and those read: `compass_ring` is an alternative to `compass` and the two together are
-an error; `plume` is an experimental control, given no food-location oracle and claiming no native
-source-localization circuit; `hunger` needs `plume` or `flight`; `flight` selects no landing site,
-controls no altitude and adds no flight-energy model. None of these four is in the ledger's
-`instrumented` column, which runs the admissible three-instrument list only
-([`instrumented_suite.md`](docs/audits/instrumented_suite.md) section 2).
-
-`ring_dc_hold_pen`, `glno_pen_hold` and the `plume` variants (`plume:bilateral=orn`,
-`plume:feedback=0`, `plume:walking_goal=0`) are diagnostic arms of the same rows; the full inventory,
-dependency rules and errors are in [`docs/INSTRUMENTS.md`](docs/INSTRUMENTS.md).
+`flyverse.instruments._check_instrument` refuses to leave empty, printed by `describe()`. The
+admission column is the section-2 item-5 gate and nothing else: `compass` was **rejected** on a
+`taste.MN9_hz` status change ([`compass_standin.md`](docs/audits/compass_standin.md)), and the other
+four navigation stand-ins have never been through it, so *untested by the gate* is neither a pass nor
+a failure. [`docs/INSTRUMENTS.md`](docs/INSTRUMENTS.md) carries the **Composition** table -- `compass`
+with `compass_ring` is an error (two heading providers), `plume` needs `compass` or `compass_ring`,
+`hunger` needs `plume` or `flight`, and no two instruments write the same cell and channel, each
+checked at CLI parse time and again before installation -- and a block per instrument with the rest
+of each one's limits: `plume` is an experimental control, given no food-location oracle and claiming
+no native source-localization circuit; `flight` selects no landing site, controls no altitude and
+adds no flight-energy model. None of those four is in the ledger's `instrumented` column.
+`ring_dc_hold_pen`,
+`glno_pen_hold` and the `plume` variants (`plume:bilateral=orn`, `plume:feedback=0`,
+`plume:walking_goal=0`) are diagnostic arms of the same rows.
 
 **The admissible list.** `sided_turn_afferent:k=0.5` + `ring_dc_hold` + `glno_sign` is admissible
 under PRESETS_SPEC section 2 item 5: no row changes status in three instrumented draws beside three
@@ -319,14 +320,14 @@ The second is carried by the three navigation audits
 > powered-flight rooms are the superseded navigation flight arm (59.67 s airborne, zero feeding in all
 > six rows), and `powered_s` is 0.00 in all 12 flight-priority room rows and all 12 plume room rows.
 
-The rooms do **not** confirm the CPU SNR result and are not offered as confirming it; what they add is
-that the measured in-room cue noise is 1.3-2.6x the analytical estimate and that the cue's sign was
-right in only 0.52 +/- 0.10 of samples
-([`plume_transduced.md`](docs/audits/plume_transduced.md), skeptic correction C7). The six runs of an
-arm differ in start *and* seed, so the across-run SD is start heterogeneity; the arms share their six
-starts, and the paired-by-start reading is the stronger statement. A third arm, `plume:feedback=off`
-(physical goal, DNa02 gain 0), fed in 3/6 -- exactly the starts already pointing near fruit. Nothing
-adopted, no default moved, the gain of 200 still underived.
+The rooms do **not** confirm the CPU SNR result and are not offered as confirming it; what they add
+is that the measured in-room cue noise is 1.3-2.6x the analytical estimate and that the cue's sign
+was right in only 0.52 +/- 0.10 of samples
+([`plume_transduced.md`](docs/audits/plume_transduced.md), skeptic correction C7). The six runs of
+an arm differ in start *and* seed, so the across-run SD is start heterogeneity; the arms share their
+six starts, and the paired-by-start reading is the stronger statement. A third arm,
+`plume:feedback=off` (physical goal, DNa02 gain 0), fed in 3/6 -- exactly the starts already
+pointing near fruit. Nothing adopted, no default moved, the gain of 200 still underived.
 
 ## The same model on three connectomes
 
@@ -384,7 +385,7 @@ and p can be read). Replicates are cluster jobs, not seeds and not batch rows. E
 re-checked by an **independent skeptic pass whose verdict line and claims are quoted verbatim**, with
 corrections applied in place and superseded sentences kept marked **Withdrawn** -- the record is
 [`docs/audits/receptor_verification.md`](docs/audits/receptor_verification.md). How a round is run
-end to end is written up separately in `docs/PROCESS.md`.
+end to end is written up separately in [`docs/PROCESS.md`](docs/PROCESS.md).
 
 ## Reproducibility
 
@@ -407,9 +408,10 @@ claims a bit-identical GPU rollout.
 
 ## Where things are
 
-The results, arm by arm, with the batch that produced each one: `docs/RESULTS.md`. One audit record
-per question, every number carrying its batch line: [`docs/audits/`](docs/audits/). Session by
-session: [`docs/NOTES.md`](docs/NOTES.md). The full file-by-file map: `docs/OVERVIEW.md`. In short:
+The results, arm by arm, with the batch that produced each one:
+[`docs/RESULTS.md`](docs/RESULTS.md). One audit record per question, every number carrying its batch
+line: [`docs/audits/`](docs/audits/). Session by session: [`docs/NOTES.md`](docs/NOTES.md). The full
+file-by-file map: `docs/OVERVIEW.md`. In short:
 
 | | |
 |---|---|
@@ -422,6 +424,8 @@ session: [`docs/NOTES.md`](docs/NOTES.md). The full file-by-file map: `docs/OVER
 | `scripts/` | `room_demo.py`, `fetch_data.py`, `benchmark.py`, `probe_*.py`, `screen_*.py`, `interp_*.py`, `cross_connectome.py` |
 | `docs/INSTALL.md`, `docs/OVERVIEW.md`, `docs/REPRODUCIBILITY.md` | install, the long form, what was measured where |
 | `docs/PRESETS_SPEC.md`, `docs/INSTRUMENTS.md`, `docs/BENCHMARK_BATTERY.md`, `docs/INTERP.md` | the preset contract, the instrument inventory, the assays, the toolkit contract |
+| [`docs/RESULTS.md`](docs/RESULTS.md), [`docs/PREDICTIONS.md`](docs/PREDICTIONS.md) | what every round asked and what came back, arm by arm; the falsifiable predictions and the assay that would refute each |
+| [`docs/PROCESS.md`](docs/PROCESS.md), [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) | how a round is run end to end; what is owed before the repository is public |
 
 ## Licence, citation and data
 

@@ -235,8 +235,9 @@ class BitIdentityTests(unittest.TestCase):
 
 
 class RawPresetTests(unittest.TestCase):
-    """docs/PRESETS_SPEC.md 1: `FlyBrain(preset="raw")` is byte-identical to `FlyBrain()` on every path -- the same
-    recorded golden, the same installed weights, the same spike train."""
+    """docs/PRESETS_SPEC.md 1: `FlyBrain(preset="raw")` is the same model as `FlyBrain()` -- the same recorded
+    golden, the same installed weights, the same spike train. Like the rest of this file it is a CPU claim:
+    the module pins CUDA_VISIBLE_DEVICES=-1 and builds device="cpu" brains (docs/REPRODUCIBILITY.md 4.4)."""
 
     def test_preset_raw_matches_the_recorded_golden(self):
         got = scenario(preset="raw")

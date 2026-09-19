@@ -41,6 +41,12 @@ every model number in this file is cited to its audit.
          no pre-rewrite object was ever pushed to the new one. This also drops stars, issues and
          existing forks -- which is the trade-off to weigh, not a detail.
       Whichever is chosen, record it in `NOTES.md` with the date, and keep the pre-rewrite bundle.
+- [x] **No second rewrite for the release-branch trailers.** The five release branches were not uniform on
+      their `Co-Authored-By` line (three carried one model name, three another). The owner's decision is
+      that **the branch commits keep their actual authors' trailers**: no commit is amended and no trailer
+      is edited for the release, because amending changes every id and would need a second commit map
+      under rule 30. This is a decision about trailers only; the author-identity question below is
+      separate and still open.
 - [ ] **Decide the commit-author identity.** Every one of the 196 commits carries one author address,
       a personal e-mail account (this pass: `git log --all --format=%ae` gives a single distinct
       address). That is not an infrastructure identifier and the scrub deliberately left it, but it
@@ -62,6 +68,7 @@ These are ignored today and the check is that they **stay** ignored; none of the
 | `docs/HANDOFF_*.md` | per-round hand-off files; they name boxes and directories (`INTERP.md` 10.4 rule 27) |
 | `out/cx5`, `out/cx6`, `out/cx7`, `out/objr3sd*`, `out/vncd4-7` `predeclared.json` | five frozen declaration families carrying `host` / `ssh` fields. Frozen run records are **never edited** (rule 30 (ii)), so the only correct handling is that they remain ignored (`../TODO.md` A, the code skeptic's list) |
 | `cache/`, `data/external/`, `out/` (except the tracked files below) | ~200 MB of compiled cache, other people's expression tables, and run output |
+| `.claude/` | agent worktrees and state. Ignoring it also keeps the now-blocking `ruff check .` off untracked worktrees (section 5) and `git add -A` off agent state |
 
 - [x] **The `.gitignore` entries exist** for all of the above.
 - [x] **The tracked exceptions under `out/` are deliberate and clean**: 76 files -- the committed plans,
@@ -159,15 +166,20 @@ The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status
       ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)): Python 3.12, CPU torch from the
       PyTorch CPU index, `FLYVERSE_DATA` pointed at a non-existent path so nothing can silently find a
       stale dataset, headless SDL, then `pytest -m "not gpu and not data and not cluster"`.
-- [ ] **Decide what the ruff step is for.** It runs `ruff check flyverse scripts tests --select
-      E9,F63,F7,F82` with `continue-on-error: true` -- it reports, it does not gate. This pass, with
-      ruff 0.16.7, it finds **14 `F821` undefined names in three scripts**: `scripts/cx_wedge.py` (8),
-      `scripts/cx_shift.py` (4), `scripts/compass_driver_trace.py` (2), all of them `fb` or `sim` in
-      what look like nested closures. `../TODO.md` A already asks whether those paths are dead or rely
-      on an enclosing scope. Close it one of two ways before the flip: fix or delete the paths and drop
-      `continue-on-error`, or keep the step advisory and say in the CI file why 14 known hits are
-      tolerated. A public repository whose first CI annotation is 14 undefined names invites the wrong
-      first impression.
+- [x] **What the ruff step is for is decided, and the step now blocks** (closed by the 0.2.0 packaging
+      pass). It runs `ruff check . --select E9,F63,F7,F82` -- syntax errors and undefined names only,
+      style still deliberately ungated -- and `continue-on-error` is gone, so a regression fails the run
+      instead of scrolling past ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)). The **14
+      `F821` undefined names** the earlier pass found with ruff 0.16.7 (`scripts/cx_wedge.py` 8,
+      `scripts/cx_shift.py` 4, `scripts/compass_driver_trace.py` 2, every one a closed-over name that a
+      later `del` in the enclosing scope unbound) are fixed and the count is now zero. The path is `.`
+      and no longer `flyverse scripts tests`, which left `examples/` unlinted. `../TODO.md` A says 12,
+      which predates `scripts/compass_driver_trace.py` (added 2026-09-15 at `07cf966`) and is stale.
+- [x] **`.claude/` is ignored, which the blocking `ruff check .` needs.** Agent worktrees and state live
+      under `.claude/`, and before this entry the directory was untracked **and** un-ignored. ruff honours
+      `.gitignore`, so ignoring it keeps a local worktree or venv -- copies of the repository, not the
+      repository -- from turning the now-blocking lint step red, and keeps `git add -A` from committing
+      agent state. CI on a fresh checkout was never affected.
 
 ---
 
@@ -194,15 +206,17 @@ The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status
 - [x] **`LICENSE`**: MIT, for the code.
 - [x] **[`../CITATION.cff`](../CITATION.cff)** exists and validates, cites the MaleCNS v1.0 release, the
       FAFB v783 and BANC v888 releases and Shiu et al. 2024, and names the entity author `tel0s`.
-- [ ] **Close the three TODOs inside `CITATION.cff`** -- they are written into the file and will be read
-      by anyone who opens it: confirm and add the DOI of the MaleCNS release paper (the manifest records
+- [ ] **Close the three TODOs inside `CITATION.cff`** -- they survive the 0.2.0 packaging pass, they are
+      **the owner's open items**, and they are written into the file and will be read by anyone who
+      opens it: confirm and add the DOI of the MaleCNS release paper (the manifest records
       the PII `S0092-8674(26)00942-6`, which has **not** been checked against a registered DOI), confirm
       the data licence, and confirm the canonical author list for the release. Either fill them or
       restate them as a note; do not ship a `TODO:` in the citation file.
-- [ ] **Decide the version.** `pyproject.toml` and `CITATION.cff` both say `0.1.0`, and `CITATION.cff`
-      says `date-released: 2026-09-13`, which is now stale. Pick the release version, set it in both
-      files in one commit, update `date-released`, and tag it -- a citable release wants a tag, and the
-      tag is what a DOI service would archive.
+- [x] **The version is decided and set.** `pyproject.toml` and `CITATION.cff` both say `0.2.0` and
+      `CITATION.cff` says `date-released: 2026-09-19`; the two are kept equal by
+      `tests/test_packaging.py::CitationTests::test_citation_version_tracks_pyproject`.
+- [ ] **Tag `v0.2.0` at the release commit.** A citable release wants a tag, and the tag is what a DOI
+      service would archive. Owner's call, on the day of the flip.
 
 ---
 
@@ -223,23 +237,23 @@ The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status
 
 ## 9. The two documents the README must link
 
-Two documents are being written for the release and are **not in the tree yet**. The README's "Where
-things are" table and its reproducibility section must link them, and the links must resolve before the
-flip:
+Both are now in the tree and both are linked from the README's "Where things are" table as relative
+Markdown links, so the section-10 item-7 link check sees them:
 
-- [ ] **`docs/PREDICTIONS.md`** -- the falsifiable predictions the model makes, each with the assay that
-      would refute it. Must use the verdict vocabulary of [`PROCESS.md`](PROCESS.md) section 3
-      (`result` / `null` / `underpowered` / `undetermined`) and cite its audit per claim.
-- [ ] **`docs/RESULTS.md`** -- the results as a reader should quote them, drawn from the audits. Two
-      constraints it inherits, both recorded:
+- [x] **[`PREDICTIONS.md`](PREDICTIONS.md)** -- the falsifiable predictions the model makes, each with the
+      assay that would refute it. It uses the verdict vocabulary of [`PROCESS.md`](PROCESS.md) section 3
+      (`result` / `null` / `underpowered` / `undetermined`) and cites its audit per claim.
+- [x] **[`RESULTS.md`](RESULTS.md)** -- the results as a reader should quote them, drawn from the audits.
+      Two constraints it inherits, both recorded and both honoured in the file as merged:
       * room numbers are quoted as mean +- across-run SD with the run as the replicate unit, and every
         room number produced before the determinism gate stays **one draw**
         ([`audits/determinism_gate.md`](audits/determinism_gate.md) 4.3);
       * the transduced-plume rooms are a **descriptive room observation** -- not a significance test, not
         an SNR measurement, not a claim about flies -- and they do **not** confirm the CPU SNR finding
         ([`audits/plume_transduced.md`](audits/plume_transduced.md) 7.3 and skeptic claim 7).
-- [ ] **Add both to the README's document table** in the same commit that adds the files, so the
-      repository never has a dangling link; a link check over the tree is the last item of section 10.
+- [x] **Both are rows in the README's document table**, beside [`PROCESS.md`](PROCESS.md) and this file,
+      as relative links rather than backticked prose, so the repository has no dangling link and the
+      link check of section 10 item 7 can see them.
 
 ---
 
@@ -254,7 +268,9 @@ Run these in order, and keep the console:
 4. `python -m flyverse.connectome` and `python scripts/hash_weights.py` -- the cache md5s and the
    compiled-W md5 against [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) section 2 (section 4).
 5. `python scripts/fetch_data.py --verify` (section 6).
-6. `ruff check flyverse scripts tests --select E9,F63,F7,F82` -- expected hits only (section 5).
+6. `ruff check . --select E9,F63,F7,F82` -- the CI invocation, which now gates; expect
+   `All checks passed!` (section 5). Untracked agent worktrees under `.claude/` are skipped because ruff
+   honours `.gitignore`.
 7. A relative-link check over every Markdown file in `docs/` and `README.md`: every relative link
    resolves in the tree, including the two new documents of section 9.
 8. Confirm the GitHub object decision of section 1 is made and recorded in `NOTES.md`, then flip.

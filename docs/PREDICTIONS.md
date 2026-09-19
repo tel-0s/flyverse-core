@@ -103,8 +103,9 @@ section 6). The LIF's effective input noise, measured for the first time, is 4.6
 above the maximum slope of the smoothed f-I (6.06 Hz/mV) -- the shipped ring cannot be an attractor at any
 operating point the cell model provides (`compass_local_recurrence.md` section 2).
 
-**The unknowns.** (a) GLNO's transmitter: the two EM predictions disagree (Glu 0.505 vs GABA at confidence
-0.30-0.33) and both map to -1 in `NT_SIGN` (`docs/audits/glno_relabel.md`). (b) The receptor class and kinetics at
+**The unknowns.** (a) GLNO's transmitter: three EM classifiers agree only that GLNO is inhibitory and disagree on
+the transmitter (BANC Glu 0.505 vs FlyWire GABA at confidence 0.30-0.33, with MaleCNS `unclear` at 0.48), and both
+inhibitory labels map to -1 in `NT_SIGN` (`docs/audits/glno_relabel.md` 1.2). (b) The receptor class and kinetics at
 ExR6 / ER6 -> PEN, EPG. (c) EPG / PEN intrinsic gain and resting drive -- the ring's operating point. (d) The sign at
 PS196_b (section 1).
 
