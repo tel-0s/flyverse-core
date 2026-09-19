@@ -21,6 +21,10 @@ The preset is one keyword on the constructors and the CLIs (`FlyBrain(preset="ra
 clarification, 2026-09-15), `instrumented` is one word away, and every audit states which preset it ran.
 `preset="raw"` with an instrument raises; the constructor never builds an instrument on its own.
 
+**Round-7 review clarification (2026-09-15, before submission).** The handoff explicitly places `SidedTurnAfferent`
+in `senses.Proprioception`, reading the existing `yaw_rate` channel. That is the body-derived input case of section 2
+item 3, not a new body-to-neural-module API. Cite this paragraph as "section 1, round-7 review clarification".
+
 Legacy explicit `--hold-edges` / `--nt-override` diagnostics keep their separate provenance under `raw`, as the
 round-7 handoff requires; `raw` without those flags is the plain comparator.
 
@@ -81,8 +85,12 @@ produced a bump that follows the fly's own turn or were shown not to. Round 7 ra
 (`docs/audits/compass_velocity_route.md` section 5.1): the signed afferent reaches GLNO -- V minus S raises GLNO L-R
 by +2.2183 Hz, a `result` at Holm p 0.0130 -- but the round **demonstrates no turn-following compass**. Primaries 1
 and 2 are `undetermined`: no HGV run passes the predeclared 50 % turn-window confinement gate, so those are
-unavailable comparisons, not zero velocity and not statistical nulls. PEN L-R and DNa02 L-R are `null`. Nothing
-downstream of a heading bump has been built since.
+unavailable comparisons, not zero velocity and not statistical nulls. PEN L-R and DNa02 L-R are `null`.
+
+Nothing downstream of a *native, turn-following* bump has been built since. The downstream instruments that do ship
+-- `plume` and its round-8 variants, implementing the published PFL3 / DNp09 goal comparator -- ride the imposed
+`compass` / `compass_ring` stand-ins admitted under sections 5 and 6, not a bump the fly's own turn produced, and
+they are untested by the section-2 item-5 gate (section 7).
 
 ## 4. What this is not
 
@@ -103,7 +111,8 @@ unchanged. It is selectable by `instruments=["compass"]`; `instrumented` alone r
 The existing proprioception entry point may forward its held `yaw_rate` to an explicitly named instrument's
 `observe_turn` receiver. The compass receives no body object, absolute heading, visual landmark, goal or
 motor command. Its neural output, stepping, checkpoint and reset use the ordinary module interface. This
-extends the earlier round-7 clarification; `SidedTurnAfferent` still lives in its original sense transducer.
+extends the round-7 review clarification in section 1; `SidedTurnAfferent` still lives in its original sense
+transducer.
 
 Admission checks and the distinction between an experimental option and default adoption are recorded in
 [audits/compass_standin.md](audits/compass_standin.md). A functional phase-tracking pass does not establish

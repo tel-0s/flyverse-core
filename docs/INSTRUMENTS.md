@@ -7,13 +7,17 @@ per shipped instrument.
 **Nothing here is on by default.** `FlyBrain()` is `FlyBrain(preset="raw")`, byte-identical on every path
 (`tests/test_bit_identity.py`, `RawPresetTests`); `preset="raw"` with an instrument raises; `preset="instrumented"`
 with an empty list reproduces `raw` on the original connectome and LIF parameters (PRESETS_SPEC section 1); and every
-audit states which preset it ran. Nothing on this page is adopted into `raw`, and no instrument's presence moves a
-suite row (PRESETS_SPEC section 4).
+audit states which preset it ran. Nothing on this page is adopted into `raw`, and no instrument changes a suite
+row's *status* outside the rows its gap is declared to touch -- an instrument that does is rejected, as `compass`
+was (the policy is PRESETS_SPEC section 4, the results section 7). Values do move: 20 of the 29 rows under the
+admissible list, with 8 rows bit-identical to `raw` ([audits/instrumented_suite.md](audits/instrumented_suite.md)
+section 4).
 
 ## The two licensed milestone sentences
 
-These are the only behavioural milestone claims the instruments license, and they appear here and nowhere else in the
-documentation. Both are quoted; neither is restated in looser words anywhere in this file.
+These are the only behavioural milestone claims the instruments license, and this page is where they are placed for
+the release; neither is restated in looser words anywhere in this file. Both are quoted, and their audit homes are
+named with each quote below.
 
 **On finding food under the instrumented preset** -- the sentence
 [docs/NOTES.md](NOTES.md) "Session 14, continued" records as the skeptic's proposed wording, quoted for the owner to
@@ -175,7 +179,8 @@ It is a **body-derived** signal (the realised yaw rate), so it lives where the `
 `FlyBrain._input` like every other sense. A `flyverse.modules` module sees neural quantities only, and no neural
 quantity in this model carries the fly's own turn with a sign, so this instrument stays in the transducer. The later
 compass candidate has an explicit held-yaw receiver authorized by PRESETS_SPEC section 5; that does not change the
-afferent's implementation (PRESETS_SPEC section 3, round-7 review clarification).
+afferent's implementation (PRESETS_SPEC section 1, round-7 review clarification, and section 5's own sentence that
+`SidedTurnAfferent` still lives in its original sense transducer).
 
 ### The side, from the graph
 
