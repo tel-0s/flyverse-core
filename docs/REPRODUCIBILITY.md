@@ -3,9 +3,14 @@
 What the shipped model is, exactly; what identifies the data it runs on; what is reproducible and
 what is not; and which number in `README.md` was measured at which commit.
 
-Everything in sections 1-3 was recomputed on **2026-09-14 at commit `28e862f`** (the current tree)
-with the commands each section quotes. Sections 4-7 record facts established earlier and name the
-file and run they come from.
+Everything in sections 1-3 was recomputed on **2026-09-14 at commit `28e862f`** with the commands each
+section quotes. Sections 4-8 record facts established earlier and later -- the latest are round 8 and
+session 14, 2026-09-18 -- and each names the audit, the batch and the file it comes from. Rounds 3
+through 8 and session 14 adopted nothing and moved no default (`docs/audits/determinism_gate.md` 1,
+`compass_sign_control.md` 4, `instrumented_suite.md` 5, `plume_goal_only.md` 4, `plume_transduced.md` 0;
+`docs/NOTES.md` sessions 11-14), so the shipped model sections 1-3 describe is the model at the current
+tree. How a round that produces any of these numbers is run is [`PROCESS.md`](PROCESS.md); what is owed
+before the repository is made public is [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md).
 
 ---
 
@@ -111,10 +116,42 @@ fan-in normalisation, antennal-lobe-only depression, the graded optic lobe) are 
 
 `senses.Proprioception`, `body.LegCycle`, `motor.read_haltere_sides`, `LIFParams.w_syn_by_nt`, the
 monoamine slow class (needs `receptor_model='full'`), the four `OpticParams` stream hooks,
-`fb.add_hook` / `fb.attach`, `Connectome.extend`, `surrogate_grad`, and every
-`flyverse/programs.py` / `flyverse/cx.py` module. All default to off/`None`; with nothing attached the
-simulation is bit-identical to the default path on CPU (`tests/test_bit_identity.py`,
-`tests/test_body_cycle.py`, `tests/test_optic_hooks.py`, `tests/test_unitary.py`).
+`fb.add_hook` / `fb.attach`, `Connectome.extend`, `surrogate_grad`, every
+`flyverse/programs.py` / `flyverse/cx.py` module, and **every instrument** (the `instrumented` preset,
+1.5). All default to off/`None`/empty; with nothing attached the simulation is bit-identical to the
+default path on CPU (`tests/test_bit_identity.py`, `tests/test_body_cycle.py`,
+`tests/test_optic_hooks.py`, `tests/test_unitary.py`).
+
+### 1.5 The presets, and what a JSON says about them
+
+`raw` is the default and is the plain model every audit refers to: the connectome, the LIF, the
+receptor table, the senses and the motor readout exactly as shipped, no module attached, no held edge,
+no relabel beyond the sourced `TYPE_NT_OVERRIDE` rows (`docs/PRESETS_SPEC.md` 1). `instrumented` is
+`raw` plus a **named list of instruments**, and an empty list on the original connectome and LIF
+parameters reproduces `raw` -- which `tests/test_bit_identity.py` asserts against the recorded golden
+(4.4 below).
+
+Every JSON says which it ran under. `flyverse.interp.common.provenance()` carries two keys beside
+`compiled_connectome` (`flyverse/interp/common.py`, the `provenance` builder; `flyverse/instruments.py`
+module docstring):
+
+| key | value |
+|---|---|
+| `preset` | `'raw'` or `'instrumented'` |
+| `instruments` | the list of each installed instrument's `describe()`; `[]` under `raw` (`flyverse/fly.py`, `instrument_records()`) |
+
+`describe()` is the instrument's own label, and `docs/PRESETS_SPEC.md` section 2 requires every field
+of it to be fillable before the instrument is admitted: `name`, `class`, `kind`
+(`stop-gap` / `edges` / `relabel` / `mechanism` / `program`), `law` (a source, or the word
+`unverified`), `law_text`, `parameters`, `replaces`, `gap` (which physiology it stands in for, pointing
+at the audit that established the gap), `source`, `removal` (what result would retire it) and `audits`.
+`replaces` is `"input"`, `"computation"` or `"configuration"`, and
+`flyverse.instruments._check_instrument` **requires** it, so an instrument that does not declare what it
+replaces cannot attach (`docs/PRESETS_SPEC.md` 5, the 2026-09-17 owner decision).
+
+Nothing is adopted into `raw` by any of this. An instrument that moves a suite row its declared gap
+does not cover is rejected, in either direction (`docs/PRESETS_SPEC.md` 2 item 5; the worked run is 6.4
+below).
 
 ---
 
@@ -147,6 +184,12 @@ Cache file md5s (`cache/`, git-ignored, ~200 MB):
 
 Receptor table `flyverse/data/receptors_by_type.csv`: md5 **`0381a446107e6050e75cc87b16d7f830`**.
 
+These three md5s are the identity a reader can check: the cache is not shipped, so "the model I ran is
+the model you ran" is `python -m flyverse.connectome` reproducing them from the manifest's files
+(section 7.1). They are re-checked by hand in the audits that depend on them -- for example
+`docs/audits/connectome_backends.md` section 1 and `docs/audits/compass_standin.md` (skeptic claim 1),
+both of which confirm all three plus the compiled-CSR md5 live.
+
 Transmitter overrides in force (they are part of the fingerprint):
 `TYPE_NT_OVERRIDE = {TmY14: glutamate, Mi19: serotonin, aMe8: acetylcholine}`,
 `UNKNOWN_NT_OVERRIDE_REGEX = {'^(lLN|v2LN|v3LN|il3LN|l2LN|vLN|LN)': gaba}`.
@@ -155,6 +198,13 @@ unknown 2,361, serotonin 415, dopamine 395, octopamine 141.
 
 The rebuild is deterministic: `python -m flyverse.connectome` recompiled from the feather files at
 `28e862f` in 15.1 s and every one of the three cache md5s above was unchanged.
+
+**One recorded exception, and it is a scoping rule, not a discrepancy.** The transduced-plume v5 rooms
+ran against a reconstructed **frozen** cache held in isolation, not against the cluster's shared cache:
+their `sign0_counts.npz` differ -- the frozen 916,626 entries against the shared 926,233 -- so those
+rooms are reproducible against the frozen cache only, and the audit says so
+(`docs/audits/plume_transduced.md` 7; `docs/NOTES.md` "Session 14, continued"). A run that names a cache
+md5 other than the three above is reproducible only against that cache.
 
 ### 2.1 The female graphs
 
@@ -219,11 +269,60 @@ not need them. `python scripts/fetch_data.py --external all` fetches them for a 
 
 ## 4. What is and is not reproducible
 
-### 4.1 The GPU rollout is not seed-reproducible
+### 4.1 Which execution paths repeat, and which do not (the determinism gate)
 
-**Two identical runs of one source tree at one seed on one GPU diverge.** The round-1 finding, still
-the governing one: on a B200, `scripts/skeptic_proprio_bitid.py` ran a 6,000-frame, 16-fly room
-rollout three times from the same tree at the same seeds. From `out/proprio_bitid/compare.txt`:
+The governing measurement is the **deterministic-kernel gate**, round 8 item 1, batch `det1`
+(`docs/audits/determinism_gate.md`). Each protocol ran **twice, sequentially, in one job on one pinned
+GPU**, and every saved array and numeric metric was compared exactly under a rule frozen before
+submission -- `numpy.array_equal(equal_nan=True)` per array after a shape check, `==` per numeric JSON
+leaf, bookkeeping keys excluded, **no tolerance and no partial credit** (`determinism_gate.md` 2).
+
+| pair | protocol | path | verdict | equal |
+|---|---|---|---|---|
+| cxS | `cx_wedge` round-7 S arm, seed 0, B=1, no world, no optic lobe | torch (`cuda_kernels` off, `event_driven` False, `cuda_sparse torch`) | **repeats exactly** | 31 / 31 arrays, 546 / 546 metrics, max abs diff 0 |
+| plume_native | the plume room, 10 s, B=6, seed 0 | native (`cuda_kernels`, `event_driven`, graphs) | **one draw** | 1 / 15 arrays, 992 / 1026 metrics; first differing frame **30** |
+| plume_torch | the same room | torch | **one draw** | 1 / 15 arrays, 992 / 1026 metrics; first differing frame **60** |
+| raw_native | the plain room, 10 s, B=6, seed 0 | native | **one draw** | 1 / 14 arrays, 142 / 178 metrics; first differing frame **4** |
+| raw_torch | the same room | torch | **one draw** | 1 / 14 arrays, 142 / 178 metrics; first differing frame **86** |
+
+(`determinism_gate.md` 3. The one equal array in every room pair is `final__g_slow`, all zero.)
+
+**What repeats.** The `cx_wedge` protocol repeats exactly on one B200, and that is the **third** exact
+repeat of the same protocol: `cx8 == cx8r` across two submissions twelve minutes apart on one node, and
+`cx9 == cx8r` **across two nodes** -- 76 of 76 (arm, key) metric rows, extended by the independent
+skeptic to the ledger arrays, which are bit-equal too at **384 / 384** over the twelve S / V runs
+(`determinism_gate.md` 4.1 and skeptic claim 6; `docs/audits/compass_sign_control.md` 3). By
+`docs/INTERP.md` 10.4 rule 16 this is written "reproduced exactly in n draws on the torch path", never
+"bit-identical".
+
+**What does not.** Neither room path repeats. The native path diverges within the first 4 (raw) or 30
+(plume) frames, the torch path at 86 (raw) or 60 (plume) -- and once it does, the two runs are as
+different as two seeds: final per-cell rates up to 127-146 Hz apart, final voltages up to 56-111 mV
+apart (`determinism_gate.md` 3).
+
+**How far it is localised, and how far it is not.** The first difference in every room pair is exactly
+**+-1 spike in exactly one of the six rows** (plume_native row 0 at frame 30, plume_torch row 4 at 60,
+raw_native row 5 at 4, raw_torch row 0 at 86); that row's body diverges 1-51 frames later and its
+antenna / plume columns later still, while the other five rows stay bit-identical for a further 215-329
+frames -- so the body integrator and the air / odour field are **not** the source. The Python layer is
+excluded too: the same B=6 raw room on the torch path repeats bit-exactly across two separate CPU
+processes for 120 frames, with Python hash randomisation on. On the native path the event-scatter CUDA
+kernel accumulates with a float `atomicAdd` (`flyverse/kernels/neural.cu:122`), which is
+order-nondeterministic by construction and is a **sufficient mechanism for that path**. Which stage of
+the room stack does not repeat on the torch path -- batched cuSPARSE SpMM, the optic lobe, the ray
+tracer or an atomic in the readout -- is **not established**, and is the open question the gate leaves
+(`determinism_gate.md` 4.2 and skeptic claim 2).
+
+**An existing, unused knob.** `scripts/benchmark.py --deterministic` already sets
+`torch.use_deterministic_algorithms(True)` with `CUBLAS_WORKSPACE_CONFIG=:4096:8`; no round has run the
+gate under it (`determinism_gate.md` 4.2, `open_questions`).
+
+### 4.2 The earlier finding: the GPU rollout is not seed-reproducible
+
+**Two identical runs of one source tree at one seed on one GPU diverge.** The round-1 finding, which the
+gate above generalises and supersedes as the governing measurement: on a B200,
+`scripts/skeptic_proprio_bitid.py` ran a 6,000-frame, 16-fly room rollout three times from the same tree
+at the same seeds. From `out/proprio_bitid/compare.txt`:
 
 ```
 reference out/proprio_bitid/head.json: tree /root/runs/propbitid-dbee52/_skepthead kwarg False device NVIDIA B200 frames 6000
@@ -244,51 +343,128 @@ All three comparisons (`work.json`, `work2.json`, `work_kwarg.json`) read *first
 500* and *VERDICT: NOT identical*, while `cache_sum_abs_W` is the same 121,460,584 in every one: the
 model is identical, the rollout is not.
 
-Consequences, and they are binding on how every number in this repository is read:
+### 4.3 How a room number may be quoted
 
-* **Runs are the replicate unit**, not seeds. `flyverse.interp.common.compare` returns
-  `underpowered` below four runs in either arm; `docs/INTERP.md` 10.1 step 3 requires
-  `min(n_a, n_b) >= 4`, five when the effect is small.
-* **Two same-code batches with the same seeds are not the same draws.** Re-running a batch is a new
-  set of replicates, never a check of the old one.
+The rule frozen in `out/det1/predeclared.json` before submission, and binding on every room number in
+this repository (`docs/audits/determinism_gate.md` 2 and 4.3):
+
+* **Runs are the replicate unit**, not seeds. `flyverse.interp.common.compare` returns `underpowered`
+  below four runs in either arm; `docs/INTERP.md` 10.1 step 3 requires `min(n_a, n_b) >= 4`, five when
+  the effect is small.
+* **Rooms run at >= 6 draws, and no room number is quoted to more than its across-draw SD.**
+* **Every room number quoted before the gate stays one draw** -- explicitly, the `plume_steering.md`
+  first-contact times (32.0 ... 21.9 s) and the 0.841211 end energy, and the `compass_standin` room
+  repeats, which stay observations.
+* **Two same-code batches with the same seeds are not the same draws.** Re-running a batch is a new set
+  of replicates, never a check of the old one.
 * A difference between two GPU runs of the same tree is not evidence of a model change; a difference
   between two *arms* needs the replicate count above and `common.compare`'s verdict.
 
-### 4.2 Bit-identity claims are CPU claims only
+One limit of the gate itself, stated in its own self-review: it tested **B=6** rooms at 10 s. B=1
+room-level determinism is untested there and untested anywhere, so no rerun of a B=1 room is claimed to
+reproduce (`determinism_gate.md` 6; `docs/audits/receptor_verification.md`, the plume-rooms NOT CHECKED
+list).
+
+### 4.4 Bit-identity is a CPU claim, and this is what pins it
 
 `tests/test_bit_identity.py` pins the default path with a recorded golden: one deterministic CPU
 scenario over a synthetic 19-cell, 4-column graph that touches all four senses, `stimulate`,
 `set_drive`, fractional-ms carry-over, a `state_dict` round trip, a per-row `reset` and a full
-`reset`, hashed after each stage. It is run as
+`reset`, hashed after each stage. The five digests cover every brain and optic state tensor, the clock
+accumulators, the RNG state, the held sensory Poisson field and every `MotorRates` field. It is run as
 
 ```
 CUDA_VISIBLE_DEVICES=-1 PYTHONIOENCODING=utf-8 python -m pytest tests/test_bit_identity.py -q
 ```
 
-Regenerating that golden is an owner decision, not a test fix: a failure means the simulated model
-moved. The same CPU-only rule applies to `tests/test_body_cycle.py` (atol 0 on every brain tensor
-with a `LegCycle` attached and the sense off), `tests/test_optic_hooks.py`, `tests/test_unitary.py`
-and `tests/test_receptor_model.py`. Nothing in this repository claims bit-identity of a GPU rollout;
-`docs/INTERP.md` 10.4 item 2 states it as a rule ("bit-identity is a CPU / `gain_fb=0` property").
+**The golden's provenance.** It was recorded on **2026-09-13**, on the merge of `feat/extensibility`
+into `main`, and verified identical on the pre-merge tree (`10ad8cc`, which has neither
+`flyverse/modules.py` nor the hooks / `attach` / `surrogate_grad` surface) by running the same file
+there: five stages, five equal digests. That equality **is** the cross-version claim of
+`docs/audits/extensibility_review.md` 2 -- 5,254 arrays, 0 differing, across three source trees with an
+external harness -- moved out of prose and into code (the file's own module docstring). The independent
+skeptic of the instrument branch confirmed the golden has been byte-identical since `96cfdaf`
+(2026-09-13), which predates that branch (`docs/audits/compass_standin.md`, skeptic claim 1).
 
-On GPU, three further sources of non-identity are documented and expected: CUDA graphs match the
-eager spike train for ~130 frames and then diverge by a spike (chaos); `--weight-dtype float16` and a
-coarser module clock change spikes from the start; and the same code on two GPU *models* can cross a
-verdict gate differently (`docs/audits/object_samedevice_r3.md`: the reference arm crosses the effect
-gate on a B200 and not on an H200).
+**Regenerating that golden is an owner decision, not a test fix**: a failure means the simulated model
+moved, and the printed block is pasted over `GOLDEN` in the same commit as the change that caused it.
+Never regenerate to make a red test green.
+
+The same file also pins the presets (`docs/PRESETS_SPEC.md` 1): `preset="raw"` reproduces all five
+digests, `preset="instrumented", instruments=[]` reproduces the whole golden dictionary, and the
+installed weights' md5 and the spike train are identical between `FlyBrain(...)` and
+`FlyBrain(..., preset="raw")`. The same CPU-only rule applies to `tests/test_body_cycle.py` (atol 0 on
+every brain tensor with a `LegCycle` attached and the sense off), `tests/test_optic_hooks.py`,
+`tests/test_unitary.py` and `tests/test_receptor_model.py`.
+
+Nothing in this repository claims bit-identity of a GPU rollout; `docs/INTERP.md` 10.4 item 2 states it
+as a rule ("bit-identity is a CPU / `gain_fb=0` property") and item 16 restates it after three
+violations in one round.
+
+On GPU, three further sources of non-identity are documented and expected, beside the gate of 4.1: CUDA
+graphs match the eager spike train for ~130 frames and then diverge by a spike (chaos);
+`--weight-dtype float16` and a coarser module clock change spikes from the start; and the same code on
+two GPU *models* can cross a verdict gate differently (`docs/audits/object_samedevice_r3.md`: the
+reference arm crosses the effect gate on a B200 and not on an H200).
 
 ---
 
-## 5. Commits
+## 5. Commits, and the 2026-09-17 history rewrite
+
+### 5.1 The commits
 
 | commit | date | what it is |
 |---|---|---|
+| `bffbb0a` | 2026-09-18 | **The current tree.** The merge of the transduced-plume v5 rooms and their skeptic pass. Nothing adopted; `raw` untouched (`docs/audits/plume_transduced.md` 0; `docs/NOTES.md` "Session 14, continued"). |
+| `03ddeb2` | 2026-09-17 | Round 8 recorded: the determinism gate, the V- sign control, the instrumented suite column and the goal-only plume arm, with both skeptic passes applied. Nothing adopted; no default moved (`docs/NOTES.md` "Session 14, round 8"). |
 | `f9e9fea` | 2026-09-14 | **The round-3 reproducibility anchor.** The whole round-3 working tree in one commit, so every batch's uncommitted cross-task dependencies have a history. `provenance.source_fingerprint` covers **44 files** at this tree (`flyverse/*.py`, `flyverse/interp/*.py`, `flyverse/data/receptors_by_type.csv`, `scripts/probe_object_sweep.py`, `scripts/interp_export.py`; verified by enumerating that commit against its own `export.SOURCE_PATTERNS`). Compiled-W md5 `ef23cc27bea13be7f6a96f3c04fd3737`, receptor-table md5 `0381a446107e6050e75cc87b16d7f830`. **Nothing was adopted in round 3 and no default moved**, so the shipped model this document describes is unchanged by it. |
-| `7937f01`, `cfaa694`, `28e862f` | 2026-09-14 | The FAFB / BANC connectome backends and their review. **The current tree.** MaleCNS identity preserved exactly: the three cache md5s and the CSR fingerprint are unchanged, the `test_bit_identity.py` golden is unchanged, and the legacy fingerprint dictionary keeps its key set (`docs/audits/connectome_backends.md`). `source_fingerprint` covers **51 files** here (the five `flyverse/backends/*.py`, `flyverse/data/type_aliases.csv` and `flyverse/data/manifest.json` were added to `SOURCE_PATTERNS`). |
+| `7937f01`, `cfaa694`, `28e862f` | 2026-09-14 | The FAFB / BANC connectome backends and their review. **The tree sections 1-3 were recomputed at.** MaleCNS identity preserved exactly: the three cache md5s and the CSR fingerprint are unchanged, the `test_bit_identity.py` golden is unchanged, and the legacy fingerprint dictionary keeps its key set (`docs/audits/connectome_backends.md`). `source_fingerprint` covers **51 files** here (the five `flyverse/backends/*.py`, `flyverse/data/type_aliases.csv` and `flyverse/data/manifest.json` were added to `SOURCE_PATTERNS`). |
 | `10ad8cc` | 2026-09-13 | Round 2 (object + dynamics): the matched object assay, the optic stream hooks, the proprioceptive transducer, `walk.power_max` de-scored. |
 | `560aaf3` | 2026-09-12 | Receptor round 5: the GF x0.3 input damping retired. **A default model change.** |
 | `79769c3` | 2026-09-12 | Receptor round 3: `receptor_model='sign'` / `'abs'` adopted as the default. **A default model change.** |
 | `069deb0` | 2026-09-11 | Session-9 audit: the 14-section benchmark suite, the compass ring attractor, the NT-sign audit. |
+
+### 5.2 The rewrite, the commit map, and how a recorded id is read
+
+On **2026-09-17** the whole history was rewritten, not the tip: `git filter-repo` over all **161**
+commits with a replacement map -- hostnames, the cluster user, the shared-filesystem root, the
+scheduler's name, three rented-box IPs and the workstation home path replaced by `<cluster-host>`,
+`<cluster-node>`, `<cluster-node-2>`, `<cluster-user>`, `<cluster-fs>`, `<scheduler>`,
+`<rented-box-ip>`, `<workstation-home>` -- applied to blobs **and** commit messages, verified by a
+full-history grep returning nothing. Every commit id changed, the ten remote branches were force-pushed,
+and a pre-rewrite bundle is kept outside the repository (`docs/NOTES.md`, "Session 13, continued: the
+history rewrite").
+
+Three consequences, and they are `docs/INTERP.md` 10.4 rule 30:
+
+1. **Content identity survived; id identity did not.** Blob hashes are unchanged except in the scrubbed
+   files, so every frozen source-hash set still ties to its (renamed) commit -- content identity is the
+   durable record (rule 6, and 4.4 above). What went stale is every audit sentence, reproduction command
+   and analyser default that *named* a commit.
+2. **The map is committed**, as
+   [`audits/commit_map_2026-09-17.json`](audits/commit_map_2026-09-17.json): **161 entries, 93 of which
+   are renamed and 68 unchanged.** The 68 are exactly the oldest 68 commits, in history order: an id
+   survives only while neither the commit nor any ancestor was touched, so the map splits the history at
+   the first scrubbed commit and everything after it moved. Every tracked text file was swept and
+   remapped, so **the ids in section 5.1 are
+   post-rewrite ids** -- `f9e9fea`'s pre-rewrite id is `eac71e0`, `28e862f`'s is `4db2e8c`, `d2abf3c`'s
+   is `6ec2de1`, and `069deb0` is one of the 68 that did not move.
+3. **Frozen records are NOT edited**, whether under ignored `out/` directories or tracked, so they keep
+   their pre-rewrite ids. An analyser that `git show`s a recorded commit resolves it through the map
+   with `flyverse.interp.common.resolve_commit`, which returns the id unchanged when it still resolves,
+   chases old -> new across successive rewrites, and **raises** rather than silently reading the wrong
+   tree on an ambiguous abbreviation or an id no map knows (`flyverse/interp/common.py`;
+   `tests/test_commit_map.py` covers both, plus `commit_equivalent` and map composition in date order).
+   `scripts/compass_driver_analyse.py`, `scripts/cx8_transfer_verify.py` and
+   `scripts/navigation_analyse.py` all read recorded commits through it.
+
+The quoting rule that follows: an audit writes "`<new id>` (pre-rewrite `<old id>`)" **only** where the
+old id is needed to find a frozen record, and the new id alone everywhere else. After any future
+rewrite, sweep every tracked text file for quoted ids, remap them from that rewrite's own map, commit it
+as `docs/audits/commit_map_<date>.json`, and keep the pre-rewrite repository as a bundle outside the
+repository.
+
+---
 
 ## 6. The benchmark tables, and which commit each was produced at
 
@@ -328,11 +504,41 @@ The source tree of that batch was HEAD **`d2abf3c`** plus an inert `body.LegCycl
 then committed as `f9e9fea` and changed no default, so the shipped model of `d2abf3c + inert
 LegCycle` and of `f9e9fea` is the same model.
 
+Note, against 4.1: that batch's "0 failed" line is a job-count line, and the per-check numbers come
+from three draws per arm on a path that does not repeat run to run. Read the suite rows with their draw
+spread, not as pinned values -- 6.4 measures exactly which of the 29 rows repeated under identical code
+in the later `suite-inst` batch.
+
 ### 6.3 The behaviour-status table (`docs/BENCHMARK_BATTERY.md`)
 
 Assay-level statuses (`pass` / `partial` / `program` / `gap` / `fail` / `untested`), not a per-check
 run. Its prose and numbers were last updated at **`f9e9fea`** (round 3). Its machine-readable form is
 `flyverse/data/expected_responses.csv`, scored by `scripts/interp_ledger.py`.
+
+### 6.4 The `instrumented` column beside `raw` (`docs/audits/instrumented_suite.md`)
+
+Round 8 item 3, batches `suite-inst` and `suite-inst-room`, 2026-09-18. Three draws per preset,
+`benchmark.py --sections all` at draw seeds 0, 1, 2, six jobs in one submission, each pinned to one GPU
+of a four-id pool. The instrument list is round 7's: `sided_turn_afferent:k=0.5`, `ring_dc_hold`,
+`glno_sign` (`instrumented_suite.md` 2).
+
+| arm | pass / fail / gap / missing, by draw seed |
+|---|---|
+| raw s0 / s1 / s2 | 27 / 0 / 2 / 0; 26 / 1 / 2 / 0; 27 / 0 / 2 / 0 |
+| instrumented s0 / s1 / s2 | 27 / 0 / 2 / 0; 26 / 1 / 2 / 0; 27 / 0 / 2 / 0 |
+
+**No row changes status in any draw.** The only row whose statuses are not uniform is `taste.MN9_hz`
+(FAIL in draw 1 under both presets, 1.69046 Hz against `> 2`): raw's own instability, identical under
+the instruments, reported and not counted. The list is therefore **admissible** under
+`docs/PRESETS_SPEC.md` section 2 item 5 -- and admissible is all it is: nothing adopted, `raw` stays the
+default, the afferent's law is still `unverified` (`instrumented_suite.md` 5).
+
+That batch also measures the reproducibility of the suite itself, which is what makes it useful here:
+the raw column **reproduces exactly on 18 of the 29 rows and differs on 11**, both against
+`compass_standin`'s raw column and against this batch's own first submission -- a same-code repeat of
+the raw arm. The 11 that do not repeat are `loom.GF_peak`, `rotate.DNp20`, `motion.min_dsi`,
+`loom_escape.GF_peak`, `walk_gf.p99`, `rotation.group_flip`, `object.LC10a`, `wind.DNp18`, `wind.DNp33`
+and the two odour rows (`instrumented_suite.md` 2).
 
 ---
 
@@ -362,12 +568,13 @@ python scripts/check_connectome_backends.py
 ```
 python scripts/benchmark.py --sections all --seeds 0,1 --json out/benchmark_suite.json     # 14 sections, ~4 min on a 4090
 python scripts/retire_measures.py --sections all --seeds 0,1,2 --timeout 60                # the 29-check suite, one draw
-bash scripts/guard_suites.sh                                                               # the three-draw guard batch (needs .cluster.json)
+bash scripts/guard_suites.sh                                                               # the three-draw guard batch (needs .cluster.json, which is git-ignored)
 bash scripts/guard_suites.sh --report                                                      # aggregate to out/guard_r3/guard_report.md (CPU)
 ```
 
-Repeat any table **three times or more** before believing a 20 % change (section 4.1). Score the
-ledger on whatever was produced, on CPU:
+Repeat any table **three times or more** before believing a 20 % change, and read section 4.1 first: in
+the `suite-inst` batch 11 of the 29 rows did not repeat under identical code (6.4). Score the ledger on
+whatever was produced, on CPU:
 
 ```
 PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py --results "out/interp/*/*.json" out/benchmark_suite.json --json out/interp/ledger/all.json
@@ -378,6 +585,20 @@ PYTHONIOENCODING=utf-8 python scripts/interp_ledger.py --results "out/interp/*/*
 ```
 python -m pytest -m "not gpu and not data and not cluster" -q
 ```
+
+### 7.4 The bit-identity golden and the determinism gate
+
+```
+CUDA_VISIBLE_DEVICES=-1 PYTHONIOENCODING=utf-8 python -m pytest tests/test_bit_identity.py -q      # 4.4; a failure means the model moved
+CUDA_VISIBLE_DEVICES=-1 PYTHONIOENCODING=utf-8 python -m pytest tests/test_commit_map.py -q        # 5.2, resolve_commit against a throwaway repo
+PYTHONIOENCODING=utf-8 python scripts/determinism_gate.py analyse --runs out/det1 --out out/det1/analysis   # 4.1, CPU, from the committed run records
+```
+
+The gate's raw runs, consoles and client log stay ignored under `out/det1/`; what is committed is
+`batch.sh`, `jobs.json`, `predeclared.json` and `analysis/{pairs,arrays,runs}.csv`, `analysis.md`,
+`summary.json`, and re-running `analyse` reproduces all of them byte-identically with 0 problems -- with
+one recorded exception, `summary.json`'s own `analysis_sha256`, which is the hash of the script and
+moved when `plan --ship` was added (`docs/audits/determinism_gate.md` 5).
 
 ---
 
@@ -404,7 +625,37 @@ python -m pytest -m "not gpu and not data and not cluster" -q
 | Object round 3: localizer negative, 40/40 rectangle verdicts `null`, same-device H200 `REPRODUCES` / B200 `PARTIAL` | `f9e9fea` | `docs/audits/object_localizer_r3.md`, `object_rectangles_r3.md`, `object_samedevice_r3.md` |
 | Cross-connectome walking: MaleCNS 2.641 +/- 0.146 vs BANC 0.275 +/- 0.004 deg/s clean yaw SD, leg-cycle arm 7.837 vs 2.651 | `cfaa694` (merged at `28e862f`) | `docs/audits/connectome_backends.md`, batch `cbwalk-384afd` |
 | Anatomy scale MaleCNS : FAFB : BANC = 1 : 0.59215 : 0.28127 | `cfaa694` | `docs/audits/connectome_backends.md` |
+| `cx_wedge` repeats exactly on one GPU (31/31 arrays, 546/546 metrics); no B=6 room repeats on either path (first difference at frame 4 / 30 / 60 / 86) | round 8, batch `det1` (2026-09-18) | `docs/audits/determinism_gate.md` 3-4; section 4.1 |
+| `cx9` reproduces `cx8r` across two nodes in 76 of 76 metric rows, and 384 / 384 ledger arrays are bit-equal | round 8, batch `cx9` (2026-09-18) | `docs/audits/compass_sign_control.md` 3; `determinism_gate.md` skeptic claim 6 |
+| The `instrumented` column changes no suite row's status (27/0/2, 26/1/2, 27/0/2 under both presets) | round 8, batches `suite-inst` / `suite-inst-room` (2026-09-18) | `docs/audits/instrumented_suite.md` 2-3; section 6.4 |
+| Plume rooms, six 60 s seed-drawn starts per arm: full **6/6**, transduced **1/6**, goal_only **3/6** fed for >= 1 s | session 14, batch `plume_transduced_v5-6ebfff` (2026-09-18) | `docs/audits/plume_transduced.md` 0 and 7.2 |
 | Demo speed 0.5x / 0.8x / 1.3x real time on a 4090 | session 10 | `docs/NOTES.md`, `docs/PERFORMANCE.md` |
 | CPU test subset green | `28e862f` (2026-09-14, this desktop, cache present) | `364 passed, 7 skipped, 29 deselected ... in 144.62s` |
+
+### 8.1 The two milestone sentences, and their licensed wording
+
+Both are behavioural claims about the **instrumented** preset, not about `raw`, and both are quoted with
+the scope their audits license.
+
+1. **Turning and finding food on the physical antennal contrast.** Under `instrumented` the fly turns
+   and finds food in a 60 s room with no oracle in the loop and `raw` untouched: the shipped `plume`
+   instrument, which reads the **physical** odour-concentration difference between the antennae, fed in
+   **6 of 6** rooms, while the opt-in `plume:bilateral=orn` variant, which substitutes the model's own
+   ORN population rates at the same gain, fed in **1 of 6** and steered on a cue **uncorrelated with the
+   true lateral contrast** (`docs/NOTES.md` "Session 13, the instrumented preset" for the 6/6 milestone
+   and the no-oracle scope; `docs/audits/plume_transduced.md` 0 and 7.2 for the three-arm comparison;
+   `docs/audits/plume_steering.md` for the original rooms). This is a **descriptive room observation** --
+   not a significance test, not an SNR measurement, not a claim about flies -- and in particular **the
+   rooms do not confirm the CPU SNR finding and are not offered as confirming it**: the in-room ORN L-R
+   and its temporal SD are different quantities from the CPU's fixed-contrast signal and 250 ms
+   counting-window noise. What the rooms add is that the measured in-room cue noise is **1.3-2.6x** the
+   analytical estimate and that the cue's sign was right in only **0.52 +/- 0.10** of samples
+   (`docs/audits/plume_transduced.md` section 5, and its rooms skeptic claim 7 -- the licensed wording).
+2. **It never flies and feeds in the same episode.** "No run in these audits shows artificially powered
+   flight and feeding in the same episode: the only powered-flight rooms are the superseded navigation
+   flight arm (59.67 s airborne, zero feeding in all six rows), and `powered_s` is 0.00 in all 12
+   flight-priority room rows and all 12 plume room rows" (`docs/audits/flight_foraging_priority.md`,
+   repeated verbatim in `docs/audits/navigation_instruments.md` and `docs/audits/plume_steering.md`;
+   required by the independent skeptic, item 13 in `docs/audits/receptor_verification.md`).
 
 A number not in this table and not in a `docs/audits/*.md` file with a batch line is not a result.
