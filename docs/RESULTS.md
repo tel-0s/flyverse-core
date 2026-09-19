@@ -54,8 +54,8 @@ with the true lateral contrast; and **no episode shows artificially powered flig
 | Flight: the octopamine state | not adoptable; `null` on behaviour, runaway above | [monoamine_slow_term.md](audits/monoamine_slow_term.md) 0 | `verify:monoamines  --  verdict: **mostly sound**` |
 | Flight: the priority policy | n/a (instrument) | [flight_foraging_priority.md](audits/flight_foraging_priority.md) | `- flight_foraging_priority: mostly sound` |
 | Fruit finding: the plume instrument | n/a (instrument) | [plume_steering.md](audits/plume_steering.md), [navigation_instruments.md](audits/navigation_instruments.md) | `- plume_steering: mostly sound` |
-| Fruit finding: the goal-only arm | `result` on the walking goal | [plume_goal_only.md](audits/plume_goal_only.md) | `- plume_goal_only: mostly sound` |
-| Fruit finding: the transduced cue | 1 of 6 rooms, cue uncorrelated with the truth | [plume_transduced.md](audits/plume_transduced.md) 3, 7 | `**VERDICT: mostly sound; merge with fixes.**` |
+| Fruit finding: the goal-only arm | n/a (instrument; goal-only feeds 4.67 +/- 0.52 of six) | [plume_goal_only.md](audits/plume_goal_only.md) | `- plume_goal_only: mostly sound` |
+| Fruit finding: the transduced cue | n/a (instrument; 1 of 6 rooms) | [plume_transduced.md](audits/plume_transduced.md) 3, 7 | `**VERDICT: mostly sound; merge with fixes.**` |
 | Monoamines (round 3) | not adoptable | [monoamine_slow_term.md](audits/monoamine_slow_term.md) | `verify:monoamines  --  verdict: **mostly sound**` |
 | Unitary strength (round 3) | not adoptable | [unitary_strength.md](audits/unitary_strength.md) | `verify:unitary  --  verdict: **mostly sound**` |
 | Guards and retirement candidates (round 3) | both candidates refused | [guard_suites_r3.md](audits/guard_suites_r3.md) 4, [anti_runaway.md](audits/anti_runaway.md) round 7 | `verify:guards  --  verdict: **mostly sound**` |
@@ -237,8 +237,8 @@ from the movers back to the central complex and the senses, all on the shipped w
 model's own units is -1.63 / -1.96 mV against a 7.0 mV threshold gap -- about 25 % of the barrier -- although
 the static wiring is net excitatory per volley (+466.1 / +447.6 mV). The inhibition is sign-correct by
 transmitter: IN12B014 -89 / -124 mV/s, GNG562 -94 / -80, PS059 -95 / -49, LT51 -57 / -70. DNa02 fires 0.011 /
-0.075 Hz and its L-R is -0.064 Hz. The three lateralised excitatory classes read 0.000 Hz at source in every
-cell of every fly: PFL3 (24 cells, max 0.000), AOTU015 and AOTU001
+0.075 Hz and its L-R is -0.064 Hz. PFL3 reads 0.000 Hz in every cell of every fly (24 cells, max 0.000);
+AOTU015 and AOTU001 read 0.000 Hz as means (AOTU015 max 10 Hz in 2 of 8 cells)
 ([deficit_turning.md](audits/deficit_turning.md) section 0).
 
 **What it means.** The deficit is localized to a named population and a named link rather than to a gain. The
@@ -302,8 +302,9 @@ ER4m at 0 onto PEN and EPG, eight arms x five seeds
 ([compass_dc_balance.md](audits/compass_dc_balance.md)); 6B: the same hold plus EPG-only and global recurrence
 ([compass_local_recurrence.md](audits/compass_local_recurrence.md)).
 
-**The verdict.** `bump_survival_s` is 0.00 s in 48 of 48 runs at the shipped gains, and no arm meets the
-predeclared working-compass rule; every surviving bump fails the rate row by about 3x
+**The verdict.** `bump_survival_s` is 0.00 s in 4 of 4 seeds in every arm at the shipped gains that is not a
+labelled instrument or reference (S, G, C, CG), and no arm meets the predeclared working-compass rule; every
+surviving bump -- F, CF, CFG and the references R / RG -- fails the rate row by about 3x
 ([compass_ring_mechanism.md](audits/compass_ring_mechanism.md)). The hold lifts the driven PEN population from
 0.29-0.66 Hz to 40.2-48.3 Hz (`result`, z 294.0, Holm 0.0317) and buys `bump_survival_s` 0.00 in 5 of 5
 seeds, because the same term is what holds the unstimulated ring at rest
@@ -356,7 +357,8 @@ their non-reversal is not a demonstrated absence
 
 ### 11. Flight: the octopamine state
 
-**The question.** Can the 2.7 M monoamine synapses that carry sign 0 be routed through a slow receptor class,
+**The question.** Can the 1.88 M monoamine synapses that carry sign 0
+([monoamine_slow_term.md](audits/monoamine_slow_term.md) section 1a) be routed through a slow receptor class,
 so that an octopaminergic flight state exists in the model at all?
 
 **The arms.** One class scalar at four settings -- `add_low` 0.02 additive (the shipped value), `add_mid` 0.2,
@@ -537,11 +539,14 @@ addendum).
 
 **What it means.** **This is a descriptive cross-connectome comparison, not a sex test.** One male
 reconstruction against one female reconstruction, with different animal, lab, synapse threshold and yield,
-different optic capability, different naming and no per-individual replication; counts run about
-1 : 0.59 : 0.28 across the three releases, so nothing is compared unscaled, and BANC's optic lobes are
-under-proofread (T2 853 against FAFB 1,466 and MaleCNS 1,630). A missing type match is not established sex
-specificity. What the survey does establish as a rate statement rather than a reconstruction artefact is
-DNa02's excitation : inhibition ratio -- 2.0 : 1 in MaleCNS, 1.96 : 1 in FAFB, 1.7 : 1 in BANC
+different optic capability, different naming and no per-individual replication; DNa02's total raw input runs
+about 1 : 0.59 : 0.28 across the three releases -- a descriptive anchor scale, not a universal correction
+([connectome_backends.md](audits/connectome_backends.md)) -- and fractions are normalised within each release,
+while BANC's optic lobes are under-proofread (T2 853 against FAFB 1,466 and MaleCNS 1,630,
+[flywire_banc_survey.md](audits/flywire_banc_survey.md)). A missing type match is not established sex
+specificity. What the survey does establish is that DNa02's excitation : inhibition ratio holds across all
+three releases (2.0 : 1 MaleCNS, 1.96 : 1 FAFB, 1.7 : 1 BANC), so the net-inhibited resting state the model
+finds is a rate statement, not a reconstruction artefact of the male graph
 ([flywire_banc_survey.md](audits/flywire_banc_survey.md)).
 
 **Skeptic.** The one row whose independent pass is **not** in
@@ -679,7 +684,7 @@ change meets the source standard of the entries already in the table
 
 | candidate | why it was not adopted |
 |---|---|
-| `LIFParams.w_syn_by_nt` (per-transmitter unitary strength) | Kept as an **opt-in instrument, not a mechanism**: default `None`, shaped weights byte-identical under `None` / `{}` / all-ones, with a CPU bit-identity test. No bracket of the field is adoptable -- every data-anchored inhibitory bracket puts `walk.power_sustained_hz` at 89-194 Hz against `< 50` ([unitary_strength.md](audits/unitary_strength.md) 4). |
+| `LIFParams.w_syn_by_nt` (per-transmitter unitary strength) | Kept as an **opt-in instrument, not a mechanism**: default `None`, shaped weights byte-identical under `None` / `{}` / all-ones, with a CPU bit-identity test. No bracket of the field is adoptable -- every data-anchored inhibitory bracket puts `walk.power_sustained_hz` at 89-194 Hz against `< 50` ([unitary_strength.md](audits/unitary_strength.md) 5). |
 | The monoamine slow class | One class scalar cannot carry dopamine, octopamine and serotonin: the two literature anchors are 50-100x apart. At the shipped 0.02 it fails `taste.MN9_hz` on the CPU; at 0.2 and 1.0 the mushroom body runs away in 5 of 5 runs ([monoamine_slow_term.md](audits/monoamine_slow_term.md) 0). |
 | `drive_clip_mv` retirement (`no_drive_clip`) | Refused on the room: 5.069 against 3.125 take-offs per 1,000 fly-s, the excess entirely voluntary, and round 6's walking-GF prediction not confirmed ([guard_suites_r3.md](audits/guard_suites_r3.md) 3-4; [anti_runaway.md](audits/anti_runaway.md) round 7). |
 | LPi -> LPLC2 pair gain x1 (`pair_gain_lpi_x1`) | Refused on the room: 34.6 take-offs per 1,000 fly-s, 451 escapes against 17, and 48 of 48 flies above the escape threshold ([guard_suites_r3.md](audits/guard_suites_r3.md) 3-4). |
