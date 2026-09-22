@@ -99,6 +99,24 @@ class SidedTurnAfferentTests(unittest.TestCase):
         self.assertFalse(cb.routing["afferent_to_PS196_b"]["CB0675"]["contralateral"])
         self.assertEqual(cb.chain_for_positive_yaw, ["CB0675_L -> PS196_b_L -> GLNO_R -> PEN_L"])
 
+    def test_a_hop_with_no_majority_is_unknown_not_ipsilateral(self):
+        """GLNO is sign 0, so a compiled cache stores its PEN entries as explicit zeros whose counts live only in
+        cache/sign0_counts.npz. Without that file the GLNO -> PEN block reads 0 vs 0, and the chain must say it cannot
+        tell ('PEN_?') rather than fall to the same side -- the pre-fix record read 'GLNO_L -> PEN_L' on such a cache.
+        An exact non-zero tie is no majority either."""
+        c = graph()
+        ty = c.neurons.type.to_numpy().astype(str)
+        glno, pen = ty == "GLNO", np.char.startswith(ty, "PEN_")
+        w = c.W.toarray()
+        w[np.ix_(pen, glno)] = 0.0
+        silent = fi.SidedTurnAfferent(Connectome(c.neurons, sp.csr_matrix(w), c.body_to_index))
+        self.assertEqual(silent.chain_for_positive_yaw, ["AN07B037_a_L -> PS196_b_R -> GLNO_L -> PEN_?",
+                                                         "AN07B037_b_L -> PS196_b_R -> GLNO_L -> PEN_?"])
+        self.assertFalse(any(b["contralateral"] for b in silent.routing["GLNO_to_PEN"].values()))
+        w[np.ix_(pen, glno)] = 250.0                                   # every GLNO -> PEN pair equal: a tie on both sides
+        tied = fi.SidedTurnAfferent(Connectome(c.neurons, sp.csr_matrix(w), c.body_to_index))
+        self.assertEqual(tied.chain_for_positive_yaw[0], "AN07B037_a_L -> PS196_b_R -> GLNO_L -> PEN_?")
+
     def test_rates_side_sign_levels_and_zero(self):
         c = graph()
         for k in fi.SidedTurnAfferent.K_LEVELS:

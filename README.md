@@ -26,12 +26,12 @@ Toolkit: [`docs/media/toolkit_loom_gf.png`](docs/media/toolkit_loom_gf.png) -- `
 ## Run it
 
 ```
-pip install -e .
+pip install -e ".[dev]"                                          # the package, plus pytest / ruff / tabulate for the tests
 python -m pytest -m "not gpu and not data and not cluster" -q   # needs no data, no cache, no GPU
 
 python scripts/fetch_data.py --list         # what the manifest knows, and what is already present
 python scripts/fetch_data.py --malecns      # ~3.7 GB from Janelia's public bucket, hash-verified
-python -m flyverse.connectome               # compile the graph cache once (15 s), print N and nnz
+python -m flyverse.connectome               # compile the graph cache once (under a minute), print N and nnz
 
 python scripts/room_demo.py                 # live window: fly on the table
 python scripts/room_demo.py --fruit apple --fence                # one apple, a fence around the table top
