@@ -553,7 +553,7 @@ and the two odour rows (`instrumented_suite.md` 2).
 ```
 python scripts/fetch_data.py --malecns                                  # ~3.7 GB, hash-verified
 python -c "from flyverse import connectome; connectome.load(rebuild=True)"
-python -m flyverse.connectome                                           # the same, then prints N and nnz
+python -m flyverse.connectome                                           # the same plus cache/sign0_counts.npz, then prints N and nnz
 python scripts/hash_weights.py                                          # compiled-W md5 and sum|W|
 python -c "from flyverse import connectome; from flyverse.interp import common; print(common.connectome_fingerprint(connectome.load())['md5'])"
 ```

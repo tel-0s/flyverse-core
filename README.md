@@ -26,12 +26,12 @@ Toolkit: [`docs/media/toolkit_loom_gf.png`](docs/media/toolkit_loom_gf.png) -- `
 ## Run it
 
 ```
-pip install -e .
+pip install -e ".[dev]"                                          # the package, plus pytest / ruff / tabulate for the tests
 python -m pytest -m "not gpu and not data and not cluster" -q   # needs no data, no cache, no GPU
 
 python scripts/fetch_data.py --list         # what the manifest knows, and what is already present
 python scripts/fetch_data.py --malecns      # ~3.7 GB from Janelia's public bucket, hash-verified
-python -m flyverse.connectome               # compile the graph cache once (15 s), print N and nnz
+python -m flyverse.connectome               # compile the graph cache once (under a minute), print N and nnz
 
 python scripts/room_demo.py                 # live window: fly on the table
 python scripts/room_demo.py --fruit apple --fence                # one apple, a fence around the table top
@@ -371,7 +371,10 @@ python scripts/interp_decompose.py analyse --static --target DNa02 --json out/in
 ```
 
 That is where GLNO -> PEN (sign 0) and the three lateralised routes into DNa02 that carry nothing were
-found, before any GPU job ran. The toolkit's output is a **diagnosis**, never a fix: a diagnosis
+found, before any GPU job ran. `python scripts/interp_deficit.py <row or check>` runs those two steps for one
+row in one command -- the row with its citation, `paths` from the stimulus's sensory entry points, a static
+`decompose` of the readout, each tool's own Result JSON -- and writes steps 3-7 out as command templates it
+does not run (`--list` names the rows; `validate` re-finds GLNO -> PEN and DNa02's wiring from the rows alone). The toolkit's output is a **diagnosis**, never a fix: a diagnosis
 licenses a measurement, a mechanism the connectome data imply, or a documented swappable module -- and
 a gain, a bias, a threshold or a sign the data cannot see is hand-crafting, named as such.
 

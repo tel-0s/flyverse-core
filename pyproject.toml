@@ -58,7 +58,12 @@ cuda = []
 # The interpretability toolkit (flyverse/interp, scripts/interp_*.py) needs pandas, pyarrow and scipy,
 # which are already hard dependencies. Nothing extra to install; the extra exists to be documented.
 interp = []
-dev = ["pytest", "ruff", "pyyaml"]
+# tabulate is what pandas' DataFrame.to_markdown() imports on the call. Two scripts use it:
+# scripts/cx_velocity_route.py (analysis.md; it falls back to to_string() without it) and
+# scripts/build_type_map_typing.py, whose committed table in docs/audits/receptor_sources_typing.md is tabulate's
+# pipe format. It was undeclared at 0.2.0, and CI was red from the push that added cx_velocity_route.py
+# (2026-09-17) onward -- three tests in tests/test_cx_velocity_route.py, invisible on a desktop that had it.
+dev = ["pytest", "ruff", "pyyaml", "tabulate"]
 
 [tool.setuptools]
 packages = ["flyverse", "flyverse.interp", "flyverse.backends"]
