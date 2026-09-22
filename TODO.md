@@ -567,7 +567,10 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
       open). Round 8 fetched none: `det1`, `cx9`, `suite-inst`, `suite-inst-room` and `plume-go` record their
       submissions only in the git-ignored client console, and both audits had to corroborate job indices from it.
       The scheduler also reports `exit_code None` for every job and classed a crashed job as `completed`, so the
-      receipt is worth having as a file precisely because its status field is not evidence.
+      receipt is worth having as a file precisely because its status field is not evidence. (2026-09-22: the
+      `exit None` is explained and fixed -- the job line's `exit $st` ended the scheduler's wrapper before it wrote
+      `<log>.exitcode`; `cluster_run.py` now submits each line in a subshell and exit codes are recorded. The
+      receipt-as-a-file item stands.)
 - [ ] **`cx_wedge` records no `CUDA_VISIBLE_DEVICES` and no timestamp.** det1's cxS rows carry the field empty
       (`summary.json` has `"cuda_visible": [null, null]`) and cx9's 18 runs carry no wall-clock time at all, so the
       GPU a run landed on and the moment it ran are only in the ignored client log. Both belong in the run record,

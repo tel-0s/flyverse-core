@@ -828,6 +828,14 @@ readout change or a sign the data cannot see is hand-crafting, and the diagnosis
    survives) or `...; st=$?; tail -4 file; exit $st`. `cluster_run.py` warns on the `;` form (stderr and the console
    log) and submits the command unchanged.
 
+   **Why the scheduler itself read `exit None` (found 2026-09-22).** The scheduler inlines the job command into a bash
+   wrapper and writes `$?` to `<log>.exitcode` on the line after it, so the `exit $st` of the form above ended the
+   *wrapper* first: no exit-code file, no end stamp, `completed` / `exit None` whatever python returned -- 0 exit-code
+   files over the 42 job logs of cx9, suite-inst and plume-go. `cluster_run.py` now submits every line inside a
+   `( ... )` subshell (`build_spec`), and the scheduler records the status the line exits with (a two-job batch on
+   2026-09-22 read `completed exit 0` for both; `tests/test_cluster_run.py` runs the wrapper under bash). The status
+   is still a receipt, not an analysis: the artefact count and the per-run blocks below are unchanged.
+
    `'<n> job(s), 0 failed'` is **necessary and never sufficient**. Before any analysis: count the expected artefacts
    (`ls out/<name>/ | wc -l` against arms x runs) and open **each** run's block in the console log -- its
    `device cuda` line (a job that fell back to the CPU analyses fine and means nothing), the device it really used,
