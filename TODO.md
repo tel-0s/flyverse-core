@@ -542,8 +542,8 @@ rungs (4.5 / 8.8 / 11 / 15 / 20 / 30 deg, elevation / distance / diameter / spee
 
 ## D. Toolkit and process
 
-- [ ] `flyverse/interp` open contract defects (`docs/INTERP.md` §11, items 9-16): the front door
-      (`interp_deficit.py` running the §10 procedure), the `edges` lesion kind, a live null and vision context for
+- [ ] `flyverse/interp` open contract defects (`docs/INTERP.md` §11, items 9-16): ~~the front door
+      (`interp_deficit.py` running the §10 procedure)~~ (2026-09-22: steps 1-2 run, 3-7 written out; §10), the `edges` lesion kind, a live null and vision context for
       the atlas, one validation semantics, CPU tests for the apply scripts, graded units' drive in mV in exports.
 - [ ] `cluster_run.py`: refuse the bare `--fetch out/`; verify-batch built in; the console log's failure line
       surfaced; a per-run `provenance.json`.

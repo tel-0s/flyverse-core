@@ -675,6 +675,27 @@ call above the 0.5 confidence the project accepts), or a documented swappable mo
 readout change or a sign the data cannot see is hand-crafting, and the diagnosis must say so by name (the
 `deficit_*.md` audits end with exactly that split; copy it).
 
+**The front door** (`scripts/interp_deficit.py`, `flyverse/interp/deficit.py`) runs steps 1-2 below for one ledger row,
+named by its `row_id` or by the `scripts/benchmark.py` check it mirrors, and writes steps 3-7 out without running them:
+
+```bash
+PYTHONIOENCODING=utf-8 python scripts/interp_deficit.py compass.wedge_cells_persisting     # -> out/interp/deficit/<row>/report.md
+PYTHONIOENCODING=utf-8 python scripts/interp_deficit.py --list                             # the rows, gap rows first
+```
+
+Step 1 is the row, its citation and model reference, its `requires` precondition, the audit that already localized it
+if one exists, and its status when `--results` are given. Step 2 is `paths` (k <= 3) from each sensory entry point of the
+row's stimulus to the readout, plus a static `decompose` of the readout, each saved as the tool's own `result/1` JSON and
+condensed into the three things step 2 says to read. Where it looks is declared in two tables, `deficit.STIMULUS_SOURCES`
+(stimulus -> sensory populations) and `deficit.READOUT_LABELS` / `BODY_READOUTS` (the ledger labels that are not
+population specs: `wing_power_MN`, `LH_apple_channel`, `body`). `--source [LABEL=]SPEC` and `--readout SPEC` override
+them, and a stimulus with no entry (the `lit.*` modulation rows) asks for `--source` rather than guessing. Joined specs
+are read as `interp_paths.py --a` reads them (`paths.spec_from_cli`): `"LNO1|SpsP|~^LAL"` is three alternatives. Passed
+whole to `common.resolve`, the same string is ONE unanchored regex on type that selects `IbSpsP` and no LAL cell. The
+front door runs no simulation, edits nothing, and its step-3 templates keep python's exit code (10.4 item 4).
+`interp_deficit.py validate` is its validation target: from the rows alone, GLNO -> PEN_a (sign 0) as the strongest
+silent link into the compass at k = 3, and DNa02 net excitatory per volley with LLPC1 its largest excitatory input.
+
 ### 10.1 The procedure (seven steps; the first four are always run, in this order)
 
 1. **Name the readout and the expectation (CPU, minutes).** The ledger row with its citation and the model reference
@@ -1143,8 +1164,9 @@ tool must do now is stated with each.
 13. **The atlas has no live null and no vision context** [atlas]: the shipped atlas' null is bit-identical 0.000 in
     100 % of 26,487 rows, which is why 11.1.4 shows up there as 4,140 `undetermined` rows. Inhibitory movers are
     invisible and the optic drive is absent. A context arm exists and was never used.
-14. **No front door** [design]: nothing runs section 10's procedure end to end from a failing ledger row
-    (`scripts/interp_deficit.py`, or `interp_ledger --explain <row>`).
+14. **No front door** [design] -- **closed 2026-09-22** for steps 1-2: `scripts/interp_deficit.py <row or check>` runs
+    them from a failing ledger row and writes steps 3-7 out as templates (section 10, before 10.1). Steps 3-7 stay a
+    person's: they need a predeclared GPU batch, and the front door submits nothing.
 15. **Neurome-facing gaps** [export, trace]: graded units carry no received drive in mV; the per-body `verdict`
     column is an uncorrected screen (5-11 % of bodies at chance) and should be labelled or gated as one.
 16. **`docs/NEUROME_INTERFACE.md` line 73 still says 3,407 sign-0 presynaptic bodies** [that document's owner], and

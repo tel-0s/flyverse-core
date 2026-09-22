@@ -371,7 +371,10 @@ python scripts/interp_decompose.py analyse --static --target DNa02 --json out/in
 ```
 
 That is where GLNO -> PEN (sign 0) and the three lateralised routes into DNa02 that carry nothing were
-found, before any GPU job ran. The toolkit's output is a **diagnosis**, never a fix: a diagnosis
+found, before any GPU job ran. `python scripts/interp_deficit.py <row or check>` runs those two steps for one
+row in one command -- the row with its citation, `paths` from the stimulus's sensory entry points, a static
+`decompose` of the readout, each tool's own Result JSON -- and writes steps 3-7 out as command templates it
+does not run (`--list` names the rows; `validate` re-finds GLNO -> PEN and DNa02's wiring from the rows alone). The toolkit's output is a **diagnosis**, never a fix: a diagnosis
 licenses a measurement, a mechanism the connectome data imply, or a documented swappable module -- and
 a gain, a bias, a threshold or a sign the data cannot see is hand-crafting, named as such.
 
