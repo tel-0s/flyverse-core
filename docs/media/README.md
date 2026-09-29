@@ -148,3 +148,17 @@ an imposed angular-memory experiment, not a recovered biological compass. Recrea
 `python scripts/compass_driver_analyse.py`, then copy `out/compass_standin/analysis/turn_trace.png`
 here. The plot uses unwrapped headings and masks phase when vector strength is below 0.6.
 No trajectory was selected by outcome. See `docs/audits/compass_standin.md` for all 48 rows.
+
+
+## The announcement trailer (2026-09-28/29)
+
+`trailer.mp4` (16 MB; 86 s, 1280x720, 25 fps, h264 crf 27, AAC 128k) is a downscaled copy of the 1080p50 master that
+`games/trailer.py` renders from `games/trailer_edl.json`. Its clips, their seeds and devices, and how every cut is
+placed on the soundtrack's beat map are in [`games/README.md`](../../games/README.md) ("The trailer"). What happens in
+each clip is in `games/captions/`. Music: "Also Sprach Zarathustra" by Kevin MacLeod (incompetech.com), licensed under
+Creative Commons: By Attribution 3.0 (http://creativecommons.org/licenses/by/3.0/), from Wikimedia Commons
+(File:Also_Sprach_Zarathustra_-_Einleitung.ogg). Encoding:
+
+```
+ffmpeg -i out/trailer/flyverse_trailer.mp4 -vf "scale=1280:720:flags=lanczos,fps=25" -c:v libx264 -preset slow -crf 27        -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart docs/media/trailer.mp4
+```

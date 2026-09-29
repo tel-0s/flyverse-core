@@ -1,0 +1,858 @@
+{
+ "fps": 50,
+ "size": [
+  1920,
+  1080
+ ],
+ "duration": 86.0,
+ "music": "out/trailer/music/zarathustra.wav",
+ "music_start": 0.0,
+ "audio_fade_out": 2.0,
+ "out": "out/trailer/flyverse_trailer.mp4",
+ "shots": [
+  {
+   "kind": "clip",
+   "src": "out/games/sunrise/seed0.mp4",
+   "t0": 0.0,
+   "t1": 14.014,
+   "src_t0": 0.0,
+   "speed": 1.0,
+   "fade_in": 2.4,
+   "texts": [
+    {
+     "t0": 1.8,
+     "t1": 4.7,
+     "text": "167,106 neurons",
+     "size": 104
+    },
+    {
+     "t0": 4.9,
+     "t1": 7.8,
+     "text": "25.6 million connections",
+     "size": 104
+    },
+    {
+     "t0": 8.0,
+     "t1": 11.8,
+     "text": "one fly's brain and nerve cord, synapse by synapse",
+     "size": 64
+    },
+    {
+     "t0": 8.3,
+     "t1": 11.8,
+     "text": "MaleCNS v1.0 \u00b7 Janelia FlyEM + Google Research, 2026",
+     "size": 30,
+     "bold": false,
+     "pos": [
+      960.0,
+      610.0
+     ],
+     "color": [
+      151,
+      171,
+      172
+     ]
+    },
+    {
+     "t0": 12.25,
+     "t1": 13.95,
+     "text": "the room's light comes on \u00b7 every glow is the model's own activity",
+     "size": 30,
+     "bold": false,
+     "pos": [
+      960.0,
+      1020
+     ],
+     "color": [
+      213,
+      223,
+      219
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 14.014,
+   "t1": 15.99,
+   "src_t0": 0.0,
+   "speed": 1.0,
+   "label": "A FLY ON A TABLE",
+   "sub": "the same brain, given eyes, antennae, taste and a body"
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/spacecraft/seed0.mp4",
+   "t0": 15.99,
+   "t1": 20.03,
+   "src_t0": 0.5,
+   "speed": 1.0,
+   "label": "SPACECRAFT",
+   "sub": "declared decoders read its HS / H2 and VST2 cells and fire the attitude thrusters"
+  },
+  {
+   "kind": "card",
+   "t0": 20.03,
+   "t1": 25.212,
+   "lines": [
+    "flyverse",
+    "a whole fly connectome, in strange places",
+    "0.2.0 \u00b7 open source"
+   ],
+   "style": "end",
+   "fade_in": 0.05,
+   "flash": true
+  },
+  {
+   "kind": "black",
+   "t0": 25.212,
+   "t1": 25.58
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed0.mp4",
+   "t0": 25.58,
+   "t1": 25.91,
+   "src_t0": 7.28,
+   "speed": 1.0,
+   "crop": [
+    12,
+    68,
+    1312,
+    738
+   ],
+   "flash": true
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/pong/seed2.mp4",
+   "t0": 25.91,
+   "t1": 26.3,
+   "src_t0": 16.4,
+   "speed": 1.0,
+   "crop": [
+    180,
+    76,
+    1560,
+    878
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/minecraft/seed0.mp4",
+   "t0": 26.3,
+   "t1": 26.602,
+   "src_t0": 4.85,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1536,
+    864
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/spacecraft/seed0.mp4",
+   "t0": 26.602,
+   "t1": 26.984,
+   "src_t0": 8.7,
+   "speed": 1.0,
+   "crop": [
+    300,
+    64,
+    1360,
+    765
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/tron/rec2/seed0.mp4",
+   "t0": 26.984,
+   "t1": 27.35,
+   "src_t0": 3.8,
+   "speed": 1.0,
+   "crop": null,
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 27.35,
+   "t1": 27.736,
+   "src_t0": 2.22,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1380,
+    776
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/hairdryer/seed0.mp4",
+   "t0": 27.736,
+   "t1": 28.078,
+   "src_t0": 17.48,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1380,
+    776
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/sunrise/seed0.mp4",
+   "t0": 28.078,
+   "t1": 28.464,
+   "src_t0": 12.15,
+   "speed": 1.0,
+   "crop": null,
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed0.mp4",
+   "t0": 28.464,
+   "t1": 28.874,
+   "src_t0": 15.3,
+   "speed": 1.0,
+   "crop": [
+    12,
+    68,
+    1312,
+    738
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/pong/seed2.mp4",
+   "t0": 29.044,
+   "t1": 30.978,
+   "src_t0": 15.1,
+   "speed": 1.0,
+   "label": "PONG",
+   "sub": "MaleCNS v1.0 vs FlyWire FAFB v783 \u00b7 paddles follow decoders of each fly's own L2 + Mi1 columns"
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/minecraft/seed0.mp4",
+   "t0": 30.978,
+   "t1": 33.086,
+   "src_t0": 24.892,
+   "speed": 1.0,
+   "label": "MINECRAFT",
+   "sub": "a real 1.21.4 server \u00b7 1,466 ommatidia ray-cast through its blocks \u00b7 giant fibre \u2192 jump"
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed0.mp4",
+   "t0": 33.086,
+   "t1": 37.46,
+   "src_t0": 13.14,
+   "speed": 1.0,
+   "label": "DOOM",
+   "sub": "the gun fires when the fly's giant fibre does"
+  },
+  {
+   "kind": "grid",
+   "t0": 37.46,
+   "t1": 42.648,
+   "cols": 3,
+   "rows": 2,
+   "flash": true,
+   "sat0": 0.12,
+   "sat1": 1.0,
+   "sat_ramp": 0.9,
+   "cells": [
+    {
+     "src": "out/games/spacecraft/seed0.mp4",
+     "src_t0": 3.0,
+     "tag": "SPACECRAFT",
+     "crop": [
+      380,
+      70,
+      1000,
+      846
+     ]
+    },
+    {
+     "src": "out/games/pong/seed2.mp4",
+     "src_t0": 17.0,
+     "tag": "PONG",
+     "crop": [
+      400,
+      70,
+      1120,
+      948
+     ]
+    },
+    {
+     "src": "out/games/minecraft/seed0.mp4",
+     "src_t0": 24.0,
+     "tag": "MINECRAFT",
+     "crop": [
+      120,
+      64,
+      1100,
+      931
+     ]
+    },
+    {
+     "src": "out/games/doom/seed1.mp4",
+     "src_t0": 17.2,
+     "tag": "DOOM",
+     "crop": [
+      96,
+      68,
+      1136,
+      962
+     ]
+    },
+    {
+     "src": "out/games/tron/rec2/seed0.mp4",
+     "src_t0": 2.17,
+     "tag": "TRON"
+    },
+    {
+     "src": "out/games/swat/seed0.mp4",
+     "src_t0": 4.5,
+     "tag": "SWAT",
+     "crop": [
+      140,
+      64,
+      1100,
+      931
+     ]
+    }
+   ],
+   "texts": [
+    {
+     "t0": 0.6,
+     "t1": 2.55,
+     "text": "raw connectomes \u00b7 no weights touched",
+     "size": 64
+    },
+    {
+     "t0": 2.7,
+     "t1": 4.9,
+     "text": "every game control is a declared read-out",
+     "size": 64
+    }
+   ]
+  },
+  {
+   "kind": "black",
+   "t0": 42.648,
+   "t1": 43.132
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 43.132,
+   "t1": 43.464,
+   "src_t0": 5.1,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1380,
+    776
+   ],
+   "flash": true
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed1.mp4",
+   "t0": 43.464,
+   "t1": 43.844,
+   "src_t0": 12.2,
+   "speed": 1.0,
+   "crop": [
+    12,
+    68,
+    1312,
+    738
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/spacecraft/seed0.mp4",
+   "t0": 43.844,
+   "t1": 44.192,
+   "src_t0": 14.0,
+   "speed": 1.0,
+   "crop": [
+    300,
+    64,
+    1360,
+    765
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/minecraft/seed0.mp4",
+   "t0": 44.192,
+   "t1": 44.586,
+   "src_t0": 26.35,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1536,
+    864
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/pong/seed0.mp4",
+   "t0": 44.586,
+   "t1": 44.946,
+   "src_t0": 8.4,
+   "speed": 1.0,
+   "crop": [
+    180,
+    76,
+    1560,
+    878
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/mars/seed0.mp4",
+   "t0": 44.946,
+   "t1": 45.348,
+   "src_t0": 31.74,
+   "speed": 1.0,
+   "crop": null,
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/hairdryer/seed0.mp4",
+   "t0": 45.348,
+   "t1": 45.71,
+   "src_t0": 19.48,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1380,
+    776
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 45.71,
+   "t1": 46.078,
+   "src_t0": 13.45,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1380,
+    776
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed2.mp4",
+   "t0": 46.078,
+   "t1": 46.476,
+   "src_t0": 26.3,
+   "speed": 1.0,
+   "crop": [
+    12,
+    68,
+    1312,
+    738
+   ],
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/sunrise/seed0.mp4",
+   "t0": 46.476,
+   "t1": 46.78,
+   "src_t0": 13.0,
+   "speed": 1.0,
+   "crop": null,
+   "flash": false
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/hairdryer/seed0.mp4",
+   "t0": 46.78,
+   "t1": 48.694,
+   "src_t0": 18.766,
+   "speed": 1.0,
+   "label": "HAIRDRYER",
+   "sub": "a scripted hand aims the jet \u00b7 the fly's wind DNs \u2192 a declared turn decoder \u00b7 sugar \u2192 MN9"
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 48.694,
+   "t1": 50.526,
+   "src_t0": 1.09,
+   "speed": 1.0,
+   "label": "SWAT",
+   "sub": "no decoders: LC4 / LPLC2 \u2192 giant fibre \u2192 the body model's escape jump"
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/tron/rec2/seed0.mp4",
+   "t0": 50.526,
+   "t1": 55.15,
+   "src_t0": 9.686,
+   "speed": 1.0,
+   "label": "TRON",
+   "sub": "MaleCNS vs FAFB \u00b7 a declared decoder turns each cycle when its giant fibre crosses 33 Hz"
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/mars/seed0.mp4",
+   "t0": 55.15,
+   "t1": 57.86,
+   "src_t0": 0.0,
+   "speed": 1.0,
+   "flash": true,
+   "label": "MARS",
+   "sub": "a dust devil's wind \u2192 the fly's wind neurons \u2192 a declared decoder veers the rover"
+  },
+  {
+   "kind": "grid",
+   "t0": 57.86,
+   "t1": 59.76,
+   "cols": 2,
+   "rows": 1,
+   "gap": 10,
+   "cells": [
+    {
+     "src": "out/games/spacecraft/b200_seed0.mp4",
+     "src_t0": 2.6,
+     "tag": "DECODERS ON",
+     "crop": [
+      420,
+      64,
+      900,
+      1016
+     ]
+    },
+    {
+     "src": "out/games/spacecraft/control_seed0.mp4",
+     "src_t0": 2.6,
+     "tag": "CONTROL: THRUSTERS OFF",
+     "crop": [
+      420,
+      64,
+      900,
+      1016
+     ]
+    }
+   ],
+   "texts": [
+    {
+     "t0": 0.2,
+     "t1": 1.85,
+     "text": "same seed, same GPU model \u00b7 thrusters on, and off",
+     "size": 44,
+     "pos": [
+      960.0,
+      1000
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/pong/seed0.mp4",
+   "t0": 59.76,
+   "t1": 61.795,
+   "src_t0": 7.075,
+   "speed": 1.0
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed1.mp4",
+   "t0": 61.795,
+   "t1": 63.25,
+   "src_t0": 17.4,
+   "speed": 1.0,
+   "texts": [
+    {
+     "t0": 0.1,
+     "t1": 1.4,
+     "text": "the chips say what is the fly and what is not: CONNECTOME \u00b7 DECODER \u00b7 GAME",
+     "size": 48,
+     "pos": [
+      960.0,
+      990
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/minecraft/seed0.mp4",
+   "t0": 63.25,
+   "t1": 64.62,
+   "src_t0": 0.3,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/spacecraft/seed0.mp4",
+   "t0": 64.62,
+   "t1": 65.68,
+   "src_t0": 13.4,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/pong/seed2.mp4",
+   "t0": 65.68,
+   "t1": 66.62,
+   "src_t0": 25.4,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed0.mp4",
+   "t0": 66.62,
+   "t1": 67.2,
+   "src_t0": 24.5,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/mars/seed0.mp4",
+   "t0": 67.2,
+   "t1": 67.98,
+   "src_t0": 31.24,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/hairdryer/seed0.mp4",
+   "t0": 67.98,
+   "t1": 68.4,
+   "src_t0": 18.48,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 68.4,
+   "t1": 68.98,
+   "src_t0": 7.7,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/minecraft/seed0.mp4",
+   "t0": 68.98,
+   "t1": 69.24,
+   "src_t0": 21.0,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1536,
+    864
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/pong/seed2.mp4",
+   "t0": 69.24,
+   "t1": 69.68,
+   "src_t0": 17.8,
+   "speed": 1.0,
+   "crop": [
+    180,
+    76,
+    1560,
+    878
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed2.mp4",
+   "t0": 69.68,
+   "t1": 69.98,
+   "src_t0": 26.35,
+   "speed": 1.0,
+   "crop": [
+    12,
+    68,
+    1312,
+    738
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/spacecraft/seed0.mp4",
+   "t0": 69.98,
+   "t1": 70.28,
+   "src_t0": 28.2,
+   "speed": 1.0,
+   "crop": [
+    300,
+    64,
+    1360,
+    765
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/tron/rec2/seed0.mp4",
+   "t0": 70.28,
+   "t1": 70.58,
+   "src_t0": 6.17,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 70.58,
+   "t1": 70.88,
+   "src_t0": 10.8,
+   "speed": 1.0,
+   "crop": [
+    0,
+    64,
+    1380,
+    776
+   ]
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/sunrise/seed0.mp4",
+   "t0": 70.88,
+   "t1": 71.18,
+   "src_t0": 12.1,
+   "speed": 1.0,
+   "crop": null
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 71.18,
+   "t1": 72.32,
+   "src_t0": 1.06,
+   "speed": 1.0
+  },
+  {
+   "kind": "white",
+   "t0": 72.32,
+   "t1": 72.41
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/swat/seed0.mp4",
+   "t0": 72.41,
+   "t1": 73.52,
+   "src_t0": 2.27,
+   "speed": 1.0,
+   "flash": true
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/minecraft/seed2.mp4",
+   "t0": 73.52,
+   "t1": 74.44,
+   "src_t0": 20.82,
+   "speed": 1.0
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/doom/seed1.mp4",
+   "t0": 74.44,
+   "t1": 75.32,
+   "src_t0": 17.34,
+   "speed": 1.0
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/tron/rec2/seed0.mp4",
+   "t0": 75.32,
+   "t1": 76.2,
+   "src_t0": 26.36,
+   "speed": 1.0
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/pong/seed2.mp4",
+   "t0": 76.2,
+   "t1": 77.0,
+   "src_t0": 17.46,
+   "speed": 1.0
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/hairdryer/seed0.mp4",
+   "t0": 77.0,
+   "t1": 77.8,
+   "src_t0": 21.6,
+   "speed": 1.0
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/mars/seed0.mp4",
+   "t0": 77.8,
+   "t1": 78.56,
+   "src_t0": 32.04,
+   "speed": 1.0
+  },
+  {
+   "kind": "clip",
+   "src": "out/games/sunrise/seed0.mp4",
+   "t0": 78.56,
+   "t1": 79.444,
+   "src_t0": 12.0,
+   "speed": 1.0
+  },
+  {
+   "kind": "card",
+   "t0": 79.444,
+   "t1": 86.0,
+   "lines": [
+    "flyverse",
+    "github.com/tel-0s/flyverse-core",
+    "pip install -e .   \u00b7   python games/pong.py",
+    "every clip is seed 0, 1 or 2 \u00b7 every game control is declared \u00b7 the captions are in games/",
+    "Connectome: MaleCNS v1.0 (Janelia FlyEM + Google Research) \u00b7 FlyWire FAFB v783",
+    "Music: \"Also Sprach Zarathustra\" Kevin MacLeod (incompetech.com) \u00b7 CC BY 3.0"
+   ],
+   "style": "end",
+   "fade_in": 0.6,
+   "fade_out": 0.8
+  }
+ ]
+}

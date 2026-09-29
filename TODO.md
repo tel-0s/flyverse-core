@@ -664,3 +664,29 @@ exactly for 59 % (FAFB) / 72 % (BANC) of MaleCNS cells and `type_aliases.csv` al
       count-ratio brake diagnostic, neither identifies biological effective coupling.
 - [ ] Obtain reproducible runtime profiles before kernel fusion; native full-brain exact-workload
       matching failed even with matched forcing. Separate UI, sensory, module and brain timings.
+
+## G. Bugs the games surfaced (2026-09-29; written up in `games/README.md`, not fixed for 0.2.0)
+
+Each touches the shipped model's inputs or the shipped room, so a fix is a default change: audit, skeptic, and the
+affected suite rows re-run on the same device. The games' captions describe the behaviour as shipped.
+
+- [ ] **The room's point light never reaches a surface.** `world.make_room` puts `World.light_pos` at the centre of
+      the 8 cm lamp globe, and `World._trace`'s shadow ray always hits the globe first, so the room is lit by the
+      ambient term alone (per-column radiance at the start pose is identical with the point light off: max 0.211,
+      mean 0.095). Fix: move the light out of the globe (swarm puts it 1 cm below, as a declared GAME change) or skip
+      the emitter in the shadow test. Every vision row renders this room, so all of them re-run.
+      Evidence: `games/captions/sunrise.md`.
+- [ ] **`world.render_camera` returns a left-right mirrored image** (column 0 looks to the camera's right).
+      `room_demo.Camera.project` mirrors to match, and hairdryer and swat flip it. Display only: the retina casts its
+      own rays. Fix it together with those three call sites.
+- [ ] **`world.value_noise` is constant along z**: `_hash3`'s z coefficient (2147483647) is 0 modulo its own
+      modulus. Harmless on the room's surfaces today; a fix changes any texture that varies with z, so re-run the
+      vision rows if one does.
+- [ ] **About 92 % of the walking speed is a constant.** `Locomotion.baseline_speed` (0.008 m/s, "intrinsic walking
+      drive") dominates forward speed, with DN / leg-MN rates adding the rest, so walking speed is not a connectome
+      readout (minecraft's HUD labels it DECODER). Decide whether to keep it as a named stop-gap or tie it to DN
+      activity. `docs/NOTES.md` still says 0.4 cm/s; `body.py` has 0.8 cm/s.
+- [ ] **Scrub leftovers** (item A's policy): the scheduler's name survives in three tracked files,
+      `docs/audits/object_samedevice_r3.md` line 146, `scripts/object_round3_export.py` line 129 and
+      `tests/test_cluster_run.py` (the fake scheduler's class name). The games' captions use `<scheduler>` /
+      `<cluster-node>`.

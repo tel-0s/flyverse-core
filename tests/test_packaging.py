@@ -123,7 +123,7 @@ class PyprojectTests(unittest.TestCase):
         self.assertTrue((ROOT / "README.md").is_file())
         self.assertTrue((ROOT / "LICENSE").is_file())
         self.assertEqual([a["name"] for a in proj["authors"]], ["tel0s"])
-        self.assertEqual(proj["urls"]["Repository"], "https://github.com/tel-0s/flyverse")
+        self.assertEqual(proj["urls"]["Repository"], "https://github.com/tel-0s/flyverse-core")
         self.assertEqual(proj["license-files"], ["LICENSE"])
         # PEP 639: the SPDX expression and a license classifier cannot coexist -- setuptools >= 77 fails
         # the build outright. Guard the combination that used to be the obvious thing to write.
@@ -176,7 +176,7 @@ class CitationTests(unittest.TestCase):
             self.assertIn(key, self.cff)
         self.assertEqual([a["name"] for a in self.cff["authors"]], ["tel0s"])
         self.assertEqual(self.cff["license"], "MIT")
-        self.assertEqual(self.cff["repository-code"], "https://github.com/tel-0s/flyverse")
+        self.assertEqual(self.cff["repository-code"], "https://github.com/tel-0s/flyverse-core")
 
     def test_citation_version_tracks_pyproject(self):
         self.assertEqual(str(self.cff["version"]), pyproject()["project"]["version"])
