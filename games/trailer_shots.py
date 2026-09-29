@@ -146,9 +146,10 @@ def shots(ev, t1, t2, clip, card):
     S.append(clip(f"{G}/sunrise/seed0.mp4", 78.56, ev["orchestra_release"], src_t0=12.0))
     # ---- the organ tail: the end card
     S.append(card(ev["orchestra_release"], 86.0, [
-        "flyverse", "github.com/tel-0s/flyverse-core", "pip install -e .   ·   python games/pong.py",
+        "flyverse", "github.com/tel-0s/flyverse-core",
+        "pip install -e .", "python scripts/fetch_data.py --malecns --fafb", "python games/pong.py",
         "every clip is seed 0, 1 or 2 · every game control is declared · the captions are in games/",
         "Connectome: MaleCNS v1.0 (Janelia FlyEM + Google Research) · FlyWire FAFB v783",
         "Music: \"Also Sprach Zarathustra\" Kevin MacLeod (incompetech.com) · CC BY 3.0"],
-        style="end", fade_in=0.6, fade_out=0.8))
+        style="end", n_big=5, commands=[2, 3, 4], fade_in=0.6, fade_out=0.8))
     return S

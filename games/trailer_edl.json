@@ -845,12 +845,20 @@
    "lines": [
     "flyverse",
     "github.com/tel-0s/flyverse-core",
-    "pip install -e .   \u00b7   python games/pong.py",
+    "pip install -e .",
+    "python scripts/fetch_data.py --malecns --fafb",
+    "python games/pong.py",
     "every clip is seed 0, 1 or 2 \u00b7 every game control is declared \u00b7 the captions are in games/",
     "Connectome: MaleCNS v1.0 (Janelia FlyEM + Google Research) \u00b7 FlyWire FAFB v783",
     "Music: \"Also Sprach Zarathustra\" Kevin MacLeod (incompetech.com) \u00b7 CC BY 3.0"
    ],
    "style": "end",
+   "n_big": 5,
+   "commands": [
+    2,
+    3,
+    4
+   ],
    "fade_in": 0.6,
    "fade_out": 0.8
   }

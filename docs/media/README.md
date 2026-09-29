@@ -160,5 +160,6 @@ Creative Commons: By Attribution 3.0 (http://creativecommons.org/licenses/by/3.0
 (File:Also_Sprach_Zarathustra_-_Einleitung.ogg). Encoding:
 
 ```
-ffmpeg -i out/trailer/flyverse_trailer.mp4 -vf "scale=1280:720:flags=lanczos,fps=25" -c:v libx264 -preset slow -crf 27        -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart docs/media/trailer.mp4
+ffmpeg -i out/trailer/flyverse_trailer.mp4 -vf "scale=1280:720:flags=lanczos,fps=25" -c:v libx264 -preset slow -crf 27 \
+       -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart docs/media/trailer.mp4
 ```

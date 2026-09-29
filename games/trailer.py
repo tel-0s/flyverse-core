@@ -132,12 +132,36 @@ class Compositor:
         lines = shot.get("lines", [])
         a = smooth((t - shot["t0"]) / max(shot.get("fade_in", 0.4), 1e-3))
         if style == "end":
-            y = h * 0.30
+            # line 0: the title; lines 1 .. n_big-1 large (the URL; `commands` lists the lines set as commands, in the
+            # plain face at `cmd_size`); the rest small print. The block is measured, then stacked top-down and centred.
+            n_big, commands = shot.get("n_big", 3), set(shot.get("commands", [2]))
+            rows = []
             for i, line in enumerate(lines):
-                size = 150 if i == 0 else (44 if i < 3 else 28)
-                col = gc.SAGE if i == 0 else (gc.TEXT if i < 3 else gc.MUTED)
-                r = self.text(line, (w / 2, y), size, col, bold=(i == 0), alpha=a, display=(i != 2))
-                y = r.bottom + (40 if i == 0 else 18)
+                if i == 0:
+                    style_i = (150, gc.SAGE, True, True)
+                elif i in commands:
+                    style_i = (shot.get("cmd_size", 36), gc.TEXT, False, False)
+                elif i < n_big:
+                    style_i = (48, gc.TEXT, False, True)
+                else:
+                    style_i = (28, gc.MUTED, False, True)
+                size, col, bold, disp = style_i
+                rows.append((line, size, col, bold, disp, self.hud.font(size, bold, disp).size(line)[1]))
+
+            def gap(i):                                   # space above line i
+                if i == 1:
+                    return 26
+                if i in commands:
+                    return 30 if (i - 1) not in commands else 6
+                if i == n_big:
+                    return 40
+                return 6
+            total = sum(r[-1] for r in rows) + sum(gap(i) for i in range(1, len(rows)))
+            y = (h - total) / 2 - h * shot.get("lift", 0.03)
+            for i, (line, size, col, bold, disp, lh) in enumerate(rows):
+                y += gap(i) if i else 0
+                self.text(line, (w / 2, y), size, col, bold=bold, display=disp, anchor="midtop", alpha=a)
+                y += lh
         else:
             y = h / 2 - (len(lines) - 1) * 50
             for i, line in enumerate(lines):
