@@ -206,7 +206,10 @@ The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status
 - [x] **`LICENSE`**: MIT, for the code.
 - [x] **[`../CITATION.cff`](../CITATION.cff)** exists and validates, cites the MaleCNS v1.0 release, the
       FAFB v783 and BANC v888 releases and Shiu et al. 2024, and names the entity author `tel0s`.
-- [ ] **Close the three TODOs inside `CITATION.cff`** -- they survive the 0.2.0 packaging pass, they are
+- [x] **Close the three TODOs inside `CITATION.cff`** (2026-09-29: the PII resolves, via Crossref and doi.org, to
+      doi:10.1016/j.cell.2026.08.015, Berg et al., Cell 189(18), now cited as its own reference with Crossref's
+      111 authors; the download page says only "CC-BY", no version, and names no author list for the release, so
+      the data entry keeps "Janelia FlyEM Project Team" and claims no SPDX licence.) -- they survive the 0.2.0 packaging pass, they are
       **the owner's open items**, and they are written into the file and will be read by anyone who
       opens it: confirm and add the DOI of the MaleCNS release paper (the manifest records
       the PII `S0092-8674(26)00942-6`, which has **not** been checked against a registered DOI), confirm
@@ -215,7 +218,8 @@ The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status
 - [x] **The version is decided and set.** `pyproject.toml` and `CITATION.cff` both say `0.2.0` and
       `CITATION.cff` says `date-released: 2026-09-19`; the two are kept equal by
       `tests/test_packaging.py::CitationTests::test_citation_version_tracks_pyproject`.
-- [ ] **Tag `v0.2.0` at the release commit.** A citable release wants a tag, and the tag is what a DOI
+- [x] **Tag `v0.2.0` at the release commit.** (2026-09-29, at the commit that checks this box, with
+      `date-released` moved to that day; the GitHub release carries the trailer.) A citable release wants a tag, and the tag is what a DOI
       service would archive. Owner's call, on the day of the flip.
 
 ---

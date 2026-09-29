@@ -454,10 +454,11 @@ papers. The repository ships **no connectome data and no third-party tables**;
 `flyverse/data/manifest.json` records the URL, SHA-256, citation and licence of every file
 `scripts/fetch_data.py` can fetch:
 
-* **MaleCNS v1.0** -- Janelia FlyEM, <https://male-cns.janelia.org>, CC BY 4.0 at the time of writing
-  (check the download page); the release paper is recorded in the manifest as Cell 2026, PII
-  S0092-8674(26)00942-6, which has not been checked against a registered DOI, so `CITATION.cff`
-  claims no `doi:` field for it.
+* **MaleCNS v1.0** -- Janelia FlyEM, <https://male-cns.janelia.org>; the download page says "The Male
+  CNS is licensed under CC-BY" (no version stated, checked 2026-09-29). Release paper: Berg et al.,
+  "Sexual dimorphism in the complete Drosophila male central nervous system connectome", Cell 189
+  (2026), [doi:10.1016/j.cell.2026.08.015](https://doi.org/10.1016/j.cell.2026.08.015) (the manifest's
+  PII S0092-8674(26)00942-6), cited in full in `CITATION.cff`.
 * **FlyWire FAFB v783** and **BANC v888** -- Codex public releases, CC BY 4.0; cite the releases and
   the original reconstruction papers. FlyWire NT predictions are used where the model reads them.
 * **External expression tables** (Ozel 2021, Davis 2020, Kurmangaliyev 2020, Nern 2025, Fly Cell

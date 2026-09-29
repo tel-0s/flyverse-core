@@ -227,8 +227,9 @@ unchanged, including its key set (`docs/CONNECTOME_BACKENDS_SPEC.md` 4.1).
 
 ### 3.1 MaleCNS v1.0 (minconf 0.5)
 
-Janelia FlyEM flat-connectome release, <https://male-cns.janelia.org/download/>; paper Cell 2026,
-S0092-8674(26)00942-6. Licence: Janelia FlyEM data terms (CC BY 4.0 at the time of writing).
+Janelia FlyEM flat-connectome release, <https://male-cns.janelia.org/download/>; paper Berg et al., Cell 2026,
+doi:10.1016/j.cell.2026.08.015 (PII S0092-8674(26)00942-6). Licence: the download page says "CC-BY" (no version
+stated, checked 2026-09-29).
 `flyverse/data/manifest.json` holds the URL, sha256 and size of each file.
 
 | file | sha256 | used by |
