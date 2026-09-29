@@ -33,6 +33,7 @@ caption ends with the skeptic's corrections.
 ## Run them
 
 ```
+python scripts/fetch_data.py --malecns --fafb     # once: the two connectomes, hash-verified (see ../README.md)
 python games/pong.py                     # interactive; W/S to play against a fly with --left human
 python games/doom.py                     # needs vizdoom:  pip install --no-deps vizdoom==1.3.1
 python games/minecraft.py                # needs Java 21+, Node 18+, and `npm install` in games/minecraft_bridge
