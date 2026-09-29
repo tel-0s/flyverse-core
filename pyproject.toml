@@ -58,7 +58,10 @@ cuda = []
 # The interpretability toolkit (flyverse/interp, scripts/interp_*.py) needs pandas, pyarrow and scipy,
 # which are already hard dependencies. Nothing extra to install; the extra exists to be documented.
 interp = []
-dev = ["pytest", "ruff", "pyyaml"]
+# tabulate: pandas' optional backend for DataFrame.to_markdown, which scripts/cx_velocity_route.py's analysis.md
+# uses (its tests run in CI). A dev extra, not a hard dependency, and not fixed in that script, whose source hash
+# the cx9 predeclaration pins.
+dev = ["pytest", "ruff", "pyyaml", "tabulate"]
 
 [tool.setuptools]
 packages = ["flyverse", "flyverse.interp", "flyverse.backends"]
