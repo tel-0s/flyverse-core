@@ -21,3 +21,8 @@ docs/HANDOFF_*.md
 
 # agent worktrees and state (ruff honours .gitignore; the CI lint step is `ruff check .`)
 .claude/
+
+# games: Node dependencies of the Minecraft bridge (games/minecraft_bridge/package.json pins them)
+games/minecraft_bridge/node_modules/
+# ViZDoom writes its config into the working directory
+_vizdoom.ini

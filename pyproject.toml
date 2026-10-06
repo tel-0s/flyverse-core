@@ -40,7 +40,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/tel-0s/flyverse"
+Repository = "https://github.com/tel-0s/flyverse-core"
 
 [project.optional-dependencies]
 # The observatory UI (flyverse/room_ui.py, scripts/room_demo.py). pygame is ALREADY a hard dependency --

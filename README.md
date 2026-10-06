@@ -19,6 +19,7 @@ declares what it replaces, whether its law is sourced or `unverified`, and what 
 *The room console: body camera, small orbit view, both retinal mosaics, antennal inputs, and
 simultaneous population, motor and body readouts. `--brain-map` opens the soma map.*
 
+Trailer: [`docs/media/trailer.mp4`](docs/media/trailer.mp4) -- 86 s of the games below, cut to "Also Sprach Zarathustra" (Kevin MacLeod, CC BY 3.0); every clip is captioned in [`games/`](games/README.md).
 Moving: [`docs/media/loom.gif`](docs/media/loom.gif) -- 25 s of the console, a loom at 8 s, the giant-fibre jump and the re-landing.
 [`docs/media/wind_apple.mp4`](docs/media/wind_apple.mp4) -- 25 s with one apple and the default wind (what the fly did, honestly captioned in [`docs/media/README.md`](docs/media/README.md), with every command line).
 Toolkit: [`docs/media/toolkit_loom_gf.png`](docs/media/toolkit_loom_gf.png) -- `interp` on the loom -> giant-fibre path: the `paths` stage map and the `atlas` readout.
@@ -93,6 +94,23 @@ biological graph) and `LIFParams(surrogate_grad=True)` are all opt-in, recorded 
 checkpoints with a declared `kind`, and inert until used -- with nothing attached the simulation is
 bit-identical to the default path on CPU. See **[Optional extensions](docs/EXTENSIBILITY.md)** and
 **[Hooks, modules, graph extension](docs/CONTROL_SURFACE.md#hooks-modules-graph-extension)**.
+
+## Games: strange places to put it
+
+[`games/`](games/README.md) puts the shipped fly, unchanged, in Pong (against the FlyWire FAFB connectome), real
+Minecraft, Doom, a 6-DOF spaceship, a TRON arena, a Mars rover, a swatter, a hairdryer, a crowd of 64 and a dark room
+whose light comes on. Each one uses only the surface above: senses in, named rates out. Every mapping from neural
+activity to a game control is a declared, read-only decoder module (it writes nothing, so the brain runs bit-identically
+with or without it; `tests/test_games_common.py`), and the HUDs tag their readouts CONNECTOME, DECODER or GAME. Each clip is one of seeds 0-2, recorded once after the code was frozen. Where a control exists (decoder
+disconnected, stimulus hidden from the fly) it was recorded on the same GPU model as the arm it is compared with, and
+each caption in
+[`games/captions/`](games/captions/) reports every outcome. The captions carry what the raw model's limits imply:
+here, the fly turns only when a declared decoder turns it.
+
+```
+python games/pong.py                       # MaleCNS vs FAFB; --left human to play one end yourself
+python games/swat.py                       # point to aim, hold the mouse button to wind up, release to swing
+```
 
 ## What the raw model does unprompted, and where it stops
 
@@ -439,10 +457,11 @@ papers. The repository ships **no connectome data and no third-party tables**;
 `flyverse/data/manifest.json` records the URL, SHA-256, citation and licence of every file
 `scripts/fetch_data.py` can fetch:
 
-* **MaleCNS v1.0** -- Janelia FlyEM, <https://male-cns.janelia.org>, CC BY 4.0 at the time of writing
-  (check the download page); the release paper is recorded in the manifest as Cell 2026, PII
-  S0092-8674(26)00942-6, which has not been checked against a registered DOI, so `CITATION.cff`
-  claims no `doi:` field for it.
+* **MaleCNS v1.0** -- Janelia FlyEM, <https://male-cns.janelia.org>; the download page says "The Male
+  CNS is licensed under CC-BY" (no version stated, checked 2026-09-29). Release paper: Berg et al.,
+  "Sexual dimorphism in the complete Drosophila male central nervous system connectome", Cell 189
+  (2026), [doi:10.1016/j.cell.2026.08.015](https://doi.org/10.1016/j.cell.2026.08.015) (the manifest's
+  PII S0092-8674(26)00942-6), cited in full in `CITATION.cff`.
 * **FlyWire FAFB v783** and **BANC v888** -- Codex public releases, CC BY 4.0; cite the releases and
   the original reconstruction papers. FlyWire NT predictions are used where the model reads them.
 * **External expression tables** (Ozel 2021, Davis 2020, Kurmangaliyev 2020, Nern 2025, Fly Cell

@@ -9,7 +9,7 @@ The repository ships **no connectome data**: the MaleCNS files are ~3.7 GB and a
 in section 1 works before any of that is downloaded, including the test suite.
 
 ```
-git clone https://github.com/tel-0s/flyverse
+git clone https://github.com/tel-0s/flyverse-core flyverse
 cd flyverse
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
 ```

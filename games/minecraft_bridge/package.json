@@ -1,0 +1,12 @@
+{
+  "name": "flyverse-minecraft-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "flyverse games/minecraft: a mineflayer bot driven by the connectome over a line-delimited JSON stdio bridge, plus a prismarine-viewer page captured by puppeteer",
+  "license": "MIT",
+  "dependencies": {
+    "mineflayer": "^4.39.0",
+    "prismarine-viewer": "^1.33.0",
+    "puppeteer": "^25.12.0"
+  }
+}

@@ -1,0 +1,1637 @@
+{
+ "track": {
+  "file": "out/trailer/music/zarathustra.wav",
+  "source_file": "out/trailer/music/zarathustra_macleod.ogg",
+  "title": "Also Sprach Zarathustra (Sonnenaufgang)",
+  "title_as_tagged_in_file": "Also Sprach Zarathustra - Sonnenaufgang",
+  "commons_file_title": "Also Sprach Zarathustra - Einleitung",
+  "composer": "Richard Strauss, Also sprach Zarathustra op. 30 (1896), Einleitung",
+  "performer_arranger": "Kevin MacLeod",
+  "year": 2010,
+  "licence": "CC BY 3.0 (Creative Commons Attribution 3.0 Unported)",
+  "licence_url": "https://creativecommons.org/licenses/by/3.0/",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg",
+  "original_source_url": "http://incompetech.com/music/royalty-free/index.html?keywords=Zarathustra",
+  "attribution_line": "\"Also Sprach Zarathustra (Sonnenaufgang)\" Kevin MacLeod (incompetech.com) / Licensed under Creative Commons: By Attribution 3.0 License / http://creativecommons.org/licenses/by/3.0/",
+  "attribution_notes": [
+   "Commons page (checked 2026-09-28): Author Kevin MacLeod, Date 2010, Source incompetech.com (link above), licence template {{CC-BY-3.0}}; no custom attribution string is specified.",
+   "incompetech.com's own credit template is: \"<Title>\" Kevin MacLeod (incompetech.com) / Licensed under Creative Commons: By Attribution 4.0 License / http://creativecommons.org/licenses/by/4.0/ ; the line above is that template with the 3.0 licence this copy was obtained under.",
+   "The piece is no longer in incompetech.com's catalogue (pieces.json, 1,443 titles, checked 2026-09-28); only 'Fanfare for Space' (2013), described by MacLeod as 'a take-off on Strauss' Zarathustra theme that is legal for use in every country'. The Commons CC BY 3.0 grant stands; the remark concerns the composition's copyright in countries with terms longer than life+70 (Strauss died 1949).",
+   "CC BY 3.0 treats synchronising the music to video as an Adaptation (s.1a); s.4b asks for the author, the title, the licence URI and a credit identifying the use, e.g. 'Music: ...' on the end card."
+  ]
+ },
+ "duration_s": 86.061,
+ "sample_rate_hz": 48000,
+ "channels": 2,
+ "peak_dbfs": 0.0,
+ "method": {
+  "onsets": "SuperFlux spectral flux, 2048-pt STFT, 10 ms hop, 30 Hz-16 kHz, log1p(100|X|), 3-bin max filter, 20 ms lag, normalised to the track maximum; peaks: local max +-50 ms, >= moving median (+-0.5 s) + max(0.025, 2 x moving MAD), 80 ms refractory; band = low <250 Hz, mid 250-2000, high >2000 (largest summed flux at the peak); event = labelled event within 40 ms",
+  "labels": "see analyze_track.py docstring; each event carries its evidence and a 0-1 confidence",
+  "times": "seconds from the first sample of zarathustra.wav (= the .ogg); frame_50fps = round(t*50)"
+ },
+ "onsets": [
+  {
+   "t": 12.04,
+   "strength": 0.0851,
+   "band": "mid",
+   "event": "call1_C4"
+  },
+  {
+   "t": 14.04,
+   "strength": 0.0401,
+   "band": "mid",
+   "event": "call1_G4"
+  },
+  {
+   "t": 15.29,
+   "strength": 0.0418,
+   "band": "low"
+  },
+  {
+   "t": 16.02,
+   "strength": 0.049,
+   "band": "mid",
+   "event": "call1_C5"
+  },
+  {
+   "t": 16.33,
+   "strength": 0.0415,
+   "band": "low"
+  },
+  {
+   "t": 19.71,
+   "strength": 0.0389,
+   "band": "low"
+  },
+  {
+   "t": 20.03,
+   "strength": 0.2129,
+   "band": "mid",
+   "event": "chord1_hit"
+  },
+  {
+   "t": 20.16,
+   "strength": 0.1962,
+   "band": "mid"
+  },
+  {
+   "t": 20.54,
+   "strength": 0.2429,
+   "band": "mid"
+  },
+  {
+   "t": 20.62,
+   "strength": 0.2682,
+   "band": "high"
+  },
+  {
+   "t": 20.75,
+   "strength": 0.2241,
+   "band": "mid"
+  },
+  {
+   "t": 22.48,
+   "strength": 0.1042,
+   "band": "high"
+  },
+  {
+   "t": 22.84,
+   "strength": 0.1063,
+   "band": "mid"
+  },
+  {
+   "t": 22.99,
+   "strength": 0.1407,
+   "band": "mid"
+  },
+  {
+   "t": 23.16,
+   "strength": 0.1167,
+   "band": "high"
+  },
+  {
+   "t": 23.27,
+   "strength": 0.1383,
+   "band": "mid"
+  },
+  {
+   "t": 23.45,
+   "strength": 0.1759,
+   "band": "mid"
+  },
+  {
+   "t": 23.73,
+   "strength": 0.1587,
+   "band": "high"
+  },
+  {
+   "t": 24.4,
+   "strength": 0.2029,
+   "band": "high"
+  },
+  {
+   "t": 24.6,
+   "strength": 0.2495,
+   "band": "high"
+  },
+  {
+   "t": 24.81,
+   "strength": 0.1865,
+   "band": "high"
+  },
+  {
+   "t": 24.93,
+   "strength": 0.1743,
+   "band": "high"
+  },
+  {
+   "t": 25.88,
+   "strength": 0.0558,
+   "band": "mid",
+   "event": "timp1_stroke2"
+  },
+  {
+   "t": 26.29,
+   "strength": 0.0577,
+   "band": "low",
+   "event": "timp1_stroke3"
+  },
+  {
+   "t": 26.6,
+   "strength": 0.0485,
+   "band": "mid",
+   "event": "timp1_stroke4"
+  },
+  {
+   "t": 26.77,
+   "strength": 0.0559,
+   "band": "low"
+  },
+  {
+   "t": 26.98,
+   "strength": 0.0537,
+   "band": "low",
+   "event": "timp1_stroke5"
+  },
+  {
+   "t": 27.34,
+   "strength": 0.1106,
+   "band": "mid",
+   "event": "timp1_stroke6"
+  },
+  {
+   "t": 27.44,
+   "strength": 0.0618,
+   "band": "mid"
+  },
+  {
+   "t": 27.57,
+   "strength": 0.0465,
+   "band": "mid"
+  },
+  {
+   "t": 27.74,
+   "strength": 0.1181,
+   "band": "low",
+   "event": "timp1_stroke7"
+  },
+  {
+   "t": 28.07,
+   "strength": 0.0878,
+   "band": "mid",
+   "event": "timp1_stroke8"
+  },
+  {
+   "t": 28.17,
+   "strength": 0.0625,
+   "band": "mid"
+  },
+  {
+   "t": 28.46,
+   "strength": 0.1767,
+   "band": "mid",
+   "event": "timp1_stroke9"
+  },
+  {
+   "t": 28.87,
+   "strength": 0.1851,
+   "band": "mid",
+   "event": "timp1_stroke10"
+  },
+  {
+   "t": 29.0,
+   "strength": 0.0835,
+   "band": "mid"
+  },
+  {
+   "t": 29.13,
+   "strength": 0.0647,
+   "band": "low"
+  },
+  {
+   "t": 29.26,
+   "strength": 0.0553,
+   "band": "low"
+  },
+  {
+   "t": 33.1,
+   "strength": 0.0466,
+   "band": "mid",
+   "event": "call2_C5"
+  },
+  {
+   "t": 37.46,
+   "strength": 0.1073,
+   "band": "mid",
+   "event": "chord2_hit"
+  },
+  {
+   "t": 37.56,
+   "strength": 0.1657,
+   "band": "mid"
+  },
+  {
+   "t": 37.65,
+   "strength": 0.1516,
+   "band": "high"
+  },
+  {
+   "t": 37.88,
+   "strength": 0.1328,
+   "band": "mid",
+   "event": "chord2_switch"
+  },
+  {
+   "t": 38.03,
+   "strength": 0.1251,
+   "band": "high"
+  },
+  {
+   "t": 38.23,
+   "strength": 0.1069,
+   "band": "high"
+  },
+  {
+   "t": 38.43,
+   "strength": 0.1008,
+   "band": "high"
+  },
+  {
+   "t": 38.64,
+   "strength": 0.0859,
+   "band": "high"
+  },
+  {
+   "t": 39.04,
+   "strength": 0.0713,
+   "band": "mid"
+  },
+  {
+   "t": 39.22,
+   "strength": 0.0618,
+   "band": "mid"
+  },
+  {
+   "t": 39.81,
+   "strength": 0.0828,
+   "band": "low"
+  },
+  {
+   "t": 39.92,
+   "strength": 0.0742,
+   "band": "low"
+  },
+  {
+   "t": 40.09,
+   "strength": 0.0734,
+   "band": "mid"
+  },
+  {
+   "t": 40.34,
+   "strength": 0.0929,
+   "band": "high"
+  },
+  {
+   "t": 40.58,
+   "strength": 0.0836,
+   "band": "low"
+  },
+  {
+   "t": 40.92,
+   "strength": 0.0815,
+   "band": "mid"
+  },
+  {
+   "t": 41.14,
+   "strength": 0.0944,
+   "band": "low"
+  },
+  {
+   "t": 41.24,
+   "strength": 0.0841,
+   "band": "low"
+  },
+  {
+   "t": 41.69,
+   "strength": 0.094,
+   "band": "high"
+  },
+  {
+   "t": 42.0,
+   "strength": 0.1047,
+   "band": "high"
+  },
+  {
+   "t": 42.09,
+   "strength": 0.0982,
+   "band": "high"
+  },
+  {
+   "t": 42.19,
+   "strength": 0.1046,
+   "band": "high"
+  },
+  {
+   "t": 42.72,
+   "strength": 0.072,
+   "band": "low"
+  },
+  {
+   "t": 43.18,
+   "strength": 0.0826,
+   "band": "low"
+  },
+  {
+   "t": 43.47,
+   "strength": 0.0764,
+   "band": "mid",
+   "event": "timp2_stroke2"
+  },
+  {
+   "t": 43.69,
+   "strength": 0.0491,
+   "band": "mid"
+  },
+  {
+   "t": 43.84,
+   "strength": 0.0827,
+   "band": "mid",
+   "event": "timp2_stroke3"
+  },
+  {
+   "t": 44.19,
+   "strength": 0.1032,
+   "band": "mid",
+   "event": "timp2_stroke4"
+  },
+  {
+   "t": 44.58,
+   "strength": 0.1571,
+   "band": "mid",
+   "event": "timp2_stroke5"
+  },
+  {
+   "t": 44.98,
+   "strength": 0.1443,
+   "band": "mid",
+   "event": "timp2_stroke6"
+  },
+  {
+   "t": 45.34,
+   "strength": 0.109,
+   "band": "mid",
+   "event": "timp2_stroke7"
+  },
+  {
+   "t": 45.71,
+   "strength": 0.1759,
+   "band": "mid",
+   "event": "timp2_stroke8"
+  },
+  {
+   "t": 45.8,
+   "strength": 0.0815,
+   "band": "mid"
+  },
+  {
+   "t": 46.08,
+   "strength": 0.1531,
+   "band": "mid",
+   "event": "timp2_stroke9"
+  },
+  {
+   "t": 46.48,
+   "strength": 0.7309,
+   "band": "high",
+   "event": "timp2_stroke10"
+  },
+  {
+   "t": 46.56,
+   "strength": 0.1644,
+   "band": "high"
+  },
+  {
+   "t": 47.61,
+   "strength": 0.0874,
+   "band": "low"
+  },
+  {
+   "t": 47.75,
+   "strength": 0.0965,
+   "band": "low"
+  },
+  {
+   "t": 48.15,
+   "strength": 0.0632,
+   "band": "high"
+  },
+  {
+   "t": 48.71,
+   "strength": 0.1329,
+   "band": "mid",
+   "event": "call3_G4"
+  },
+  {
+   "t": 48.91,
+   "strength": 0.0782,
+   "band": "mid"
+  },
+  {
+   "t": 49.06,
+   "strength": 0.0784,
+   "band": "mid"
+  },
+  {
+   "t": 49.23,
+   "strength": 0.0893,
+   "band": "mid"
+  },
+  {
+   "t": 49.53,
+   "strength": 0.0651,
+   "band": "mid"
+  },
+  {
+   "t": 49.61,
+   "strength": 0.0606,
+   "band": "mid"
+  },
+  {
+   "t": 49.85,
+   "strength": 0.0646,
+   "band": "low"
+  },
+  {
+   "t": 50.49,
+   "strength": 0.1027,
+   "band": "high",
+   "event": "call3_C5"
+  },
+  {
+   "t": 50.62,
+   "strength": 0.072,
+   "band": "mid"
+  },
+  {
+   "t": 50.77,
+   "strength": 0.0756,
+   "band": "high"
+  },
+  {
+   "t": 51.04,
+   "strength": 0.0623,
+   "band": "mid"
+  },
+  {
+   "t": 51.22,
+   "strength": 0.053,
+   "band": "low"
+  },
+  {
+   "t": 51.74,
+   "strength": 0.0565,
+   "band": "low"
+  },
+  {
+   "t": 52.72,
+   "strength": 0.0522,
+   "band": "low"
+  },
+  {
+   "t": 53.44,
+   "strength": 0.0532,
+   "band": "low"
+  },
+  {
+   "t": 53.67,
+   "strength": 0.0609,
+   "band": "low"
+  },
+  {
+   "t": 53.84,
+   "strength": 0.0486,
+   "band": "low"
+  },
+  {
+   "t": 53.99,
+   "strength": 0.0572,
+   "band": "mid"
+  },
+  {
+   "t": 54.7,
+   "strength": 0.1954,
+   "band": "high",
+   "event": "call3_E"
+  },
+  {
+   "t": 55.15,
+   "strength": 0.8833,
+   "band": "high",
+   "event": "chord3_hit"
+  },
+  {
+   "t": 55.33,
+   "strength": 0.3086,
+   "band": "high"
+  },
+  {
+   "t": 55.88,
+   "strength": 0.2445,
+   "band": "high"
+  },
+  {
+   "t": 56.05,
+   "strength": 0.2322,
+   "band": "high"
+  },
+  {
+   "t": 56.2,
+   "strength": 0.2187,
+   "band": "high"
+  },
+  {
+   "t": 56.88,
+   "strength": 0.1752,
+   "band": "high"
+  },
+  {
+   "t": 57.78,
+   "strength": 0.1623,
+   "band": "mid"
+  },
+  {
+   "t": 57.96,
+   "strength": 0.1578,
+   "band": "high"
+  },
+  {
+   "t": 58.1,
+   "strength": 0.1562,
+   "band": "mid"
+  },
+  {
+   "t": 59.0,
+   "strength": 0.3755,
+   "band": "high"
+  },
+  {
+   "t": 59.25,
+   "strength": 0.1817,
+   "band": "mid"
+  },
+  {
+   "t": 60.15,
+   "strength": 0.2036,
+   "band": "high"
+  },
+  {
+   "t": 60.47,
+   "strength": 0.215,
+   "band": "high"
+  },
+  {
+   "t": 61.09,
+   "strength": 0.1707,
+   "band": "high"
+  },
+  {
+   "t": 63.25,
+   "strength": 0.9922,
+   "band": "high",
+   "event": "build_start"
+  },
+  {
+   "t": 63.91,
+   "strength": 0.2906,
+   "band": "mid"
+  },
+  {
+   "t": 64.62,
+   "strength": 0.2721,
+   "band": "high"
+  },
+  {
+   "t": 64.95,
+   "strength": 0.2653,
+   "band": "high"
+  },
+  {
+   "t": 65.08,
+   "strength": 0.2321,
+   "band": "high"
+  },
+  {
+   "t": 65.41,
+   "strength": 0.2234,
+   "band": "mid"
+  },
+  {
+   "t": 65.69,
+   "strength": 0.2067,
+   "band": "high"
+  },
+  {
+   "t": 65.98,
+   "strength": 0.1896,
+   "band": "mid"
+  },
+  {
+   "t": 66.08,
+   "strength": 0.1914,
+   "band": "high"
+  },
+  {
+   "t": 66.62,
+   "strength": 0.1752,
+   "band": "mid"
+  },
+  {
+   "t": 66.87,
+   "strength": 0.2066,
+   "band": "mid"
+  },
+  {
+   "t": 67.19,
+   "strength": 0.3443,
+   "band": "mid"
+  },
+  {
+   "t": 67.48,
+   "strength": 0.2614,
+   "band": "high"
+  },
+  {
+   "t": 67.79,
+   "strength": 0.2816,
+   "band": "mid"
+  },
+  {
+   "t": 68.4,
+   "strength": 0.1773,
+   "band": "high"
+  },
+  {
+   "t": 68.78,
+   "strength": 0.1688,
+   "band": "mid"
+  },
+  {
+   "t": 69.25,
+   "strength": 0.1671,
+   "band": "high"
+  },
+  {
+   "t": 70.14,
+   "strength": 0.2598,
+   "band": "high"
+  },
+  {
+   "t": 71.46,
+   "strength": 0.2882,
+   "band": "high"
+  },
+  {
+   "t": 71.6,
+   "strength": 0.2823,
+   "band": "high"
+  },
+  {
+   "t": 72.41,
+   "strength": 1.0,
+   "band": "high",
+   "event": "climax"
+  },
+  {
+   "t": 72.51,
+   "strength": 0.376,
+   "band": "high"
+  },
+  {
+   "t": 73.53,
+   "strength": 0.2998,
+   "band": "high"
+  },
+  {
+   "t": 73.91,
+   "strength": 0.3,
+   "band": "high"
+  },
+  {
+   "t": 73.99,
+   "strength": 0.2591,
+   "band": "high"
+  },
+  {
+   "t": 74.32,
+   "strength": 0.2346,
+   "band": "high"
+  },
+  {
+   "t": 74.43,
+   "strength": 0.2688,
+   "band": "high"
+  },
+  {
+   "t": 74.81,
+   "strength": 0.217,
+   "band": "high"
+  },
+  {
+   "t": 75.32,
+   "strength": 0.2294,
+   "band": "high"
+  },
+  {
+   "t": 75.88,
+   "strength": 0.2312,
+   "band": "high"
+  },
+  {
+   "t": 76.34,
+   "strength": 0.3193,
+   "band": "high"
+  },
+  {
+   "t": 77.15,
+   "strength": 0.2709,
+   "band": "high"
+  },
+  {
+   "t": 77.23,
+   "strength": 0.2678,
+   "band": "high"
+  },
+  {
+   "t": 77.38,
+   "strength": 0.2837,
+   "band": "high"
+  },
+  {
+   "t": 77.89,
+   "strength": 0.2813,
+   "band": "high"
+  },
+  {
+   "t": 78.02,
+   "strength": 0.2871,
+   "band": "high"
+  },
+  {
+   "t": 78.14,
+   "strength": 0.2915,
+   "band": "high"
+  },
+  {
+   "t": 78.25,
+   "strength": 0.2986,
+   "band": "high"
+  },
+  {
+   "t": 78.55,
+   "strength": 0.3126,
+   "band": "high"
+  },
+  {
+   "t": 78.69,
+   "strength": 0.288,
+   "band": "high"
+  },
+  {
+   "t": 78.84,
+   "strength": 0.3043,
+   "band": "high"
+  },
+  {
+   "t": 79.21,
+   "strength": 0.2071,
+   "band": "high"
+  },
+  {
+   "t": 79.69,
+   "strength": 0.0565,
+   "band": "mid"
+  }
+ ],
+ "sections": [
+  {
+   "id": "pedal",
+   "t_start": 0.628,
+   "t_end": 12.022,
+   "label": "Low C pedal (darkness)",
+   "confidence": 0.95,
+   "evidence": "events pedal_start, call1_C4"
+  },
+  {
+   "id": "call1",
+   "t_start": 12.022,
+   "t_end": 20.03,
+   "label": "Trumpet call 1: C-G-C",
+   "confidence": 0.9,
+   "evidence": "pitch track C4, G4, C5"
+  },
+  {
+   "id": "chord1",
+   "t_start": 20.03,
+   "t_end": 25.212,
+   "label": "Chord 1: C major -> C minor",
+   "confidence": 0.9,
+   "evidence": "hit, third switch and release as the events of the same name",
+   "quality": "major->minor"
+  },
+  {
+   "id": "timpani1",
+   "t_start": 25.58,
+   "t_end": 29.044,
+   "label": "Timpani 1: 10 strokes alternating G2 / C3, ending on C3",
+   "confidence": 0.85,
+   "evidence": "mean spacing 0.366 s"
+  },
+  {
+   "id": "call2",
+   "t_start": 29.044,
+   "t_end": 37.46,
+   "label": "Trumpet call 2: C-G-C",
+   "confidence": 0.9,
+   "evidence": "pitch track C4, G4, C5"
+  },
+  {
+   "id": "chord2",
+   "t_start": 37.46,
+   "t_end": 42.648,
+   "label": "Chord 2: C minor -> C major",
+   "confidence": 0.9,
+   "evidence": "hit, third switch and release as the events of the same name",
+   "quality": "minor->major"
+  },
+  {
+   "id": "timpani2",
+   "t_start": 43.132,
+   "t_end": 46.676,
+   "label": "Timpani 2: 10 strokes alternating G2 / C3, ending on C3",
+   "confidence": 0.85,
+   "evidence": "mean spacing 0.372 s"
+  },
+  {
+   "id": "call3",
+   "t_start": 46.78,
+   "t_end": 55.15,
+   "label": "Trumpet call 3: C-G-C (then E-F)",
+   "confidence": 0.9,
+   "evidence": "pitch track C4, G4, C5"
+  },
+  {
+   "id": "answer",
+   "t_start": 55.15,
+   "t_end": 63.25,
+   "label": "Answer phrase after call 3: F major and its continuation (F - F/C - Am - Dm/G7 colours)",
+   "confidence": 0.65,
+   "evidence": "chroma per segment; chord names are approximate (dense synthesized orchestra)",
+   "changes": [
+    56.95,
+    57.86,
+    59.76,
+    61.795,
+    62.84
+   ]
+  },
+  {
+   "id": "build",
+   "t_start": 63.25,
+   "t_end": 72.41,
+   "label": "Build: dominant held, top line G -> A -> B",
+   "confidence": 0.8,
+   "evidence": "events build_*"
+  },
+  {
+   "id": "climax_hold",
+   "t_start": 72.41,
+   "t_end": 79.444,
+   "label": "Climax chord held (C major)",
+   "confidence": 0.9,
+   "evidence": "C/E/G chroma throughout"
+  },
+  {
+   "id": "organ_tail",
+   "t_start": 79.444,
+   "t_end": 86.061,
+   "label": "Organ tail (organ alone, decaying to silence)",
+   "confidence": 0.75,
+   "evidence": "instrument identity (organ) is from the score; the audio shows a sustained low C + G3 decaying ~8.5 dB/s"
+  }
+ ],
+ "events": [
+  {
+   "id": "pedal_start",
+   "t": 0.628,
+   "frame_50fps": 31,
+   "label": "Low C pedal enters (C1 ~32.7 Hz with its harmonics; organ / contrabass register)",
+   "confidence": 0.95,
+   "evidence": "25-120 Hz energy rises ~35 dB from the -62 dBFS floor; steepest at 0.63 s; C1 fundamental dominates the spectrum through 12 s with no trumpet partials"
+  },
+  {
+   "id": "call1_C4",
+   "t": 12.022,
+   "frame_50fps": 601,
+   "label": "Trumpet call 1: C (C4, 262 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the C4 partials; pitch track over the held note = C4 (98% of frames)",
+   "call": 1,
+   "note": "C4"
+  },
+  {
+   "id": "call1_G4",
+   "t": 14.014,
+   "frame_50fps": 701,
+   "label": "Trumpet call 1: G (G4, 392 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the G4 partials; pitch track over the held note = G4 (100% of frames)",
+   "call": 1,
+   "note": "G4"
+  },
+  {
+   "id": "call1_C5",
+   "t": 15.99,
+   "frame_50fps": 800,
+   "label": "Trumpet call 1: C (C5, 523 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the C5 partials; pitch track over the held note = C5 (100% of frames)",
+   "call": 1,
+   "note": "C5"
+  },
+  {
+   "id": "chord1_hit",
+   "t": 20.03,
+   "frame_50fps": 1002,
+   "label": "Chord 1: tutti C major (third E)",
+   "confidence": 0.95,
+   "evidence": "attack onset 0.21, flux peak 0.21 at 20.03 s, steepest 200-4000 Hz rise 20.01 s; thirds just after the hit: E -28 dB vs Eb -39 dB",
+   "quality": "major",
+   "t_peak": 20.03
+  },
+  {
+   "id": "chord1_switch",
+   "t": 20.46,
+   "frame_50fps": 1023,
+   "label": "Chord 1: third moves -> C minor",
+   "confidence": 0.85,
+   "evidence": "major-minus-minor third energy changes sign at 20.46 s; held part: E -37 dB vs Eb -25 dB",
+   "quality": "minor"
+  },
+  {
+   "id": "timp1_pickup_25.05",
+   "t": 25.046,
+   "frame_50fps": 1252,
+   "label": "Timpani 1: possible stroke (G2) under the chord release",
+   "confidence": 0.4,
+   "evidence": "40-400 Hz flux peak before the regular figure, overlapping the chord's decay; the same two-stroke lead-in appears ~0.5 s before stroke 1 in both passages",
+   "pitch": "G2",
+   "group": 1
+  },
+  {
+   "id": "chord1_release",
+   "t": 25.212,
+   "frame_50fps": 1261,
+   "label": "Chord 1 released (upper partials decay)",
+   "confidence": 0.7,
+   "evidence": "steepest fall of 1.5-6 kHz energy; the release is a decay, so +-0.2 s",
+   "quality": null
+  },
+  {
+   "id": "timp1_pickup_25.34",
+   "t": 25.344,
+   "frame_50fps": 1267,
+   "label": "Timpani 1: possible stroke (pitch unclear) under the chord release",
+   "confidence": 0.3,
+   "evidence": "40-400 Hz flux peak before the regular figure, overlapping the chord's decay; the same two-stroke lead-in appears ~0.5 s before stroke 1 in both passages",
+   "pitch": null,
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke1",
+   "t": 25.58,
+   "frame_50fps": 1279,
+   "label": "Timpani 1, stroke 1 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +9.7 dB, C3 +4.3 dB)",
+   "pitch": "G2",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke2",
+   "t": 25.91,
+   "frame_50fps": 1296,
+   "label": "Timpani 1, stroke 2 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -3.0 dB, C3 +7.5 dB)",
+   "pitch": "C3",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke3",
+   "t": 26.3,
+   "frame_50fps": 1315,
+   "label": "Timpani 1, stroke 3 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +15.3 dB, C3 +2.6 dB)",
+   "pitch": "G2",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke4",
+   "t": 26.602,
+   "frame_50fps": 1330,
+   "label": "Timpani 1, stroke 4 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -1.8 dB, C3 +3.9 dB)",
+   "pitch": "C3",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke5",
+   "t": 26.984,
+   "frame_50fps": 1349,
+   "label": "Timpani 1, stroke 5 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +9.1 dB, C3 -1.1 dB)",
+   "pitch": "G2",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke6",
+   "t": 27.35,
+   "frame_50fps": 1368,
+   "label": "Timpani 1, stroke 6 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -2.5 dB, C3 +11.7 dB)",
+   "pitch": "C3",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke7",
+   "t": 27.736,
+   "frame_50fps": 1387,
+   "label": "Timpani 1, stroke 7 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +12.6 dB, C3 -0.7 dB)",
+   "pitch": "G2",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke8",
+   "t": 28.078,
+   "frame_50fps": 1404,
+   "label": "Timpani 1, stroke 8 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +0.2 dB, C3 +14.4 dB)",
+   "pitch": "C3",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke9",
+   "t": 28.464,
+   "frame_50fps": 1423,
+   "label": "Timpani 1, stroke 9 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +12.8 dB, C3 +2.9 dB)",
+   "pitch": "G2",
+   "group": 1
+  },
+  {
+   "id": "timp1_stroke10",
+   "t": 28.874,
+   "frame_50fps": 1444,
+   "label": "Timpani 1, stroke 10 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -2.5 dB, C3 +21.5 dB)",
+   "pitch": "C3",
+   "group": 1
+  },
+  {
+   "id": "call2_C4",
+   "t": 29.044,
+   "frame_50fps": 1452,
+   "label": "Trumpet call 2: C (C4, 262 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the C4 partials; pitch track over the held note = C4 (97% of frames)",
+   "call": 2,
+   "note": "C4"
+  },
+  {
+   "id": "call2_G4",
+   "t": 30.978,
+   "frame_50fps": 1549,
+   "label": "Trumpet call 2: G (G4, 392 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the G4 partials; pitch track over the held note = G4 (100% of frames)",
+   "call": 2,
+   "note": "G4"
+  },
+  {
+   "id": "call2_C5",
+   "t": 33.086,
+   "frame_50fps": 1654,
+   "label": "Trumpet call 2: C (C5, 523 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the C5 partials; pitch track over the held note = C5 (76% of frames)",
+   "call": 2,
+   "note": "C5"
+  },
+  {
+   "id": "chord2_hit",
+   "t": 37.46,
+   "frame_50fps": 1873,
+   "label": "Chord 2: tutti C minor (third Eb)",
+   "confidence": 0.95,
+   "evidence": "attack onset 0.11, flux peak 0.17 at 37.56 s, steepest 200-4000 Hz rise 37.45 s; thirds just after the hit: E -39 dB vs Eb -30 dB",
+   "quality": "minor",
+   "t_peak": 37.56
+  },
+  {
+   "id": "chord2_switch",
+   "t": 37.85,
+   "frame_50fps": 1892,
+   "label": "Chord 2: third moves -> C major",
+   "confidence": 0.85,
+   "evidence": "major-minus-minor third energy changes sign at 37.85 s; held part: E -25 dB vs Eb -38 dB",
+   "quality": "major"
+  },
+  {
+   "id": "timp2_pickup_42.61",
+   "t": 42.606,
+   "frame_50fps": 2130,
+   "label": "Timpani 2: possible stroke (G2) under the chord release",
+   "confidence": 0.4,
+   "evidence": "40-400 Hz flux peak before the regular figure, overlapping the chord's decay; the same two-stroke lead-in appears ~0.5 s before stroke 1 in both passages",
+   "pitch": "G2",
+   "group": 2
+  },
+  {
+   "id": "chord2_release",
+   "t": 42.648,
+   "frame_50fps": 2132,
+   "label": "Chord 2 released (upper partials decay)",
+   "confidence": 0.7,
+   "evidence": "steepest fall of 1.5-6 kHz energy; the release is a decay, so +-0.2 s",
+   "quality": null
+  },
+  {
+   "id": "timp2_pickup_42.84",
+   "t": 42.84,
+   "frame_50fps": 2142,
+   "label": "Timpani 2: possible stroke (pitch unclear) under the chord release",
+   "confidence": 0.3,
+   "evidence": "40-400 Hz flux peak before the regular figure, overlapping the chord's decay; the same two-stroke lead-in appears ~0.5 s before stroke 1 in both passages",
+   "pitch": null,
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke1",
+   "t": 43.132,
+   "frame_50fps": 2157,
+   "label": "Timpani 2, stroke 1 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +6.6 dB, C3 +2.9 dB)",
+   "pitch": "G2",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke2",
+   "t": 43.464,
+   "frame_50fps": 2173,
+   "label": "Timpani 2, stroke 2 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -1.3 dB, C3 +20.5 dB)",
+   "pitch": "C3",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke3",
+   "t": 43.844,
+   "frame_50fps": 2192,
+   "label": "Timpani 2, stroke 3 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +15.5 dB, C3 +0.9 dB)",
+   "pitch": "G2",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke4",
+   "t": 44.192,
+   "frame_50fps": 2210,
+   "label": "Timpani 2, stroke 4 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -3.7 dB, C3 +13.5 dB)",
+   "pitch": "C3",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke5",
+   "t": 44.586,
+   "frame_50fps": 2229,
+   "label": "Timpani 2, stroke 5 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +16.1 dB, C3 +2.9 dB)",
+   "pitch": "G2",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke6",
+   "t": 44.946,
+   "frame_50fps": 2247,
+   "label": "Timpani 2, stroke 6 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +0.1 dB, C3 +20.4 dB)",
+   "pitch": "C3",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke7",
+   "t": 45.348,
+   "frame_50fps": 2267,
+   "label": "Timpani 2, stroke 7 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +11.6 dB, C3 -5.1 dB)",
+   "pitch": "G2",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke8",
+   "t": 45.71,
+   "frame_50fps": 2286,
+   "label": "Timpani 2, stroke 8 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -0.3 dB, C3 +11.4 dB)",
+   "pitch": "C3",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke9",
+   "t": 46.078,
+   "frame_50fps": 2304,
+   "label": "Timpani 2, stroke 9 (G2)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 +9.2 dB, C3 -5.2 dB)",
+   "pitch": "G2",
+   "group": 2
+  },
+  {
+   "id": "timp2_stroke10",
+   "t": 46.476,
+   "frame_50fps": 2324,
+   "label": "Timpani 2, stroke 10 (C3)",
+   "confidence": 0.85,
+   "evidence": "40-400 Hz flux peak; pitch from the post-stroke spectral gain (G2 -2.3 dB, C3 +8.6 dB)",
+   "pitch": "C3",
+   "group": 2
+  },
+  {
+   "id": "call3_C4",
+   "t": 46.78,
+   "frame_50fps": 2339,
+   "label": "Trumpet call 3: C (C4, 262 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the C4 partials; pitch track over the held note = C4 (82% of frames)",
+   "call": 3,
+   "note": "C4"
+  },
+  {
+   "id": "call3_G4",
+   "t": 48.694,
+   "frame_50fps": 2435,
+   "label": "Trumpet call 3: G (G4, 392 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the G4 partials; pitch track over the held note = G4 (94% of frames)",
+   "call": 3,
+   "note": "G4"
+  },
+  {
+   "id": "call3_C5",
+   "t": 50.526,
+   "frame_50fps": 2526,
+   "label": "Trumpet call 3: C (C5, 523 Hz)",
+   "confidence": 0.9,
+   "evidence": "steepest rise of the C5 partials; pitch track over the held note = C5 (95% of frames)",
+   "call": 3,
+   "note": "C5"
+  },
+  {
+   "id": "call3_E",
+   "t": 54.718,
+   "frame_50fps": 2736,
+   "label": "Trumpet call 3 continues: E over a C-major swell (the tutti starts to enter)",
+   "confidence": 0.75,
+   "evidence": "rise of the E3/E4/E5 partials after the third C5; 200-4000 Hz energy starts rising 54.6 s",
+   "call": 3,
+   "note": "E"
+  },
+  {
+   "id": "chord3_hit",
+   "t": 55.15,
+   "frame_50fps": 2758,
+   "label": "Chord 3: tutti F major (trumpet E -> F; IV of C)",
+   "confidence": 0.85,
+   "evidence": "flux 0.88, one of the three strongest attacks in the track; F/A/C chroma, F2-F3 bass from 55.0 s; F partial rise 54.96 s",
+   "quality": "major (F, IV)",
+   "t_peak": 55.15
+  },
+  {
+   "id": "answer_change1",
+   "t": 56.95,
+   "frame_50fps": 2848,
+   "label": "Answer phrase: harmony changes (top pitch classes after: F C A C#)",
+   "confidence": 0.6,
+   "evidence": "chroma novelty peak (0.4 s windows); harmonic change under sustained texture, no sharp attack"
+  },
+  {
+   "id": "answer_change2",
+   "t": 57.86,
+   "frame_50fps": 2893,
+   "label": "Answer phrase: harmony changes (top pitch classes after: C G A C#)",
+   "confidence": 0.6,
+   "evidence": "chroma novelty peak (0.4 s windows); harmonic change under sustained texture, no sharp attack"
+  },
+  {
+   "id": "answer_change3",
+   "t": 59.76,
+   "frame_50fps": 2988,
+   "label": "Answer phrase: harmony changes (top pitch classes after: C A E G)",
+   "confidence": 0.6,
+   "evidence": "chroma novelty peak (0.4 s windows); harmonic change under sustained texture, no sharp attack"
+  },
+  {
+   "id": "answer_change4",
+   "t": 61.795,
+   "frame_50fps": 3090,
+   "label": "Answer phrase: harmony changes (top pitch classes after: D B C A)",
+   "confidence": 0.6,
+   "evidence": "chroma novelty peak (0.4 s windows); harmonic change under sustained texture, no sharp attack"
+  },
+  {
+   "id": "answer_change5",
+   "t": 62.84,
+   "frame_50fps": 3142,
+   "label": "Answer phrase: harmony changes (top pitch classes after: C E B G)",
+   "confidence": 0.6,
+   "evidence": "chroma novelty peak (0.4 s windows); harmonic change under sustained texture, no sharp attack"
+  },
+  {
+   "id": "build_start",
+   "t": 63.25,
+   "frame_50fps": 3162,
+   "label": "Build begins: tutti hit, C/G (cadential 6-4) then a held dominant G with crescendo",
+   "confidence": 0.8,
+   "evidence": "onset-strength peak 0.99 (one of the three strongest); G4/G5/G6 dominate 64-69.8 s over a G bass"
+  },
+  {
+   "id": "build_A",
+   "t": 70.06,
+   "frame_50fps": 3503,
+   "label": "Build: top line rises G -> A",
+   "confidence": 0.7,
+   "evidence": "A4/A5 partials rise; A strongest pitch class 70.0-71.0 s"
+  },
+  {
+   "id": "build_B",
+   "t": 71.346,
+   "frame_50fps": 3567,
+   "label": "Build: top line rises A -> B over G major (V)",
+   "confidence": 0.7,
+   "evidence": "B4/B5 partials rise in two steps (a soft one ~71.1 s, the main one ~71.35-71.6 s); B/D/G strongest 71.5-72.2 s"
+  },
+  {
+   "id": "climax",
+   "t": 72.41,
+   "frame_50fps": 3620,
+   "label": "CLIMAX: C major, full orchestra + organ (top line B -> C)",
+   "confidence": 0.95,
+   "evidence": "the strongest attack in the track (flux 1.00 at 72.41 s); C5 partial rise 72.41 s; C/E/G chroma from 72.4 s; C2 enters in the bass",
+   "t_peak": 72.41
+  },
+  {
+   "id": "orchestra_release",
+   "t": 79.444,
+   "frame_50fps": 3972,
+   "label": "Orchestra releases; the organ holds on alone",
+   "confidence": 0.8,
+   "evidence": "steepest fall of 1.5-6 kHz energy; afterwards only the low C and G3 register sustain and decay smoothly"
+  },
+  {
+   "id": "tail_below_-40dBFS",
+   "t": 83.765,
+   "frame_50fps": 4188,
+   "label": "Organ tail falls below -40 dBFS",
+   "confidence": 0.9,
+   "evidence": "50 ms RMS"
+  },
+  {
+   "id": "audible_end",
+   "t": 85.347,
+   "frame_50fps": 4267,
+   "label": "Organ tail falls below -60 dBFS (effective end)",
+   "confidence": 0.9,
+   "evidence": "50 ms RMS"
+  }
+ ],
+ "timpani_detail": {
+  "after_call1": {
+   "strokes": [
+    {
+     "t": 25.58,
+     "pitch": "G2",
+     "gain_G2_db": 9.7,
+     "gain_C3_db": 4.3,
+     "flux": 0.53
+    },
+    {
+     "t": 25.91,
+     "pitch": "C3",
+     "gain_G2_db": -3.0,
+     "gain_C3_db": 7.5,
+     "flux": 0.41
+    },
+    {
+     "t": 26.3,
+     "pitch": "G2",
+     "gain_G2_db": 15.3,
+     "gain_C3_db": 2.6,
+     "flux": 0.65
+    },
+    {
+     "t": 26.602,
+     "pitch": "C3",
+     "gain_G2_db": -1.8,
+     "gain_C3_db": 3.9,
+     "flux": 0.36
+    },
+    {
+     "t": 26.984,
+     "pitch": "G2",
+     "gain_G2_db": 9.1,
+     "gain_C3_db": -1.1,
+     "flux": 0.46
+    },
+    {
+     "t": 27.35,
+     "pitch": "C3",
+     "gain_G2_db": -2.5,
+     "gain_C3_db": 11.7,
+     "flux": 0.76
+    },
+    {
+     "t": 27.736,
+     "pitch": "G2",
+     "gain_G2_db": 12.6,
+     "gain_C3_db": -0.7,
+     "flux": 0.78
+    },
+    {
+     "t": 28.078,
+     "pitch": "C3",
+     "gain_G2_db": 0.2,
+     "gain_C3_db": 14.4,
+     "flux": 0.55
+    },
+    {
+     "t": 28.464,
+     "pitch": "G2",
+     "gain_G2_db": 12.8,
+     "gain_C3_db": 2.9,
+     "flux": 1.0
+    },
+    {
+     "t": 28.874,
+     "pitch": "C3",
+     "gain_G2_db": -2.5,
+     "gain_C3_db": 21.5,
+     "flux": 0.77
+    }
+   ],
+   "possible_pickups": [
+    {
+     "t": 25.046,
+     "pitch": "G2",
+     "gain_G2_db": 10.2,
+     "gain_C3_db": -1.8,
+     "flux": 0.36
+    },
+    {
+     "t": 25.344,
+     "pitch": null,
+     "gain_G2_db": -2.3,
+     "gain_C3_db": -0.5,
+     "flux": 0.46
+    }
+   ]
+  },
+  "after_call2": {
+   "strokes": [
+    {
+     "t": 43.132,
+     "pitch": "G2",
+     "gain_G2_db": 6.6,
+     "gain_C3_db": 2.9,
+     "flux": 0.74
+    },
+    {
+     "t": 43.464,
+     "pitch": "C3",
+     "gain_G2_db": -1.3,
+     "gain_C3_db": 20.5,
+     "flux": 0.5
+    },
+    {
+     "t": 43.844,
+     "pitch": "G2",
+     "gain_G2_db": 15.5,
+     "gain_C3_db": 0.9,
+     "flux": 0.52
+    },
+    {
+     "t": 44.192,
+     "pitch": "C3",
+     "gain_G2_db": -3.7,
+     "gain_C3_db": 13.5,
+     "flux": 0.64
+    },
+    {
+     "t": 44.586,
+     "pitch": "G2",
+     "gain_G2_db": 16.1,
+     "gain_C3_db": 2.9,
+     "flux": 1.0
+    },
+    {
+     "t": 44.946,
+     "pitch": "C3",
+     "gain_G2_db": 0.1,
+     "gain_C3_db": 20.4,
+     "flux": 0.51
+    },
+    {
+     "t": 45.348,
+     "pitch": "G2",
+     "gain_G2_db": 11.6,
+     "gain_C3_db": -5.1,
+     "flux": 0.9
+    },
+    {
+     "t": 45.71,
+     "pitch": "C3",
+     "gain_G2_db": -0.3,
+     "gain_C3_db": 11.4,
+     "flux": 0.79
+    },
+    {
+     "t": 46.078,
+     "pitch": "G2",
+     "gain_G2_db": 9.2,
+     "gain_C3_db": -5.2,
+     "flux": 1.0
+    },
+    {
+     "t": 46.476,
+     "pitch": "C3",
+     "gain_G2_db": -2.3,
+     "gain_C3_db": 8.6,
+     "flux": 0.92
+    }
+   ],
+   "possible_pickups": [
+    {
+     "t": 42.606,
+     "pitch": "G2",
+     "gain_G2_db": 27.9,
+     "gain_C3_db": -5.2,
+     "flux": 0.5
+    },
+    {
+     "t": 42.84,
+     "pitch": null,
+     "gain_G2_db": -6.1,
+     "gain_C3_db": -0.5,
+     "flux": 0.26
+    }
+   ]
+  }
+ }
+}
