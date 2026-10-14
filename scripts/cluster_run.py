@@ -42,7 +42,9 @@ through an ssh local port-forward this script opens and closes itself; "api" is 
 
 A job line that ends with `; tail ...` or `; cat ...` after a redirect is WARNED about (stderr and the console log,
 never rewritten): `;` makes the job's exit status tail's, not python's, so a run that died mid-write still exits 0 and
-`'<n> job(s), 0 failed'` proves nothing. Write `&& tail -4 <file>` or `st=$?; tail -4 <file>; exit $st`.
+`'<n> job(s), 0 failed'` proves nothing. Write `&& tail -4 <file>` or `st=$?; tail -4 <file>; exit $st`. Every job line is
+submitted inside a `( ... )` subshell, so that `exit` sets the job's status without ending the scheduler's own wrapper
+before it records the exit code (build_spec, JOB_SUBSHELL).
 
 AN EXPERIMENTAL FACTOR IS NEVER THE UNIT OF SCHEDULING (docs/INTERP.md 10.4 item 9): least-loaded-first places one job
 per command, so "one job per arm" makes ARM collinear with BOX -- and the fleet mixes GPU models. `--arm-block
@@ -554,6 +556,12 @@ def parse_gpu_ids(s: str | None) -> list[int] | None:
     return ids
 
 
+# JOB_SUBSHELL. The scheduler inlines the command into a bash wrapper and records `$?` to `<log>.exitcode` on the line
+# AFTER it. A job line that ends `st=$?; tail ...; exit $st` (the rule above, INTERP 10.4 item 4) therefore exited the
+# WRAPPER: no exit-code file, no end stamp, and the job read `completed`, `exit None` whatever python returned -- every
+# job of round 8 (0 exit-code files over 42 job logs in cx9 / suite-inst / plume-go), which is why "the scheduler reports
+# exit_code None for every job" (NOTES session 14). Run in `( ... )`, the line's `exit` ends the subshell and the wrapper
+# records its status. The newline before `)` keeps a trailing `# comment` in a job line from swallowing the parenthesis.
 def build_spec(t: Target, jname: str, command: str, args, gpu_id: int | None = None) -> dict:
     """The scheduler JobSpec of one job. With a --gpu-ids pool the job is a strict pin: `gpus: 1`, `gpu_ids: [gpu_id]`
     (the id submit_all dealt it from the pool); `vram_gb` is the configured per-GPU budget either way."""
@@ -562,7 +570,7 @@ def build_spec(t: Target, jname: str, command: str, args, gpu_id: int | None = N
     spec = {"job_type": "benchmark", "name": jname, "gpus": t.gpus, "vram_gb": t.vram_gb,
             "estimated_minutes": args.minutes, "priority": args.priority, "tags": args.tags.split(","),
             "working_dir": t.rdir, "log_path": f"{t.rdir}/logs/{jname}.log", "env": env,
-            "command": f"source .venv/bin/activate && {command}"}
+            "command": f"source .venv/bin/activate && ( {command}\n)"}      # a subshell: see JOB_SUBSHELL
     if args.node:
         spec["node"] = args.node
     if gpu_id is not None:

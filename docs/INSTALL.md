@@ -43,7 +43,7 @@ what the benchmark numbers in `docs/PERFORMANCE.md` and the cluster runs were pr
 ### Extras
 
 ```
-pip install -e ".[dev]"     # pytest, ruff, pyyaml -- what CI installs
+pip install -e ".[dev]"     # pytest, ruff, pyyaml, tabulate -- what CI installs
 pip install -e ".[ui]"      # pygame; ALREADY a hard dependency, the extra just names it
 pip install -e ".[cuda]"    # empty on purpose: the CUDA wheel comes from the index above, not from PyPI
 pip install -e ".[interp]"  # empty on purpose: the toolkit needs pandas/pyarrow/scipy, already required
@@ -113,7 +113,7 @@ weights table alone is a ~1 GB feather that is read into memory):
 
 ```
 python -c "from flyverse import connectome; connectome.load(rebuild=True)"
-python -m flyverse.connectome            # the same thing, then prints N and nnz
+python -m flyverse.connectome            # the same thing plus cache/sign0_counts.npz, then prints N and nnz
 ```
 
 Afterwards `connectome.load()` reads `cache/W_post_pre.npz`, `cache/neurons.parquet` and

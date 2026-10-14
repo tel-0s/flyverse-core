@@ -386,6 +386,18 @@ def load_runs(runs_dir: Path, alias: dict) -> tuple[list, list]:
     return rows, problems
 
 
+def _markdown(df: pd.DataFrame) -> str:
+    """`df.to_markdown()` when tabulate is installed (the `dev` extra), else `df.to_string()`.
+
+    The guard has to be a try: `hasattr(df, "to_markdown")` is always true -- pandas defines the method and raises
+    ImportError from the call when tabulate is missing -- so the old `... if hasattr(...) else ...` never fell back
+    and three tests in tests/test_cx_velocity_route.py failed on every CI run from 2026-09-17."""
+    try:
+        return df.to_markdown()
+    except ImportError:
+        return df.to_string()
+
+
 def analyse(runs_dir: Path, out_dir: Path, label: str | None, alias: dict):
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     rows, problems = load_runs(Path(runs_dir), alias)
@@ -456,7 +468,7 @@ def analyse(runs_dir: Path, out_dir: Path, label: str | None, alias: dict):
                   f"{r['diff']:+.4f} | {r['z']:+.2f} | {r['p']:.4f} | {r['p_holm']:.4f} | {r['p_floor']:.4f} |")
     md += ["", f"`bump_follow_wedges_per_s` rows use only runs whose bump was confined in >= {FOLLOW_GATE:.0%} of the turn-window frames "
                "(`follow_gated` in runs.csv); the ungated values are in per_seed.csv.", "",
-           "## Per arm (`descriptive.csv`: mean over seeds)", "", desc.round(4).to_markdown() if hasattr(desc, "to_markdown") else desc.round(4).to_string(), "",
+           "## Per arm (`descriptive.csv`: mean over seeds)", "", _markdown(desc.round(4)), "",
            "## Per-seed lists (`per_seed.csv`, columns arm,key,seeds,values -- pasted, never retyped: INTERP 10.4 rule 28)", "",
            "| arm | key | seeds | values |", "|---|---|---|---|"]
     for r in per:

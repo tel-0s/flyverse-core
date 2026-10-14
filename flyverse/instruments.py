@@ -272,12 +272,20 @@ class SidedTurnAfferent:
         return out
 
     def _chain(self):
-        """Follow the majority side of each hop from a LEFT afferent (what sign +1 drives on a left turn)."""
+        """Follow the majority side of each hop from a LEFT afferent (what sign +1 drives on a left turn).
+
+        A hop with no majority is '?', like an absent type: an exact tie, and in particular 0 vs 0 synapses. The
+        second is what GLNO -> PEN reads when cache/sign0_counts.npz is missing (GLNO is sign 0, so its entries in
+        W are explicit zeros and only that file carries their counts); the chain used to call such a hop
+        ipsilateral and record 'GLNO_L -> PEN_L' where the shipped cache says PEN_R."""
         def step(block, side):
             if block is None:
                 return None
-            same, cross = block[side + side]["synapses"], block[side + ("R" if side == "L" else "L")]["synapses"]
-            return side if same >= cross else ("R" if side == "L" else "L")
+            other = "R" if side == "L" else "L"
+            same, cross = block[side + side]["synapses"], block[side + other]["synapses"]
+            if same == cross:
+                return None
+            return side if same > cross else other
         chain = []
         for t in self.types:
             side = "L"

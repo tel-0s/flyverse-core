@@ -119,6 +119,9 @@ and its two companions present -- the tree grep returns **40 hits across 13 file
 `scripts/box_status.py`, `scripts/compass_driver_analyse.py`, `scripts/probe_compass_driver.py`,
 `tests/test_cx_velocity_route.py` and the four remaining audits. A re-run that returns that count over
 that file list closes the check; a different count, or a file not on that list, is read before the flip.
+The count is engine-dependent: `\b` is not ERE, and on macOS `git grep -E` the dotted-quad branch matches nothing
+(15 hits in 10 files, every IP fixture missed). Run the tree grep as `git grep -nIP` (PCRE), which gives the 40 / 13
+above on macOS as well (2026-09-22, the second-machine pass), and the history grep with a grep that has `\b`.
 
 The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status.py` and
 `object_round3_export.py` is code, not an identifier, and stays.
@@ -139,6 +142,14 @@ The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status
       (`PYTHONIOENCODING=utf-8 CUDA_VISIBLE_DEVICES=-1`, `SDL_VIDEODRIVER=dummy`). The previously
       recorded figure is 364 passed / 7 skipped / 29 deselected at `28e862f`
       ([`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) section 8); the suite has grown since.
+      **2026-09-22, second-machine pass: that green was the desktop's, not GitHub's.** CI on `main` failed on
+      every push from 2026-09-17 to the 0.2.0 integration commit -- the same 3 tests of
+      `tests/test_cx_velocity_route.py` each time (`scripts/cx_velocity_route.py` calls `to_markdown()`, which
+      needs `tabulate`; it was undeclared and happened to be installed on the desktop, and the script's
+      `hasattr` guard can never fall back). Fixed on branch `opus/release-fixes` (`tabulate` in the `dev`
+      extra, the guard a `try`).
+- [ ] **Read the GitHub Actions run on the release commit itself**, not a local run: green, with the
+      pass count of the CPU subset above (+ the tests added since).
 - [x] **The raw bit-identity gate passes.** This pass:
       `CUDA_VISIBLE_DEVICES=-1 python -m pytest tests/test_bit_identity.py -q` ->
       **6 passed, 10 subtests passed**. That file pins the default path against a recorded golden and
@@ -154,9 +165,24 @@ The generic ssh / scp machinery in `cluster_run.py`, `fetch_run.py`, `box_status
       ([`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) section 2; commands in its section 7.1). The cache is
       git-ignored, so this is a check that a fresh rebuild from the manifest reproduces the published
       fingerprint, which is the only thing a reader can check.
+      **2026-09-22, second machine (Apple M5, macOS, CPU; numpy 2.5.3, pyarrow 25.0.1, pandas 3.0.5 and
+      3.0.6):** the content fingerprint reproduces exactly (N 167,106, nnz 25,578,600, `sum|W|`
+      121,460,584, compiled-CSR md5 `ef23cc27bea13be7f6a96f3c04fd3737`; sign-0 counts 916,626 entries /
+      2,701,289 synapses), and **none of the three file md5s does**: `W_post_pre.npz` `a4fe1cc1...`,
+      `sign0_counts.npz` `1bea3ae1...`, and `neurons.parquet` `5b607a63...` under pandas 3.0.5 but
+      `e6c9fc9a...` under 3.0.6 -- while two rebuilds in one environment are byte-identical. The file md5s are
+      a same-environment check (writer library versions end up in the bytes); what a reader can check is
+      the compiled-CSR md5, and this item should say so.
 - [ ] **A clean-clone run-through on CUDA is still owed** (`../TODO.md` A, packaging): `pip install -e .`
       from a fresh clone, `python scripts/fetch_data.py --malecns`, rebuild, `python scripts/room_demo.py`
       on CPU and on CUDA. `uv.lock` exists; the CI job installs CPU torch explicitly.
+      **The CPU / Apple-silicon half, 2026-09-22** (a clean clone of `959f2e9` plus the `opus/release-fixes`
+      patch, Python 3.12.13, torch 2.14.0, `pip install -e ".[dev]"`): ruff clean; the CPU subset with no
+      cache **521 passed, 34 skipped, 0 failed**; `fetch_data.py --verify` ok on the four MaleCNS files;
+      `python -m flyverse.connectome` 39 s, all three cache files; the fingerprint above; the subset again
+      with the cache **540 passed, 15 skipped, 0 failed**; `test_bit_identity.py` 6 passed;
+      `tests/test_metal.py` 11 passed on MPS; `room_demo.py --headless --seconds 3` renders on MPS with the
+      Metal kernels. The CUDA half is still owed.
 
 ---
 

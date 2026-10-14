@@ -904,5 +904,11 @@ if __name__ == "__main__":
     ap.add_argument("--cache-dir", type=Path)
     args = ap.parse_args()
     c = load(args.cache_dir, rebuild=True, dataset=args.dataset, edges=args.edges, nt_threshold=args.nt_threshold)
+    if args.dataset == "malecns" and args.edges == "threshold" and args.nt_threshold == 0.5:
+        # The shipped cache is three files (docs/REPRODUCIBILITY.md 2): the third holds the raw counts of the
+        # explicit-zero (sign-0) entries. The interp tools build it on first use, but the instruments' routing and
+        # the cx_* scripts read it with build=False, and a file left over from an older compile would outlive the
+        # W it was keyed to -- so the compile writes it too.
+        build_sign0_counts(c, args.cache_dir)
     print(c.neurons.head())
     print("N =", c.n, " nnz =", c.W.nnz)

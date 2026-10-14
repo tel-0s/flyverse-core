@@ -12,6 +12,7 @@ import io
 import json
 import os
 import re
+import shutil
 import socket
 import socketserver
 import sys
@@ -402,7 +403,7 @@ class RunTests(unittest.TestCase):
         self.assertEqual([n.rsplit("-", 1)[-1] for n in a.names()], ["2"])
         self.assertEqual([n.rsplit("-", 1)[-1] for n in b.names()], ["0", "1", "3"])
         spec = b.submitted[0]["spec"]
-        self.assertEqual(spec["command"], "source .venv/bin/activate && c0")
+        self.assertEqual(spec["command"], "source .venv/bin/activate && ( c0\n)")
         self.assertTrue(spec["working_dir"].startswith("/root/runs-b/x-"))
         self.assertEqual(spec["log_path"], f"{spec['working_dir']}/logs/{spec['name']}.log")
         self.assertEqual((spec["gpus"], spec["vram_gb"]), (1, 24))
@@ -740,7 +741,7 @@ class GpuPoolTests(unittest.TestCase):
         self.assertEqual([s["gpus"] for s in specs], [1] * 6)
         self.assertEqual([s["vram_gb"] for s in specs], [24] * 6)          # the configured per-GPU budget, untouched
         self.assertEqual([s["node"] for s in specs], ["<cluster-node-2>"] * 6)
-        self.assertEqual([s["command"] for s in specs], [f"source .venv/bin/activate && {c}" for c in cmds])
+        self.assertEqual([s["command"] for s in specs], [f"source .venv/bin/activate && ( {c}\n)" for c in cmds])
         self.assertIn("gpu pool [4, 5, 6, 7]", log)
         self.assertRegex(log, r"job job01 queued  @house  x-\w+-0 \[gpu 4\]: c0")
         self.assertRegex(log, r"job job05 queued  @house  x-\w+-4 \[gpu 4\]: c4")
@@ -795,7 +796,8 @@ class GpuPoolTests(unittest.TestCase):
 class ExitStatusTests(unittest.TestCase):
     """A job line that ends with `; tail ...` / `; cat ...` after a redirect exits with TAIL's status, not python's:
     a run that died mid-write still reports `completed exit 0`, and `'<n> job(s), 0 failed'` then proves nothing.
-    cluster_run warns (stderr and the console log) and submits the command unchanged."""
+    cluster_run warns (stderr and the console log) and submits the line unchanged, inside the `( ... )` subshell that
+    lets the scheduler's wrapper record the status the line exits with (JOB_SUBSHELL)."""
 
     def test_only_a_semicolon_tail_after_a_redirect_is_flagged(self):
         bad = "mkdir -p out/od && python scripts/interp_trace.py record > out/od/a.txt 2>&1; tail -4 out/od/a.txt"
@@ -835,7 +837,34 @@ class ExitStatusTests(unittest.TestCase):
         self.assertIn("WARNING command 0", log)                         # in the log the round tees
         self.assertIn("WARNING command 0", err.getvalue())              # and on stderr
         self.assertNotIn("WARNING command 1", log)
-        self.assertEqual(h.submitted[0]["spec"]["command"], f"source .venv/bin/activate && {bad}")
+        self.assertEqual(h.submitted[0]["spec"]["command"], f"source .venv/bin/activate && ( {bad}\n)")
+
+    @unittest.skipIf(shutil.which("bash") is None, "bash runs the scheduler's wrapper")
+    def test_the_scheduler_wrapper_records_the_status_the_line_exits_with(self):
+        """The scheduler inlines the command into a bash script and writes `$?` to `<log>.exitcode` on the next line
+        (heimdall's node_agent). The project's own exit-preserving job line ends `exit $st`: submitted bare, that exits
+        the WRAPPER, no exit-code file is written and the job reads `completed`, `exit None` -- every round-8 job.
+        Inside build_spec's subshell the wrapper records the line's status: 3 here, and 0 for a clean line."""
+        line = "python3 -c 'import sys; sys.exit(3)' > run.txt 2>&1; st=$?; tail -1 run.txt; exit $st  # a trailing comment"
+        t = cr.Target("house", dict(TARGET))
+        t.rdir = "/unused"
+        args = type("A", (), {"minutes": 1, "priority": 50, "tags": "x", "node": None})()
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, ".venv", "bin").mkdir(parents=True); Path(d, ".venv", "bin", "activate").write_text("")
+
+            def wrapper(command, name):                                 # the scheduler's wrapper, line for line
+                exit_file = Path(d, f"{name}.exitcode")
+                script = Path(d, f"{name}.sh")
+                script.write_text("\n".join(["#!/usr/bin/env bash", f"cd {d}", command, "_exit_code=$?",
+                                              f'echo "$_exit_code" > {exit_file}', "exit $_exit_code"]) + "\n")
+                import subprocess
+                rc = subprocess.run(["bash", str(script)], capture_output=True, text=True).returncode
+                return rc, (exit_file.read_text().strip() if exit_file.exists() else None)
+
+            self.assertEqual(wrapper(f"source .venv/bin/activate && {line}", "bare"), (3, None))   # the old spec: lost
+            self.assertEqual(wrapper(cr.build_spec(t, "j", line, args)["command"], "sub"), (3, "3"))
+            clean = "python3 -c 'pass' > ok.txt 2>&1; st=$?; tail -1 ok.txt; exit $st"
+            self.assertEqual(wrapper(cr.build_spec(t, "k", clean, args)["command"], "ok"), (0, "0"))
 
 
 if __name__ == "__main__":

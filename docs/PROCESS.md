@@ -217,6 +217,9 @@ Every element of that line is a rule:
 session 14 both hit the failure it cannot see: the scheduler listed a **crashed** job as `completed` with
 `exit_code None` (`determinism_gate.md` 2 and 4.4), and the plume v5 receipt records 18 completed with
 `exit_code null` for every job (`plume_transduced.md` 7.1). Neither round uses "0 failed" as evidence.
+The `exit None` has a mechanism (found 2026-09-22, `INTERP.md` 10.4 rule 4): the job line's own `exit $st` ended the
+scheduler's wrapper before it could record the status. `cluster_run.py` now runs every line in a subshell, so the
+scheduler's exit code is real from then on; it stays a receipt, and the steps below stay the evidence.
 
 Before any analysis:
 
